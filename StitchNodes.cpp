@@ -404,27 +404,35 @@ try {
 			double dLat = vecNodes[t][i].lat;
 			double dLon = vecNodes[t][i].lon;
 
-			kdres * set = kd_nearest3(vecKDTrees[t+1], dX, dY, dZ);
+			for (int g = 1; g <= nMaxGapSize+1; g++) {
+				if (t+g >= vecTimes.size()) {
+					break;
+				}
 
-			int iRes =
-				  reinterpret_cast<int*>(kd_res_item_data(set))
-				- reinterpret_cast<int*>(noptr);
+				kdres * set = kd_nearest3(vecKDTrees[t+g], dX, dY, dZ);
 
-			kd_res_free(set);
+				int iRes =
+					  reinterpret_cast<int*>(kd_res_item_data(set))
+					- reinterpret_cast<int*>(noptr);
 
-			// Great circle distance between points
-			double dLonC = vecNodes[t+1][iRes].lon;
-			double dLatC = vecNodes[t+1][iRes].lat;
+				kd_res_free(set);
 
-			double dR = 180.0 / M_PI * acos(sin(dLatC) * sin(dLat)
-					+ cos(dLatC) * cos(dLat) * cos(dLon - dLonC));
+				// Great circle distance between points
+				double dLonC = vecNodes[t+g][iRes].lon;
+				double dLatC = vecNodes[t+g][iRes].lat;
 
-			// Verify great circle distance satisfies range requirement
-			if (dR <= dRange) {
+				double dR = 180.0 / M_PI * acos(sin(dLatC) * sin(dLat)
+						+ cos(dLatC) * cos(dLat) * cos(dLon - dLonC));
 
-				// Insert new path segment into set of path segments
-				vecPathSegmentsSet[t].insert(
-					PathSegment(t, i, t+1, iRes));
+				// Verify great circle distance satisfies range requirement
+				if (dR <= dRange) {
+
+					// Insert new path segment into set of path segments
+					vecPathSegmentsSet[t].insert(
+						PathSegment(t, i, t+g, iRes));
+
+					break;
+				}
 			}
 		}
 	}
@@ -505,7 +513,11 @@ try {
 			int iStartTime = vecPaths[i].m_iTimes[0];
 
 			fprintf(fp, "start\t");
+			fprintf(fp, "%li\t", vecPaths[i].m_iTimes.size());
 			for (int j = 0; j < vecTimes[iStartTime].size(); j++) {
+				if (j == 3) {
+					continue;
+				}
 				fprintf(fp, "%s\t", vecTimes[iStartTime][j].c_str());
 			}
 			fprintf(fp, "\n");
@@ -520,6 +532,9 @@ try {
 						vecCandidates[iTime][iCandidate][j].c_str());
 				}
 				for (int j = 0; j < vecTimes[iTime].size(); j++) {
+					if (j == 3) {
+						continue;
+					}
 					fprintf(fp, "%s\t", vecTimes[iTime][j].c_str());
 				}
 				fprintf(fp, "\n");
