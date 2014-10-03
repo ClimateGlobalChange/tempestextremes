@@ -86,6 +86,10 @@ void ParseInput(
 	// Open file for reading
 	FILE * fp = fopen(strInputFile.c_str(), "r");
 
+	if (fp == NULL) {
+		_EXCEPTION1("Unable to open input file \"%s\"", strInputFile.c_str());
+	}
+
 	// Buffer storage
 	std::string strLine;
 	char szBuffer[1024];
@@ -283,6 +287,11 @@ try {
 	EndCommandLine(argv)
 
 	AnnounceBanner();
+
+	// Check input
+	if (strInputFile.size() == 0) {
+		_EXCEPTIONT("No input file specified");
+	}
 
 	// Parse format string
 	std::vector< std::string > vecFormatStrings;

@@ -4,3 +4,11 @@ cam5_1_1degree_CLIVAR_climo.cam2.h2.0001-01-01-00000.nc-raw_cyclone.txt
 nodes.txt
 
 traj.txt
+
+build/*
+
+depend/*
+
+*.swp
+
+StitchNodes
