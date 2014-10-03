@@ -53,7 +53,8 @@ void ParseVariableList(
 			(strVariables[iVarCurrent] == ',') ||
 			(strVariables[iVarCurrent] == ' ') ||
 			(strVariables[iVarCurrent] == '\t') ||
-			(strVariables[iVarCurrent] == '\n')
+			(strVariables[iVarCurrent] == '\n') ||
+			(strVariables[iVarCurrent] == '\r')
 		) {
 			if (iVarCurrent == iVarBegin) {
 				if (iVarCurrent >= strVariables.length()) {
@@ -279,7 +280,7 @@ try {
 		CommandLineString(strInputFile, "in", "");
 		CommandLineString(strOutputFile, "out", "");
 		CommandLineString(strFormat, "format", "no,i,j,lon,lat");
-		CommandLineDouble(dRange, "range", 5.0);
+		CommandLineDoubleD(dRange, "range", 5.0, "(degrees)");
 		CommandLineInt(nMinPathLength, "minlength", 3);
 		CommandLineInt(nMaxGapSize, "maxgap", 0);
 
@@ -467,14 +468,15 @@ try {
 
 				int txnext = iterSeg->m_iTime[1];
 
-				vecPathSegmentsSet[tx].erase(iterSeg);
-
-				if (tx == vecTimes.size()-1) {
+				if (txnext >= vecTimes.size()-1) {
+					vecPathSegmentsSet[tx].erase(iterSeg);
 					break;
 				}
 
 				PathSegment segFind(
 					iterSeg->m_iTime[1], iterSeg->m_iCandidate[1], 0, 0);
+
+				vecPathSegmentsSet[tx].erase(iterSeg);
 
 				iterSeg = vecPathSegmentsSet[txnext].find(segFind);
 
