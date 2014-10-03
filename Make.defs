@@ -1,0 +1,46 @@
+##
+## Compilation directories
+##
+DEPDIR=depend
+BUILDDIR=build
+
+##
+## Dependency file construction
+##
+DEPDIR=depend
+MAKEDEPEND=mkdir -p $(DEPDIR); \
+	echo "-- Generating dependencies for $<"; \
+	touch $(DEPDIR)/$*.P && makedepend -- $(CFLAGS) -- -f $(DEPDIR)/$*.P $< > /dev/null 2>&1; \
+	sed 's/\($*\)\.o[ :]*/$(BUILDDIR)\/\1.o $(DEPDIR)\/$*.d : /g' < $(DEPDIR)/$*.P > $(DEPDIR)/$*.d; \
+	  rm -f $(DEPDIR)/$*.P
+	#$(CC) -M $(CFLAGS) $< > $(DEPDIR)/$*.P; \
+
+##
+## Compilation rules
+##
+$(BUILDDIR)/%.o : %.cpp
+	@mkdir -p $(BUILDDIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILDDIR)/%.o : %.c
+	@mkdir -p $(BUILDDIR)
+	$(CCOMP) $(CFLAGS) -c -o $@ $<
+
+$(BUILDDIR)/%.o : %.f90
+	@mkdir -p $(BUILDDIR)
+	$(F90) $(FORTFLAGS) -c -o $@ $<
+
+$(BUILDDIR)/%.o : %.f
+	@mkdir -p $(BUILDDIR)
+	$(F90) $(FORTFLAGS) -c -o $@ $<
+
+##
+## Dependency generation
+##
+$(DEPDIR)/%.d : %.cpp
+	@$(MAKEDEPEND)
+$(DEPDIR)/%.d : %.f90
+	@$(MAKEDEPEND)
+$(DEPDIR)/%.d : %.f
+	@$(MAKEDEPEND)
+
