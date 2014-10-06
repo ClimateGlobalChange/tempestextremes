@@ -159,7 +159,11 @@ void ParseInput(
 			vecCandidates.resize(iTime + 1);
 			vecCandidates[iTime].resize(nCandidates);
 
-			eReadState = ReadState_Candidate;
+			if (nCandidates != 0) {
+				eReadState = ReadState_Candidate;
+			} else {
+				iTime++;	
+			}
 
 		// Parse candidate information
 		} else if (eReadState == ReadState_Candidate) {
@@ -397,6 +401,10 @@ try {
 
 		// Loop through all points at the current time level
 		for (int i = 0; i < vecCandidates[t].size(); i++) {
+
+			if (vecCandidates[t+1].size() == 0) {
+				break;
+			}
 
 			double dX = vecNodes[t][i].x;
 			double dY = vecNodes[t][i].y;

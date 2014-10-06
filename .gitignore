@@ -12,3 +12,7 @@ depend/*
 *.swp
 
 StitchNodes
+
+cyclones_out
+
+cyclones_traj.txt
