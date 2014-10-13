@@ -279,6 +279,9 @@ try {
 	// Maximum time gap (in time steps)
 	int nMaxGapSize;
 
+	// Output format
+	std::string strOutputFormat;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -287,6 +290,7 @@ try {
 		CommandLineDoubleD(dRange, "range", 5.0, "(degrees)");
 		CommandLineInt(nMinPathLength, "minlength", 3);
 		CommandLineInt(nMaxGapSize, "maxgap", 0);
+		CommandLineStringD(strOutputFormat, "out_format", "std", "(std|visit)");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -296,6 +300,13 @@ try {
 	// Check input
 	if (strInputFile.size() == 0) {
 		_EXCEPTIONT("No input file specified");
+	}
+
+	// Output format
+	if ((strOutputFormat != "std") &&
+		(strOutputFormat != "visit")
+	) {
+		_EXCEPTIONT("Output format must be either \"std\" or \"visit\"");
 	}
 
 	// Parse format string
@@ -512,7 +523,7 @@ try {
 
 	// Write results out
 	AnnounceStartBlock("Writing results");
-	{
+	if (strOutputFormat == "std") {
 		FILE * fp = fopen(strOutputFile.c_str(), "w");
 		if (fp == NULL) {
 			_EXCEPTION1("Failed to open output file \"%s\"",
@@ -551,7 +562,44 @@ try {
 			}
 		}
 		fclose(fp);
+
+	} else if (strOutputFormat == "visit") {
+		FILE * fp = fopen(strOutputFile.c_str(), "w");
+		if (fp == NULL) {
+			_EXCEPTION1("Failed to open output file \"%s\"",
+				strOutputFile.c_str());
+		}
+
+		// Write output format
+		fprintf(fp, "id,time_id,year,month,day,hour,");
+		fprintf(fp, "%s", strFormat.c_str());
+		fprintf(fp, "\n");
+
+		for (int i = 0; i < vecPaths.size(); i++) {
+			for (int t = 0; t < vecPaths[i].m_iTimes.size(); t++) {
+				int iTime = vecPaths[i].m_iTimes[t];
+				int iCandidate = vecPaths[i].m_iCandidates[t];
+
+				fprintf(fp, "%i,\t%i,\t%s,\t%s,\t%s,\t%s,\t",
+					i+1, t+1,
+					vecTimes[iTime][2].c_str(),
+					vecTimes[iTime][1].c_str(),
+					vecTimes[iTime][0].c_str(),
+					vecTimes[iTime][4].c_str());
+
+				fprintf(fp, "\t");
+				for (int j = 0; j < vecCandidates[iTime][iCandidate].size(); j++) {
+					fprintf(fp, "%s",
+						vecCandidates[iTime][iCandidate][j].c_str());
+					if (j != vecCandidates[iTime][iCandidate].size()-1) {
+						fprintf(fp, ",\t");
+					}
+				}
+				fprintf(fp, "\n");
+			}
+		}
 	}
+
 	AnnounceEndBlock("Done");
 
 	// Cleanup
