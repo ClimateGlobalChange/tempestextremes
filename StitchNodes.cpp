@@ -95,6 +95,9 @@ void ParseInput(
 	std::string strLine;
 	char szBuffer[1024];
 
+	// Insufficient candidate information warning
+	bool fWarnInsufficientCandidateInfo = false;
+
 	// Current read state
 	enum ReadState {
 		ReadState_Time,
@@ -169,6 +172,10 @@ void ParseInput(
 		} else if (eReadState == ReadState_Candidate) {
 			ParseVariableList(strLine, vecCandidates[iTime][iCandidate]);
 
+			if (vecCandidates[iTime][iCandidate].size() != nFormatEntries) {
+				fWarnInsufficientCandidateInfo = true;
+			}
+
 			iCandidate++;
 			if (iCandidate == nCandidates) {
 				eReadState = ReadState_Time;
@@ -179,6 +186,12 @@ void ParseInput(
 	}
 
 	fclose(fp);	
+
+	// Insufficient candidate information
+	if (fWarnInsufficientCandidateInfo) {
+		Announce("WARNING: One or more candidates do not have match"
+				" --format entries");
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -372,6 +385,11 @@ try {
 	for (int t = 0; t < vecTimes.size(); t++) {
 
 		// Create a new kdtree
+		if (vecCandidates[t].size() == 0) {
+			vecKDTrees[t] = NULL;
+			continue;
+		}
+
 		vecKDTrees[t] = kd_create(3);
 
 		vecNodes[t].resize(vecCandidates[t].size());
@@ -429,7 +447,16 @@ try {
 					break;
 				}
 
+				if (vecKDTrees[t+g] == NULL) {
+					continue;
+				}
+
 				kdres * set = kd_nearest3(vecKDTrees[t+g], dX, dY, dZ);
+
+				if (kd_res_size(set) == 0) {
+					kd_res_free(set);
+					break;
+				}
 
 				int iRes =
 					  reinterpret_cast<int*>(kd_res_item_data(set))
