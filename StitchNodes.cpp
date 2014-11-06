@@ -506,7 +506,7 @@ try {
 				tx = txnext;
 			}
 
-			if (path.m_iTimes.size() > nMinPathLength) {
+			if (path.m_iTimes.size() >= nMinPathLength) {
 /*
 				printf("Start Time: %i\n", path.m_iTimes[0]);
 				for (int i = 0; i < path.m_iTimes.size(); i++) {
