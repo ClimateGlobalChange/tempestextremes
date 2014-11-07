@@ -207,6 +207,12 @@ struct Node {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+typedef std::vector< std::vector<std::string> > TimesVector;
+
+typedef std::vector< std::vector< std::vector<std::string> > > CandidateVector;
+
+///////////////////////////////////////////////////////////////////////////////
+
 class PathSegment {
 
 public:
@@ -270,6 +276,249 @@ typedef std::vector<Path> PathVector;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class PathThresholdOp {
+
+public:
+	///	<summary>
+	///		Possible operations.
+	///	</summary>
+	enum Operation {
+		GreaterThan,
+		LessThan,
+		GreaterThanEqualTo,
+		LessThanEqualTo,
+		EqualTo,
+		NotEqualTo
+	};
+
+public:
+	///	<summary>
+	///		Parse a threshold operator string.
+	///	</summary>
+	void Parse(
+		const std::string & strOp,
+		const std::vector< std::string > & vecFormatStrings
+	) {
+		// Read mode
+		enum {
+			ReadMode_Column,
+			ReadMode_Op,
+			ReadMode_Value,
+			ReadMode_MinCount,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Column;
+
+		// Loop through string
+		int iLast = 0;
+		for (int i = 0; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in column name
+				if (eReadMode == ReadMode_Column) {
+
+					int j = 0;
+					for (; j < vecFormatStrings.size(); j++) {
+						if (strSubStr == vecFormatStrings[j]) {
+							m_iColumn = j;
+							break;
+						}
+					}
+					if (j == vecFormatStrings.size()) {
+						_EXCEPTION1("Threshold column name \"%s\" "
+							"not found in --format", strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Op;
+
+				// Read in operation
+				} else if (eReadMode == ReadMode_Op) {
+					if (strSubStr == ">") {
+						m_eOp = GreaterThan;
+					} else if (strSubStr == "<") {
+						m_eOp = LessThan;
+					} else if (strSubStr == ">=") {
+						m_eOp = GreaterThanEqualTo;
+					} else if (strSubStr == "<=") {
+						m_eOp = LessThanEqualTo;
+					} else if (strSubStr == "=") {
+						m_eOp = EqualTo;
+					} else if (strSubStr == "!=") {
+						m_eOp = NotEqualTo;
+					} else {
+						_EXCEPTION1("Threshold invalid operation \"%s\"",
+							strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Value;
+
+				// Read in value
+				} else if (eReadMode == ReadMode_Value) {
+					m_dValue = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_MinCount;
+
+				// Read in minimum count
+				} else if (eReadMode == ReadMode_MinCount) {
+					if (strSubStr == "all") {
+						m_nMinimumCount = (-1);
+					} else {
+						m_nMinimumCount = atoi(strSubStr.c_str());
+					}
+
+					if (m_nMinimumCount < -1) {
+						_EXCEPTION1("Invalid minimum count \"%i\"",
+							m_nMinimumCount);
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("Too many entries in threshold string \"%s\"",
+						strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("Insufficient entries in threshold string \"%s\"",
+					strOp.c_str());
+		}
+
+		// Output announcement
+		std::string strDescription;
+		strDescription += vecFormatStrings[m_iColumn];
+		if (m_eOp == GreaterThan) {
+			strDescription += " greater than ";
+		} else if (m_eOp == LessThan) {
+			strDescription += " less than ";
+		} else if (m_eOp == GreaterThanEqualTo) {
+			strDescription += " greater than or equal to ";
+		} else if (m_eOp == LessThanEqualTo) {
+			strDescription += " less than or equal to ";
+		} else if (m_eOp == EqualTo) {
+			strDescription += " equal to ";
+		} else if (m_eOp == NotEqualTo) {
+			strDescription += " not equal to ";
+		}
+
+		char szValue[128];
+		sprintf(szValue, "%f", m_dValue);
+		strDescription += szValue;
+
+		char szMinCount[160];
+		if (m_nMinimumCount == -1) {
+			strDescription += " at all times";
+		} else {
+			sprintf(szMinCount, " at least %i time(s)", m_nMinimumCount);
+			strDescription += szMinCount;
+		}
+
+		Announce("%s", strDescription.c_str());
+	}
+
+	///	<summary>
+	///		Verify that the specified path satisfies the threshold op.
+	///	</summary>
+	bool Apply(
+		const Path & path,
+		const CandidateVector & vecCandidates
+	) {
+		int nCount = 0;
+		for (int s = 0; s < path.m_iTimes.size(); s++) {
+			int t = path.m_iTimes[s];
+			int i = path.m_iCandidates[s];
+
+			double dCandidateValue =
+				atof(vecCandidates[t][i][m_iColumn].c_str());
+
+			if ((m_eOp == GreaterThan) &&
+				(dCandidateValue > m_dValue)
+			) {
+				nCount++;
+
+			} else if (
+				(m_eOp == LessThan) &&
+				(dCandidateValue < m_dValue)
+			) {
+				nCount++;
+
+			} else if (
+				(m_eOp == GreaterThanEqualTo) &&
+				(dCandidateValue >= m_dValue)
+			) {
+				nCount++;
+			
+			} else if (
+				(m_eOp == LessThanEqualTo) &&
+				(dCandidateValue <= m_dValue)
+			) {
+				nCount++;
+
+			} else if (
+				(m_eOp == EqualTo) &&
+				(dCandidateValue == m_dValue)
+			) {
+				nCount++;
+
+			} else if (
+				(m_eOp == NotEqualTo) &&
+				(dCandidateValue != m_dValue)
+			) {
+				nCount++;
+			}
+		}
+
+		// Check that the criteria is satisfied for all segments
+		if (m_nMinimumCount == (-1)) {
+			if (nCount == (int)(path.m_iTimes.size())) {
+				return true;
+			} else {
+				return false;
+			}
+		}
+
+		// Check total count against min count
+		if (nCount >= m_nMinimumCount) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+protected:
+	///	<summary>
+	///		Active column.
+	///	</summary>
+	int m_iColumn;
+
+	///	<summary>
+	///		Operation.
+	///	</summary>
+	Operation m_eOp;
+
+	///	<summary>
+	///		Threshold value.
+	///	</summary>
+	double m_dValue;
+
+	///	<summary>
+	///		Minimum number of segments that need to satisfy the op.
+	///	</summary>
+	int m_nMinimumCount;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 try {
@@ -295,6 +544,9 @@ try {
 	// Output format
 	std::string strOutputFormat;
 
+	// Thresholds
+	std::string strThreshold;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -303,6 +555,7 @@ try {
 		CommandLineDoubleD(dRange, "range", 5.0, "(degrees)");
 		CommandLineInt(nMinPathLength, "minlength", 3);
 		CommandLineInt(nMaxGapSize, "maxgap", 0);
+		CommandLineStringD(strThreshold, "threshold", "", "[col,op,value,count;...]");
 		CommandLineStringD(strOutputFormat, "out_format", "std", "(std|visit)");
 
 		ParseCommandLine(argc, argv);
@@ -350,9 +603,32 @@ try {
 		_EXCEPTIONT("Longitude \"lon\" must be specified in format");
 	}
 
+	// Parse the threshold string
+	std::vector<PathThresholdOp> vecThresholdOp;
+
+	if (strThreshold != "") {
+		AnnounceStartBlock("Parsing thresholds");
+
+		int iLast = 0;
+		for (int i = 0; i <= strThreshold.length(); i++) {
+
+			if ((i == strThreshold.length()) || (strThreshold[i] == ';')) {
+				std::string strSubStr = strThreshold.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecThresholdOp.size());
+				vecThresholdOp.resize(iNextOp + 1);
+				vecThresholdOp[iNextOp].Parse(strSubStr, vecFormatStrings);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
 	// Parse the input
-	std::vector< std::vector<std::string> > vecTimes;
-	std::vector< std::vector< std::vector<std::string> > > vecCandidates;
+	TimesVector vecTimes;
+	CandidateVector vecCandidates;
 
 	{
 		AnnounceStartBlock("Loading candidate data");
@@ -491,6 +767,9 @@ try {
 
 	std::vector< Path > vecPaths;
 
+	int nRejectedMinLengthPaths = 0;
+	int nRejectedThresholdPaths = 0;
+
 	// Loop through all times
 	for (int t = 0; t < vecTimes.size()-1; t++) {
 
@@ -533,18 +812,36 @@ try {
 				tx = txnext;
 			}
 
-			if (path.m_iTimes.size() >= nMinPathLength) {
-/*
-				printf("Start Time: %i\n", path.m_iTimes[0]);
-				for (int i = 0; i < path.m_iTimes.size(); i++) {
-					printf("%i, ", path.m_iCandidates[i]);
-				}
-*/
-				vecPaths.push_back(path);
+			// Reject path due to minimum length
+			if (path.m_iTimes.size() < nMinPathLength) {
+				nRejectedMinLengthPaths++;
+				continue;
 			}
+
+			// Reject path due to threshold
+			bool fOpResult = true;
+			for (int x = 0; x < vecThresholdOp.size(); x++) {
+				fOpResult =
+					vecThresholdOp[x].Apply(
+						path,
+						vecCandidates);
+
+				if (!fOpResult) {
+					break;
+				}
+			}
+			if (!fOpResult) {
+				nRejectedThresholdPaths++;
+				continue;
+			}
+
+			// Add path to array of paths
+			vecPaths.push_back(path);
 		}
 	}
 
+	Announce("Paths rejected (minlength): %i", nRejectedMinLengthPaths);
+	Announce("Paths rejected (threshold): %i", nRejectedThresholdPaths);
 	Announce("Total paths found: %i", vecPaths.size());
 	AnnounceEndBlock("Done");
 
