@@ -82,7 +82,8 @@ void ParseInput(
 	const std::string & strInputFile,
 	const std::vector< std::string > & vecFormatStrings,
 	std::vector< std::vector<std::string> > & vecTimes,
-	std::vector< std::vector< std::vector<std::string> > > & vecCandidates
+	std::vector< std::vector< std::vector<std::string> > > & vecCandidates,
+	int nTimeStride = 1
 ) {
 	// Open file for reading
 	FILE * fp = fopen(strInputFile.c_str(), "r");
@@ -107,6 +108,7 @@ void ParseInput(
 	// Number of entries per candidate
 	int nFormatEntries = vecFormatStrings.size();
 
+	int iAllTime = 0;
 	int iTime = 0;
 
 	int iCandidate = 0;
@@ -148,28 +150,56 @@ void ParseInput(
 
 		// Parse the time
 		if (eReadState == ReadState_Time) {
+
+			// Parse the time data
 			vecTimes.resize(iTime + 1);
 
 			ParseVariableList(strLine, vecTimes[iTime]);
 
 			if (vecTimes[iTime].size() != 5) {
-				_EXCEPTION1("Malformed time string:\n%s", szBuffer);
+				_EXCEPTION1("Malformed time string:\n%s", strLine.c_str());
 			}
 
 			iCandidate = 0;
 			nCandidates = atoi(vecTimes[iTime][3].c_str());
 
+			// Verify that this time is on stride
+			if (iAllTime % nTimeStride != 0) {
+				if (nCandidates != 0) {
+					eReadState = ReadState_Candidate;
+				} else {
+					iAllTime++;
+				}
+				vecTimes.resize(iTime);
+				continue;
+			}
+
+			// Prepare to parse candidate data
 			vecCandidates.resize(iTime + 1);
 			vecCandidates[iTime].resize(nCandidates);
 
 			if (nCandidates != 0) {
 				eReadState = ReadState_Candidate;
 			} else {
-				iTime++;	
+				iTime++;
+				iAllTime++;
 			}
 
 		// Parse candidate information
 		} else if (eReadState == ReadState_Candidate) {
+
+			// Ignore candidates that are not on stride
+			if (iAllTime % nTimeStride != 0) {
+				iCandidate++;
+				if (iCandidate == nCandidates) {
+					eReadState = ReadState_Time;
+					iAllTime++;
+					iCandidate = 0;
+				}
+				continue;
+			}
+
+			// Parse candidates
 			ParseVariableList(strLine, vecCandidates[iTime][iCandidate]);
 
 			if (vecCandidates[iTime][iCandidate].size() != nFormatEntries) {
@@ -180,6 +210,7 @@ void ParseInput(
 			if (iCandidate == nCandidates) {
 				eReadState = ReadState_Time;
 				iTime++;
+				iAllTime++;
 				iCandidate = 0;
 			}
 		}
@@ -541,6 +572,9 @@ try {
 	// Maximum time gap (in time steps)
 	int nMaxGapSize;
 
+	// Time step stride
+	int nTimeStride;
+
 	// Output format
 	std::string strOutputFormat;
 
@@ -555,7 +589,9 @@ try {
 		CommandLineDoubleD(dRange, "range", 5.0, "(degrees)");
 		CommandLineInt(nMinPathLength, "minlength", 3);
 		CommandLineInt(nMaxGapSize, "maxgap", 0);
-		CommandLineStringD(strThreshold, "threshold", "", "[col,op,value,count;...]");
+		CommandLineStringD(strThreshold, "threshold", "",
+			"[col,op,value,count;...]");
+		CommandLineInt(nTimeStride, "timestride", 1);
 		CommandLineStringD(strOutputFormat, "out_format", "std", "(std|visit)");
 
 		ParseCommandLine(argc, argv);
@@ -637,7 +673,8 @@ try {
 			strInputFile,
 			vecFormatStrings,
 			vecTimes,
-			vecCandidates);
+			vecCandidates,
+			nTimeStride);
 
 		Announce("Discrete times: %i", vecTimes.size());
 
