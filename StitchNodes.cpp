@@ -569,6 +569,12 @@ try {
 	// Minimum path length
 	int nMinPathLength;
 
+	// Minimum distance between endpoints of path
+	double dMinEndpointDistance;
+
+	// Minimum path length
+	double dMinPathDistance;
+
 	// Maximum time gap (in time steps)
 	int nMaxGapSize;
 
@@ -588,6 +594,8 @@ try {
 		CommandLineString(strFormat, "format", "no,i,j,lon,lat");
 		CommandLineDoubleD(dRange, "range", 5.0, "(degrees)");
 		CommandLineInt(nMinPathLength, "minlength", 3);
+		CommandLineDoubleD(dMinEndpointDistance, "min_endpoint_dist", 0.0, "(degrees)");
+		CommandLineDoubleD(dMinPathDistance, "min_path_dist", 0.0, "(degrees)");
 		CommandLineInt(nMaxGapSize, "maxgap", 0);
 		CommandLineStringD(strThreshold, "threshold", "",
 			"[col,op,value,count;...]");
@@ -805,6 +813,8 @@ try {
 	std::vector< Path > vecPaths;
 
 	int nRejectedMinLengthPaths = 0;
+	int nRejectedMinEndpointDistPaths = 0;
+	int nRejectedMinPathDistPaths = 0;
 	int nRejectedThresholdPaths = 0;
 
 	// Loop through all times
@@ -855,6 +865,59 @@ try {
 				continue;
 			}
 
+			// Reject path due to minimum endpoint distance
+			if (dMinEndpointDistance > 0.0) {
+				int nT = path.m_iTimes.size();
+
+				int iTime0 = path.m_iTimes[0];
+				int iRes0  = path.m_iCandidates[0];
+
+				int iTime1 = path.m_iTimes[nT-1];
+				int iRes1  = path.m_iCandidates[nT-1];
+
+				double dLon0 = vecNodes[iTime0][iRes0].lon;
+				double dLat0 = vecNodes[iTime0][iRes0].lat;
+
+				double dLon1 = vecNodes[iTime1][iRes1].lon;
+				double dLat1 = vecNodes[iTime1][iRes1].lat;
+
+				double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLat1)
+						+ cos(dLat0) * cos(dLat1) * cos(dLon0 - dLon1));
+
+				if (dR < dMinEndpointDistance) {
+					nRejectedMinEndpointDistPaths++;
+					continue;
+				}
+			}
+
+			// Reject path due to minimum total path distance
+			if (dMinPathDistance > 0.0) {
+				double dTotalPathDistance = 0.0;
+				for (int i = 0; i < path.m_iTimes.size() - 1; i++) {
+					int iTime0 = path.m_iTimes[i];
+					int iRes0 = path.m_iCandidates[i];
+
+					int iTime1 = path.m_iTimes[i+1];
+					int iRes1 = path.m_iCandidates[i+1];
+
+					double dLon0 = vecNodes[iTime0][iRes0].lon;
+					double dLat0 = vecNodes[iTime0][iRes0].lat;
+
+					double dLon1 = vecNodes[iTime1][iRes1].lon;
+					double dLat1 = vecNodes[iTime1][iRes1].lat;
+
+					double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLat1)
+						+ cos(dLat0) * cos(dLat1) * cos(dLon0 - dLon1));
+
+					dTotalPathDistance += dR;
+				}
+
+				if (dTotalPathDistance < dMinPathDistance) {
+					nRejectedMinPathDistPaths++;
+					continue;
+				}
+			}
+
 			// Reject path due to threshold
 			bool fOpResult = true;
 			for (int x = 0; x < vecThresholdOp.size(); x++) {
@@ -878,6 +941,8 @@ try {
 	}
 
 	Announce("Paths rejected (minlength): %i", nRejectedMinLengthPaths);
+	Announce("Paths rejected (minendpointdist): %i", nRejectedMinEndpointDistPaths);
+	Announce("Paths rejected (minpathdist): %i", nRejectedMinPathDistPaths);
 	Announce("Paths rejected (threshold): %i", nRejectedThresholdPaths);
 	Announce("Total paths found: %i", vecPaths.size());
 	AnnounceEndBlock("Done");
