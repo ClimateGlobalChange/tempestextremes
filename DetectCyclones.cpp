@@ -31,6 +31,7 @@
 #include <iostream>
 #include <string>
 #include <set>
+#include <queue>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -38,12 +39,13 @@
 ///		Find the locations of all minima in the given DataMatrix.
 ///	</summary>
 void FindAllLocalMinima(
-	const DataMatrix<float> data,
+	const DataMatrix<float> & data,
 	std::set< std::pair<int, int> > & setMinima
 ) {
 	int nLon = data.GetColumns();
 	int nLat = data.GetRows();
 
+	// Check interior nodes
 	for (int j = 1; j < nLat-1; j++) {
 	for (int i = 0; i < nLon; i++) {
 
@@ -66,6 +68,37 @@ DonePressureMinima:
 		}
 	}
 	}
+/*
+	// Check south pole (one node at south pole)
+	{
+		bool fMinimum = true;
+		for (int i = 0; i < nLon; i++) {
+			if (data[1][i] < data[0][i]) {
+				fMinimum = false;
+				break;
+			}
+		}
+		if (fMinimum) {
+			_EXCEPTION();
+			setMinima.insert(std::pair<int,int>(0,0));
+		}
+	}
+
+	// Check north pole (one node at north pole)
+	{
+		bool fMinimum = true;
+		for (int i = 0; i < nLon; i++) {
+			if (data[nLat-2][i] < data[nLat-1][i]) {
+				fMinimum = false;
+				break;
+			}
+		}
+		if (fMinimum) {
+			_EXCEPTION();
+			setMinima.insert(std::pair<int,int>(nLat-1,0));
+		}
+	}
+*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -74,7 +107,7 @@ DonePressureMinima:
 ///		Find the locations of all maxima in the given DataMatrix.
 ///	</summary>
 void FindAllLocalMaxima(
-	const DataMatrix<float> data,
+	const DataMatrix<float> & data,
 	std::set< std::pair<int, int> > & setMaxima
 ) {
 	int nLon = data.GetColumns();
@@ -102,11 +135,163 @@ DonePressureMaxima:
 		}
 	}
 	}
+/*
+	// Check south pole (one node at south pole)
+	{
+		bool fMaximum = true;
+		for (int i = 0; i < nLon; i++) {
+			if (data[1][i] > data[0][i]) {
+				fMaximum = false;
+				break;
+			}
+		}
+		if (fMaximum) {
+			_EXCEPTION();
+			setMaxima.insert(std::pair<int,int>(0,0));
+		}
+	}
+
+	// Check north pole (one node at north pole)
+	{
+		bool fMaximum = true;
+		for (int i = 0; i < nLon; i++) {
+			if (data[nLat-2][i] > data[nLat-1][i]) {
+				fMaximum = false;
+				break;
+			}
+		}
+		if (fMaximum) {
+			_EXCEPTION();
+			setMaxima.insert(std::pair<int,int>(nLat-1,0));
+		}
+	}
+*/
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Find the maximum value of a field near the given point.
+///	</summary>
+///	<param name="dMaxDist">
+///		Maximum distance from the initial point in degrees.
+///	</param>
+void FindLocalMaximum(
+	const DataMatrix<float> & data,
+	const DataVector<double> & dataLon,
+	const DataVector<double> & dataLat,
+	int iLat,
+	int iLon,
+	double dMaxDist,
+	std::pair<int, int> & prMaximum,
+	float & dMaxValue,
+	float & dRMax
+) {
+	// Verify that dMaxDist is less than 180.0
+	if (dMaxDist > 180.0) {
+		_EXCEPTIONT("MaxDist must be less than 180.0");
+	}
+
+	// Number of latitudes and longitudes
+	const int nLat = dataLat.GetRows();
+	const int nLon = dataLon.GetRows();
+
+	// Initialize the maximum to the central location
+	prMaximum = std::pair<int, int>(iLat, iLon);
+	dMaxValue = data[iLat][iLon];
+	dRMax = 0.0;
+
+	// Queue of nodes that remain to be visited
+	std::queue< std::pair<int, int> > queueNodes;
+	queueNodes.push(prMaximum);
+
+	// Set of nodes that have already been visited
+	std::set< std::pair<int, int> > setNodesVisited;
+
+	// Latitude and longitude at the origin
+	double dLat0 = dataLat[iLat];
+	double dLon0 = dataLon[iLon];
+
+	// Loop through all latlon elements
+	while (queueNodes.size() != 0) {
+		std::pair<int, int> pr = queueNodes.front();
+		queueNodes.pop();
+
+		if (setNodesVisited.find(pr) != setNodesVisited.end()) {
+			continue;
+		}
+
+		setNodesVisited.insert(pr);
+
+		double dLatThis = dataLat[pr.first];
+		double dLonThis = dataLon[pr.second];
+
+		// Great circle distance to this element
+		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
+				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0));
+
+		if (dR > dMaxDist) {
+			continue;
+		}
+
+		// Check for new local maximum
+		if (data[pr.first][pr.second] > dMaxValue) {
+			prMaximum = pr;
+			dMaxValue = data[pr.first][pr.second];
+			dRMax = dR;
+		}
+
+		// Add all neighbors of this point
+		std::pair<int,int> prWest(pr.first, (pr.second + nLon - 1) % nLon);
+		if (setNodesVisited.find(prWest) == setNodesVisited.end()) {
+			queueNodes.push(prWest);
+		}
+
+		std::pair<int,int> prEast(pr.first, (pr.second + 1) % nLon);
+		if (setNodesVisited.find(prEast) == setNodesVisited.end()) {
+			queueNodes.push(prEast);
+		}
+
+		std::pair<int,int> prNorth(pr.first + 1, pr.second);
+		if ((prNorth.first < nLat) &&
+			(setNodesVisited.find(prNorth) == setNodesVisited.end())
+		) {
+			queueNodes.push(prNorth);
+		}
+
+		std::pair<int,int> prSouth(pr.first - 1, pr.second);
+		if ((prSouth.first >= 0) &&
+			(setNodesVisited.find(prSouth) == setNodesVisited.end())
+		) {
+			queueNodes.push(prSouth);
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Parse a pair of Date values.
+///	</summary>
+void ParseDate(
+	int nDate,
+	int nDateSec,
+	int & nDateYear,
+	int & nDateMonth,
+	int & nDateDay,
+	int & nDateHour
+) {
+	nDateYear  = nDate / 10000;
+	nDateMonth = (nDate % 10000) / 100;
+	nDateDay   = (nDate % 100);
+	nDateHour  = nDateSec / 3600;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char** argv) {
+
+	NcError error(NcError::verbose_nonfatal);
 
 try {
 
@@ -131,6 +316,9 @@ try {
 	// Append to output file
 	bool fAppend;
 
+	// Output header
+	bool fOutputHeader;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -139,7 +327,8 @@ try {
 		CommandLineDoubleD(dNoWarmCoreDist, "nowarmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinLaplacian, "minlaplacian", 0.0, "(Pa / degree^2)");
 		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
-		CommandLineBool(fAppend, "append");
+		//CommandLineBool(fAppend, "append");
+		CommandLineBool(fOutputHeader, "out_header");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -167,10 +356,24 @@ try {
 
 	// Get latitude/longitude dimensions
 	NcDim * dimLat = ncInput.get_dim("lat");
+	if (dimLat == NULL) {
+		_EXCEPTIONT("No dimension \"lat\" found in input file");
+	}
+
 	NcDim * dimLon = ncInput.get_dim("lon");
+	if (dimLon == NULL) {
+		_EXCEPTIONT("No dimension \"lon\" found in input file");
+	}
 
 	NcVar * varLat = ncInput.get_var("lat");
+	if (varLat == NULL) {
+		_EXCEPTIONT("No variable \"lat\" found in input file");
+	}
+
 	NcVar * varLon = ncInput.get_var("lon");
+	if (varLon == NULL) {
+		_EXCEPTIONT("No variable \"lon\" found in input file");
+	}
 
 	int nLat = dimLat->size();
 	int nLon = dimLon->size();
@@ -191,7 +394,14 @@ try {
 
 	// Get time dimension
 	NcDim * dimTime = ncInput.get_dim("time");
+	if (dimTime == NULL) {
+		_EXCEPTIONT("No dimension \"time\" found in input file");
+	}
+
 	NcVar * varTime = ncInput.get_var("time");
+	if (varTime == NULL) {
+		_EXCEPTIONT("No variable \"time\" found in input file");
+	}
 
 	int nTime = dimTime->size();
 
@@ -207,6 +417,22 @@ try {
 	NcVar * varT200 = ncInput.get_var("T200");
 	NcVar * varT500 = ncInput.get_var("T500");
 
+	if (varPSL == NULL) {
+		_EXCEPTIONT("No variable \"PSL\" found in input file");
+	}
+	if (varU850 == NULL) {
+		_EXCEPTIONT("No variable \"U850\" found in input file");
+	}
+	if (varV850 == NULL) {
+		_EXCEPTIONT("No variable \"V850\" found in input file");
+	}
+	if (varT200 == NULL) {
+		_EXCEPTIONT("No variable \"T200\" found in input file");
+	}
+	if (varT500 == NULL) {
+		_EXCEPTIONT("No variable \"T500\" found in input file");
+	}
+
 	// Storage for auxiliary variables
 	DataMatrix<float> dataPSL(nLat, nLon);
 	DataMatrix<float> dataU850(nLat, nLon);
@@ -214,7 +440,21 @@ try {
 	DataMatrix<float> dataT200(nLat, nLon);
 	DataMatrix<float> dataT500(nLat, nLon);
 
+	DataMatrix<float> dataUMag850(nLat, nLon);
+
 	DataMatrix<float> dataDel2PSL(nLat, nLon);
+
+	// Open output file
+	FILE * fpOutput = fopen(strOutputFile.c_str(), "w");
+	if (fpOutput == NULL) {
+		_EXCEPTION1("Could not open output file \"%s\"",
+			strOutputFile.c_str());
+	}
+
+	if (fOutputHeader) {
+		fprintf(fpOutput, "#day\tmonth\tyear\tcount\thour");
+		fprintf(fpOutput, "#\t#\ti\tj\tpsl_lon\tpsl_lat\twind_max\tpsl_min");
+	}
 
 	// Loop through all times
 	for (int t = 0; t < nTime; t++) {
@@ -238,6 +478,15 @@ try {
 
 		varT500->set_cur(t,0,0);
 		varT500->get(&(dataT500[0][0]), 1, nLat, nLon);
+
+		// Compute wind magnitude
+		for (int j = 0; j < nLat; j++) {
+		for (int i = 0; i < nLon; i++) {
+			dataUMag850[j][i] = sqrt(
+				  dataU850[j][i] * dataU850[j][i]
+				+ dataV850[j][i] * dataV850[j][i]);
+		}
+		}
 
 		// Tag all pressure minima
 		std::set< std::pair<int, int> > setPressureMinima;
@@ -412,8 +661,107 @@ try {
 		Announce("Rejected (   warm core): %i", nRejectedWarmCore);
 		Announce("Rejected (no warm core): %i", nRejectedNoWarmCore);
 		Announce("Rejected (   laplacian): %i", nRejectedLaplacian);
+
+		// Determine wind maximum at all pressure minima
+		AnnounceStartBlock("Searching for maximum winds");
+		std::vector<float> vecMaxWindSp;
+		std::vector<float> vecRMaxWindSp;
+		{
+			std::set< std::pair<int, int> >::const_iterator iterPSL
+				= setPressureMinima.begin();
+			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+
+				std::pair<int, int> prMaximum;
+
+				float dRMaxWind;
+				float dMaxWindSp;
+
+				FindLocalMaximum(
+					dataUMag850,
+					dataLon,
+					dataLat,
+					iterPSL->first,
+					iterPSL->second,
+					dWindSpDist,
+					prMaximum,
+					dMaxWindSp,
+					dRMaxWind);
+
+				vecMaxWindSp.push_back(dMaxWindSp);
+				vecRMaxWindSp.push_back(dRMaxWind);
+			}
+		}
+
+		AnnounceEndBlock("Done");
+
+		// Write results to file
+		{
+			// Parse time information
+			NcVar * varDate = ncInput.get_var("date");
+			NcVar * varDateSec = ncInput.get_var("datesec");
+
+			int nDateYear;
+			int nDateMonth;
+			int nDateDay;
+			int nDateHour;
+
+			if ((varDate != NULL) && (varDateSec != NULL)) {
+				int nDate;
+				int nDateSec;
+
+				varDate->set_cur(t);
+				varDate->get(&nDate, 1);
+
+				varDateSec->set_cur(t);
+				varDateSec->get(&nDateSec, 1);
+
+				ParseDate(
+					nDate,
+					nDateSec,
+					nDateYear,
+					nDateMonth,
+					nDateDay,
+					nDateHour);
+
+			} else if (varDate == NULL) {
+				_EXCEPTIONT("No variable \"date\" found in input file");
+
+			} else if (varDateSec == NULL) {
+				_EXCEPTIONT("No variable \"datesec\" found in input file");
+			}
+
+			// Write time information
+			fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
+				nDateYear,
+				nDateMonth,
+				nDateDay,
+				static_cast<int>(setPressureMinima.size()),
+				nDateHour);
+
+			// Write candidate information
+			int iCandidateCount = 0;
+
+			std::set< std::pair<int, int> >::const_iterator iterPSL
+				= setPressureMinima.begin();
+			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+				fprintf(fpOutput, "%i\t%i\t%i\t%3.6f\t%3.6f\t%2.6f\t%3.6f\t%6.6f\n",
+					iCandidateCount,
+					iterPSL->second,
+					iterPSL->first,
+					dataLon[iterPSL->second] * 180.0 / M_PI,
+					dataLat[iterPSL->first]  * 180.0 / M_PI,
+					vecMaxWindSp[iCandidateCount],
+					vecRMaxWindSp[iCandidateCount],
+					dataPSL[iterPSL->first][iterPSL->second]);
+
+				iCandidateCount++;
+			}
+		}
+
 		AnnounceEndBlock("Done");
 	}
+
+	fclose(fpOutput);
 
 	ncInput.close();
 
