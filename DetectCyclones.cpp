@@ -452,8 +452,8 @@ try {
 	}
 
 	if (fOutputHeader) {
-		fprintf(fpOutput, "#day\tmonth\tyear\tcount\thour");
-		fprintf(fpOutput, "#\t#\ti\tj\tpsl_lon\tpsl_lat\twind_max\tr_wind_max\tpsl_min");
+		fprintf(fpOutput, "#day\tmonth\tyear\tcount\thour\n");
+		fprintf(fpOutput, "#\t#\ti\tj\tpsl_lon\tpsl_lat\twind_max\tr_wind_max\tpsl_min\n");
 	}
 
 	// Loop through all times
