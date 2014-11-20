@@ -386,6 +386,12 @@ try {
 	// Distance to search for maximum wind speed
 	double dWindSpDist;
 
+	// Maximum latitude for detection
+	double dMaxLatitude;
+
+	// Minimum latitude for detection
+	double dMinLatitude;
+
 	// Append to output file
 	bool fAppend;
 
@@ -400,6 +406,8 @@ try {
 		CommandLineDoubleD(dNoWarmCoreDist, "nowarmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinLaplacian, "minlaplacian", 0.0, "(Pa / degree^2)");
 		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
+		CommandLineDoubleD(dMaxLatitude, "maxlat", 0.0, "(degrees)");
+		CommandLineDoubleD(dMinLatitude, "minlat", 0.0, "(degrees)");
 		//CommandLineBool(fAppend, "append");
 		CommandLineBool(fOutputHeader, "out_header");
 
@@ -423,6 +431,17 @@ try {
 		_EXCEPTIONT("Only one of --warmcoredist and --nowarmcoredist"
 			   " may be active");
 	}
+
+	// Check minimum latitude and maximum latitude
+	if (dMaxLatitude < 0.0) {
+		_EXCEPTIONT("--maxlat must be nonnegative");
+	}
+	if (dMinLatitude < 0.0) {
+		_EXCEPTIONT("--minlat must be nonnegative");
+	}
+
+	dMaxLatitude *= M_PI / 180.0;
+	dMinLatitude *= M_PI / 180.0;
 
 	// Load the netcdf file
 	NcFile ncInput(strInputFile.c_str());
@@ -570,6 +589,45 @@ try {
 		int nRejectedWarmCore = 0;
 		int nRejectedNoWarmCore = 0;
 		int nRejectedLaplacian = 0;
+		int nRejectedLatitude = 0;
+
+		// Eliminate based on maximum latitude
+		if (dMaxLatitude != 0.0) {
+			std::set< std::pair<int, int> > setNewPressureMinima;
+
+			std::set< std::pair<int, int> >::const_iterator iterPSL
+				= setPressureMinima.begin();
+			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+				double dLat = dataLat[iterPSL->first];
+
+				if (fabs(dLat) <= dMaxLatitude) {
+					setNewPressureMinima.insert(*iterPSL);
+				} else {
+					nRejectedLatitude++;
+				}
+			}
+
+			setPressureMinima = setNewPressureMinima;
+		}
+
+		// Eliminate based on minimum latitude
+		if (dMinLatitude != 0.0) {
+			std::set< std::pair<int, int> > setNewPressureMinima;
+
+			std::set< std::pair<int, int> >::const_iterator iterPSL
+				= setPressureMinima.begin();
+			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+				double dLat = dataLat[iterPSL->first];
+
+				if (fabs(dLat) >= dMinLatitude) {
+					setNewPressureMinima.insert(*iterPSL);
+				} else {
+					nRejectedLatitude++;
+				}
+			}
+
+			setPressureMinima = setNewPressureMinima;
+		}
 
 		// Detect presence of warm core near PSL min
 		if ((dWarmCoreDist != 0.0) || (dNoWarmCoreDist != 0.0)) {
@@ -731,6 +789,7 @@ try {
 		}
 
 		Announce("Total candidates: %i", setPressureMinima.size());
+		Announce("Rejected (    latitude): %i", nRejectedLatitude);
 		Announce("Rejected (   warm core): %i", nRejectedWarmCore);
 		Announce("Rejected (no warm core): %i", nRejectedNoWarmCore);
 		Announce("Rejected (   laplacian): %i", nRejectedLaplacian);
