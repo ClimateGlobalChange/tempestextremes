@@ -332,6 +332,11 @@ void ParseTimeDouble(
 				time.GetDay(),
 				time.GetSecond());
 
+		nDateYear = time.GetYear();
+		nDateMonth = time.GetMonth();
+		nDateDay = time.GetDay();
+		nDateHour = time.GetSecond() / 3600;
+
 		//printf("%s\n", strSubStr.c_str());
 
 	// Time format is "hours since ..."
@@ -351,6 +356,11 @@ void ParseTimeDouble(
 				time.GetMonth(),
 				time.GetDay(),
 				time.GetSecond());
+
+		nDateYear = time.GetYear();
+		nDateMonth = time.GetMonth();
+		nDateDay = time.GetDay();
+		nDateHour = time.GetSecond() / 3600;
 
 		//printf("%s\n", strSubStr.c_str());
 
