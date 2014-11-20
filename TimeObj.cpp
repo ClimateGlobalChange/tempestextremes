@@ -135,7 +135,7 @@ void Time::VerifyTime() {
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 		if (m_eCalendarType == CalendarStandard) {
-			if (((m_iYear / 4) == 0) && ((m_iYear / 1000) != 0)) {
+			if (((m_iYear % 4) == 0) && ((m_iYear % 1000) != 0)) {
 				nDaysPerMonth[1] = 29;
 			}
 		}
@@ -174,7 +174,7 @@ void Time::NormalizeTime() {
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 		if (m_eCalendarType == CalendarStandard) {
-			if (((m_iYear / 4) == 0) && ((m_iYear / 1000) != 0)) {
+			if (((m_iYear % 4) == 0) && ((m_iYear % 1000) != 0)) {
 				nDaysPerMonth[1] = 29;
 			}
 		}
@@ -225,7 +225,7 @@ void Time::NormalizeTime() {
 
 				// Adjust number of days per month
 				if (m_eCalendarType == CalendarStandard) {
-					if (((m_iYear / 4) == 0) && ((m_iYear / 1000) != 0)) {
+					if (((m_iYear % 4) == 0) && ((m_iYear % 1000) != 0)) {
 						nDaysPerMonth[1] = 29;
 					} else {
 						nDaysPerMonth[1] = 28;
@@ -245,7 +245,7 @@ void Time::NormalizeTime() {
 
 				// Adjust number of days per month
 				if (m_eCalendarType == CalendarStandard) {
-					if (((m_iYear / 4) == 0) && ((m_iYear / 1000) != 0)) {
+					if (((m_iYear % 4) == 0) && ((m_iYear % 1000) != 0)) {
 						nDaysPerMonth[1] = 29;
 					} else {
 						nDaysPerMonth[1] = 28;
