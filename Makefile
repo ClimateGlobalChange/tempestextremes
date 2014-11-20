@@ -24,7 +24,7 @@ STITCHNODES_CFILES= kdtree.c
 STITCHBLOBS_FILES= StitchBlobs.cpp Announce.cpp
 STITCHBLOBS_CFILES= kdtree.c
 
-DETECTCYCLONES_FILES= DetectCyclones.cpp Announce.cpp
+DETECTCYCLONES_FILES= DetectCyclones.cpp Announce.cpp TimeObj.cpp
 DETECTCYCLONES_CFILES= kdtree.c
 
 # Load system-specific defaults

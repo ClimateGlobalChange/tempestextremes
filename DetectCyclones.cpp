@@ -19,6 +19,7 @@
 #include "Announce.h"
 #include "DataVector.h"
 #include "DataMatrix.h"
+#include "TimeObj.h"
 
 #include "kdtree.h"
 
@@ -285,6 +286,78 @@ void ParseDate(
 	nDateMonth = (nDate % 10000) / 100;
 	nDateDay   = (nDate % 100);
 	nDateHour  = nDateSec / 3600;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Parse a time value.
+///	</summary>
+void ParseTimeDouble(
+	const std::string & strTimeUnits,
+	const std::string & strTimeCalendar,
+	double dTime,
+	int & nDateYear,
+	int & nDateMonth,
+	int & nDateDay,
+	int & nDateHour
+) {
+	// Get calendar type
+	Time::CalendarType cal;
+	if (strTimeCalendar == "noleap") {
+		cal = Time::CalendarNoLeap;
+	} else if (strTimeCalendar == "standard") {
+		cal = Time::CalendarStandard;
+	} else {
+		_EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
+	}
+
+	// Time format is "days since ..."
+	if ((strTimeUnits.length() >= 11) &&
+	    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
+	) {
+		std::string strSubStr = strTimeUnits.substr(11);
+		Time time(Time::CalendarNoLeap);
+		time.FromFormattedString(strSubStr);
+
+		int nDays = static_cast<int>(dTime);
+		time.AddDays(nDays);
+
+		int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
+		time.AddSeconds(nSeconds);
+
+		Announce("Time (YMDS): %i %i %i %i",
+				time.GetYear(),
+				time.GetMonth(),
+				time.GetDay(),
+				time.GetSecond());
+
+		//printf("%s\n", strSubStr.c_str());
+
+	// Time format is "hours since ..."
+	} else if (
+	    (strTimeUnits.length() >= 12) &&
+	    (strncmp(strTimeUnits.c_str(), "hours since ", 12) == 0)
+	) {
+		std::string strSubStr = strTimeUnits.substr(12);
+		Time time(Time::CalendarNoLeap);
+		time.FromFormattedString(strSubStr);
+
+		int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 3600.0);
+		time.AddSeconds(nSeconds);
+
+		Announce("Time (YMDS): %i %i %i %i",
+				time.GetYear(),
+				time.GetMonth(),
+				time.GetDay(),
+				time.GetSecond());
+
+		//printf("%s\n", strSubStr.c_str());
+
+	} else {
+		_EXCEPTIONT("Unknown \"time::units\" format");
+	}
+	//_EXCEPTION();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -697,14 +770,14 @@ try {
 		// Write results to file
 		{
 			// Parse time information
-			NcVar * varDate = ncInput.get_var("date");
-			NcVar * varDateSec = ncInput.get_var("datesec");
+			//NcVar * varDate = ncInput.get_var("date");
+			//NcVar * varDateSec = ncInput.get_var("datesec");
 
 			int nDateYear;
 			int nDateMonth;
 			int nDateDay;
 			int nDateHour;
-
+/*
 			if ((varDate != NULL) && (varDateSec != NULL)) {
 				int nDate;
 				int nDateSec;
@@ -723,12 +796,32 @@ try {
 					nDateDay,
 					nDateHour);
 
-			} else if (varDate == NULL) {
-				_EXCEPTIONT("No variable \"date\" found in input file");
+			} else {
+*/
+				NcAtt * attTimeUnits = varTime->get_att("units");
+				if (attTimeUnits == NULL) {
+					_EXCEPTIONT("Variable \"time\" has no \"units\" attribute");
+				}
 
-			} else if (varDateSec == NULL) {
-				_EXCEPTIONT("No variable \"datesec\" found in input file");
-			}
+				std::string strTimeUnits = attTimeUnits->as_string(0);
+
+
+				std::string strTimeCalendar = "noleap";
+				NcAtt * attTimeCalendar = varTime->get_att("calendar");
+				if (attTimeUnits != NULL) {
+					strTimeCalendar = attTimeCalendar->as_string(0);
+				}
+
+
+				ParseTimeDouble(
+					strTimeUnits,
+					strTimeCalendar,
+					dTime[t],
+					nDateYear,
+					nDateMonth,
+					nDateDay,
+					nDateHour);
+//			}
 
 			// Write time information
 			fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
