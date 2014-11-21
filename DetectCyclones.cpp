@@ -377,6 +377,8 @@ int main(int argc, char** argv) {
 	NcError error(NcError::verbose_nonfatal);
 
 try {
+	// Radius of the Earth
+	const float ParamEarthRadius = 6.37122e6;
 
 	// Input file
 	std::string strInputFile;
@@ -384,23 +386,26 @@ try {
 	// Output file
 	std::string strOutputFile;
 
+	// Maximum latitude for detection
+	double dMaxLatitude;
+
+	// Minimum latitude for detection
+	double dMinLatitude;
+
 	// Require temperature maxima at T200 and T500 within this distance
 	double dWarmCoreDist;
 
 	// No temperature maxima at T200 and T500 within this distance
 	double dNoWarmCoreDist;
 
+	// Require 850hPa vorticity maxima within this distance
+	double dVortDist;
+
 	// Minimum Laplacian value
 	double dMinLaplacian;
 
 	// Distance to search for maximum wind speed
 	double dWindSpDist;
-
-	// Maximum latitude for detection
-	double dMaxLatitude;
-
-	// Minimum latitude for detection
-	double dMinLatitude;
 
 	// Append to output file
 	bool fAppend;
@@ -412,12 +417,13 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
 		CommandLineString(strOutputFile, "out", "");
-		CommandLineDoubleD(dWarmCoreDist, "warmcoredist", 0.0, "(degrees)");
-		CommandLineDoubleD(dNoWarmCoreDist, "nowarmcoredist", 0.0, "(degrees)");
-		CommandLineDoubleD(dMinLaplacian, "minlaplacian", 0.0, "(Pa / degree^2)");
-		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
 		CommandLineDoubleD(dMaxLatitude, "maxlat", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinLatitude, "minlat", 0.0, "(degrees)");
+		CommandLineDoubleD(dWarmCoreDist, "warmcoredist", 0.0, "(degrees)");
+		CommandLineDoubleD(dNoWarmCoreDist, "nowarmcoredist", 0.0, "(degrees)");
+		CommandLineDoubleD(dVortDist, "vortdist", 0.0, "(degrees)");
+		CommandLineDoubleD(dMinLaplacian, "minlaplacian", 0.0, "(Pa / degree^2)");
+		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
 		//CommandLineBool(fAppend, "append");
 		CommandLineBool(fOutputHeader, "out_header");
 
@@ -596,10 +602,11 @@ try {
 
 		// Total number of pressure minima
 		int nTotalPressureMinima = setPressureMinima.size();
+		int nRejectedLatitude = 0;
+		int nRejectedVortMax = 0;
 		int nRejectedWarmCore = 0;
 		int nRejectedNoWarmCore = 0;
 		int nRejectedLaplacian = 0;
-		int nRejectedLatitude = 0;
 
 		// Eliminate based on maximum latitude
 		if (dMaxLatitude != 0.0) {
@@ -639,9 +646,102 @@ try {
 			setPressureMinima = setNewPressureMinima;
 		}
 
+		// Eliminate based on presence of vorticity maximum
+		if (dVortDist != 0.0) {
+
+			float dDeltaLat = static_cast<float>(dataLat[1] - dataLat[0]);
+			float dDeltaLon = static_cast<float>(dataLon[1] - dataLon[0]);
+
+			DataMatrix<float> dataZETA850(nLat, nLon);
+
+			// Compute vorticity
+			for (int j = 1; j < nLat-1; j++) {
+			for (int i = 0; i < nLon; i++) {
+
+				int inext = (i + 1) % nLon;
+				int jnext = (j + 1);
+
+				int ilast = (i + nLon - 1) % nLon;
+				int jlast = (j - 1);
+
+				float dDyU850 = (dataU850[jnext][i] - dataU850[jlast][i])
+					/ (2.0 * dDeltaLat);
+				float dDxV850 = (dataV850[j][inext] - dataV850[j][ilast])
+					/ (2.0 * dDeltaLon);
+
+				dataZETA850[j][i] = dDxV850 - dDyU850
+					+ dataU850[j][i] / ParamEarthRadius * tan(dataLat[j]);
+
+				if (dataLat[j] < 0.0) {
+					dataZETA850[j][i] *= -1.0;
+				}
+			}
+			}
+
+			// Find all vorticity maxima
+			std::set< std::pair<int, int> > setZETA850Maxima;
+			FindAllLocalMaxima(dataZETA850, setZETA850Maxima);
+
+			// Construct KD tree for ZETA850
+			kdtree * kdZETA850Maxima = kd_create(3);
+			std::set< std::pair<int, int> >::const_iterator iterZETA850
+				= setZETA850Maxima.begin();
+
+			for (; iterZETA850 != setZETA850Maxima.end(); iterZETA850++) {
+				double dLat = dataLat[iterZETA850->first];
+				double dLon = dataLon[iterZETA850->second];
+
+				double dX = sin(dLon) * cos(dLat);
+				double dY = cos(dLon) * cos(dLat);
+				double dZ = sin(dLat);
+
+				kd_insert3(kdZETA850Maxima, dX, dY, dZ, NULL);
+			}
+
+			// Remove pressure minima that are near temperature maxima
+			std::set< std::pair<int, int> > setNewPressureMinima;
+
+			std::set< std::pair<int, int> >::const_iterator iterPSL
+				= setPressureMinima.begin();
+			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+				double dLat = dataLat[iterPSL->first];
+				double dLon = dataLon[iterPSL->second];
+
+				double dX = sin(dLon) * cos(dLat);
+				double dY = cos(dLon) * cos(dLat);
+				double dZ = sin(dLat);
+
+				kdres * kdresZETA850 = kd_nearest3(kdZETA850Maxima, dX, dY, dZ);
+
+				double dZETA850pos[3];
+
+				kd_res_item(kdresZETA850, dZETA850pos);
+
+				kd_res_free(kdresZETA850);
+
+				double dZETA850dist = sqrt(
+					  (dX - dZETA850pos[0]) * (dX - dZETA850pos[0])
+					+ (dY - dZETA850pos[1]) * (dY - dZETA850pos[1])
+					+ (dZ - dZETA850pos[2]) * (dZ - dZETA850pos[2]));
+
+				dZETA850dist = 2.0 * asin(0.5 * dZETA850dist) * 180.0 / M_PI;
+
+				// Reject storms with no warm core
+				if (dZETA850dist <= dVortDist) {
+					setNewPressureMinima.insert(*iterPSL);
+				} else {
+					nRejectedVortMax++;
+				}
+			}
+
+			kd_free(kdZETA850Maxima);
+
+			setPressureMinima = setNewPressureMinima;
+		}
+
 		// Detect presence of warm core near PSL min
 		if ((dWarmCoreDist != 0.0) || (dNoWarmCoreDist != 0.0)) {
-			
+
 			std::set< std::pair<int, int> > setT200Maxima;
 			FindAllLocalMaxima(dataT200, setT200Maxima);
 
@@ -800,6 +900,7 @@ try {
 
 		Announce("Total candidates: %i", setPressureMinima.size());
 		Announce("Rejected (    latitude): %i", nRejectedLatitude);
+		Announce("Rejected (no vort max ): %i", nRejectedVortMax);
 		Announce("Rejected (   warm core): %i", nRejectedWarmCore);
 		Announce("Rejected (no warm core): %i", nRejectedNoWarmCore);
 		Announce("Rejected (   laplacian): %i", nRejectedLaplacian);
