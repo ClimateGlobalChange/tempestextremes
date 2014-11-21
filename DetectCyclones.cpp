@@ -317,7 +317,7 @@ void ParseTimeDouble(
 	    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
 	) {
 		std::string strSubStr = strTimeUnits.substr(11);
-		Time time(Time::CalendarNoLeap);
+		Time time(cal);
 		time.FromFormattedString(strSubStr);
 
 		int nDays = static_cast<int>(dTime);
@@ -345,7 +345,7 @@ void ParseTimeDouble(
 	    (strncmp(strTimeUnits.c_str(), "hours since ", 12) == 0)
 	) {
 		std::string strSubStr = strTimeUnits.substr(12);
-		Time time(Time::CalendarNoLeap);
+		Time time(cal);
 		time.FromFormattedString(strSubStr);
 
 		int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 3600.0);
