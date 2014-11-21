@@ -401,6 +401,15 @@ try {
 	// Require 850hPa vorticity maxima within this distance
 	double dVortDist;
 
+	// Distance to evaluate delta SLP
+	double dDeltaSLPDist;
+
+	// Amount to require SLP increase
+	double dDeltaSLPAmt;
+
+	// Number of rotations
+	int nDeltaSLPCount;
+
 	// Minimum Laplacian value
 	double dMinLaplacian;
 
@@ -422,6 +431,9 @@ try {
 		CommandLineDoubleD(dWarmCoreDist, "warmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dNoWarmCoreDist, "nowarmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dVortDist, "vortdist", 0.0, "(degrees)");
+		CommandLineDoubleD(dDeltaSLPDist, "deltaslpdist", 0.0, "(degrees)");
+		CommandLineDoubleD(dDeltaSLPAmt, "deltaslpamt", 0.0, "(Pa)");
+		CommandLineInt(nDeltaSLPCount, "deltaslpcount", 8);
 		CommandLineDoubleD(dMinLaplacian, "minlaplacian", 0.0, "(Pa / degree^2)");
 		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
 		//CommandLineBool(fAppend, "append");
@@ -606,6 +618,7 @@ try {
 		int nRejectedVortMax = 0;
 		int nRejectedWarmCore = 0;
 		int nRejectedNoWarmCore = 0;
+		int nRejectedClosedContour = 0;
 		int nRejectedLaplacian = 0;
 
 		// Eliminate based on maximum latitude
@@ -691,8 +704,8 @@ try {
 				double dLat = dataLat[iterZETA850->first];
 				double dLon = dataLon[iterZETA850->second];
 
-				double dX = sin(dLon) * cos(dLat);
-				double dY = cos(dLon) * cos(dLat);
+				double dX = cos(dLon) * cos(dLat);
+				double dY = sin(dLon) * cos(dLat);
 				double dZ = sin(dLat);
 
 				kd_insert3(kdZETA850Maxima, dX, dY, dZ, NULL);
@@ -707,8 +720,8 @@ try {
 				double dLat = dataLat[iterPSL->first];
 				double dLon = dataLon[iterPSL->second];
 
-				double dX = sin(dLon) * cos(dLat);
-				double dY = cos(dLon) * cos(dLat);
+				double dX = cos(dLon) * cos(dLat);
+				double dY = sin(dLon) * cos(dLat);
 				double dZ = sin(dLat);
 
 				kdres * kdresZETA850 = kd_nearest3(kdZETA850Maxima, dX, dY, dZ);
@@ -757,8 +770,8 @@ try {
 				double dLat = dataLat[iterT200->first];
 				double dLon = dataLon[iterT200->second];
 
-				double dX = sin(dLon) * cos(dLat);
-				double dY = cos(dLon) * cos(dLat);
+				double dX = cos(dLon) * cos(dLat);
+				double dY = sin(dLon) * cos(dLat);
 				double dZ = sin(dLat);
 
 				kd_insert3(kdT200Maxima, dX, dY, dZ, NULL);
@@ -773,8 +786,8 @@ try {
 				double dLat = dataLat[iterT500->first];
 				double dLon = dataLon[iterT500->second];
 
-				double dX = sin(dLon) * cos(dLat);
-				double dY = cos(dLon) * cos(dLat);
+				double dX = cos(dLon) * cos(dLat);
+				double dY = sin(dLon) * cos(dLat);
 				double dZ = sin(dLat);
 
 				kd_insert3(kdT500Maxima, dX, dY, dZ, NULL);
@@ -789,8 +802,8 @@ try {
 				double dLat = dataLat[iterPSL->first];
 				double dLon = dataLon[iterPSL->second];
 
-				double dX = sin(dLon) * cos(dLat);
-				double dY = cos(dLon) * cos(dLat);
+				double dX = cos(dLon) * cos(dLat);
+				double dY = sin(dLon) * cos(dLat);
 				double dZ = sin(dLat);
 
 				kdres * kdresT200 = kd_nearest3(kdT200Maxima, dX, dY, dZ);
@@ -848,7 +861,155 @@ try {
 			setPressureMinima = setNewPressureMinima;
 		}
 
-		// Calculate the Laplacian of pressure at the PSL min
+		// Eliminate based on minimum SLP increase away from PSL min
+		if (dDeltaSLPDist != 0.0) {
+
+			double dDeltaLat = (dataLat[1] - dataLat[0]);
+			double dDeltaLon = (dataLon[1] - dataLon[0]);
+
+			std::set< std::pair<int, int> > setNewPressureMinima;
+
+			std::set< std::pair<int, int> >::const_iterator iterPSL
+				= setPressureMinima.begin();
+			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+				
+				double dLat = dataLat[iterPSL->first];
+				double dLon = dataLon[iterPSL->second];
+
+				// This PSL location on the sphere
+				double dX0 = cos(dLon) * cos(dLat);
+				double dY0 = sin(dLon) * cos(dLat);
+				double dZ0 = sin(dLat);
+
+				// Pick a quasi-arbitrary reference direction
+				double dX1;
+				double dY1;
+				double dZ1;
+				if ((fabs(dX0) >= fabs(dY0)) && (fabs(dX0) >= fabs(dZ0))) {
+					dX1 = dX0;
+					dY1 = dY0 + 1.0;
+					dZ1 = dZ0;
+				} else if ((fabs(dY0) >= fabs(dX0)) && (fabs(dY0) >= fabs(dZ0))) {
+					dX1 = dX0;
+					dY1 = dY0;
+					dZ1 = dZ0 + 1.0;
+				} else {
+					dX1 = dX0 + 1.0;
+					dY1 = dY0;
+					dZ1 = dZ0;
+				}
+
+				// Project perpendicular to PSL location
+				double dDot = dX1 * dX0 + dY1 * dY0 + dZ1 * dZ0;
+
+				dX1 -= dDot * dX0;
+				dY1 -= dDot * dY0;
+				dZ1 -= dDot * dZ0;
+
+				// Normalize
+				double dMag1 = sqrt(dX1 * dX1 + dY1 * dY1 + dZ1 * dZ1);
+
+				if (dMag1 < 1.0e-12) {
+					_EXCEPTIONT("Logic error");
+				}
+
+				double dScale1 = asin(dDeltaSLPDist * M_PI / 180.0) / dMag1;
+
+				dX1 *= dScale1;
+				dY1 *= dScale1;
+				dZ1 *= dScale1;
+
+				// Verify dot product is zero
+				dDot = dX0 * dX1 + dY0 * dY1 + dZ0 * dZ1;
+				if (fabs(dDot) > 1.0e-12) {
+					_EXCEPTIONT("Logic error");
+				}
+
+				// Cross product
+				double dCrossX = dY0 * dZ1 - dZ0 * dY1;
+				double dCrossY = dZ0 * dX1 - dX0 * dZ1;
+				double dCrossZ = dX0 * dY1 - dY0 * dX1;
+
+				// Obtain reference PSL
+				float dRefPSL = dataPSL[iterPSL->first][iterPSL->second];
+
+				// Loop through all directions
+				bool fReject = false;
+
+				for (int a = 0; a < nDeltaSLPCount; a++) {
+
+					// Angle of rotation
+					double dAngle = 2.0 * M_PI
+						* static_cast<double>(a)
+						/ static_cast<double>(nDeltaSLPCount);
+
+					// Calculate new rotated vector
+					double dX2 = dX0 + dX1 * cos(dAngle) + dCrossX * sin(dAngle);
+					double dY2 = dY0 + dY1 * cos(dAngle) + dCrossY * sin(dAngle);
+					double dZ2 = dZ0 + dZ1 * cos(dAngle) + dCrossZ * sin(dAngle);
+
+					double dMag2 = sqrt(dX2 * dX2 + dY2 * dY2 + dZ2 * dZ2);
+
+					dX2 /= dMag2;
+					dY2 /= dMag2;
+					dZ2 /= dMag2;
+
+					// Calculate new lat/lon location
+					double dLat2 = asin(dZ2);
+					double dLon2 = atan2(dY2, dX2);
+
+					if (dLon2 < 0.0) {
+						dLon2 += 2.0 * M_PI;
+					}
+/*
+					printf("%i : %3.2f %3.2f : %3.2f %3.2f\n",
+						a,
+						dLat * 180.0 / M_PI,
+						dLon * 180.0 / M_PI,
+						dLat2 * 180.0 / M_PI,
+						dLon2 * 180.0 / M_PI);
+*/
+					int j = (dLat2 + 0.5 * M_PI) / dDeltaLat;
+					int i = (dLon2) / dDeltaLon;
+
+					if (i == nLon) {
+						i = nLon-1;
+					}
+					if (j == nLat) {
+						j = nLat-1;
+					}
+
+					// Check for insufficient distance
+					if ((i == iterPSL->second) && (j == iterPSL->first)) {
+						_EXCEPTIONT(
+							"--deltaslpdist insufficient; increase value");
+					}
+
+					// Check for out of bounds
+					if ((i < 0) || (j < 0) || (i >= nLon) || (j >= nLat)) {
+						_EXCEPTION4("Logic error %i/%i, %i/%i", i, nLon, j, nLat);
+					}
+
+					// Verify sufficient increase in PSL
+					if (dataPSL[j][i] - dRefPSL < dDeltaSLPAmt) {
+						fReject = true;
+						break;
+					}
+				}
+
+				// If not rejected, add to new pressure minima array
+				if (!fReject) {
+					setNewPressureMinima.insert(*iterPSL);
+				} else {
+					nRejectedClosedContour++;
+				}
+			}
+
+			setPressureMinima = setNewPressureMinima;
+
+		}
+
+		// Eliminate based on minimum the Laplacian of pressure at the PSL min
 		if (dMinLaplacian != 0.0) {
 			float dDeltaLat = static_cast<float>(dataLat[1] - dataLat[0]);
 			float dDeltaLon = static_cast<float>(dataLon[1] - dataLon[0]);
@@ -903,6 +1064,7 @@ try {
 		Announce("Rejected (no vort max ): %i", nRejectedVortMax);
 		Announce("Rejected (   warm core): %i", nRejectedWarmCore);
 		Announce("Rejected (no warm core): %i", nRejectedNoWarmCore);
+		Announce("Rejected ( closed cont): %i", nRejectedClosedContour);
 		Announce("Rejected (   laplacian): %i", nRejectedLaplacian);
 
 		// Determine wind maximum at all pressure minima
