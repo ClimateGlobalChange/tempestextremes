@@ -304,10 +304,17 @@ void ParseTimeDouble(
 ) {
 	// Get calendar type
 	Time::CalendarType cal;
-	if (strTimeCalendar == "noleap") {
+	if ((strTimeCalendar.length() >= 6) &&
+		(strncmp(strTimeCalendar.c_str(), "noleap", 6) == 0)
+	) {
 		cal = Time::CalendarNoLeap;
-	} else if (strTimeCalendar == "standard") {
+
+	} else if (
+		(strTimeCalendar.length() >= 8) &&
+		(strncmp(strTimeCalendar.c_str(), "standard", 8) == 0)
+	) {
 		cal = Time::CalendarStandard;
+
 	} else {
 		_EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
 	}
