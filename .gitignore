@@ -11,7 +11,13 @@ depend/*
 
 *.swp
 
+*.nc
+
+DetectCyclones
+
 StitchNodes
+
+StitchBlobs
 
 cyclones_out
 
