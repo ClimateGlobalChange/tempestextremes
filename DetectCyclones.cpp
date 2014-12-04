@@ -920,7 +920,7 @@ try {
 					_EXCEPTIONT("Logic error");
 				}
 
-				double dScale1 = asin(dDeltaSLPDist * M_PI / 180.0) / dMag1;
+				double dScale1 = tan(dDeltaSLPDist * M_PI / 180.0) / dMag1;
 
 				dX1 *= dScale1;
 				dY1 *= dScale1;
@@ -932,7 +932,7 @@ try {
 					_EXCEPTIONT("Logic error");
 				}
 
-				// Cross product
+				// Cross product (magnitude automatically 
 				double dCrossX = dY0 * dZ1 - dZ0 * dY1;
 				double dCrossY = dZ0 * dX1 - dX0 * dZ1;
 				double dCrossZ = dX0 * dY1 - dY0 * dX1;
