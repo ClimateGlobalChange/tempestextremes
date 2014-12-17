@@ -393,6 +393,12 @@ try {
 	// Output file
 	std::string strOutputFile;
 
+	// Zonal velocity name
+	std::string strUName;
+
+	// Meridional velocity name
+	std::string strVName;
+
 	// Maximum latitude for detection
 	double dMaxLatitude;
 
@@ -433,6 +439,8 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
 		CommandLineString(strOutputFile, "out", "");
+		CommandLineString(strUName, "uname", "U850");
+		CommandLineString(strVName, "vname", "V850");
 		CommandLineDoubleD(dMaxLatitude, "maxlat", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinLatitude, "minlat", 0.0, "(degrees)");
 		CommandLineDoubleD(dWarmCoreDist, "warmcoredist", 0.0, "(degrees)");
@@ -539,19 +547,19 @@ try {
 
 	// Get auxiliary variables
 	NcVar * varPSL  = ncInput.get_var("PSL");
-	NcVar * varU850 = ncInput.get_var("U850");
-	NcVar * varV850 = ncInput.get_var("V850");
+	NcVar * varUvel = ncInput.get_var(strUName.c_str());
+	NcVar * varVvel = ncInput.get_var(strVName.c_str());
 	NcVar * varT200 = ncInput.get_var("T200");
 	NcVar * varT500 = ncInput.get_var("T500");
 
 	if (varPSL == NULL) {
 		_EXCEPTIONT("No variable \"PSL\" found in input file");
 	}
-	if (varU850 == NULL) {
-		_EXCEPTIONT("No variable \"U850\" found in input file");
+	if (varUvel == NULL) {
+		_EXCEPTION1("No variable \"%s\" found in input file", strUName.c_str());
 	}
-	if (varV850 == NULL) {
-		_EXCEPTIONT("No variable \"V850\" found in input file");
+	if (varVvel == NULL) {
+		_EXCEPTION1("No variable \"%s\" found in input file", strVName.c_str());
 	}
 	if (varT200 == NULL) {
 		_EXCEPTIONT("No variable \"T200\" found in input file");
@@ -562,8 +570,8 @@ try {
 
 	// Storage for auxiliary variables
 	DataMatrix<float> dataPSL(nLat, nLon);
-	DataMatrix<float> dataU850(nLat, nLon);
-	DataMatrix<float> dataV850(nLat, nLon);
+	DataMatrix<float> dataUvel(nLat, nLon);
+	DataMatrix<float> dataVvel(nLat, nLon);
 	DataMatrix<float> dataT200(nLat, nLon);
 	DataMatrix<float> dataT500(nLat, nLon);
 
@@ -594,11 +602,11 @@ try {
 		varPSL->set_cur(t,0,0);
 		varPSL->get(&(dataPSL[0][0]), 1, nLat, nLon);
 
-		varU850->set_cur(t,0,0);
-		varU850->get(&(dataU850[0][0]), 1, nLat, nLon);
+		varUvel->set_cur(t,0,0);
+		varUvel->get(&(dataUvel[0][0]), 1, nLat, nLon);
 
-		varV850->set_cur(t,0,0);
-		varV850->get(&(dataV850[0][0]), 1, nLat, nLon);
+		varVvel->set_cur(t,0,0);
+		varVvel->get(&(dataVvel[0][0]), 1, nLat, nLon);
 
 		varT200->set_cur(t,0,0);
 		varT200->get(&(dataT200[0][0]), 1, nLat, nLon);
@@ -610,8 +618,8 @@ try {
 		for (int j = 0; j < nLat; j++) {
 		for (int i = 0; i < nLon; i++) {
 			dataUMag850[j][i] = sqrt(
-				  dataU850[j][i] * dataU850[j][i]
-				+ dataV850[j][i] * dataV850[j][i]);
+				  dataUvel[j][i] * dataUvel[j][i]
+				+ dataVvel[j][i] * dataVvel[j][i]);
 		}
 		}
 
@@ -684,13 +692,13 @@ try {
 				int ilast = (i + nLon - 1) % nLon;
 				int jlast = (j - 1);
 
-				float dDyU850 = (dataU850[jnext][i] - dataU850[jlast][i])
+				float dDyUvel = (dataUvel[jnext][i] - dataUvel[jlast][i])
 					/ (2.0 * dDeltaLat);
-				float dDxV850 = (dataV850[j][inext] - dataV850[j][ilast])
+				float dDxVvel = (dataVvel[j][inext] - dataVvel[j][ilast])
 					/ (2.0 * dDeltaLon);
 
-				dataZETA850[j][i] = dDxV850 - dDyU850
-					+ dataU850[j][i] / ParamEarthRadius * tan(dataLat[j]);
+				dataZETA850[j][i] = dDxVvel - dDyUvel
+					+ dataUvel[j][i] / ParamEarthRadius * tan(dataLat[j]);
 
 				if (dataLat[j] < 0.0) {
 					dataZETA850[j][i] *= -1.0;
@@ -1000,6 +1008,13 @@ try {
 					// Verify sufficient increase in PSL
 					if (dataPSL[j][i] - dRefPSL < dDeltaSLPAmt) {
 						fReject = true;
+/*
+						if (dataLat[j] < -1.0) {
+							printf("DeltaSLP failed in cell lat %i (%1.2f) lon %i (%1.2f))\n", iterPSL->first, dataLat[iterPSL->first] * 180.0 / M_PI, iterPSL->second, dataLon[iterPSL->second] * 180.0 / M_PI);
+							printf("DeltaSLP failed in cell lat %i (%1.2f) lon %i (%1.2f))\n", j, dataLat[j] * 180.0 / M_PI, i, dataLon[i] * 180.0 / M_PI);
+							printf("SLP: %1.5e %1.5e\n", dataPSL[j][i], dRefPSL);
+						}
+*/
 						break;
 					}
 				}

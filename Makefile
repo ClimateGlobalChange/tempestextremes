@@ -21,7 +21,7 @@ LDFILES= -lnetcdf -lnetcdf_c++ -framework accelerate
 STITCHNODES_FILES= StitchNodes.cpp Announce.cpp
 STITCHNODES_CFILES= kdtree.c
 
-STITCHBLOBS_FILES= StitchBlobs.cpp Announce.cpp
+STITCHBLOBS_FILES= StitchBlobs.cpp Announce.cpp NetCDFUtilities.cpp
 STITCHBLOBS_CFILES= kdtree.c
 
 DETECTCYCLONES_FILES= DetectCyclones.cpp Announce.cpp TimeObj.cpp
