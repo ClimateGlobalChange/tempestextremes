@@ -712,6 +712,7 @@ try {
 			tagMinimum.global_id = nTotalBlobCount;
 		} else {
 			tagMinimum.global_id = 0;
+			nTotalBlobCount--;
 		}
 
 		// Refer all tags in clique to minimum tag
@@ -819,6 +820,10 @@ try {
 
 		// Put patch information into matrix
 		for (int p = 0; p < vecPatchTags.size(); p++) {
+
+			if (vecPatchTags[p].global_id == 0) {
+				continue;
+			}
 
 			IndicatorSetConstIterator iter = vecPatches[p].begin();
 			for (; iter != vecPatches[p].end(); iter++) {
