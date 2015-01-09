@@ -384,6 +384,9 @@ int main(int argc, char** argv) {
 	NcError error(NcError::verbose_nonfatal);
 
 try {
+	// Gravitational constant
+	const float ParamGravity = 9.80616;
+
 	// Radius of the Earth
 	const float ParamEarthRadius = 6.37122e6;
 
@@ -404,6 +407,12 @@ try {
 
 	// Minimum latitude for detection
 	double dMinLatitude;
+
+	// File containing information on topography
+	std::string strTopoFile;
+
+	// Maximum topographic height for a detection
+	double dMaxTopoHeight;
 
 	// Require temperature maxima at T200 and T500 within this distance
 	double dWarmCoreDist;
@@ -443,6 +452,8 @@ try {
 		CommandLineString(strVName, "vname", "V850");
 		CommandLineDoubleD(dMaxLatitude, "maxlat", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinLatitude, "minlat", 0.0, "(degrees)");
+		CommandLineString(strTopoFile, "topofile", "");
+		CommandLineDoubleD(dMaxTopoHeight, "maxtopoht", 0.0, "(m)");
 		CommandLineDoubleD(dWarmCoreDist, "warmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dNoWarmCoreDist, "nowarmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dVortDist, "vortdist", 0.0, "(degrees)");
@@ -579,6 +590,32 @@ try {
 
 	DataMatrix<float> dataDel2PSL(nLat, nLon);
 
+	DataMatrix<float> dataPHIS(nLat, nLon);
+
+	// Topography variable
+	NcVar * varPHIS = NULL;
+
+	if (strTopoFile != "") {
+		NcFile ncTopo(strTopoFile.c_str());
+		NcVar * varPHIS = ncTopo.get_var("PHIS");
+
+		if (varPHIS == NULL) {
+			_EXCEPTIONT("No variable \"PHIS\" found in topography file");
+		}
+
+		if (varPHIS->num_dims() == 3) {
+			varPHIS->get(&(dataPHIS[0][0]), 1, nLat, nLon);
+		} else if (varPHIS->num_dims() == 2) {
+			varPHIS->get(&(dataPHIS[0][0]), nLat, nLon);
+		} else {
+			_EXCEPTIONT("Invalid number of dimensions on variable \"PHIS\"");
+		}
+	}
+
+	if ((strTopoFile == "") && (dMaxTopoHeight != 0.0)) {
+		_EXCEPTIONT("No topography file specified; required for --maxtopoht");
+	}
+
 	// Open output file
 	FILE * fpOutput = fopen(strOutputFile.c_str(), "w");
 	if (fpOutput == NULL) {
@@ -630,6 +667,7 @@ try {
 		// Total number of pressure minima
 		int nTotalPressureMinima = setPressureMinima.size();
 		int nRejectedLatitude = 0;
+		int nRejectedTopography = 0;
 		int nRejectedVortMax = 0;
 		int nRejectedWarmCore = 0;
 		int nRejectedNoWarmCore = 0;
@@ -668,6 +706,28 @@ try {
 					setNewPressureMinima.insert(*iterPSL);
 				} else {
 					nRejectedLatitude++;
+				}
+			}
+
+			setPressureMinima = setNewPressureMinima;
+		}
+
+		// Eliminate based on maximum topographic height
+		if (dMaxTopoHeight != 0.0) {
+			std::set< std::pair<int, int> > setNewPressureMinima;
+
+			std::set< std::pair<int, int> >::const_iterator iterPSL
+				= setPressureMinima.begin();
+			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+				float dPHIS = dataPHIS[iterPSL->first][iterPSL->second];
+
+				double dTopoHeight =
+					static_cast<double>(dPHIS / ParamGravity);
+
+				if (dTopoHeight <= dMaxTopoHeight) {
+					setNewPressureMinima.insert(*iterPSL);
+				} else {
+					nRejectedTopography++;
 				}
 			}
 
@@ -1083,6 +1143,7 @@ try {
 
 		Announce("Total candidates: %i", setPressureMinima.size());
 		Announce("Rejected (    latitude): %i", nRejectedLatitude);
+		Announce("Rejected (  topography): %i", nRejectedTopography);
 		Announce("Rejected (no vort max ): %i", nRejectedVortMax);
 		Announce("Rejected (   warm core): %i", nRejectedWarmCore);
 		Announce("Rejected (no warm core): %i", nRejectedNoWarmCore);
