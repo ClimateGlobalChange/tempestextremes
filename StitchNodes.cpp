@@ -997,7 +997,7 @@ try {
 		}
 
 		// Write output format
-		fprintf(fp, "id,time_id,year,month,day,hour,");
+		fprintf(fp, "#id,time_id,year,month,day,hour,");
 		fprintf(fp, "%s", strFormat.c_str());
 		fprintf(fp, "\n");
 
