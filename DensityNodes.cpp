@@ -111,6 +111,9 @@ try {
 	// Number of longitudes in output
 	int nLon;
 
+	// Include poles when computing latitude array
+	bool fWithPoles;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -122,6 +125,7 @@ try {
 		CommandLineInt(iLatIxCol, "ilatcol", 9);
 		CommandLineInt(nLat, "nlat", 0);
 		CommandLineInt(nLon, "nlon", 0);
+		CommandLineBool(fWithPoles, "withpoles");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -271,6 +275,38 @@ try {
 	NcDim * dimLat = ncOutput.add_dim("lat", nLat);
 	NcDim * dimLon = ncOutput.add_dim("lon", nLon);
 
+	NcVar * varLat = ncOutput.add_var("lat", ncDouble, dimLat);
+	NcVar * varLon = ncOutput.add_var("lon", ncDouble, dimLon);
+
+	varLat->add_att("units", "degrees_north");
+	varLon->add_att("units", "degrees_east");
+
+	DataVector<double> dLat(nLat);
+	DataVector<double> dLon(nLon);
+
+	if (fWithPoles) {
+		for (int j = 0; j < nLat; j++) {
+			dLat[j] = -90.0
+				+ 180.0 * static_cast<double>(j)
+					/ static_cast<double>(nLat-1);
+		}
+
+	} else {
+		for (int j = 0; j < nLat; j++) {
+			dLat[j] = -90.0
+				+ 180.0 * (static_cast<double>(j) + 0.5)
+					/ static_cast<double>(nLat);
+		}
+	}
+
+	for (int i = 0; i < nLon; i++) {
+		dLon[i] = 360.0 * static_cast<double>(i) / static_cast<double>(nLon);
+	}
+
+	varLat->put(&(dLat[0]), nLat);
+	varLon->put(&(dLon[0]), nLon);
+
+	// Output counts
 	NcVar * varCount =
 		ncOutput.add_var(
 			strOutputVariable.c_str(),
