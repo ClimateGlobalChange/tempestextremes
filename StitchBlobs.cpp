@@ -24,6 +24,7 @@
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
 
+#include <cstring>
 #include <cstdlib>
 #include <cstdio>
 #include <cmath>
@@ -210,6 +211,94 @@ struct Tag {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Load in the contents of a text file containing one filename per
+///		line and store in a vector of strings.
+///	</summary>
+void GetInputFileList(
+	const std::string & strInputFileList,
+	std::vector<std::string> & vecInputFiles
+) {
+	FILE * fp = fopen(strInputFileList.c_str(), "r");
+
+	char szBuffer[1024];
+	for (;;) {
+		fgets(szBuffer, 1024, fp);
+
+		if (feof(fp)) {
+			break;
+		}
+
+		// Remove end-of-line characters
+		for (;;) {
+			int nLen = strlen(szBuffer);
+			if ((szBuffer[nLen-1] == '\n') ||
+				(szBuffer[nLen-1] == '\r') ||
+				(szBuffer[nLen-1] == ' ')
+			) {
+				szBuffer[nLen-1] = '\0';
+				continue;
+			}
+			break;
+		}
+
+		vecInputFiles.push_back(szBuffer);
+	}
+
+	if (vecInputFiles.size() == 0) {
+		_EXCEPTION1("No files found in file \"%s\"", strInputFileList.c_str());
+	}
+
+	fclose(fp);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Get a DataVector containing the time variable across a list of
+///		input files.
+///	</summary>
+void GetAllTimes(
+	const std::vector<std::string> & vecInputFiles,
+	DataVector<double> & dataTimes
+) {
+	std::vector<double> vecTimes;
+
+	for (int f = 0; f < vecInputFiles.size(); f++) {
+		NcFile ncFile(vecInputFiles[f].c_str());
+		if (!ncFile.is_valid()) {
+			_EXCEPTION1("Unable to open input file \"%s\"",
+				vecInputFiles[f].c_str());
+		}
+
+		NcDim * dimTime = ncFile.get_dim("time");
+		if (dimTime == NULL) {
+			_EXCEPTIONT("No dimension \"time\" found in input file");
+		}
+
+		NcVar * varTime = ncFile.get_var("time");
+		if (varTime == NULL) {
+			_EXCEPTIONT("No variable \"time\" found in input file");
+		}
+
+		int nTime = dimTime->size();
+
+		DataVector<double> dTime;
+		dTime.Initialize(nTime);
+
+		varTime->get(dTime, nTime);
+
+		for (int t = 0; t < nTime; t++) {
+			vecTimes.push_back(dTime[t]);
+		}
+	}
+
+	dataTimes.Initialize(vecTimes.size());
+	memcpy(&(dataTimes[0]), &(vecTimes[0]), vecTimes.size() * sizeof(double));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 	NcError error(NcError::verbose_nonfatal);
@@ -218,6 +307,9 @@ try {
 
 	// Input file
 	std::string strInputFile;
+
+	// Input file list
+	std::string strInputFileList;
 
 	// Output file
 	std::string strOutputFile;
@@ -237,6 +329,7 @@ try {
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
+		CommandLineString(strInputFileList, "inlist", "");
 		CommandLineString(strOutputFile, "out", "");
 		CommandLineString(strVariable, "var", "");
 		CommandLineString(strOutputVariable, "outvar", "");
@@ -249,17 +342,20 @@ try {
 	AnnounceBanner();
 
 	// Check input
-	if (strInputFile.length() == 0) {
-		_EXCEPTIONT("No input file (--in) specified");
+	if ((strInputFile == "") && (strInputFileList == "")) {
+		_EXCEPTIONT("No input file (--in) or (--inlist) specified");
+	}
+	if ((strInputFile != "") && (strInputFileList != "")) {
+		_EXCEPTIONT("Only one input file (--in) or (--inlist) allowed");
 	}
 
 	// Check output
-	if (strOutputFile.length() == 0) {
+	if (strOutputFile == "") {
 		_EXCEPTIONT("No output file (--out) specified");
 	}
 
 	// Check variable
-	if (strVariable.length() == 0) {
+	if (strVariable == "") {
 		_EXCEPTIONT("No variable name (--var) specified");
 	}
 
@@ -268,74 +364,86 @@ try {
 		strOutputVariable = strVariable + "tag";
 	}
 
-	// Load the netcdf input file
-	NcFile ncInput(strInputFile.c_str());
+	// Input file list
+	std::vector<std::string> vecInputFiles;
 
-	// Get latitude/longitude dimensions
-	NcDim * dimLat = ncInput.get_dim("lat");
-	if (dimLat == NULL) {
-		_EXCEPTIONT("No dimension \"lat\" found in input file");
+	if (strInputFile != "") {
+		vecInputFiles.push_back(strInputFile);
+	}
+	if (strInputFileList != "") {
+		GetInputFileList(strInputFileList, vecInputFiles);
 	}
 
-	NcDim * dimLon = ncInput.get_dim("lon");
-	if (dimLon == NULL) {
-		_EXCEPTIONT("No dimension \"lon\" found in input file");
+	int nFiles = vecInputFiles.size();
+
+	// Load in spatial dimension data
+	int nLat;
+	int nLon;
+
+	DataVector<double> dataLatDeg;
+	DataVector<double> dataLat;
+
+	DataVector<double> dataLonDeg;
+	DataVector<double> dataLon;
+
+	{
+		// Load the first netcdf input file
+		NcFile ncInput(vecInputFiles[0].c_str());
+
+		if (!ncInput.is_valid()) {
+			_EXCEPTION1("Unable to open NetCDF file \"%s\"",
+				vecInputFiles[0].c_str());
+		}
+
+		// Get latitude/longitude dimensions
+		NcDim * dimLat = ncInput.get_dim("lat");
+		if (dimLat == NULL) {
+			_EXCEPTIONT("No dimension \"lat\" found in input file");
+		}
+
+		NcDim * dimLon = ncInput.get_dim("lon");
+		if (dimLon == NULL) {
+			_EXCEPTIONT("No dimension \"lon\" found in input file");
+		}
+
+		NcVar * varLat = ncInput.get_var("lat");
+		if (varLat == NULL) {
+			_EXCEPTIONT("No variable \"lat\" found in input file");
+		}
+
+		NcVar * varLon = ncInput.get_var("lon");
+		if (varLon == NULL) {
+			_EXCEPTIONT("No variable \"lon\" found in input file");
+		}
+
+		nLat = dimLat->size();
+		nLon = dimLon->size();
+
+		dataLatDeg.Initialize(nLat);
+		dataLat.Initialize(nLat);
+
+		dataLonDeg.Initialize(nLon);
+		dataLon.Initialize(nLon);
+
+		varLat->get(dataLatDeg, nLat);
+		for (int j = 0; j < nLat; j++) {
+			dataLat[j] = dataLatDeg[j] * M_PI / 180.0;
+		}
+
+		varLon->get(dataLonDeg, nLon);
+		for (int i = 0; i < nLon; i++) {
+			dataLon[i] = dataLonDeg[i] * M_PI / 180.0;
+		}
+
+		// Close first netcdf file
+		ncInput.close();
 	}
 
-	NcVar * varLat = ncInput.get_var("lat");
-	if (varLat == NULL) {
-		_EXCEPTIONT("No variable \"lat\" found in input file");
-	}
-
-	NcVar * varLon = ncInput.get_var("lon");
-	if (varLon == NULL) {
-		_EXCEPTIONT("No variable \"lon\" found in input file");
-	}
-
-	int nLat = dimLat->size();
-	int nLon = dimLon->size();
-
-	DataVector<double> dataLatDeg(nLat);
-	DataVector<double> dataLat(nLat);
-	varLat->get(dataLatDeg, nLat);
-
-	for (int j = 0; j < nLat; j++) {
-		dataLat[j] = dataLatDeg[j] * M_PI / 180.0;
-	}
-
-	DataVector<double> dataLonDeg(nLon);
-	DataVector<double> dataLon(nLon);
-	varLon->get(dataLonDeg, nLon);
-
-	for (int i = 0; i < nLon; i++) {
-		dataLon[i] = dataLonDeg[i] * M_PI / 180.0;
-	}
-
-	// Get time dimension
-	NcDim * dimTime = ncInput.get_dim("time");
-	if (dimTime == NULL) {
-		_EXCEPTIONT("No dimension \"time\" found in input file");
-	}
-
-	NcVar * varTime = ncInput.get_var("time");
-	if (varTime == NULL) {
-		_EXCEPTIONT("No variable \"time\" found in input file");
-	}
-
-	int nTime = dimTime->size();
-
+	// Get time dimension over all files
 	DataVector<double> dTime;
-	dTime.Initialize(nTime);
+	GetAllTimes(vecInputFiles, dTime);
 
-	varTime->get(dTime, nTime);
-
-	// Load in indicator variable
-	NcVar * varIndicator = ncInput.get_var(strVariable.c_str());
-
-	if (varIndicator->num_dims() != 3) {
-		_EXCEPTION1("Incorrect number of dimensions for \"%s\" (3 expected)",
-			strVariable.c_str());
-	}
+	int nTime = dTime.GetRows();
 
 	// Allocate indicator data
 	DataMatrix<int> dataIndicator(nLat, nLon);
@@ -359,193 +467,224 @@ try {
 	std::vector< std::vector<LatLonBox> > vecAllPatchBoxes;
 	vecAllPatchBoxes.resize(nTime);
 
-	// Loop through all times
-	for (int t = 0; t < nTime; t++) {
+	// Time index across all files
+	int iTime = 0;
 
-		// Get the current patch vector
-		std::vector<IndicatorSet> & vecPatches = vecAllPatches[t];
+	// Loop through all files
+	for (int f = 0; f < nFiles; f++) {
 
-		std::vector<LatLonBox> & vecPatchBoxes = vecAllPatchBoxes[t];
+		// Load in each file
+		NcFile ncInput(vecInputFiles[f].c_str());
+		if (!ncInput.is_valid()) {
+			_EXCEPTION1("Unable to open input file \"%s\"",
+				vecInputFiles[f].c_str());
+		}
 
-		// New announcement block for timestep
-		char szStartBlock[128];
-		sprintf(szStartBlock, "Time %i", t);
-		AnnounceStartBlock(szStartBlock);
+		// Get current time dimension
+		NcDim * dimTime = ncInput.get_dim("time");
 
-		// Load in the data at this time
-		varIndicator->set_cur(t, 0, 0);
-		varIndicator->get(&(dataIndicator[0][0]), 1, nLat, nLon);
+		int nLocalTimes = dimTime->size();
 
-		// Insert all detected locations into set
-		for (int j = 0; j < nLat; j++) {
-		for (int i = 0; i < nLon; i++) {
-			if (dataIndicator[j][i] != 0) {
-				setIndicators.insert( LatLonPair(j, i));
+		// Load in indicator variable
+		NcVar * varIndicator = ncInput.get_var(strVariable.c_str());
+
+		if (varIndicator->num_dims() != 3) {
+			_EXCEPTION1("Incorrect number of dimensions for \"%s\" (3 expected)",
+				strVariable.c_str());
+		}
+
+		// Loop through all times
+		for (int t = 0; t < nLocalTimes; t++, iTime++) {
+
+			// Get the current patch vector
+			std::vector<IndicatorSet> & vecPatches = vecAllPatches[iTime];
+
+			std::vector<LatLonBox> & vecPatchBoxes = vecAllPatchBoxes[iTime];
+
+			// New announcement block for timestep
+			char szStartBlock[128];
+			sprintf(szStartBlock, "Time %i (%i)", iTime, t);
+			AnnounceStartBlock(szStartBlock);
+
+			// Load in the data at this time
+			varIndicator->set_cur(t, 0, 0);
+			varIndicator->get(&(dataIndicator[0][0]), 1, nLat, nLon);
+
+			// Insert all detected locations into set
+			for (int j = 0; j < nLat; j++) {
+			for (int i = 0; i < nLon; i++) {
+				if (dataIndicator[j][i] != 0) {
+					setIndicators.insert( LatLonPair(j, i));
+				}
 			}
-		}
-		}
+			}
 
-		Announce("Tagged points: %i", setIndicators.size());
+			Announce("Tagged points: %i", setIndicators.size());
 
-		// Rejections due to insufficient node count
-		int nRejectedMinSize = 0;
+			// Rejections due to insufficient node count
+			int nRejectedMinSize = 0;
 
-		// Find all patches
-		for (; setIndicators.size() != 0;) {
+			// Find all patches
+			for (; setIndicators.size() != 0;) {
 
-			// Next starting location
-			LatLonPair pr = *(setIndicators.begin());
+				// Next starting location
+				LatLonPair pr = *(setIndicators.begin());
 
-			// Current patch
-			int ixPatch = vecPatches.size();
-			vecPatches.resize(ixPatch+1);
-			vecPatchBoxes.resize(ixPatch+1);
+				// Current patch
+				int ixPatch = vecPatches.size();
+				vecPatches.resize(ixPatch+1);
+				vecPatchBoxes.resize(ixPatch+1);
 
-			// Initialize bounding box
-			LatLonBox & box = vecPatchBoxes[ixPatch];
+				// Initialize bounding box
+				LatLonBox & box = vecPatchBoxes[ixPatch];
 
-			box.lat[0] = pr.lat;
-			box.lat[1] = pr.lat;
-			box.lon[0] = pr.lon;
-			box.lon[1] = pr.lon;
+				box.lat[0] = pr.lat;
+				box.lat[1] = pr.lat;
+				box.lon[0] = pr.lon;
+				box.lon[1] = pr.lon;
 
-			// Find all connecting elements in patch
-			setNeighbors.clear();
-			setNeighbors.insert(pr);
-			while (setNeighbors.size() != 0) {
-				pr = *(setNeighbors.begin());
-				setNeighbors.erase(setNeighbors.begin());
+				// Find all connecting elements in patch
+				setNeighbors.clear();
+				setNeighbors.insert(pr);
+				while (setNeighbors.size() != 0) {
+					pr = *(setNeighbors.begin());
+					setNeighbors.erase(setNeighbors.begin());
 
-				// This node is already included in the patch
-				if (vecPatches[ixPatch].find(pr) != vecPatches[ixPatch].end()) {
-					continue;
-				}
-
-				// This node has not been tagged
-				IndicatorSetIterator iterIndicator = setIndicators.find(pr);
-				if (iterIndicator == setIndicators.end()) {
-					continue;
-				}
-
-				// Remove this indicator from the set of available indicators
-				setIndicators.erase(iterIndicator);
-
-				// Insert the node into the patch
-				vecPatches[ixPatch].insert(pr);
-
-				// Update bounding box
-				if (pr.lat > box.lat[1]) {
-					box.lat[1] = pr.lat;
-				}
-				if (pr.lat < box.lat[0]) {
-					box.lat[0] = pr.lat;
-				}
-				if (pr.lon == nLon-1) {
-					if (box.lon[0] <= box.lon[1]) {
-						if (nLon - 1 - box.lon[1] < box.lon[0] + 1) {
-							box.lon[1] = nLon - 1;
-						} else {
-							box.lon[0] = nLon - 1;
-						}
+					// This node is already included in the patch
+					if (vecPatches[ixPatch].find(pr) !=
+						vecPatches[ixPatch].end()
+					) {
+						continue;
 					}
 
-				} else if (pr.lon == 0) {
-					if (box.lon[0] <= box.lon[1]) {
-						if (nLon - box.lon[1] < box.lon[0]) {
-							box.lon[1] = 0;
-						} else {
-							box.lon[0] = 0;
-						}
+					// This node has not been tagged
+					IndicatorSetIterator iterIndicator = setIndicators.find(pr);
+					if (iterIndicator == setIndicators.end()) {
+						continue;
 					}
 
-				} else {
-					if (box.lon[0] <= box.lon[1]) {
-						if (pr.lon < box.lon[0]) {
-							box.lon[0] = pr.lon;
+					// Remove this from the set of available indicators
+					setIndicators.erase(iterIndicator);
+
+					// Insert the node into the patch
+					vecPatches[ixPatch].insert(pr);
+
+					// Update bounding box
+					if (pr.lat > box.lat[1]) {
+						box.lat[1] = pr.lat;
+					}
+					if (pr.lat < box.lat[0]) {
+						box.lat[0] = pr.lat;
+					}
+					if (pr.lon == nLon-1) {
+						if (box.lon[0] <= box.lon[1]) {
+							if (nLon - 1 - box.lon[1] < box.lon[0] + 1) {
+								box.lon[1] = nLon - 1;
+							} else {
+								box.lon[0] = nLon - 1;
+							}
 						}
-						if (pr.lon > box.lon[1]) {
-							box.lon[1] = pr.lon;
+
+					} else if (pr.lon == 0) {
+						if (box.lon[0] <= box.lon[1]) {
+							if (nLon - box.lon[1] < box.lon[0]) {
+								box.lon[1] = 0;
+							} else {
+								box.lon[0] = 0;
+							}
 						}
 
 					} else {
-						if ((pr.lon >= box.lon[0]) || (pr.lon <= box.lon[1])) {
-						} else if (pr.lon - box.lon[1] < box.lon[0] - pr.lon) {
-							box.lon[1] = pr.lon;
+						if (box.lon[0] <= box.lon[1]) {
+							if (pr.lon < box.lon[0]) {
+								box.lon[0] = pr.lon;
+							}
+							if (pr.lon > box.lon[1]) {
+								box.lon[1] = pr.lon;
+							}
+
 						} else {
-							box.lon[0] = pr.lon;
+							if ((pr.lon >= box.lon[0]) ||
+								(pr.lon <= box.lon[1])
+							) {
+							} else if (
+								pr.lon - box.lon[1] < box.lon[0] - pr.lon
+							) {
+								box.lon[1] = pr.lon;
+							} else {
+								box.lon[0] = pr.lon;
+							}
 						}
 					}
-				}
 
-				// Insert neighbors
-				if (pr.lat == 0) {
-					for (int i = 0; i < nLon; i++) {
-						setNeighbors.insert(LatLonPair(0, i));
-					}
-					setNeighbors.insert(LatLonPair(1, (pr.lon+nLon-1)%nLon));
-					setNeighbors.insert(LatLonPair(1, pr.lon));
-					setNeighbors.insert(LatLonPair(1, (pr.lon+1)%nLon));
+					// Insert neighbors
+					if (pr.lat == 0) {
+						for (int i = 0; i < nLon; i++) {
+							setNeighbors.insert(LatLonPair(0, i));
+						}
+						setNeighbors.insert(LatLonPair(1, (pr.lon+nLon-1)%nLon));
+						setNeighbors.insert(LatLonPair(1, pr.lon));
+						setNeighbors.insert(LatLonPair(1, (pr.lon+1)%nLon));
 
-				} else if (pr.lat == nLat - 1) {
-					for (int i = 0; i < nLon; i++) {
-						setNeighbors.insert(LatLonPair(nLat-1, i));
-					}
-					setNeighbors.insert(
-						LatLonPair(nLat-2, (pr.lon+nLon-1)%nLon));
-					setNeighbors.insert(
-						LatLonPair(nLat-2, pr.lon));
-					setNeighbors.insert(
-						LatLonPair(nLat-2, (pr.lon+1)%nLon));
+					} else if (pr.lat == nLat - 1) {
+						for (int i = 0; i < nLon; i++) {
+							setNeighbors.insert(LatLonPair(nLat-1, i));
+						}
+						setNeighbors.insert(
+							LatLonPair(nLat-2, (pr.lon+nLon-1)%nLon));
+						setNeighbors.insert(
+							LatLonPair(nLat-2, pr.lon));
+						setNeighbors.insert(
+							LatLonPair(nLat-2, (pr.lon+1)%nLon));
 	
-				} else {
+					} else {
 
-					setNeighbors.insert(
-						LatLonPair(pr.lat+1, (pr.lon+nLon-1)%nLon));
-					setNeighbors.insert(
-						LatLonPair(pr.lat  , (pr.lon+nLon-1)%nLon));
-					setNeighbors.insert(
-						LatLonPair(pr.lat-1, (pr.lon+nLon-1)%nLon));
+						setNeighbors.insert(
+							LatLonPair(pr.lat+1, (pr.lon+nLon-1)%nLon));
+						setNeighbors.insert(
+							LatLonPair(pr.lat  , (pr.lon+nLon-1)%nLon));
+						setNeighbors.insert(
+							LatLonPair(pr.lat-1, (pr.lon+nLon-1)%nLon));
 
-					setNeighbors.insert(
-						LatLonPair(pr.lat+1, pr.lon));
-					setNeighbors.insert(
-						LatLonPair(pr.lat-1, pr.lon));
+						setNeighbors.insert(
+							LatLonPair(pr.lat+1, pr.lon));
+						setNeighbors.insert(
+							LatLonPair(pr.lat-1, pr.lon));
 
-					setNeighbors.insert(
-						LatLonPair(pr.lat+1, (pr.lon+1)%nLon));
-					setNeighbors.insert(
-						LatLonPair(pr.lat,   (pr.lon+1)%nLon));
-					setNeighbors.insert(
-						LatLonPair(pr.lat-1, (pr.lon+1)%nLon));
+						setNeighbors.insert(
+							LatLonPair(pr.lat+1, (pr.lon+1)%nLon));
+						setNeighbors.insert(
+							LatLonPair(pr.lat,   (pr.lon+1)%nLon));
+						setNeighbors.insert(
+							LatLonPair(pr.lat-1, (pr.lon+1)%nLon));
+					}
+				}
+
+				// Check patch size
+				if (vecPatches[ixPatch].size() < nMinPatchSize) {
+					nRejectedMinSize++;
+					vecPatches.resize(ixPatch);
+					vecPatchBoxes.resize(ixPatch);
 				}
 			}
 
-			// Check patch size
-			if (vecPatches[ixPatch].size() < nMinPatchSize) {
-				nRejectedMinSize++;
-				vecPatches.resize(ixPatch);
-				vecPatchBoxes.resize(ixPatch);
+			Announce("Patches detected: %i", vecPatches.size());
+			Announce("Rejected (min size): %i", nRejectedMinSize);
+
+			for (int p = 0; p < vecPatchBoxes.size(); p++) {
+				Announce("Blob %i [%i, %i] x [%i, %i]",
+					p+1,
+					vecPatchBoxes[p].lat[0],
+					vecPatchBoxes[p].lat[1],
+					vecPatchBoxes[p].lon[0],
+					vecPatchBoxes[p].lon[1]);
 			}
+
+			AnnounceEndBlock("Done");
 		}
 
-		Announce("Patches detected: %i", vecPatches.size());
-		Announce("Rejected (min size): %i", nRejectedMinSize);
-
-		for (int p = 0; p < vecPatchBoxes.size(); p++) {
-			Announce("Blob %i [%i, %i] x [%i, %i]",
-				p+1,
-				vecPatchBoxes[p].lat[0],
-				vecPatchBoxes[p].lat[1],
-				vecPatchBoxes[p].lon[0],
-				vecPatchBoxes[p].lon[1]);
-		}
-
-		AnnounceEndBlock("Done");
-/*
-		if (t == 1) {
-			break;
-		}
-*/
+		// Close NetCDF file
+		ncInput.close();
 	}
 
 	AnnounceEndBlock("Done");
@@ -717,14 +856,10 @@ try {
 
 		// Refer all tags in clique to minimum tag
 		std::set<Tag>::const_iterator iterTagsVisited = setTagsVisited.begin();
-		//printf("Clique: (%i) ", iMinimumTag);
 		for (; iterTagsVisited != setTagsVisited.end(); iterTagsVisited++) {
 			mapEquivalentTags.insert(
 				std::pair<Tag,Tag>(*iterTagsVisited, tagMinimum));
-
-			//printf("%i ", *iterTagsVisited);
 		}
-		//printf("\n");
 	}
 
 	// Apply equivalent tags
@@ -787,15 +922,25 @@ try {
 
 	varOutputTime->set_cur((long)0);
 	varOutputTime->put(dTime, nTime);
-	CopyNcVarAttributes(varTime, varOutputTime);
 
 	varOutputLat->set_cur((long)0);
 	varOutputLat->put(dataLatDeg, nLat);
-	CopyNcVarAttributes(varLat, varOutputLat);
 
 	varOutputLon->set_cur((long)0);
 	varOutputLon->put(dataLonDeg, nLon);
-	CopyNcVarAttributes(varLon, varOutputLon);
+
+	// Copy variable attributes from first input file
+	{
+		NcFile ncInput(vecInputFiles[0].c_str());
+
+		NcVar * varTime = ncInput.get_var("time");
+		NcVar * varLat = ncInput.get_var("lat");
+		NcVar * varLon = ncInput.get_var("lon");
+
+		CopyNcVarAttributes(varTime, varOutputTime);
+		CopyNcVarAttributes(varLat, varOutputLat);
+		CopyNcVarAttributes(varLon, varOutputLon);
+	}
 
 	NcVar * varData =
 		ncOutput.add_var(
@@ -837,7 +982,6 @@ try {
 		varData->put(&(dataPatchTag[0][0]), 1, nLat, nLon);
 	}
 
-	ncInput.close();
 	ncOutput.close();
 
 	AnnounceEndBlock("Done");
