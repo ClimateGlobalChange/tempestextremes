@@ -29,6 +29,7 @@
 #include <cstdio>
 #include <cmath>
 #include <vector>
+#include <set>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -99,6 +100,9 @@ try {
 	// Output variable name
 	std::string strOutputVariable;
 
+	// Index column
+	int iStormIxCol;
+
 	// Column in which the longitude index appears
 	int iLonIxCol;
 
@@ -121,6 +125,7 @@ try {
 		CommandLineStringD(strInputFormat, "in_format", "visit", "(std|visit)");
 		CommandLineString(strOutputFile, "out", "");
 		CommandLineString(strOutputVariable, "outvar", "density");
+		CommandLineInt(iStormIxCol, "ixcol", 1);
 		CommandLineInt(iLonIxCol, "iloncol", 8);
 		CommandLineInt(iLatIxCol, "ilatcol", 9);
 		CommandLineInt(nLat, "nlat", 0);
@@ -192,6 +197,9 @@ try {
 				vecInputFiles[f].c_str());
 		}
 
+		int iStormIxLast = (-1);
+		std::set< std::pair<int, int> > setLocations;
+
 		for (;;) {
 
 			// Read in the next line
@@ -210,6 +218,7 @@ try {
 			}
 
 			// Parse line
+			int iStormIx = 0;
 			int iLon = 0;
 			int iLat = 0;
 
@@ -225,6 +234,10 @@ try {
 					(strBuffer[i] == '\0')
 				) {
 					if (!fWhitespace) {
+						if (iCol == iStormIxCol) {
+							strBuffer[i] = '\0';
+							iStormIx = atoi(&(strBuffer[iLast]));
+						}
 						if (iCol == iLonIxCol) {
 							strBuffer[i] = '\0';
 							iLon = atoi(&(strBuffer[iLast]));
@@ -253,7 +266,31 @@ try {
 				_EXCEPTION1("Longitude index (%i) out of range", iLon);
 			}
 
-			nCounts[iLat][iLon]++;
+			// Insert all locations from the previous storm
+			if (iStormIx != iStormIxLast) {
+				std::set< std::pair<int, int> >::iterator iterLocations =
+					setLocations.begin();
+
+				for (; iterLocations != setLocations.end(); iterLocations++) {
+					nCounts[iterLocations->first][iterLocations->second]++;
+				}
+
+				setLocations.clear();
+				iStormIxLast = iStormIx;
+			}
+
+			// Insert new location
+			setLocations.insert(std::pair<int,int>(iLat, iLon));
+		}
+
+		// Add remaining locations from setLocations
+		if (setLocations.size() != 0) {
+			std::set< std::pair<int, int> >::iterator iterLocations =
+				setLocations.begin();
+
+			for (; iterLocations != setLocations.end(); iterLocations++) {
+				nCounts[iterLocations->first][iterLocations->second]++;
+			}
 		}
 
 		fclose(fp);
