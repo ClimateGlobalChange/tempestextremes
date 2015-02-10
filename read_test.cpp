@@ -30,7 +30,7 @@ int main(){
   for (int b=0; b++; b<nVars){
     NcVar *readVar = readin.get_var(b);
     std::string varName = readVar->name();
-    int dimsVar = readVar->num_dims;
+    int dimsVar = readVar->num_dims();
     int atts = readVar->num_atts();
     std::cout<< "There are "<< atts <<" attributes.";
     std::cout << "Variable " << varName.c_str() << " has attributes ";
