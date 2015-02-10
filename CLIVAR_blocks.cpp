@@ -10,63 +10,61 @@
 #include "Exception.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
-
+#include "DataVector.h"
+#include "DataMatrix.h"
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
 #include <iostream>
 
 
-NcVar *interpolate_lev(NcVar *var, NcVar *hyam, NcVar *hybm, NcVar *ps, NcFile outfile){
+NcVar *interpolate_lev(NcVar *var, NcVar *hyam, NcVar *hybm, NcVar *ps, NcDim *pLev){
   //need to calculate at each level, interpolate to new variable
-  //How to get dimensions? Ask!
 
-  //Create new variable and copy time, lat, lon dimensions
-  //but initialize pressure levels
-  //Possible to copy dimensions?
-  //Or should the variable be stored as an array, 
-  //then written as a new variable?
-  NcAtt *att_units = var->get_att("units");
-  char *units = att_units->as_string(0);
-  NcVar *NewVar = outfile.add_var(units.c_str());
-
+  //Array dimensions
   int nTime = var->get_dim(0)->size();
   int nLev = var->get_dim(1)->size();
   int nLat = var->get_dim(2)->size();
   int nLon = var->get_dim(3)->size();
-
+  int npLev = pLev->size();
+  
+  //Matrix to store PS
   DataMatrix3D<double> matPS(nTime, nLat, nLon);
-  var->set_cur(0, 0, 0);
-  var->get(&(matPS[0][0][0]), nTime, nLat, nLon);
+  ps->set_cur(0, 0, 0);
+  ps->get(&(matPS[0][0][0]), nTime, nLat, nLon);
 
+  //Matrix to store input variable data
   DataMatrix4D<double> matVar(nTime, nLev, nLat, nLon);
   var->set_cur(0, 0, 0, 0);
   var->get(&(matVar[0][0][0][0]), nTime, nLev, nLat, nLon);
+  
+  //Matrix to store output variable data
+  DataMatrix4D<double> matVarOut(nTime, npLev, nLat, nLon);
 
-  DataMatrix4D<double> matVarOut(nTime, nLev, nLat, nLon);
-
+  //hybrid coefficient A
   DataVector<float> vecHyam(nLev);
   hyam->set_cur((long) 0);
   hyam->get(&(vecHyam[0]), nLev);
 
+  //hybrid coefficient B
   DataVector<float> vecHybm(nLev);
   hybm->set_cur((long) 0);
   hybm->get(&(vecHybm[0]), nLev);
   
-  //Note: need to define these lengths!
-  for (t=0; t++; t<time_len){
-    for (l=0; l++; l<(lev_len-1)){
+  //Loop over input data and interpolate to output var
+  for (int t=0; t++; t<nTime){
+    for (int l=0; l++; l<(nLev-1)){
       float A1 = vecHyam[l];
       float B1 = vecHybm[l];
       float A2 = vecHyam[l+1];
       float B2 = vecHybm[l+1];
-      for (a=0; a++; a<lat_len){
-        for (b=0; b++; b<lon_len){
+      for (int a=0; a++; a<nLat){
+        for (int b=0; b++; b<nLon){
           float p1 = 100000.0 * A1 + matPS[t][a][b] * B1;
           float p2 = 100000.0 * A2 + matPS[t][a][b] * B2;
-          for (p=0; p++; p<plev_len){
-            if (p1<plev[p] && p2>=plev[p]){
-              float weight = ((plev[p]-p1)/(p2-p1));
+          for (int p=0; p++; p<npLev){
+            if (p1<pLev[p] && p2>=pLev[p]){
+              float weight = ((pLev[p]-p1)/(p2-p1));
               matVarOut[t][p][a][b] = weight*matVar[t][l+1][a][b]
                                + (1.-weight)*matVar[t][l][a][b];
             }
