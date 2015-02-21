@@ -30,6 +30,9 @@ DETECTCYCLONES_CFILES= kdtree.c
 DENSITYNODES_FILES= DensityNodes.cpp Announce.cpp
 DENSITYNODES_CFILES=
 
+APPENDNODEDATA_FILES= AppendNodeData.cpp Announce.cpp
+APPENDNODEDATA_CFILES=
+
 # Load system-specific defaults
 CFLAGS+= -I$(NETCDF_INCLUDEDIR)
 LDFLAGS+= -L$(NETCDF_LIBDIR)
@@ -39,7 +42,7 @@ include Make.defs
 ##
 ## Build instructions
 ##
-all: StitchNodes StitchBlobs DetectCyclones DensityNodes
+all: StitchNodes StitchBlobs DetectCyclones DensityNodes AppendNodeData
 
 StitchNodes: $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
@@ -53,11 +56,14 @@ DetectCyclones: $(DETECTCYCLONES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DETECTCYCLONES_C
 DensityNodes: $(DENSITYNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENSITYNODES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(DENSITYNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENSITYNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 
+AppendNodeData: $(APPENDNODEDATA_FILES:%.cpp=$(BUILDDIR)/%.o) $(APPENDNODEDATA_CFILES:%.c=$(BUILDDIR)/%.o)
+	$(CC) $(LDFLAGS) -o $@ $(APPENDNODEDATA_FILES:%.cpp=$(BUILDDIR)/%.o) $(APPENDNODEDATA_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
+
 ##
 ## Clean
 ##
 clean:
-	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes
+	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes AppendNodeData
 	rm -rf $(DEPDIR)
 	rm -rf $(BUILDDIR)
 

@@ -24,3 +24,7 @@ cyclones_out
 cyclones_traj.txt
 
 traj2.txt
+
+DensityNodes
+
+AppendNodeData
