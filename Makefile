@@ -18,6 +18,13 @@ LDFILES= -lnetcdf -lnetcdf_c++
 ##############################################################################
 
 # Local files
+######################################
+#ADDED MY FILES HERE!
+######################################
+CLIVAR_FILES = CLIVAR_blocks.cpp Announce.cpp NetCDFUtilities.cpp CLIVAR_block_utilities.cpp
+CLIVAR_CFILES =
+######################################
+
 STITCHNODES_FILES= StitchNodes.cpp Announce.cpp
 STITCHNODES_CFILES= kdtree.c
 
@@ -39,7 +46,7 @@ include Make.defs
 ##
 ## Build instructions
 ##
-all: StitchNodes StitchBlobs DetectCyclones DensityNodes
+all: StitchNodes StitchBlobs DetectCyclones DensityNodes CLIVAR_blocks 
 
 StitchNodes: $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
@@ -53,11 +60,15 @@ DetectCyclones: $(DETECTCYCLONES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DETECTCYCLONES_C
 DensityNodes: $(DENSITYNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENSITYNODES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(DENSITYNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENSITYNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 
+CLIVAR_blocks: $(CLIVAR_FILES:%.cpp=$(BUILDDIR)/%.o) $(CLIVAR_CFILES:%.c=$(BUILDDIR)/%.o)
+	$(CC) $(LDFLAGS) -o $@ $(CLIVAR_FILES:%.cpp=$(BUILDDIR)/%.o) $(CLIVAR_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
+
+
 ##
 ## Clean
 ##
 clean:
-	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes
+	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes CLIVAR_blocks Read_test
 	rm -rf $(DEPDIR)
 	rm -rf $(BUILDDIR)
 

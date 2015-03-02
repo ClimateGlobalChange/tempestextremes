@@ -6,109 +6,77 @@
 ///
 
 
-#include "CLIVAR_blocks.h"
+#include "CLIVAR_block_utilities.h"
+#include "CommandLine.h"
+#include "Announce.h"
 #include "Exception.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
 #include "DataVector.h"
-#include "DataMatrix.h"
+#include "DataMatrix3D.h"
+#include "DataMatrix4D.h"
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
 #include <iostream>
 
-
-NcVar *interpolate_lev(NcVar *var, NcVar *hyam, NcVar *hybm, NcVar *ps, NcDim *pLev){
-  //need to calculate at each level, interpolate to new variable
-
-  //Array dimensions
-  int nTime = var->get_dim(0)->size();
-  int nLev = var->get_dim(1)->size();
-  int nLat = var->get_dim(2)->size();
-  int nLon = var->get_dim(3)->size();
-  int npLev = pLev->size();
-  
-  //Matrix to store PS
-  DataMatrix3D<double> matPS(nTime, nLat, nLon);
-  ps->set_cur(0, 0, 0);
-  ps->get(&(matPS[0][0][0]), nTime, nLat, nLon);
-
-  //Matrix to store input variable data
-  DataMatrix4D<double> matVar(nTime, nLev, nLat, nLon);
-  var->set_cur(0, 0, 0, 0);
-  var->get(&(matVar[0][0][0][0]), nTime, nLev, nLat, nLon);
-  
-  //Matrix to store output variable data
-  DataMatrix4D<double> matVarOut(nTime, npLev, nLat, nLon);
-
-  //hybrid coefficient A
-  DataVector<float> vecHyam(nLev);
-  hyam->set_cur((long) 0);
-  hyam->get(&(vecHyam[0]), nLev);
-
-  //hybrid coefficient B
-  DataVector<float> vecHybm(nLev);
-  hybm->set_cur((long) 0);
-  hybm->get(&(vecHybm[0]), nLev);
-  
-  //Loop over input data and interpolate to output var
-  for (int t=0; t++; t<nTime){
-    for (int l=0; l++; l<(nLev-1)){
-      float A1 = vecHyam[l];
-      float B1 = vecHybm[l];
-      float A2 = vecHyam[l+1];
-      float B2 = vecHybm[l+1];
-      for (int a=0; a++; a<nLat){
-        for (int b=0; b++; b<nLon){
-          float p1 = 100000.0 * A1 + matPS[t][a][b] * B1;
-          float p2 = 100000.0 * A2 + matPS[t][a][b] * B2;
-          for (int p=0; p++; p<npLev){
-            if (p1<pLev[p] && p2>=pLev[p]){
-              float weight = ((pLev[p]-p1)/(p2-p1));
-              matVarOut[t][p][a][b] = weight*matVar[t][l+1][a][b]
-                               + (1.-weight)*matVar[t][l][a][b];
-            }
-          }
-        }
-      }
-    }
-  }
-
-  NewVar->set_cur(0, 0, 0, 0);
-  NewVar->put(&(matVarOut[0][0][0][0]), nTime, nLev, nLat, nLon);
-
-  return(NewVar);
-}
 //////////////////////////////////////////////////////////////////////// 
 int main(int argc, char **argv){
-  if (argc<3){
-    cout<< "Error: provide input file names for both 3D and 2D.";
-    return 1;
-  }
-  std::string strfile_in = argv[1];
+
+  //Input file with variable to be interpolated
+  std::string strfile_in;
+  //Input file with PS
+  std::string strfile_2d;
+  //Output file to be written
+  std::string strfile_out;
+  
+  //Parse command line
+  BeginCommandLine()
+
+    CommandLineString(strfile_in, "in", "");
+    CommandLineString(strfile_2d, "in2d", "");
+    CommandLineString(strfile_out, "out", "");
+
+    ParseCommandLine(argc, argv);
+
+  EndCommandLine(argv)
+  AnnounceBanner();
+
+    // Check input
+    if (strfile_in == "") {
+       _EXCEPTIONT("No input file (--in) specified");
+    }
+    if (strfile_2d == "") {
+       _EXCEPTIONT("No input file (--in2d) specified");
+    }
+    if (strfile_out == "") {
+       _EXCEPTIONT("No output file (--out) specified");
+    }
 
   //Open input file (as read-only)
   NcFile readin(strfile_in.c_str());
-  cout<< "Reading file "<< strfile_in.c_str();  
+  std::cout<< "Reading file "<< strfile_in.c_str() << std::endl;  
 
   //Open 2D input file
-  std::string strfile_2d = argv[2];
   NcFile readin_2d(strfile_2d.c_str());
-  cout<< "Reading file " << strfile_2d.c_str();
+  std::cout<< "Reading file " << strfile_2d.c_str() << std::endl;
   
-  //Dimensions
-  //What does the arrow symbol do?
+  //Dimensions and associated variables
   NcDim *time = readin.get_dim("time");
-  long time_len = time->size();
+  int time_len = time->size();
+  NcVar *timevar = readin.get_var("time");
 
   NcDim *lev = readin.get_dim("lev");
-  long lev_len = lev->size();
-
+  int lev_len = lev->size();
+  
   NcDim *lat = readin.get_dim("lat");
-  long lat_len = lat->size();
+  int lat_len = lat->size();
+  NcVar *latvar = readin.get_var("lat");
 
   NcDim *lon = readin.get_dim("lon");
-  long lon_len = lon->size();
+  int lon_len = lon->size();
+  NcVar *lonvar = readin.get_var("lon");
+
 
   //Coefficients
   NcVar *hyam = readin.get_var("hyam");
@@ -120,18 +88,79 @@ int main(int argc, char **argv){
   NcVar *vvar = readin.get_var("V");
   NcVar *ps = readin_2d.get_var("PS");
 
+  //Create pressure level vector
+  int plev_len = (100000.0-5000.0)/(5000.0);
+
+  DataVector<double> pVals(plev_len);
+
+  for (int i=0; i<plev_len; i++){
+    double pNum = 5000.0 * (i+1);
+    pVals[i] = pNum;
+  }
+
   //Create output file
-  std::string strfile_out = strfile_in.replace(".nc", "test.nc");
   NcFile file_out(strfile_out.c_str(), NcFile::Replace);
+
+  //Dimensions: time, pressure, lat, lon
   NcDim *out_time = file_out.add_dim("time", time_len);
-  //How to create pressure level?
   NcDim *out_plev = file_out.add_dim("lev", plev_len);
   NcDim *out_lat = file_out.add_dim("lat", lat_len);
   NcDim *out_lon = file_out.add_dim("lon", lon_len);
-  
+ 
+  //COPY EXISTING DIMENSION VALUES
+  NcVar *time_vals = file_out.add_var("time", ncDouble, out_time);
+  NcVar *lat_vals = file_out.add_var("lat", ncDouble, out_lat);
+  NcVar *lon_vals = file_out.add_var("lon", ncDouble, out_lon); 
+
+  copy_dim_var(timevar, time_vals);
+  copy_dim_var(latvar, lat_vals);
+  copy_dim_var(lonvar, lon_vals);
+
+  //Give pressure level dimension values
+  NcVar *plev_vals = file_out.add_var("lev", ncDouble, out_plev);
+  plev_vals-> set_cur((long) 0);
+  plev_vals->put(&(pVals[0]), plev_len);
+
+  //Add interpolated variables to outfile
+  NcVar *out_temp = file_out.add_var("T", ncDouble, out_time, out_plev, out_lat, out_lon);
+  interpolate_lev(temp, hyam, hybm, ps, plev_vals, out_temp);
+
+  NcVar *out_uvar = file_out.add_var("U", ncDouble, out_time, out_plev, out_lat, out_lon);
+  interpolate_lev(uvar, hyam, hybm, ps, plev_vals, out_uvar);
+
+  NcVar *out_vvar = file_out.add_var("V", ncDouble, out_time, out_plev, out_lat, out_lon);
+  interpolate_lev(vvar, hyam, hybm, ps, plev_vals, out_vvar);
 
   ////////////////////////////////////////////////////////////
-  //Close input files
-  filein.close()
-  filein_2d.close()
+
+  //Variables for PV calculation
+//  double radius = 6371000.0;
+//  double pi = 4.0*cmath::atan(1.0);
+//  double radian = 180.0/pi;
+//  double sigma = cmath::pow(7.2921, -5.0);
+
+  DataVector<double> coriolis(lat_len);
+  DataVector<double> cosphi(lat_len);
+
+  double dphi;
+  double dlambda;
+  double dp;
+
+  pv_vars_calc(lat_vals, lon_vals, plev_vals, dphi, dlambda, dp, coriolis, cosphi);
+
+  //Calculate PT and add to outfile
+  NcVar *pt_var = file_out.add_var("PT", ncDouble, out_time, out_plev, out_lat, out_lon);
+  PT_calc(out_temp, plev_vals, pt_var);
+
+  //Calculate relative vorticity and add to outfile
+  NcVar *rvort_var = file_out.add_var("REL_VORT", ncDouble, out_time, out_plev, out_lat, out_lon);
+  rVort_calc(out_uvar, out_vvar, dphi, dlambda, cosphi, rvort_var);
+ 
+
+ //Close input files
+  readin.close();
+  readin_2d.close();
+
+  //Close output file
+  file_out.close();
 }
