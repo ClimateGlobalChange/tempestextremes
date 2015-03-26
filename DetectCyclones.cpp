@@ -41,14 +41,18 @@
 ///	</summary>
 void FindAllLocalMinima(
 	const DataMatrix<float> & data,
-	std::set< std::pair<int, int> > & setMinima
+	std::set< std::pair<int, int> > & setMinima,
+	bool fRegional
 ) {
-	int nLon = data.GetColumns();
-	int nLat = data.GetRows();
+	const int nLon = data.GetColumns();
+	const int nLat = data.GetRows();
+
+	const int nLonBegin = (fRegional)?(1):(0);
+	const int nLonEnd   = (fRegional)?(nLon-1):(nLon);
 
 	// Check interior nodes
 	for (int j = 1; j < nLat-1; j++) {
-	for (int i = 0; i < nLon; i++) {
+	for (int i = nLonBegin; i < nLonEnd; i++) {
 
 		bool fMinimum = true;
 		for (int q = -1; q <= 1; q++) {
@@ -109,13 +113,17 @@ DonePressureMinima:
 ///	</summary>
 void FindAllLocalMaxima(
 	const DataMatrix<float> & data,
-	std::set< std::pair<int, int> > & setMaxima
+	std::set< std::pair<int, int> > & setMaxima,
+	bool fRegional
 ) {
-	int nLon = data.GetColumns();
-	int nLat = data.GetRows();
+	const int nLon = data.GetColumns();
+	const int nLat = data.GetRows();
+
+	const int nLonBegin = (fRegional)?(1):(0);
+	const int nLonEnd   = (fRegional)?(nLon-1):(nLon);
 
 	for (int j = 1; j < nLat-1; j++) {
-	for (int i = 0; i < nLon; i++) {
+	for (int i = nLonBegin; i < nLonEnd; i++) {
 
 		bool fMaximum = true;
 		for (int q = -1; q <= 1; q++) {
@@ -379,6 +387,300 @@ void ParseTimeDouble(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Determine if the given field has a closed contour about this point.
+///	</summary>
+bool HasClosedContour(
+	const DataVector<double> & dataLat,
+	const DataVector<double> & dataLon,
+	const DataMatrix<double> & dataState,
+	const int iLat,
+	const int iLon,
+	double dDeltaAmt,
+	double dDeltaDist,
+	int nDeltaCount
+) {
+	// Verify arguments
+	if (dDeltaAmt == 0.0) {
+		_EXCEPTIONT("Closed contour amount must be non-zero");
+	}
+	if (dDeltaDist <= 0.0) {
+		_EXCEPTIONT("Closed contour distance must be positive");
+	}
+	if (nDeltaCount <= 0) {
+		_EXCEPTIONT("Number of sample points for closed contour "
+			"must be positive");
+	}
+
+	// Grid spacing
+	const int nLat = dataLat.GetRows();
+	const int nLon = dataLon.GetRows();
+
+	const double dDeltaLat = (dataLat[1] - dataLat[0]);
+	const double dDeltaLon = (dataLon[1] - dataLon[0]);
+				
+	double dLat = dataLat[iLat];
+	double dLon = dataLon[iLon];
+
+	// This location in Cartesian geometry
+	double dX0 = cos(dLon) * cos(dLat);
+	double dY0 = sin(dLon) * cos(dLat);
+	double dZ0 = sin(dLat);
+
+	// Pick a quasi-arbitrary reference direction
+	double dX1;
+	double dY1;
+	double dZ1;
+	if ((fabs(dX0) >= fabs(dY0)) && (fabs(dX0) >= fabs(dZ0))) {
+		dX1 = dX0;
+		dY1 = dY0 + 1.0;
+		dZ1 = dZ0;
+	} else if ((fabs(dY0) >= fabs(dX0)) && (fabs(dY0) >= fabs(dZ0))) {
+		dX1 = dX0;
+		dY1 = dY0;
+		dZ1 = dZ0 + 1.0;
+	} else {
+		dX1 = dX0 + 1.0;
+		dY1 = dY0;
+		dZ1 = dZ0;
+	}
+
+	// Project perpendicular to detection location
+	double dDot = dX1 * dX0 + dY1 * dY0 + dZ1 * dZ0;
+
+	dX1 -= dDot * dX0;
+	dY1 -= dDot * dY0;
+	dZ1 -= dDot * dZ0;
+
+	// Normalize
+	double dMag1 = sqrt(dX1 * dX1 + dY1 * dY1 + dZ1 * dZ1);
+
+	if (dMag1 < 1.0e-12) {
+		_EXCEPTIONT("Logic error");
+	}
+
+	double dScale1 = tan(dDeltaDist * M_PI / 180.0) / dMag1;
+
+	dX1 *= dScale1;
+	dY1 *= dScale1;
+	dZ1 *= dScale1;
+
+	// Verify dot product is zero
+	dDot = dX0 * dX1 + dY0 * dY1 + dZ0 * dZ1;
+	if (fabs(dDot) > 1.0e-12) {
+		_EXCEPTIONT("Logic error");
+	}
+
+	// Cross product (magnitude automatically 
+	double dCrossX = dY0 * dZ1 - dZ0 * dY1;
+	double dCrossY = dZ0 * dX1 - dX0 * dZ1;
+	double dCrossZ = dX0 * dY1 - dY0 * dX1;
+
+	// Obtain reference value
+	float dRefValue = dataState[iLat][iLon];
+
+	// Loop through all sample points
+	for (int a = 0; a < nDeltaCount; a++) {
+
+		// Angle of rotation
+		double dAngle = 2.0 * M_PI
+			* static_cast<double>(a)
+			/ static_cast<double>(nDeltaCount);
+
+		// Calculate new rotated vector
+		double dX2 = dX0 + dX1 * cos(dAngle) + dCrossX * sin(dAngle);
+		double dY2 = dY0 + dY1 * cos(dAngle) + dCrossY * sin(dAngle);
+		double dZ2 = dZ0 + dZ1 * cos(dAngle) + dCrossZ * sin(dAngle);
+
+		double dMag2 = sqrt(dX2 * dX2 + dY2 * dY2 + dZ2 * dZ2);
+
+		dX2 /= dMag2;
+		dY2 /= dMag2;
+		dZ2 /= dMag2;
+
+		// Calculate new lat/lon location
+		double dLat2 = asin(dZ2);
+		double dLon2 = atan2(dY2, dX2);
+
+		if (dLon2 < 0.0) {
+			dLon2 += 2.0 * M_PI;
+		}
+/*
+		printf("%i : %3.2f %3.2f : %3.2f %3.2f\n",
+			a,
+			dLat * 180.0 / M_PI,
+			dLon * 180.0 / M_PI,
+			dLat2 * 180.0 / M_PI,
+			dLon2 * 180.0 / M_PI);
+*/
+		int j = (dLat2 + 0.5 * M_PI) / dDeltaLat;
+		int i = (dLon2) / dDeltaLon;
+
+		if (i == nLon) {
+			i = nLon-1;
+		}
+		if (j == nLat) {
+			j = nLat-1;
+		}
+
+		// Check for insufficient distance
+		if ((i == iLon) && (j == iLat)) {
+			_EXCEPTIONT("Closed contour distance insufficient; increase value");
+		}
+
+		// Check for out of bounds
+		if ((i < 0) || (j < 0) || (i >= nLon) || (j >= nLat)) {
+			_EXCEPTION4("Logic error %i/%i, %i/%i", i, nLon, j, nLat);
+		}
+
+		// Verify sufficient increase in value
+		if (dDeltaAmt > 0.0) {
+			if (dataState[j][i] - dRefValue < dDeltaAmt) {
+				return false;
+			}
+
+		// Verify sufficient decrease in value
+		} else {
+			if (dRefValue - dataState[j][i] < -dDeltaAmt) {
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class describing a general closed contour operation.
+///	</summary>
+class ClosedContourOp {
+
+public:
+	///	<summary>
+	///		Parse a threshold operator string.
+	///	</summary>
+	void Parse(
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Variable,
+			ReadMode_Distance,
+			ReadMode_Amount,
+			ReadMode_Count,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Variable;
+
+		// Loop through string
+		int iLast = 0;
+		for (int i = 0; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in variable name
+				if (eReadMode == ReadMode_Variable) {
+					m_strVariable = strSubStr;
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Amount;
+
+				// Read in amount
+				} else if (eReadMode == ReadMode_Amount) {
+					m_dDeltaAmount = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Distance;
+
+				// Read in distance
+				} else if (eReadMode == ReadMode_Distance) {
+					m_dDistance = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Count;
+
+				// Read in count
+				} else if (eReadMode == ReadMode_Count) {
+					m_nCount = atoi(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("Too many entries in threshold string \"%s\"",
+						strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("Insufficient entries in threshold string \"%s\"",
+					strOp.c_str());
+		}
+
+		// Output announcement
+		char szBuffer[128];
+
+		std::string strDescription;
+		strDescription += m_strVariable;
+
+		if (m_dDeltaAmount == 0.0) {
+			_EXCEPTIONT("For closed contour op, delta amount must be non-zero");
+		}
+		if (m_dDistance <= 0.0) {
+			_EXCEPTIONT("For closed contour op, distance must be positive");
+		}
+		if (m_nCount <= 0) {
+			_EXCEPTIONT("For closed contour op, count must be positive");
+		}
+
+		if (m_dDeltaAmount < 0.0) {
+			Announce("%s decreases by %f over %f degrees (%i samples)",
+				m_strVariable.c_str(),
+				-m_dDeltaAmount,
+				m_dDistance,
+				m_nCount);
+
+		} else {
+			Announce("%s increases by %f over %f degrees (%i samples)",
+				m_strVariable.c_str(),
+				m_dDeltaAmount,
+				m_dDistance,
+				m_nCount);
+		}
+	}
+
+public:
+	///	<summary>
+	///		Variable name.
+	///	</summary>
+	std::string m_strVariable;
+
+	///	<summary>
+	///		Threshold amount.  If positive this represents a minimum
+	///		increase.  If negative this represents a minimum decrease.
+	///	</summary>
+	double m_dDeltaAmount;
+
+	///	<summary>
+	///		Threshold distance.
+	///	</summary>
+	double m_dDistance;
+
+	///	<summary>
+	///		Number of nodes used to evaluate closed contour.
+	///	</summary>
+	int m_nCount;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 	NcError error(NcError::verbose_nonfatal);
@@ -401,6 +703,9 @@ try {
 
 	// Meridional velocity name
 	std::string strVName;
+
+	// Data is regional
+	bool fRegional;
 
 	// Maximum latitude for detection
 	double dMaxLatitude;
@@ -426,14 +731,8 @@ try {
 	// Require 850hPa vorticity maxima within this distance
 	double dVortDist;
 
-	// Distance to evaluate delta SLP
-	double dDeltaSLPDist;
-
-	// Amount to require SLP increase
-	double dDeltaSLPAmt;
-
-	// Number of rotations
-	int nDeltaSLPCount;
+	// Closed contour commands
+	std::string strClosedContourCmd;
 
 	// Minimum Laplacian value
 	double dMinLaplacian;
@@ -453,6 +752,7 @@ try {
 		CommandLineString(strOutputFile, "out", "");
 		CommandLineString(strUName, "uname", "U850");
 		CommandLineString(strVName, "vname", "V850");
+		CommandLineBool(fRegional, "regional");
 		CommandLineDoubleD(dMaxLatitude, "maxlat", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinLatitude, "minlat", 0.0, "(degrees)");
 		CommandLineString(strTopoFile, "topofile", "");
@@ -461,9 +761,7 @@ try {
 		CommandLineDoubleD(dWarmCoreDist, "warmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dNoWarmCoreDist, "nowarmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dVortDist, "vortdist", 0.0, "(degrees)");
-		CommandLineDoubleD(dDeltaSLPDist, "deltaslpdist", 0.0, "(degrees)");
-		CommandLineDoubleD(dDeltaSLPAmt, "deltaslpamt", 0.0, "(Pa)");
-		CommandLineInt(nDeltaSLPCount, "deltaslpcount", 8);
+		CommandLineString(strClosedContourCmd, "closedcontourcmd", "");
 		CommandLineDoubleD(dMinLaplacian, "minlaplacian", 0.0, "(Pa / degree^2)");
 		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
 		//CommandLineBool(fAppend, "append");
@@ -488,6 +786,32 @@ try {
 	if ((dWarmCoreDist != 0.0) && (dNoWarmCoreDist != 0.0)) {
 		_EXCEPTIONT("Only one of --warmcoredist and --nowarmcoredist"
 			   " may be active");
+	}
+
+	// Parse the closed contour command string
+	std::vector<ClosedContourOp> vecClosedContourOp;
+
+	if (strClosedContourCmd != "") {
+		AnnounceStartBlock("Parsing closed contour operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strClosedContourCmd.length(); i++) {
+
+			if ((i == strClosedContourCmd.length()) ||
+				(strClosedContourCmd[i] == ';')
+			) {
+				std::string strSubStr =
+					strClosedContourCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecClosedContourOp.size());
+				vecClosedContourOp.resize(iNextOp + 1);
+				vecClosedContourOp[iNextOp].Parse(strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
 	}
 
 	// Check minimum latitude and maximum latitude
@@ -525,8 +849,8 @@ try {
 		_EXCEPTIONT("No variable \"lon\" found in input file");
 	}
 
-	int nLat = dimLat->size();
-	int nLon = dimLon->size();
+	const int nLat = dimLat->size();
+	const int nLon = dimLon->size();
 
 	DataVector<double> dataLat(nLat);
 	varLat->get(dataLat, nLat);
@@ -666,7 +990,7 @@ try {
 
 		// Tag all pressure minima
 		std::set< std::pair<int, int> > setPressureMinima;
-		FindAllLocalMinima(dataPSL, setPressureMinima);
+		FindAllLocalMinima(dataPSL, setPressureMinima, fRegional);
 
 		// Total number of pressure minima
 		int nTotalPressureMinima = setPressureMinima.size();
@@ -676,8 +1000,9 @@ try {
 		int nRejectedVortMax = 0;
 		int nRejectedWarmCore = 0;
 		int nRejectedNoWarmCore = 0;
-		int nRejectedClosedContour = 0;
 		int nRejectedLaplacian = 0;
+
+		DataVector<int> vecRejectedClosedContour(vecClosedContourOp.size());
 
 		// Eliminate based on maximum latitude
 		if (dMaxLatitude != 0.0) {
@@ -851,7 +1176,7 @@ try {
 
 			// Find all vorticity maxima
 			std::set< std::pair<int, int> > setZETA850Maxima;
-			FindAllLocalMaxima(dataZETA850, setZETA850Maxima);
+			FindAllLocalMaxima(dataZETA850, setZETA850Maxima, fRegional);
 
 			// Construct KD tree for ZETA850
 			kdtree * kdZETA850Maxima = kd_create(3);
@@ -914,10 +1239,10 @@ try {
 		if ((dWarmCoreDist != 0.0) || (dNoWarmCoreDist != 0.0)) {
 
 			std::set< std::pair<int, int> > setT200Maxima;
-			FindAllLocalMaxima(dataT200, setT200Maxima);
+			FindAllLocalMaxima(dataT200, setT200Maxima, fRegional);
 
 			std::set< std::pair<int, int> > setT500Maxima;
-			FindAllLocalMaxima(dataT500, setT500Maxima);
+			FindAllLocalMaxima(dataT500, setT500Maxima, fRegional);
 
 			// Construct KD tree for T200
 			kdtree * kdT200Maxima = kd_create(3);
@@ -1019,159 +1344,47 @@ try {
 			setPressureMinima = setNewPressureMinima;
 		}
 
-		// Eliminate based on minimum SLP increase away from PSL min
-		if (dDeltaSLPDist != 0.0) {
-
-			double dDeltaLat = (dataLat[1] - dataLat[0]);
-			double dDeltaLon = (dataLon[1] - dataLon[0]);
-
+		// Eliminate based on closed contours
+		for (int ccc = 0; ccc < vecClosedContourOp.size(); ccc++) {
 			std::set< std::pair<int, int> > setNewPressureMinima;
 
+			// Load relevant data
+			DataMatrix<double> dataState(nLat, nLon);
+			
+			NcVar * varDataState =
+				ncInput.get_var(vecClosedContourOp[ccc].m_strVariable.c_str());
+
+			varDataState->set_cur(t,0,0);
+			varDataState->get(&(dataState[0][0]), 1, nLat, nLon);
+
+			// Loop through all pressure minima
 			std::set< std::pair<int, int> >::const_iterator iterPSL
 				= setPressureMinima.begin();
+
 			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				
-				double dLat = dataLat[iterPSL->first];
-				double dLon = dataLon[iterPSL->second];
 
-				// This PSL location on the sphere
-				double dX0 = cos(dLon) * cos(dLat);
-				double dY0 = sin(dLon) * cos(dLat);
-				double dZ0 = sin(dLat);
-
-				// Pick a quasi-arbitrary reference direction
-				double dX1;
-				double dY1;
-				double dZ1;
-				if ((fabs(dX0) >= fabs(dY0)) && (fabs(dX0) >= fabs(dZ0))) {
-					dX1 = dX0;
-					dY1 = dY0 + 1.0;
-					dZ1 = dZ0;
-				} else if ((fabs(dY0) >= fabs(dX0)) && (fabs(dY0) >= fabs(dZ0))) {
-					dX1 = dX0;
-					dY1 = dY0;
-					dZ1 = dZ0 + 1.0;
-				} else {
-					dX1 = dX0 + 1.0;
-					dY1 = dY0;
-					dZ1 = dZ0;
-				}
-
-				// Project perpendicular to PSL location
-				double dDot = dX1 * dX0 + dY1 * dY0 + dZ1 * dZ0;
-
-				dX1 -= dDot * dX0;
-				dY1 -= dDot * dY0;
-				dZ1 -= dDot * dZ0;
-
-				// Normalize
-				double dMag1 = sqrt(dX1 * dX1 + dY1 * dY1 + dZ1 * dZ1);
-
-				if (dMag1 < 1.0e-12) {
-					_EXCEPTIONT("Logic error");
-				}
-
-				double dScale1 = tan(dDeltaSLPDist * M_PI / 180.0) / dMag1;
-
-				dX1 *= dScale1;
-				dY1 *= dScale1;
-				dZ1 *= dScale1;
-
-				// Verify dot product is zero
-				dDot = dX0 * dX1 + dY0 * dY1 + dZ0 * dZ1;
-				if (fabs(dDot) > 1.0e-12) {
-					_EXCEPTIONT("Logic error");
-				}
-
-				// Cross product (magnitude automatically 
-				double dCrossX = dY0 * dZ1 - dZ0 * dY1;
-				double dCrossY = dZ0 * dX1 - dX0 * dZ1;
-				double dCrossZ = dX0 * dY1 - dY0 * dX1;
-
-				// Obtain reference PSL
-				float dRefPSL = dataPSL[iterPSL->first][iterPSL->second];
-
-				// Loop through all directions
-				bool fReject = false;
-
-				for (int a = 0; a < nDeltaSLPCount; a++) {
-
-					// Angle of rotation
-					double dAngle = 2.0 * M_PI
-						* static_cast<double>(a)
-						/ static_cast<double>(nDeltaSLPCount);
-
-					// Calculate new rotated vector
-					double dX2 = dX0 + dX1 * cos(dAngle) + dCrossX * sin(dAngle);
-					double dY2 = dY0 + dY1 * cos(dAngle) + dCrossY * sin(dAngle);
-					double dZ2 = dZ0 + dZ1 * cos(dAngle) + dCrossZ * sin(dAngle);
-
-					double dMag2 = sqrt(dX2 * dX2 + dY2 * dY2 + dZ2 * dZ2);
-
-					dX2 /= dMag2;
-					dY2 /= dMag2;
-					dZ2 /= dMag2;
-
-					// Calculate new lat/lon location
-					double dLat2 = asin(dZ2);
-					double dLon2 = atan2(dY2, dX2);
-
-					if (dLon2 < 0.0) {
-						dLon2 += 2.0 * M_PI;
-					}
-/*
-					printf("%i : %3.2f %3.2f : %3.2f %3.2f\n",
-						a,
-						dLat * 180.0 / M_PI,
-						dLon * 180.0 / M_PI,
-						dLat2 * 180.0 / M_PI,
-						dLon2 * 180.0 / M_PI);
-*/
-					int j = (dLat2 + 0.5 * M_PI) / dDeltaLat;
-					int i = (dLon2) / dDeltaLon;
-
-					if (i == nLon) {
-						i = nLon-1;
-					}
-					if (j == nLat) {
-						j = nLat-1;
-					}
-
-					// Check for insufficient distance
-					if ((i == iterPSL->second) && (j == iterPSL->first)) {
-						_EXCEPTIONT(
-							"--deltaslpdist insufficient; increase value");
-					}
-
-					// Check for out of bounds
-					if ((i < 0) || (j < 0) || (i >= nLon) || (j >= nLat)) {
-						_EXCEPTION4("Logic error %i/%i, %i/%i", i, nLon, j, nLat);
-					}
-
-					// Verify sufficient increase in PSL
-					if (dataPSL[j][i] - dRefPSL < dDeltaSLPAmt) {
-						fReject = true;
-/*
-						if (dataLat[j] < -1.0) {
-							printf("DeltaSLP failed in cell lat %i (%1.2f) lon %i (%1.2f))\n", iterPSL->first, dataLat[iterPSL->first] * 180.0 / M_PI, iterPSL->second, dataLon[iterPSL->second] * 180.0 / M_PI);
-							printf("DeltaSLP failed in cell lat %i (%1.2f) lon %i (%1.2f))\n", j, dataLat[j] * 180.0 / M_PI, i, dataLon[i] * 180.0 / M_PI);
-							printf("SLP: %1.5e %1.5e\n", dataPSL[j][i], dRefPSL);
-						}
-*/
-						break;
-					}
-				}
+				// Determine if pressure minima have a closed contour
+				bool fHasClosedContour =
+					HasClosedContour(
+						dataLat,
+						dataLon,
+						dataState,
+						iterPSL->first,
+						iterPSL->second,
+						vecClosedContourOp[ccc].m_dDeltaAmount,
+						vecClosedContourOp[ccc].m_dDistance,
+						vecClosedContourOp[ccc].m_nCount
+					);
 
 				// If not rejected, add to new pressure minima array
-				if (!fReject) {
+				if (fHasClosedContour) {
 					setNewPressureMinima.insert(*iterPSL);
 				} else {
-					nRejectedClosedContour++;
+					vecRejectedClosedContour[ccc]++;
 				}
 			}
 
 			setPressureMinima = setNewPressureMinima;
-
 		}
 
 		// Eliminate based on minimum the Laplacian of pressure at the PSL min
@@ -1228,11 +1441,17 @@ try {
 		Announce("Rejected (    latitude): %i", nRejectedLatitude);
 		Announce("Rejected (  topography): %i", nRejectedTopography);
 		Announce("Rejected (      merged): %i", nRejectedMerge);
-		Announce("Rejected (no vort max ): %i", nRejectedVortMax);
+		Announce("Rejected ( no vort max): %i", nRejectedVortMax);
 		Announce("Rejected (   warm core): %i", nRejectedWarmCore);
 		Announce("Rejected (no warm core): %i", nRejectedNoWarmCore);
-		Announce("Rejected ( closed cont): %i", nRejectedClosedContour);
-		Announce("Rejected (   laplacian): %i", nRejectedLaplacian);
+		//Announce("Rejected ( slp contour): %i", nRejectedSLPClosedContour);
+		//Announce("Rejected (temp contour): %i", nRejectedTempClosedContour);
+
+		for (int ccc = 0; ccc < vecRejectedClosedContour.GetRows(); ccc++) {
+			Announce("Rejected: (contour %s): %i",
+					vecClosedContourOp[ccc].m_strVariable.c_str(),
+					vecRejectedClosedContour[ccc]);
+		}
 
 		// Determine wind maximum at all pressure minima
 		AnnounceStartBlock("Searching for maximum winds");
