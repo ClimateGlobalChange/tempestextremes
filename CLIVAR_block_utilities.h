@@ -40,11 +40,11 @@ void pv_vars_calc(
   NcVar *lat,
   NcVar *lon,
   NcVar *plev,
-  double lat_res,
-  double lon_res,
-  double p_res,
-  DataVector<double> coriolis,
-  DataVector<double> cosphi
+  double & lat_res,
+  double & lon_res,
+  double & p_res,
+  DataVector<double> & coriolis,
+  DataVector<double> & cosphi
 );
 
 //Function that calculates PT
@@ -70,10 +70,12 @@ void PV_calc(
         NcVar *V,
         NcVar *PT,
         NcVar *rVort,
+        NcVar *pVals,
         DataVector<double> coriolis,
+        DataVector<double> cosphi,
         double dphi,
         double dlambda,
-        double dp,
-        NcVar *PV);
+        NcVar *PV,
+        NcVar *intPV);
 
 #endif

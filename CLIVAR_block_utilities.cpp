@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstring>
 
+///////////////////////////////////////////////////////////////////////////////////////
 //Function to interpolate variables from hybrid levels to pressure levels
 void interpolate_lev(NcVar *var, 
                      NcVar *hyam, 
@@ -33,7 +34,8 @@ void interpolate_lev(NcVar *var,
   int nLon = var->get_dim(3)->size();
   int npLev = pLev->get_dim(0)->size();
 
-  std::cout<<"Dimensions: Time: "<<nTime<<", hybrid level: "<<nLev<< " lat: " << nLat << " lon: " << nLon << " plev: " << npLev<<std::endl;
+  std::cout<<"Dimensions: Time: "<<nTime<<", hybrid level: "<<nLev\
+    << " lat: " << nLat << " lon: " << nLon << " plev: " << npLev<<std::endl;
 
   //Matrix to store PS
   DataMatrix3D <double> matPS(nTime, nLat, nLon);
@@ -84,9 +86,6 @@ void interpolate_lev(NcVar *var,
                                + (1.0-weight)*matVar[t][l][a][b];
             }
           }
-//          if (interp_check == 0){
-//            std::cout<< "Did not interpolate this variable to pressure levels for (l,a,b) = ("<< l <<", "<<a<<", "<<b<<")"<<std::endl;
-//          }
         }
       }
     }
@@ -118,24 +117,24 @@ void copy_dim_var(
   CopyNcVarAttributes(inVar, outVar);
 }
 
-////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
 
 //Function that calculates dlat, don, etc for PV calculation
 void pv_vars_calc(
   NcVar *lat,
   NcVar *lon,
   NcVar *plev,
-  double lat_res,
-  double lon_res,
-  double p_res,
-  DataVector<double> coriolis,
-  DataVector<double> cosphi
+  double & lat_res,
+  double & lon_res,
+  double & p_res,
+  DataVector<double> & coriolis,
+  DataVector<double> & cosphi
 ){ 
   double radius = 6371000.0;
   double pi = 4.0*std::atan(1.0);
   double radian = 180.0/pi;
   double sigma = std::pow(7.2921, -5.0);
-
+  //std::cout<<"Initiating var calcs."<<std::endl;
   int nLat = lat->get_dim(0)->size();
   DataVector<double> latVec(nLat);
   lat->set_cur((long) 0);
@@ -150,11 +149,11 @@ void pv_vars_calc(
   DataVector<double> pVec(np);
   plev->set_cur((long) 0);
   plev->get(&(pVec[0]), np);
+  
 
-  lat_res = latVec[1]-latVec[0];
-  lon_res = lonVec[1]-lonVec[0];
-  p_res = pVec[1]-pVec[0];
- 
+  lat_res = latVec[2]-latVec[1];
+  lon_res = lonVec[2]-lonVec[1];
+  p_res = pVec[2]-pVec[1];
   for (int i=0; i<nLat; i++){
     double sinphi = std::sin(latVec[i]/radian);
     coriolis[i] = 2.0 * sigma * sinphi;
@@ -212,67 +211,59 @@ void rVort_calc(
 	DataVector<double> cosphi,
 	NcVar *vorticity
 ){
-  std::cout<<"Starting rel vort calculations."<<std::endl;
-
   int nTime = U->get_dim(0)->size();
   int nPlev = U->get_dim(1)->size();
   int nLat = U->get_dim(2)->size();
   int nLon = U->get_dim(3)->size();
 
- std::cout<<"Dimensions: Time: "<<nTime<<", lat: " << nLat << " lon: " << nLon << " plev: " << nPlev<<std::endl;
  double radius = 6371000.0;
-  std::cout<<"Initializing data matrices."<<std::endl;
 //INPUTS
   DataMatrix4D<double> VMat(nTime, nPlev, nLat, nLon);
-
-  std::cout<< "About to load variables."<<std::endl;
   V->set_cur(0,0,0,0);
-  std::cout<<"Set V to 0."<<std::endl;
   V->get(&(VMat[0][0][0][0]), nTime, nPlev, nLat, nLon);
-  std::cout<<"Loaded V matrix."<<std::endl;
 
   DataMatrix4D<double> UMat(nTime, nPlev, nLat, nLon);
   U->set_cur(0,0,0,0);
   U->get(&(UMat[0][0][0][0]),nTime, nPlev, nLat, nLon);
-  std::cout<<"Set U data matrix."<<std::endl;
-  std::cout<<"Initializing output data matrix."<<std::endl;
-//OUTPUT: Relative vorticity
-  DataMatrix4D<double> RVMat(nTime, nPlev, nLat, nLon);
+//OUTPUT: Partial derivatives
+//U WRT PHI
+  DataMatrix4D<double> dUdphi(nTime, nPlev, nLat, nLon);
   for (int t=0; t<nTime; t++){
     for (int p=0; p<nPlev; p++){
-      for (int a=0; a<nLat; a++){
-        for (int b=0; b<nLon; b++){
-          double dvdlambda;
-          double dudphi;
-	  //END CASES (PERIODIC BOUNDARY CONDITION)
-          if (b==0){
-	    dvdlambda = (VMat[t][p][a][1]-VMat[t][p][a][nLon-1])/(2.0*dlambda);
-          }
-	  else if (b==(nLon-1)){
-	    dvdlambda = (VMat[t][p][a][0]-VMat[t][p][a][nLon-2])/(2.0*dlambda);
-	  }
-          //OTHERWISE:
-          else{
-	    dvdlambda = (VMat[t][p][a][b+1]-VMat[t][p][a][b-1])/(2.0*dlambda);
-	  }
-          //END CASES (POLES)
-          if (a==0){
-	    dudphi = (-UMat[t][p][2][b]*cosphi[2] + 4.0*UMat[t][p][1][b]*cosphi[1]-3.0*UMat[t][p][0][b]*cosphi[0])/(2.0*dphi);
-	  }
-	  else if (a==(nLat-1)){
-	    dudphi = (3.0*UMat[t][p][nLat-1][b]*cosphi[nLat-1] - 4.0*UMat[t][p][nLat-2][b]*cosphi[nLat-2] + UMat[t][p][nLat-3][b]*cosphi[nLat-3])/(2.0*dphi);
-	  }
-	  //OTHERWISE:
-	  else{
-	    dudphi = (UMat[t][p][a+1][b]*cosphi[a+1]-UMat[t][p][a-1][b]*cosphi[a-1])/(2.0*dphi);
-	  }
-	  RVMat[t][p][a][b] = (1.0/(radius*cosphi[a]))*(dvdlambda-dudphi);
-          if (t==0){std::cout<<"Rel vort is "<< RVMat[t][p][a][b]<<std::endl;}
+      for (int b=0; b<nLon; b++){
+        dUdphi[t][p][0][b]=0;
+        dUdphi[t][p][nLat-1][b]=0.0;
+        for (int a=0; a<(nLat-1); a++){
+          dUdphi[t][p][a][b]=(UMat[t][p][a+1][b]-UMat[t][p][a-1][b])/(2.0*dphi);
         }
       }
     }
   }
 
+  //V WRT LAMBDA
+  DataMatrix4D<double> dVdl(nTime, nPlev, nLat, nLon);
+  for (int t=0; t<nTime; t++){
+    for (int p=0; p<nPlev; p++){
+      for (int a=0; a<nLat; a++){
+        dVdl[t][p][a][0]=(VMat[t][p][a][1]-VMat[t][p][a][nLon-1])/(2.0*dlambda);
+        dVdl[t][p][a][nLon-1]=(VMat[t][p][a][0]-VMat[t][p][a][nLon-2])/(2.0*dlambda);
+        for (int b=1; b<(nLon-1); b++){
+          dVdl[t][p][a][b]=(VMat[t][p][a][b+1]-VMat[t][p][a][b-1])/(2.0*dlambda);
+        }
+      }
+    }
+  }
+
+  DataMatrix4D<double>RVMat(nTime, nPlev, nLat, nLon);
+  for (int t=0; t<nTime; t++){
+    for (int p=0; p<nPlev; p++){
+      for (int a=0; a<nLat; a++){
+        for (int b=0; b<nLon; b++){
+          RVMat[t][p][a][b] = (1.0/radius*cosphi[a])*(dVdl[t][p][a][b]-dUdphi[t][p][a][b]);
+        }
+      }
+    }
+  }
   std::cout<<"Finished calculating relative vorticity."<<std::endl;
   vorticity->set_cur(0,0,0,0);
   vorticity->put(&(RVMat[0][0][0][0]),nTime, nPlev, nLat, nLon);
@@ -284,12 +275,14 @@ void PV_calc(
 	NcVar *U, 
 	NcVar *V, 
 	NcVar *PT, 
-	NcVar *rVort, 	
+	NcVar *rVort,
+        NcVar *pVals, 	
 	DataVector<double> coriolis,
+        DataVector<double>cosphi,
 	double dphi,
 	double dlambda,
-	double dp,
-	NcVar *PV){
+	NcVar *PV,
+        NcVar *intPV){
 
   int nTime = U->get_dim(0)->size();
   int nPlev = U->get_dim(1)->size();
@@ -297,10 +290,10 @@ void PV_calc(
   int nLon = U->get_dim(3)->size();
 
   //Input matrices
-  DataMatrix4D<double> UMat;
-  DataMatrix4D<double> VMat;
-  DataMatrix4D<double> PTMat;
-  DataMatrix4D<double> RVMat;
+  DataMatrix4D<double> UMat(nTime, nPlev, nLat, nLon);
+  DataMatrix4D<double> VMat(nTime, nPlev, nLat, nLon);
+  DataMatrix4D<double> PTMat(nTime, nPlev, nLat, nLon);
+  DataMatrix4D<double> RVMat(nTime, nPlev, nLat, nLon);
 
   //Load data
   U->set_cur(0,0,0,0); 
@@ -315,10 +308,147 @@ void PV_calc(
   rVort->set_cur(0,0,0,0);
   rVort->get(&(RVMat[0][0][0][0]), nTime, nPlev, nLat, nLon);
 
-  
+  //Pressure axis values
+  DataVector<double> pVec(nPlev);
+  pVals->set_cur((long) 0);
+  pVals->get(&(pVec[0]), nPlev);
 
+  //Matrices for the partials
+  //PT, U, V WRT P
+  DataMatrix4D<double> dpt_dp(nTime, nPlev, nLat, nLon);
+  DataMatrix4D<double> du_dp(nTime, nPlev, nLat, nLon);
+  DataMatrix4D<double> dv_dp(nTime, nPlev, nLat, nLon);
+
+  double dp1 = pVec[1]-pVec[0];
+  double dp2 = pVec[nPlev-1]-pVec[nPlev-2];
+  for (int t=0; t<nTime; t++){
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+      //0 case
+        dpt_dp[t][0][a][b] = (-PTMat[t][2][a][b]+4.0*PTMat[t][1][a][b]-3.0*PTMat[t][0][a][b])/(2.0*dp1);
+        du_dp[t][0][a][b] = (-UMat[t][2][a][b]+4.0*UMat[t][1][a][b]-3.0*UMat[t][0][a][b])/(2.0*dp1);
+        dv_dp[t][0][a][b] = (-VMat[t][2][a][b]+4.0*VMat[t][1][a][b]-3.0*VMat[t][0][a][b])/(2.0*dp1);           //end case
+        dpt_dp[t][nPlev-1][a][b] = (3.0*PTMat[t][nPlev-1][a][b]-4.0*PTMat[t][nPlev-2][a][b]\
+          +PTMat[t][nPlev-3][a][b])/(2.0*dp2);
+        du_dp[t][nPlev-1][a][b] = (3.0*UMat[t][nPlev-1][a][b]-4.0*UMat[t][nPlev-2][a][b]\
+          +UMat[t][nPlev-3][a][b])/(2.0*dp2);
+        dv_dp[t][nPlev-1][a][b] = (3.0*VMat[t][nPlev-1][a][b]-4.0*VMat[t][nPlev-2][a][b]\
+          +VMat[t][nPlev-3][a][b])/(2.0*dp2);
+        for (int p=1; p<(nPlev-1); p++){
+          double dp = pVec[p+1]-pVec[p];
+          dpt_dp[t][p][a][b] = (PTMat[t][p+1][a][b]-PTMat[t][p-1][a][b])/(2.0*dp);
+          du_dp[t][p][a][b] = (UMat[t][p+1][a][b]-UMat[t][p-1][a][b])/(2.0*dp);
+          dv_dp[t][p][a][b] = (VMat[t][p+1][a][b]-VMat[t][p-1][a][b])/(2.0*dp);
+        }
+      }
+    }
+  }
+  
+  //PT WRT PHI
+  DataMatrix4D<double> dpt_dphi(nTime, nPlev, nLat, nLon);
+  //end cases
+  for (int t=0; t<nTime; t++){
+    for (int p=0; p<nPlev; p++){
+      for (int b=0; b<nLon; b++){
+        dpt_dphi[t][p][0][b]=(-PTMat[t][p][2][b]+4.0*PTMat[t][p][1][b]\
+          -3.0*PTMat[t][p][0][b])/(2.0*dphi);
+        dpt_dphi[t][p][nLat-1][b]=(3.0*PTMat[t][p][nLat-1][b]-4.0*PTMat[t][p][nLat-2][b]\
+          +PTMat[t][p][nLat-2][b])/(2.0*dphi);
+        for (int a=1; a<(nLat-1); a++){
+          dpt_dphi[t][p][a][b]=(PTMat[t][p][a+1][b]-PTMat[t][p][a-1][b])/(2.0*dphi);
+        }
+      }
+    }
+  }
+
+  //PT WRT LAMBDA
+  DataMatrix4D<double> dpt_dl(nTime, nPlev, nLat, nLon);
+  //end cases
+  for (int t=0; t<nTime; t++){
+    for (int p=0; p<nPlev; p++){
+      for (int a=0; a<nLat; a++){
+        dpt_dl[t][p][a][0]=(PTMat[t][p][a][1]-PTMat[t][p][a][nLon-1])/(2.0*dlambda);
+        dpt_dl[t][p][a][nLon-1]=(PTMat[t][p][a][nLon-2]-PTMat[t][p][a][0])/(2.0*dlambda);
+        for (int b=1; b<(nLon-1); b++){
+          dpt_dl[t][p][a][b]=(PTMat[t][p][a][b+1]-PTMat[t][p][a][b-1])/(2.0*dlambda);
+        }
+      }
+    }
+  }
+ 
+  DataMatrix4D<double> PVMat(nTime, nPlev, nLat, nLon);
+  //PV Calculation!
+  double radius = 6371000.0;
+  for (int t=0; t<nTime; t++){
+    for (int p=0; p<nPlev; p++){
+      for (int a=0; a<nLat; a++){
+        double cosvar=cosphi[a];
+        double corvar=coriolis[a];
+        for (int b=0; b<nLon; b++){
+          PVMat[t][p][a][b] = 9.80616*((1.0/(radius*cosvar))*dv_dp[t][p][a][b]*dpt_dl[t][p][a][b]\
+           -(1.0/radius)*du_dp[t][p][a][b]*dpt_dphi[t][p][a][b]\
+           -(corvar+RVMat[t][p][a][b])*dpt_dp[t][p][a][b]);
+        }
+      }
+    }
+  }
+  std::cout<<"Calculated potential vorticity."<<std::endl;           
+  PV->set_cur(0,0,0,0);
+  PV->put(&(PVMat[0][0][0][0]),nTime,nPlev,nLat,nLon);
+
+  //Integrate PV over upper troposphere
+  int pos_top;
+  int pos_bot;
+
+  for (int x=0; x<nPlev; x++){
+    if (abs(pVec[x]-15000.0)<0.0001){
+      pos_top = x;
+      std::cout<<"150 mb position is at x="<<x<<std::endl;
+    }
+    if (abs(pVec[x]-50000.0)<0.0001){
+      pos_bot = x;
+      std::cout<<"500 mb position is at x="<<x<<std::endl;
+    }
+  }
+  DataMatrix3D<double> iPVMat(nTime, nLat, nLon);
+
+  double PVbot;
+  double PVmid;
+  double PVtop;
+  
+//Eliminate polar regions from calculations
+  int i10 = 10/dphi;
+  int i171 = 171/dphi;
+  int int_length = abs(pos_bot - pos_top);
+  double diff_levs = abs(pVec[pos_bot]-pVec[pos_top]);
+  std::cout<<"Length of modified pressure axis is "<<int_length<<std::endl;
+
+  //Fill array with integrated values
+  for (int t=0; t<nTime; t++){
+    for (int b=0; b<nLon; b++){
+      for (int a=0; a<i10; a++){
+        iPVMat[t][a][b] = 0.0;
+      }
+      for (int a=i10; a<i171; a++){
+        PVtop = PVMat[t][pos_top][a][b];
+        PVbot = PVMat[t][pos_bot][a][b];
+        PVmid = 2.0*PVMat[t][pos_top+1][a][b];
+        for (int x=2; x<int_length; x++){
+          PVmid+= 2.0*PVMat[t][pos_top+x][a][b];
+          std::cout<<"Added value from position "<<pos_top+x<<", where pressure is "\
+          << pVec[pos_top+x]<<" Pa"<<std::endl;
+        }
+        iPVMat[t][a][b] = (PVtop+PVmid+PVbot)/(2.0*diff_levs);
+      }
+      for (int a=i171; a<nLat; a++){
+        iPVMat[t][a][b]=0.0;
+      }
+    }
+  }
+  intPV->set_cur(0,0,0,0);
+  intPV->put(&(iPVMat[0][0][0]),nTime,nLat,nLon);
 
 } 
-
+//////////////////////////////////////////////////////////////////////////////////////////////////
 
 
