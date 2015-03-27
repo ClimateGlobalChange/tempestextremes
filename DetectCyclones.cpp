@@ -566,8 +566,8 @@ bool HasClosedContour(
 			dLat2 * 180.0 / M_PI,
 			dLon2 * 180.0 / M_PI);
 */
-		int j = (dLat2 - dataLat[0]) / dDeltaLat;
-		int i = (dLon2 - dataLon[0]) / dDeltaLon;
+		int j = static_cast<int>((dLat2 - dataLat[0]) / dDeltaLat + 0.5);
+		int i = static_cast<int>((dLon2 - dataLon[0]) / dDeltaLon + 0.5);
 
 		if (!fRegional) {
 			if (i == nLon) {
