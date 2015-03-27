@@ -266,7 +266,7 @@ void FindLocalMinMax(
 		if (setNodesVisited.find(prWest) == setNodesVisited.end()) {
 			if (!fRegional) {
 				queueNodes.push(prWest);
-			} else if (pr.second != 0) {
+			} else if (pr.second >= 0) {
 				queueNodes.push(prWest);
 			}
 		}
@@ -275,7 +275,7 @@ void FindLocalMinMax(
 		if (setNodesVisited.find(prEast) == setNodesVisited.end()) {
 			if (!fRegional) {
 				queueNodes.push(prEast);
-			} else if (pr.second != nLon-1) {
+			} else if (pr.second <= nLon-1) {
 				queueNodes.push(prEast);
 			}
 		}
@@ -583,6 +583,9 @@ bool HasClosedContour(
 
 		// Check for out of bounds
 		if ((i < 0) || (j < 0) || (i >= nLon) || (j >= nLat)) {
+			if (fRegional) {
+				return false;
+			}
 			_EXCEPTION4("Logic error %i/%i, %i/%i", i, nLon, j, nLat);
 		}
 
