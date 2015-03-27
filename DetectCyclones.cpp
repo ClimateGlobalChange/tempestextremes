@@ -195,7 +195,8 @@ void FindLocalMinMax(
 	double dMaxDist,
 	std::pair<int, int> & prMaximum,
 	float & dMaxValue,
-	float & dRMax
+	float & dRMax,
+	bool fRegional
 ) {
 	// Verify that dMaxDist is less than 180.0
 	if (dMaxDist > 180.0) {
@@ -263,12 +264,20 @@ void FindLocalMinMax(
 		// Add all neighbors of this point
 		std::pair<int,int> prWest(pr.first, (pr.second + nLon - 1) % nLon);
 		if (setNodesVisited.find(prWest) == setNodesVisited.end()) {
-			queueNodes.push(prWest);
+			if (!fRegional) {
+				queueNodes.push(prWest);
+			} else if (pr.second != 0) {
+				queueNodes.push(prWest);
+			}
 		}
 
 		std::pair<int,int> prEast(pr.first, (pr.second + 1) % nLon);
 		if (setNodesVisited.find(prEast) == setNodesVisited.end()) {
-			queueNodes.push(prEast);
+			if (!fRegional) {
+				queueNodes.push(prEast);
+			} else if (pr.second != nLon-1) {
+				queueNodes.push(prEast);
+			}
 		}
 
 		std::pair<int,int> prNorth(pr.first + 1, pr.second);
@@ -409,7 +418,8 @@ bool HasClosedContour(
 	double dDeltaAmt,
 	double dDeltaDist,
 	int nDeltaCount,
-	double dMinMaxDist
+	double dMinMaxDist,
+	bool fRegional
 ) {
 	// Verify arguments
 	if (dDeltaAmt == 0.0) {
@@ -454,7 +464,8 @@ bool HasClosedContour(
 			dMinMaxDist,
 			prExtrema,
 			dValue,
-			dR);
+			dR,
+			fRegional);
 
 		iLat = prExtrema.first;
 		iLon = prExtrema.second;
@@ -556,7 +567,7 @@ bool HasClosedContour(
 			dLon2 * 180.0 / M_PI);
 */
 		int j = (dLat2 + 0.5 * M_PI) / dDeltaLat;
-		int i = (dLon2) / dDeltaLon;
+		int i = (dLon2 - dataLon[0]) / dDeltaLon;
 
 		if (i == nLon) {
 			i = nLon-1;
@@ -1214,11 +1225,14 @@ try {
 			float dDeltaLat = static_cast<float>(dataLat[1] - dataLat[0]);
 			float dDeltaLon = static_cast<float>(dataLon[1] - dataLon[0]);
 
+			int iLonBegin = (fRegional)?(1):(0);
+			int iLonEnd   = (fRegional)?(nLon-1):(nLon);
+
 			DataMatrix<float> dataZETA850(nLat, nLon);
 
 			// Compute vorticity
 			for (int j = 1; j < nLat-1; j++) {
-			for (int i = 0; i < nLon; i++) {
+			for (int i = iLonBegin; i < iLonEnd; i++) {
 
 				int inext = (i + 1) % nLon;
 				int jnext = (j + 1);
@@ -1440,7 +1454,8 @@ try {
 						vecClosedContourOp[ccc].m_dDeltaAmount,
 						vecClosedContourOp[ccc].m_dDistance,
 						vecClosedContourOp[ccc].m_nCount,
-						vecClosedContourOp[ccc].m_dMinMaxDist
+						vecClosedContourOp[ccc].m_dMinMaxDist,
+						fRegional
 					);
 
 				// If not rejected, add to new pressure minima array
@@ -1544,7 +1559,8 @@ try {
 					dWindSpDist,
 					prMaximum,
 					dMaxWindSp,
-					dRMaxWind);
+					dRMaxWind,
+					fRegional);
 
 				vecMaxWindSp.push_back(dMaxWindSp);
 				vecRMaxWindSp.push_back(dRMaxWind);
