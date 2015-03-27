@@ -180,12 +180,13 @@ DonePressureMaxima:
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		Find the maximum value of a field near the given point.
+///		Find the minimum/maximum value of a field near the given point.
 ///	</summary>
 ///	<param name="dMaxDist">
 ///		Maximum distance from the initial point in degrees.
 ///	</param>
-void FindLocalMaximum(
+void FindLocalMinMax(
+	bool fMinimum,
 	const DataMatrix<float> & data,
 	const DataVector<double> & dataLon,
 	const DataVector<double> & dataLat,
@@ -244,10 +245,19 @@ void FindLocalMaximum(
 		}
 
 		// Check for new local maximum
-		if (data[pr.first][pr.second] > dMaxValue) {
-			prMaximum = pr;
-			dMaxValue = data[pr.first][pr.second];
-			dRMax = dR;
+		if (fMinimum) {
+			if (data[pr.first][pr.second] < dMaxValue) {
+				prMaximum = pr;
+				dMaxValue = data[pr.first][pr.second];
+				dRMax = dR;
+			}
+
+		} else {
+			if (data[pr.first][pr.second] > dMaxValue) {
+				prMaximum = pr;
+				dMaxValue = data[pr.first][pr.second];
+				dRMax = dR;
+			}
 		}
 
 		// Add all neighbors of this point
@@ -393,12 +403,13 @@ void ParseTimeDouble(
 bool HasClosedContour(
 	const DataVector<double> & dataLat,
 	const DataVector<double> & dataLon,
-	const DataMatrix<double> & dataState,
-	const int iLat,
-	const int iLon,
+	const DataMatrix<float> & dataState,
+	const int iLat0,
+	const int iLon0,
 	double dDeltaAmt,
 	double dDeltaDist,
-	int nDeltaCount
+	int nDeltaCount,
+	double dMinMaxDist
 ) {
 	// Verify arguments
 	if (dDeltaAmt == 0.0) {
@@ -418,7 +429,38 @@ bool HasClosedContour(
 
 	const double dDeltaLat = (dataLat[1] - dataLat[0]);
 	const double dDeltaLon = (dataLon[1] - dataLon[0]);
-				
+
+	// Find min/max near point
+	int iLat;
+	int iLon;
+
+	if (dMinMaxDist == 0.0) {
+		iLat = iLat0;
+		iLon = iLon0;
+
+	// Find a local minimum / maximum
+	} else {
+		std::pair<int, int> prExtrema;
+		float dValue;
+		float dR;
+
+		FindLocalMinMax(
+			(dDeltaAmt > 0.0),
+			dataState,
+			dataLon,
+			dataLat,
+			iLat0,
+			iLon0,
+			dMinMaxDist,
+			prExtrema,
+			dValue,
+			dR);
+
+		iLat = prExtrema.first;
+		iLon = prExtrema.second;
+	}
+
+	// Coordinates of detection point	
 	double dLat = dataLat[iLat];
 	double dLon = dataLon[iLon];
 
@@ -559,7 +601,7 @@ class ClosedContourOp {
 
 public:
 	///	<summary>
-	///		Parse a threshold operator string.
+	///		Parse a closed contour operation string.
 	///	</summary>
 	void Parse(
 		const std::string & strOp
@@ -570,6 +612,7 @@ public:
 			ReadMode_Distance,
 			ReadMode_Amount,
 			ReadMode_Count,
+			ReadMode_MinMaxDist,
 			ReadMode_Invalid
 		} eReadMode = ReadMode_Variable;
 
@@ -609,18 +652,29 @@ public:
 					m_nCount = atoi(strSubStr.c_str());
 
 					iLast = i + 1;
+					eReadMode = ReadMode_MinMaxDist;
+
+				// Read in min/max distance
+				} else if (eReadMode == ReadMode_MinMaxDist) {
+					m_dMinMaxDist = atof(strSubStr.c_str());
+
+					iLast = i + 1;
 					eReadMode = ReadMode_Invalid;
 
 				// Invalid
 				} else if (eReadMode == ReadMode_Invalid) {
-					_EXCEPTION1("Too many entries in threshold string \"%s\"",
+					_EXCEPTION1("\nToo many entries in closed contour op \"%s\""
+						"\nRequired: \"<name>,<amount>,<distance>,"
+						"<count>,<minmaxdist>\"",
 						strOp.c_str());
 				}
 			}
 		}
 
 		if (eReadMode != ReadMode_Invalid) {
-			_EXCEPTION1("Insufficient entries in threshold string \"%s\"",
+			_EXCEPTION1("\nInsufficient entries in closed contour op \"%s\""
+					"\nRequired: \"<name>,<amount>,<distance>,"
+					"<count>,<minmaxdist>\"",
 					strOp.c_str());
 		}
 
@@ -639,20 +693,27 @@ public:
 		if (m_nCount <= 0) {
 			_EXCEPTIONT("For closed contour op, count must be positive");
 		}
+		if (m_dMinMaxDist < 0.0) {
+			_EXCEPTIONT("For closed contour op, min/max dist must be nonnegative");
+		}
 
 		if (m_dDeltaAmount < 0.0) {
-			Announce("%s decreases by %f over %f degrees (%i samples)",
+			Announce("%s decreases by %f over %f deg (%i samples)"
+				   " (max search %f deg)",
 				m_strVariable.c_str(),
 				-m_dDeltaAmount,
 				m_dDistance,
-				m_nCount);
+				m_nCount,
+				m_dMinMaxDist);
 
 		} else {
-			Announce("%s increases by %f over %f degrees (%i samples)",
+			Announce("%s increases by %f over %f degrees (%i samples)"
+					" (min search %f deg)",
 				m_strVariable.c_str(),
 				m_dDeltaAmount,
 				m_dDistance,
-				m_nCount);
+				m_nCount,
+				m_dMinMaxDist);
 		}
 	}
 
@@ -677,6 +738,11 @@ public:
 	///		Number of nodes used to evaluate closed contour.
 	///	</summary>
 	int m_nCount;
+
+	///	<summary>
+	///		Distance to search for min or max.
+	///	</summary>
+	double m_dMinMaxDist;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1349,7 +1415,7 @@ try {
 			std::set< std::pair<int, int> > setNewPressureMinima;
 
 			// Load relevant data
-			DataMatrix<double> dataState(nLat, nLon);
+			DataMatrix<float> dataState(nLat, nLon);
 			
 			NcVar * varDataState =
 				ncInput.get_var(vecClosedContourOp[ccc].m_strVariable.c_str());
@@ -1373,7 +1439,8 @@ try {
 						iterPSL->second,
 						vecClosedContourOp[ccc].m_dDeltaAmount,
 						vecClosedContourOp[ccc].m_dDistance,
-						vecClosedContourOp[ccc].m_nCount
+						vecClosedContourOp[ccc].m_nCount,
+						vecClosedContourOp[ccc].m_dMinMaxDist
 					);
 
 				// If not rejected, add to new pressure minima array
@@ -1467,7 +1534,8 @@ try {
 				float dRMaxWind;
 				float dMaxWindSp;
 
-				FindLocalMaximum(
+				FindLocalMinMax(
+					false,
 					dataUMag850,
 					dataLon,
 					dataLat,
