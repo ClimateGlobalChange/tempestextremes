@@ -555,7 +555,7 @@ bool HasClosedContour(
 		double dLat2 = asin(dZ2);
 		double dLon2 = atan2(dY2, dX2);
 
-		if (dLon2 < 0.0) {
+		if (dLon2 < dataLon[0]) {
 			dLon2 += 2.0 * M_PI;
 		}
 /*
@@ -566,15 +566,19 @@ bool HasClosedContour(
 			dLat2 * 180.0 / M_PI,
 			dLon2 * 180.0 / M_PI);
 */
-		int j = (dLat2 + 0.5 * M_PI) / dDeltaLat;
+		int j = (dLat2 - dataLat[0]) / dDeltaLat;
 		int i = (dLon2 - dataLon[0]) / dDeltaLon;
 
-		if (i == nLon) {
-			i = nLon-1;
+		if (!fRegional) {
+			if (i == nLon) {
+				i = nLon-1;
+			}
+			if (j == nLat) {
+				j = nLat-1;
+			}
 		}
-		if (j == nLat) {
-			j = nLat-1;
-		}
+
+		//printf("%i %i : %i %i\n", iLat, iLon, j, i);
 
 		// Check for insufficient distance
 		if ((i == iLon) && (j == iLat)) {
@@ -1037,7 +1041,8 @@ try {
 	}
 
 	// Loop through all times
-	for (int t = 0; t < nTime; t++) {
+	//for (int t = 0; t < nTime; t++) {
+	for (int t = 0; t < 1; t++) {
 
 		char szStartBlock[128];
 		sprintf(szStartBlock, "Time %i", t);
