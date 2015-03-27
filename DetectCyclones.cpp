@@ -1041,8 +1041,8 @@ try {
 	}
 
 	// Loop through all times
-	//for (int t = 0; t < nTime; t++) {
-	for (int t = 0; t < 1; t++) {
+	for (int t = 0; t < nTime; t++) {
+	//for (int t = 0; t < 1; t++) {
 
 		char szStartBlock[128];
 		sprintf(szStartBlock, "Time %i", t);
