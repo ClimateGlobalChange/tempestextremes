@@ -532,6 +532,13 @@ bool HasClosedContour(
 	// Obtain reference value
 	float dRefValue = dataState[iLat][iLon];
 
+	// Output closed contour details
+	AnnounceStartBlock(2, "Closed contour:");
+	Announce(2, "Storm at (%i, %i) : (%1.5f, %1.5f)",
+		iLat0, iLon0, dataLat[iLat0] * 180.0 / M_PI, dataLon[iLon0] * 180.0 / M_PI);
+	Announce(2, "Extrema at (%i, %i) : (%1.5f, %1.5f) : %1.5e",
+		iLat, iLon, dLat * 180.0 / M_PI, dLon * 180.0 / M_PI, dRefValue);
+
 	// Loop through all sample points
 	for (int a = 0; a < nDeltaCount; a++) {
 
@@ -588,25 +595,36 @@ bool HasClosedContour(
 		// Check for out of bounds
 		if ((i < 0) || (j < 0) || (i >= nLon) || (j >= nLat)) {
 			if (fRegional) {
+				Announce(2, "Point (%i, %i) out of bounds, returning", j, i);
+				AnnounceEndBlock(2, NULL);
 				return false;
 			}
 			_EXCEPTION4("Logic error %i/%i, %i/%i", i, nLon, j, nLat);
 		}
 
+		Announce(2, "Checking point (%i, %i) : (%1.5f %1.5f) : %1.5e",
+			j, i, dLat2 * 180.0 / M_PI, dLon2 * 180.0 / M_PI, dataState[j][i]);
+
 		// Verify sufficient increase in value
 		if (dDeltaAmt > 0.0) {
 			if (dataState[j][i] - dRefValue < dDeltaAmt) {
+				Announce(2, "Failed criteria; returning");
+				AnnounceEndBlock(2, NULL);
 				return false;
 			}
 
 		// Verify sufficient decrease in value
 		} else {
 			if (dRefValue - dataState[j][i] < -dDeltaAmt) {
+				Announce(2, "Failed criteria; returning");
+				AnnounceEndBlock(2, NULL);
 				return false;
 			}
 		}
 	}
 
+	Announce(2, "Passed criteria; returning");
+	AnnounceEndBlock(2, NULL);
 	return true;
 }
 
@@ -830,6 +848,9 @@ try {
 	// Output header
 	bool fOutputHeader;
 
+	// Verbosity level
+	int iVerbosityLevel;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -850,11 +871,15 @@ try {
 		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
 		//CommandLineBool(fAppend, "append");
 		CommandLineBool(fOutputHeader, "out_header");
+		CommandLineInt(iVerbosityLevel, "verbosity", 0);
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
 
 	AnnounceBanner();
+
+	// Set verbosity level
+	AnnounceSetVerbosityLevel(iVerbosityLevel);
 
 	// Check input
 	if (strInputFile.length() == 0) {
