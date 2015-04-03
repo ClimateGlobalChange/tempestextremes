@@ -13,6 +13,8 @@ depend/*
 
 *.nc
 
+*.txt
+
 DetectCyclones
 
 StitchNodes
