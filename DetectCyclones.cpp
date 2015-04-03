@@ -62,12 +62,12 @@ void FindAllLocalMinima(
 
 			if (data[jx][ix] < data[j][i]) {
 				fMinimum = false;
-				goto DonePressureMinima;
+				goto DoneCandidates;
 			}
 		}
 		}
 
-DonePressureMinima:
+DoneCandidates:
 		if (fMinimum) {
 			setMinima.insert(std::pair<int,int>(j,i));
 		}
@@ -800,6 +800,12 @@ try {
 	// Output file
 	std::string strOutputFile;
 
+	// Variable to search for the minimum
+	std::string strSearchByMin;
+
+	// Variable to search for the maximum
+	std::string strSearchByMax;
+
 	// Zonal velocity name
 	std::string strUName;
 
@@ -855,6 +861,8 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
 		CommandLineString(strOutputFile, "out", "");
+		CommandLineStringD(strSearchByMin, "searchbymin", "", "(default PSL)");
+		CommandLineString(strSearchByMax, "searchbymax", "");
 		CommandLineString(strUName, "uname", "U850");
 		CommandLineString(strVName, "vname", "V850");
 		CommandLineBool(fRegional, "regional");
@@ -867,7 +875,7 @@ try {
 		CommandLineDoubleD(dNoWarmCoreDist, "nowarmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dVortDist, "vortdist", 0.0, "(degrees)");
 		CommandLineString(strClosedContourCmd, "closedcontourcmd", "");
-		CommandLineDoubleD(dMinLaplacian, "minlaplacian", 0.0, "(Pa / degree^2)");
+		//CommandLineDoubleD(dMinLaplacian, "minlaplacian", 0.0, "(Pa / degree^2)");
 		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
 		//CommandLineBool(fAppend, "append");
 		CommandLineBool(fOutputHeader, "out_header");
@@ -895,6 +903,15 @@ try {
 	if ((dWarmCoreDist != 0.0) && (dNoWarmCoreDist != 0.0)) {
 		_EXCEPTIONT("Only one of --warmcoredist and --nowarmcoredist"
 			   " may be active");
+	}
+
+	// Only one of search by min or search by max should be specified
+	if ((strSearchByMin == "") && (strSearchByMax == "")) {
+		strSearchByMin = "PSL";
+	}
+	if ((strSearchByMin != "") && (strSearchByMax != "")) {
+		_EXCEPTIONT("Only one of --searchbymin or --searchbymax can"
+			" be specified");
 	}
 
 	// Parse the closed contour command string
@@ -994,15 +1011,31 @@ try {
 	varTime->get(dTime, nTime);
 
 	// Get auxiliary variables
-	NcVar * varPSL  = ncInput.get_var("PSL");
+	bool fSearchByMinima = false;
+	NcVar * varSearch;
+	if (strSearchByMin != "") {
+		fSearchByMinima = true;
+		varSearch = ncInput.get_var(strSearchByMin.c_str());
+		if (varSearch == NULL) {
+			_EXCEPTION1("Unable to find variable \"%s\"",
+				strSearchByMin.c_str());
+		}
+
+	} else {
+		fSearchByMinima = false;
+		varSearch = ncInput.get_var(strSearchByMax.c_str());
+		if (varSearch == NULL) {
+			_EXCEPTION1("Unable to find variable \"%s\"",
+				strSearchByMax.c_str());
+		}
+	}
+
+	NcVar * varPSL = ncInput.get_var("PSL");
 	NcVar * varUvel = ncInput.get_var(strUName.c_str());
 	NcVar * varVvel = ncInput.get_var(strVName.c_str());
 	NcVar * varT200 = ncInput.get_var("T200");
 	NcVar * varT500 = ncInput.get_var("T500");
 
-	if (varPSL == NULL) {
-		_EXCEPTIONT("No variable \"PSL\" found in input file");
-	}
 	if (varUvel == NULL) {
 		_EXCEPTION1("No variable \"%s\" found in input file", strUName.c_str());
 	}
@@ -1017,6 +1050,7 @@ try {
 	}
 
 	// Storage for auxiliary variables
+	DataMatrix<float> dataSearch(nLat, nLon);
 	DataMatrix<float> dataPSL(nLat, nLon);
 	DataMatrix<float> dataUvel(nLat, nLon);
 	DataMatrix<float> dataVvel(nLat, nLon);
@@ -1074,6 +1108,9 @@ try {
 		AnnounceStartBlock(szStartBlock);
 
 		// Get the auxiliary variables
+		varSearch->set_cur(t,0,0);
+		varSearch->get(&(dataSearch[0][0]), 1, nLat, nLon);
+
 		varPSL->set_cur(t,0,0);
 		varPSL->get(&(dataPSL[0][0]), 1, nLat, nLon);
 
@@ -1099,11 +1136,15 @@ try {
 		}
 
 		// Tag all pressure minima
-		std::set< std::pair<int, int> > setPressureMinima;
-		FindAllLocalMinima(dataPSL, setPressureMinima, fRegional);
+		std::set< std::pair<int, int> > setCandidates;
+		if (strSearchByMin != "") {
+			FindAllLocalMinima(dataSearch, setCandidates, fRegional);
+		} else {
+			FindAllLocalMaxima(dataSearch, setCandidates, fRegional);
+		}
 
 		// Total number of pressure minima
-		int nTotalPressureMinima = setPressureMinima.size();
+		int nTotalCandidates = setCandidates.size();
 		int nRejectedLatitude = 0;
 		int nRejectedTopography = 0;
 		int nRejectedMerge = 0;
@@ -1116,67 +1157,67 @@ try {
 
 		// Eliminate based on maximum latitude
 		if (dMaxLatitude != 0.0) {
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				double dLat = dataLat[iterPSL->first];
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				double dLat = dataLat[iterCandidate->first];
 
 				if (fabs(dLat) <= dMaxLatitude) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 				} else {
 					nRejectedLatitude++;
 				}
 			}
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
 		// Eliminate based on minimum latitude
 		if (dMinLatitude != 0.0) {
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				double dLat = dataLat[iterPSL->first];
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				double dLat = dataLat[iterCandidate->first];
 
 				if (fabs(dLat) >= dMinLatitude) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 				} else {
 					nRejectedLatitude++;
 				}
 			}
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
 		// Eliminate based on maximum topographic height
 		if (dMaxTopoHeight != 0.0) {
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				float dPHIS = dataPHIS[iterPSL->first][iterPSL->second];
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				float dPHIS = dataPHIS[iterCandidate->first][iterCandidate->second];
 
 				double dTopoHeight =
 					static_cast<double>(dPHIS / ParamGravity);
 
 				if (dTopoHeight <= dMaxTopoHeight) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 				} else {
 					nRejectedTopography++;
 				}
 			}
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
 		// Eliminate based on merge distance
 		if (dMergeDist != 0.0) {
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
 			// Calculate spherical distance
 			double dSphDist = 2.0 * sin(0.5 * dMergeDist / 180.0 * M_PI);
@@ -1184,24 +1225,24 @@ try {
 			// Create a new KD Tree containing all nodes
 			kdtree * kdMerge = kd_create(3);
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				double dLat = dataLat[iterPSL->first];
-				double dLon = dataLon[iterPSL->second];
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				double dLat = dataLat[iterCandidate->first];
+				double dLon = dataLon[iterCandidate->second];
 
 				double dX = cos(dLon) * cos(dLat);
 				double dY = sin(dLon) * cos(dLat);
 				double dZ = sin(dLat);
 
-				kd_insert3(kdMerge, dX, dY, dZ, (void*)(&(*iterPSL)));
+				kd_insert3(kdMerge, dX, dY, dZ, (void*)(&(*iterCandidate)));
 			}
 
 			// Loop through all PSL find set of nearest neighbors
-			iterPSL = setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				double dLat = dataLat[iterPSL->first];
-				double dLon = dataLon[iterPSL->second];
+			iterCandidate = setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				double dLat = dataLat[iterCandidate->first];
+				double dLon = dataLon[iterCandidate->second];
 
 				double dX = cos(dLon) * cos(dLat);
 				double dY = sin(dLon) * cos(dLat);
@@ -1214,19 +1255,28 @@ try {
 				// Number of neighbors
 				int nNeighbors = kd_res_size(kdresMerge);
 				if (nNeighbors == 0) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 
 				} else {
-					double dPSL = dataPSL[iterPSL->first][iterPSL->second];
+					double dValue =
+						dataSearch[iterCandidate->first][iterCandidate->second];
 
-					bool fMinima = true;
+					bool fExtrema = true;
 					for (;;) {
 						std::pair<int,int> * ppr =
 							(std::pair<int,int> *)(kd_res_item_data(kdresMerge));
 
-						if (dataPSL[ppr->first][ppr->second] < dPSL) {
-							fMinima = false;
-							break;
+						if (fSearchByMinima) {
+							if (dataSearch[ppr->first][ppr->second] < dValue) {
+								fExtrema = false;
+								break;
+							}
+
+						} else {
+							if (dataSearch[ppr->first][ppr->second] > dValue) {
+								fExtrema = false;
+								break;
+							}
 						}
 
 						int iHasMore = kd_res_next(kdresMerge);
@@ -1235,8 +1285,8 @@ try {
 						}
 					}
 
-					if (fMinima) {
-						setNewPressureMinima.insert(*iterPSL);
+					if (fExtrema) {
+						setNewCandidates.insert(*iterCandidate);
 					} else {
 						nRejectedMerge++;
 					}
@@ -1249,7 +1299,7 @@ try {
 			kd_free(kdMerge);
 
 			// Update set of pressure minima
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
 		// Eliminate based on presence of vorticity maximum
@@ -1308,13 +1358,13 @@ try {
 			}
 
 			// Remove pressure minima that are near temperature maxima
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				double dLat = dataLat[iterPSL->first];
-				double dLon = dataLon[iterPSL->second];
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				double dLat = dataLat[iterCandidate->first];
+				double dLon = dataLon[iterCandidate->second];
 
 				double dX = cos(dLon) * cos(dLat);
 				double dY = sin(dLon) * cos(dLat);
@@ -1337,7 +1387,7 @@ try {
 
 				// Reject storms with no warm core
 				if (dZETA850dist <= dVortDist) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 				} else {
 					nRejectedVortMax++;
 				}
@@ -1345,7 +1395,7 @@ try {
 
 			kd_free(kdZETA850Maxima);
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
 		// Detect presence of warm core near PSL min
@@ -1390,13 +1440,13 @@ try {
 			}
 
 			// Remove pressure minima that are near temperature maxima
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				double dLat = dataLat[iterPSL->first];
-				double dLon = dataLon[iterPSL->second];
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				double dLat = dataLat[iterCandidate->first];
+				double dLon = dataLon[iterCandidate->second];
 
 				double dX = cos(dLon) * cos(dLat);
 				double dY = sin(dLon) * cos(dLat);
@@ -1433,7 +1483,7 @@ try {
 					if ((dT200dist >= dNoWarmCoreDist) ||
 						(dT500dist >= dNoWarmCoreDist)
 					) {
-						setNewPressureMinima.insert(*iterPSL);
+						setNewCandidates.insert(*iterCandidate);
 					} else {
 						nRejectedWarmCore++;
 					}
@@ -1444,7 +1494,7 @@ try {
 					if ((dT200dist <= dWarmCoreDist) &&
 						(dT500dist <= dWarmCoreDist)
 					) {
-						setNewPressureMinima.insert(*iterPSL);
+						setNewCandidates.insert(*iterCandidate);
 					} else {
 						nRejectedNoWarmCore++;
 					}
@@ -1454,12 +1504,12 @@ try {
 			kd_free(kdT200Maxima);
 			kd_free(kdT500Maxima);
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
 		// Eliminate based on closed contours
 		for (int ccc = 0; ccc < vecClosedContourOp.size(); ccc++) {
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
 			// Load relevant data
 			DataMatrix<float> dataState(nLat, nLon);
@@ -1471,10 +1521,10 @@ try {
 			varDataState->get(&(dataState[0][0]), 1, nLat, nLon);
 
 			// Loop through all pressure minima
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
 
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
 				// Determine if pressure minima have a closed contour
 				bool fHasClosedContour =
@@ -1482,8 +1532,8 @@ try {
 						dataLat,
 						dataLon,
 						dataState,
-						iterPSL->first,
-						iterPSL->second,
+						iterCandidate->first,
+						iterCandidate->second,
 						vecClosedContourOp[ccc].m_dDeltaAmount,
 						vecClosedContourOp[ccc].m_dDistance,
 						vecClosedContourOp[ccc].m_nCount,
@@ -1493,13 +1543,13 @@ try {
 
 				// If not rejected, add to new pressure minima array
 				if (fHasClosedContour) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 				} else {
 					vecRejectedClosedContour[ccc]++;
 				}
 			}
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
 		// Eliminate based on minimum the Laplacian of pressure at the PSL min
@@ -1507,14 +1557,14 @@ try {
 			float dDeltaLat = static_cast<float>(dataLat[1] - dataLat[0]);
 			float dDeltaLon = static_cast<float>(dataLon[1] - dataLon[0]);
 
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
-				int i = iterPSL->second;
-				int j = iterPSL->first;
+				int i = iterCandidate->second;
+				int j = iterCandidate->first;
 
 				int inext = (i + 1) % nLon;
 				int jnext = (j + 1);
@@ -1543,16 +1593,16 @@ try {
 				dLaplacian *= (M_PI / 180.0) * (M_PI / 180.0);
 
 				if (dLaplacian >= dMinLaplacian) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 				} else {
 					nRejectedLaplacian++;
 				}
 			}
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
-		Announce("Total candidates: %i", setPressureMinima.size());
+		Announce("Total candidates: %i", setCandidates.size());
 		Announce("Rejected (    latitude): %i", nRejectedLatitude);
 		Announce("Rejected (  topography): %i", nRejectedTopography);
 		Announce("Rejected (      merged): %i", nRejectedMerge);
@@ -1573,9 +1623,9 @@ try {
 		std::vector<float> vecMaxWindSp;
 		std::vector<float> vecRMaxWindSp;
 		{
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
 				std::pair<int, int> prMaximum;
 
@@ -1587,8 +1637,8 @@ try {
 					dataUMag850,
 					dataLon,
 					dataLat,
-					iterPSL->first,
-					iterPSL->second,
+					iterCandidate->first,
+					iterCandidate->second,
 					dWindSpDist,
 					prMaximum,
 					dMaxWindSp,
@@ -1663,24 +1713,24 @@ try {
 				nDateYear,
 				nDateMonth,
 				nDateDay,
-				static_cast<int>(setPressureMinima.size()),
+				static_cast<int>(setCandidates.size()),
 				nDateHour);
 
 			// Write candidate information
 			int iCandidateCount = 0;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 				fprintf(fpOutput, "%i\t%i\t%i\t%3.6f\t%3.6f\t%2.6f\t%3.6f\t%6.6f\n",
 					iCandidateCount,
-					iterPSL->second,
-					iterPSL->first,
-					dataLon[iterPSL->second] * 180.0 / M_PI,
-					dataLat[iterPSL->first]  * 180.0 / M_PI,
+					iterCandidate->second,
+					iterCandidate->first,
+					dataLon[iterCandidate->second] * 180.0 / M_PI,
+					dataLat[iterCandidate->first]  * 180.0 / M_PI,
 					vecMaxWindSp[iCandidateCount],
 					vecRMaxWindSp[iCandidateCount],
-					dataPSL[iterPSL->first][iterPSL->second]);
+					dataPSL[iterCandidate->first][iterCandidate->second]);
 
 				iCandidateCount++;
 			}
