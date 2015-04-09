@@ -70,7 +70,8 @@ int main(int argc, char **argv){
         strfile_in.c_str());
     }
     //Interpolated file name
-    std::string interp_file = "test_interp.nc";
+    std::string interp_file = strfile_in.replace(strfile_in.end()-3,strfile_in.end(),"_ipl.nc");
+    std::cout<< "Interpolated file name is "<<interp_file<<std::endl;
     //open interpolated file
     NcFile readin_out(interp_file.c_str(), NcFile::Replace, NULL,\
       0, NcFile::Offset64Bits);

@@ -61,8 +61,9 @@ void GetInputFileList(
 }
 
 int main(int argc, char **argv){
-  NcError error(NcError::verbose_fatal);
+  NcError error(NcError::verbose_nonfatal);
 
+  try{
   std::string fileList;
   bool leap;
   std::string strfile_out;
@@ -105,11 +106,11 @@ int main(int argc, char **argv){
 
   int yearLen = 365;
   //if the calendar contains leap years, need to check for extra day
-  if (leap){
-    string timeUnits = timeVal.get_att("units");
+/*  if (leap){
+    std::string timeUnits = timeVal->get_att("units");
 
 
-  }
+  }*/
 
   //Length of 31 days axis
   int arrLen = int(31.0/tRes);
@@ -298,11 +299,13 @@ int main(int argc, char **argv){
     }
     tStart = tEnd;
     tEnd = tStart + nSteps;
+    std::cout<<"tEnd is currently "<<tEnd<<std::endl;
 
    //Check if new file needs to be opened
     if (tEnd>nTime){
       std::cout<<"Time dimension exceeded."<<std::endl;
       infile.close();
+      std::cout<<"Closed file "<<InputFiles[x]<<std::endl;
       x+=1;
       if (x<nFiles){
       NcFile infile(InputFiles[x].c_str());
@@ -340,10 +343,13 @@ int main(int argc, char **argv){
   }
 
   //Get existing file info to copy to output file
-  NcDim *inLatDim = infile.get_dim("lat");
-  NcDim *inLonDim = infile.get_dim("lon");
-  NcVar *inLatVar = infile.get_var("lat");
-  NcVar *inLonVar = infile.get_var("lon");
+
+  NcFile refFile(InputFiles[0].c_str());
+
+  NcDim *inLatDim = refFile.get_dim("lat");
+  NcDim *inLonDim = refFile.get_dim("lon");
+  NcVar *inLatVar = refFile.get_var("lat");
+  NcVar *inLonVar = refFile.get_var("lon");
 
 
 //Output to file
@@ -355,24 +361,31 @@ int main(int argc, char **argv){
     timeVals[t] = t+1;
   }
 
-  NcVar *outTimeVar = outfile.add_var("time", ncInt, yearLen);
+  NcVar *outTimeVar = outfile.add_var("time", ncInt, outTime);
   outTimeVar->set_cur((long) 0);
   outTimeVar->put(&(timeVals[0]),yearLen);
 
   NcDim *outLat = outfile.add_dim("lat", nLat);
   NcDim *outLon = outfile.add_dim("lon", nLon);
-  NcVar *outLatVar = outfile.add_var("lat", NcDouble, nLat);
-  NcVar *outLonVar = outfile.add_var("lon", NcDouble, nLon);
+  NcVar *outLatVar = outfile.add_var("lat", ncDouble, outLat);
+  NcVar *outLonVar = outfile.add_var("lon", ncDouble, outLon);
 
   copy_dim_var(inLatVar,outLatVar);
   copy_dim_var(inLonVar,outLonVar);
 
-  NcVar *outAvgIPV("AIPV", NcDouble, yearLen, nLat, nLon);
+  NcVar *outAvgIPV = outfile.add_var("AIPV", ncDouble, outTime, outLat, outLon);
   outAvgIPV->set_cur(0,0,0);
   outAvgIPV->put(&(avgStoreVals[0][0][0]),yearLen,nLat,nLon);
 
-  infile.close();
+  refFile.close();
   outfile.close();
+  }
+
+  catch (Exception & e){
+    std::cout<<e.ToString() <<std::endl;
+  }
+//  infile.close();
+//  outfile.close();
 
   
 }
