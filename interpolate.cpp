@@ -17,12 +17,16 @@
 
 //////////////////////////////////////////////////////////////////////// 
 
-void interp_util(NcFile readin, 
-                 std::string strname_2d, 
-                 std::string interp_out) {
+void interp_util(NcFile & readin, 
+                 const std::string & strname_2d, 
+                 NcFile & ifile_out) {
 
   //open 2D PS file
   NcFile readin_2d(strname_2d.c_str());
+  if (!readin_2d.is_valid()) {
+    _EXCEPTION1("Unable to open file \"%s\" for reading",
+      strname_2d.c_str());
+  }
 
   //Dimensions and associated variables
   NcDim *time = readin.get_dim("time");
@@ -60,9 +64,7 @@ void interp_util(NcFile readin,
     pVals[i] = pNum;
   }
     
-  //Create file for interpolated output variables
-  NcFile ifile_out(interp_out.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
-
+  //Write information to outfile
   NcDim *itime = ifile_out.add_dim("time", time_len);
   NcDim *ilev = ifile_out.add_dim("lev", plev_len);
   NcDim *ilat = ifile_out.add_dim("lat", lat_len);
@@ -90,8 +92,7 @@ void interp_util(NcFile readin,
 
   NcVar *iv = ifile_out.add_var("V", ncDouble, itime, ilev, ilat, ilon);
   interpolate_lev(vvar, hyam, hybm, ps, ilev_vals, iv); 
-  
+
   readin_2d.close();  
-  ifile_out.close();
   std::cout<<"Finished interpolating variables."<<std::endl;
 } 

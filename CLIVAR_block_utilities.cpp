@@ -421,7 +421,7 @@ void PV_calc(
   int i171 = 171/dphi;
   int int_length = abs(pos_bot - pos_top);
   double diff_levs = abs(pVec[pos_bot]-pVec[pos_top]);
-  std::cout<<"Length of modified pressure axis is "<<int_length<<std::endl;
+//  std::cout<<"Length of modified pressure axis is "<<int_length<<std::endl;
 
   //Fill array with integrated values
   for (int t=0; t<nTime; t++){
@@ -435,7 +435,7 @@ void PV_calc(
         PVmid = 2.0*PVMat[t][pos_top+1][a][b];
         for (int x=2; x<int_length; x++){
           PVmid+= 2.0*PVMat[t][pos_top+x][a][b];
-          std::cout<<"Added value from position "<<pos_top+x<<", where pressure is "\
+         // std::cout<<"Added value from position "<<pos_top+x<<", where pressure is "\
           << pVec[pos_top+x]<<" Pa"<<std::endl;
         }
         iPVMat[t][a][b] = (PVtop+PVmid+PVbot)/(2.0*diff_levs);
@@ -447,7 +447,7 @@ void PV_calc(
   }
   intPV->set_cur(0,0,0,0);
   intPV->put(&(iPVMat[0][0][0]),nTime,nLat,nLon);
-
+  std::cout<<"Finished integrating PV."<<std::endl;
 } 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 

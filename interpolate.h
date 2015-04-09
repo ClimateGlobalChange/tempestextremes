@@ -19,8 +19,8 @@
 #include <cmath>
 #include <cstring>
 
-void interp_util(NcFile readin,
-                 std::string strname_2d,
-                 std::string interp_out);
+void interp_util(NcFile & readin,
+                 const std::string & strname_2d,
+                 NcFile & ifile_out);
 
 #endif

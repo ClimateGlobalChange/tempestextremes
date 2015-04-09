@@ -23,6 +23,9 @@
 
 //////////////////////////////////////////////////////////////////////// 
 int main(int argc, char **argv){
+  NcError error(NcError::verbose_fatal);
+
+  try {
 
   //Input file (sometimes needs to be interpolated)
   std::string strfile_in;
@@ -31,7 +34,9 @@ int main(int argc, char **argv){
   //Output file to be written
   std::string strfile_out;
   //Interpolate, yes or no?
-  std::string interp_check;
+  bool interp_check;
+  //If Pressure is in hPa, need to create new pressure axis
+  bool is_hPa;
   
   //Parse command line
   BeginCommandLine()
@@ -39,39 +44,55 @@ int main(int argc, char **argv){
     CommandLineString(strfile_in, "in", "");
     CommandLineString(strfile_2d, "in2d", "");
     CommandLineString(strfile_out, "out", "");
-    CommandLineString(interp_check, "ipl", "");
+    CommandLineBool(interp_check, "ipl");
+    CommandLineBool(is_hPa, "hpa");
     ParseCommandLine(argc, argv);
 
   EndCommandLine(argv)
   AnnounceBanner();
 
-    // Check input
-    if (strfile_in == "") {
-       _EXCEPTIONT("No input file (--in) specified");
-    }
-    if (strfile_out == "") {
-       _EXCEPTIONT("No output file (--out) specified");
-    }
+  // Check input
+  if (strfile_in == "") {
+     _EXCEPTIONT("No input file (--in) specified");
+  }
+  if (strfile_out == "") {
+     _EXCEPTIONT("No output file (--out) specified");
+  }
 
   //If variables need interpolating, do this first!i  
-  if (interp_check == "y" or interp_check == "yes"){
+  if (interp_check) {
     if (strfile_2d == "") {
        _EXCEPTIONT("No input file (--in2d) specified");
     }
+    NcFile readin_int(strfile_in.c_str());
+    if (!readin_int.is_valid()) {
+      _EXCEPTION1("Unable to open file \"%s\" for reading",
+        strfile_in.c_str());
+    }
     //Interpolated file name
     std::string interp_file = "test_interp.nc";
+    //open interpolated file
+    NcFile readin_out(interp_file.c_str(), NcFile::Replace, NULL,\
+      0, NcFile::Offset64Bits);
+    if (!readin_out.is_valid()) {
+      _EXCEPTION1("Unable to open file \"%s\" for writing",
+        interp_file.c_str());
+    }
 
     //Interpolate variable and write to new file
-    NcFile readin_int(strfile_in.c_str());
-    interp_util(readin_int, strfile_2d, interp_file);
-   // std::cout<<"About to close file."<<std::endl;
-   // readin_int.close();
-    //Replace infile name with interpolated file name
+    interp_util(readin_int, strfile_2d, readin_out);
+    readin_out.close();
     strfile_in = interp_file;
-    std::cout<<"Input file is now "<<strfile_in<<std::endl;
   }
-  //Read input file
+ /* else{
+    //Read input file
+    NcFile readin(strfile_in.c_str());
+  }*/
+
   NcFile readin(strfile_in.c_str());
+  if (!readin.is_valid()) {
+    _EXCEPTION1("Invalid file \"%s\"", strfile_in.c_str());
+  }
 
   //Dimensions and associated variables
   NcDim *time = readin.get_dim("time");
@@ -89,8 +110,7 @@ int main(int argc, char **argv){
   NcDim *lon = readin.get_dim("lon");
   int lon_len = lon->size();
   NcVar *lonvar = readin.get_var("lon");
-
-
+    
   //Variables for calculations
   NcVar *temp = readin.get_var("T");
   NcVar *uvar = readin.get_var("U");
@@ -111,8 +131,25 @@ int main(int argc, char **argv){
   NcVar *lat_vals = file_out.add_var("lat", ncDouble, out_lat);
   NcVar *lon_vals = file_out.add_var("lon", ncDouble, out_lon); 
 
+
+  //if Pressure axis is in hPa, need to change to Pa
+  if (is_hPa){
+    DataVector<double> levhPa(lev_len);
+    levvar->set_cur((long) 0);
+    levvar->get(&(levhPa[0]),lev_len);
+
+    DataVector<double> levPa(lev_len);
+    for (int p=0; p<lev_len; p++){
+      levPa[p] = levhPa[0]*100.0;
+    }
+    lev_vals->set_cur((long) 0);
+    lev_vals->put(&(levPa[0]),lev_len);
+  }
+  else if (!is_hPa){
+    copy_dim_var(levvar, lev_vals);
+  }
+
   copy_dim_var(timevar, time_vals);
-  copy_dim_var(levvar, lev_vals);
   copy_dim_var(latvar, lat_vals);
   copy_dim_var(lonvar, lon_vals);
 
@@ -144,4 +181,8 @@ int main(int argc, char **argv){
 
   //Close output file
   file_out.close();
+
+  } catch (Exception & e) {
+    std::cout << e.ToString() << std::endl;
+  }
 }
