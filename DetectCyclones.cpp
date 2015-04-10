@@ -37,6 +37,317 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		A class storing a thresholding operator.
+///	</summary>
+class ThresholdOp {
+
+public:
+	///	<summary>
+	///		Possible operations.
+	///	</summary>
+	enum Operation {
+		GreaterThan,
+		LessThan,
+		GreaterThanEqualTo,
+		LessThanEqualTo,
+		EqualTo,
+		NotEqualTo
+	};
+
+public:
+	///	<summary>
+	///		Parse a threshold operator string.
+	///	</summary>
+	void Parse(
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Variable,
+			ReadMode_Op,
+			ReadMode_Value,
+			ReadMode_Distance,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Variable;
+
+		// Loop through string
+		int iLast = 0;
+		for (int i = 0; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in column name
+				if (eReadMode == ReadMode_Variable) {
+
+					m_strVariable = strSubStr;
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Op;
+
+				// Read in operation
+				} else if (eReadMode == ReadMode_Op) {
+					if (strSubStr == ">") {
+						m_eOp = GreaterThan;
+					} else if (strSubStr == "<") {
+						m_eOp = LessThan;
+					} else if (strSubStr == ">=") {
+						m_eOp = GreaterThanEqualTo;
+					} else if (strSubStr == "<=") {
+						m_eOp = LessThanEqualTo;
+					} else if (strSubStr == "=") {
+						m_eOp = EqualTo;
+					} else if (strSubStr == "!=") {
+						m_eOp = NotEqualTo;
+					} else {
+						_EXCEPTION1("Threshold invalid operation \"%s\"",
+							strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Value;
+
+				// Read in value
+				} else if (eReadMode == ReadMode_Value) {
+					m_dValue = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Distance;
+
+				// Read in minimum count
+				} else if (eReadMode == ReadMode_Distance) {
+					m_dDistance = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
+							"\nRequired: \"<name>,<operation>"
+							",<value>,<distance>\"",
+							strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
+					"\nRequired: \"<name>,<operation>,<value>,<distance>\"",
+					strOp.c_str());
+		}
+
+		if (m_dDistance < 0.0) {
+			_EXCEPTIONT("For threshold op, distance must be nonnegative");
+		}
+
+		// Output announcement
+		char szBuffer[128];
+		sprintf(szBuffer, "%s", m_strVariable.c_str());
+
+		std::string strDescription = szBuffer;
+		if (m_eOp == GreaterThan) {
+			strDescription += " is greater than ";
+		} else if (m_eOp == LessThan) {
+			strDescription += " is less than ";
+		} else if (m_eOp == GreaterThanEqualTo) {
+			strDescription += " is greater than or equal to ";
+		} else if (m_eOp == LessThanEqualTo) {
+			strDescription += " is less than or equal to ";
+		} else if (m_eOp == EqualTo) {
+			strDescription += " is equal to ";
+		} else if (m_eOp == NotEqualTo) {
+			strDescription += " is not equal to ";
+		}
+
+		sprintf(szBuffer, "%f within %f degrees",
+			m_dValue, m_dDistance);
+		strDescription += szBuffer;
+
+		Announce("%s", strDescription.c_str());
+	}
+
+public:
+	///	<summary>
+	///		Variable to use for thresholding.
+	///	</summary>
+	std::string m_strVariable;
+
+	///	<summary>
+	///		Operation.
+	///	</summary>
+	Operation m_eOp;
+
+	///	<summary>
+	///		Threshold value.
+	///	</summary>
+	double m_dValue;
+
+	///	<summary>
+	///		Distance to search for threshold value
+	///	</summary>
+	double m_dDistance;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class describing a general closed contour operation.
+///	</summary>
+class ClosedContourOp {
+
+public:
+	///	<summary>
+	///		Parse a closed contour operation string.
+	///	</summary>
+	void Parse(
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Variable,
+			ReadMode_Distance,
+			ReadMode_Amount,
+			ReadMode_Count,
+			ReadMode_MinMaxDist,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Variable;
+
+		// Loop through string
+		int iLast = 0;
+		for (int i = 0; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in variable name
+				if (eReadMode == ReadMode_Variable) {
+					m_strVariable = strSubStr;
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Amount;
+
+				// Read in amount
+				} else if (eReadMode == ReadMode_Amount) {
+					m_dDeltaAmount = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Distance;
+
+				// Read in distance
+				} else if (eReadMode == ReadMode_Distance) {
+					m_dDistance = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Count;
+
+				// Read in count
+				} else if (eReadMode == ReadMode_Count) {
+					m_nCount = atoi(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_MinMaxDist;
+
+				// Read in min/max distance
+				} else if (eReadMode == ReadMode_MinMaxDist) {
+					m_dMinMaxDist = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nToo many entries in closed contour op \"%s\""
+						"\nRequired: \"<name>,<amount>,<distance>,"
+						"<count>,<minmaxdist>\"",
+						strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("\nInsufficient entries in closed contour op \"%s\""
+					"\nRequired: \"<name>,<amount>,<distance>,"
+					"<count>,<minmaxdist>\"",
+					strOp.c_str());
+		}
+
+		// Output announcement
+		char szBuffer[128];
+
+		std::string strDescription;
+		strDescription += m_strVariable;
+
+		if (m_dDeltaAmount == 0.0) {
+			_EXCEPTIONT("For closed contour op, delta amount must be non-zero");
+		}
+		if (m_dDistance <= 0.0) {
+			_EXCEPTIONT("For closed contour op, distance must be positive");
+		}
+		if (m_nCount <= 0) {
+			_EXCEPTIONT("For closed contour op, count must be positive");
+		}
+		if (m_dMinMaxDist < 0.0) {
+			_EXCEPTIONT("For closed contour op, min/max dist must be nonnegative");
+		}
+
+		if (m_dDeltaAmount < 0.0) {
+			Announce("%s decreases by %f over %f deg (%i samples)"
+				   " (max search %f deg)",
+				m_strVariable.c_str(),
+				-m_dDeltaAmount,
+				m_dDistance,
+				m_nCount,
+				m_dMinMaxDist);
+
+		} else {
+			Announce("%s increases by %f over %f degrees (%i samples)"
+					" (min search %f deg)",
+				m_strVariable.c_str(),
+				m_dDeltaAmount,
+				m_dDistance,
+				m_nCount,
+				m_dMinMaxDist);
+		}
+	}
+
+public:
+	///	<summary>
+	///		Variable name.
+	///	</summary>
+	std::string m_strVariable;
+
+	///	<summary>
+	///		Threshold amount.  If positive this represents a minimum
+	///		increase.  If negative this represents a minimum decrease.
+	///	</summary>
+	double m_dDeltaAmount;
+
+	///	<summary>
+	///		Threshold distance.
+	///	</summary>
+	double m_dDistance;
+
+	///	<summary>
+	///		Number of nodes used to evaluate closed contour.
+	///	</summary>
+	int m_nCount;
+
+	///	<summary>
+	///		Distance to search for min or max.
+	///	</summary>
+	double m_dMinMaxDist;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Find the locations of all minima in the given DataMatrix.
 ///	</summary>
 void FindAllLocalMinima(
@@ -631,155 +942,143 @@ bool HasClosedContour(
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		A class describing a general closed contour operation.
+///		Determine if the given field satisfies the threshold.
 ///	</summary>
-class ClosedContourOp {
+bool SatisfiesThreshold(
+	const DataVector<double> & dataLat,
+	const DataVector<double> & dataLon,
+	const DataMatrix<float> & dataState,
+	const int iLat,
+	const int iLon,
+	const ThresholdOp::Operation op,
+	const double dTargetValue,
+	const double dMaxDist,
+	bool fRegional
+) {
+	// Verify that dMaxDist is less than 180.0
+	if (dMaxDist > 180.0) {
+		_EXCEPTIONT("MaxDist must be less than 180.0");
+	}
 
-public:
-	///	<summary>
-	///		Parse a closed contour operation string.
-	///	</summary>
-	void Parse(
-		const std::string & strOp
-	) {
-		// Read mode
-		enum {
-			ReadMode_Variable,
-			ReadMode_Distance,
-			ReadMode_Amount,
-			ReadMode_Count,
-			ReadMode_MinMaxDist,
-			ReadMode_Invalid
-		} eReadMode = ReadMode_Variable;
+	// Number of latitudes and longitudes
+	const int nLat = dataLat.GetRows();
+	const int nLon = dataLon.GetRows();
 
-		// Loop through string
-		int iLast = 0;
-		for (int i = 0; i <= strOp.length(); i++) {
+	// Queue of nodes that remain to be visited
+	std::queue< std::pair<int, int> > queueNodes;
+	std::pair<int, int> pr0(iLat, iLon);
+	queueNodes.push(pr0);
 
-			// Comma-delineated
-			if ((i == strOp.length()) || (strOp[i] == ',')) {
+	// Set of nodes that have already been visited
+	std::set< std::pair<int, int> > setNodesVisited;
 
-				std::string strSubStr =
-					strOp.substr(iLast, i - iLast);
+	// Latitude and longitude at the origin
+	double dLat0 = dataLat[iLat];
+	double dLon0 = dataLon[iLon];
 
-				// Read in variable name
-				if (eReadMode == ReadMode_Variable) {
-					m_strVariable = strSubStr;
+	// Loop through all latlon elements
+	while (queueNodes.size() != 0) {
+		std::pair<int, int> pr = queueNodes.front();
+		queueNodes.pop();
 
-					iLast = i + 1;
-					eReadMode = ReadMode_Amount;
+		if (setNodesVisited.find(pr) != setNodesVisited.end()) {
+			continue;
+		}
 
-				// Read in amount
-				} else if (eReadMode == ReadMode_Amount) {
-					m_dDeltaAmount = atof(strSubStr.c_str());
+		setNodesVisited.insert(pr);
 
-					iLast = i + 1;
-					eReadMode = ReadMode_Distance;
+		double dLatThis = dataLat[pr.first];
+		double dLonThis = dataLon[pr.second];
 
-				// Read in distance
-				} else if (eReadMode == ReadMode_Distance) {
-					m_dDistance = atof(strSubStr.c_str());
+		// Great circle distance to this element
+		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
+				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0));
 
-					iLast = i + 1;
-					eReadMode = ReadMode_Count;
-
-				// Read in count
-				} else if (eReadMode == ReadMode_Count) {
-					m_nCount = atoi(strSubStr.c_str());
-
-					iLast = i + 1;
-					eReadMode = ReadMode_MinMaxDist;
-
-				// Read in min/max distance
-				} else if (eReadMode == ReadMode_MinMaxDist) {
-					m_dMinMaxDist = atof(strSubStr.c_str());
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Invalid;
-
-				// Invalid
-				} else if (eReadMode == ReadMode_Invalid) {
-					_EXCEPTION1("\nToo many entries in closed contour op \"%s\""
-						"\nRequired: \"<name>,<amount>,<distance>,"
-						"<count>,<minmaxdist>\"",
-						strOp.c_str());
-				}
+		if (pr != pr0) {
+			if (dR > dMaxDist) {
+				continue;
 			}
 		}
 
-		if (eReadMode != ReadMode_Invalid) {
-			_EXCEPTION1("\nInsufficient entries in closed contour op \"%s\""
-					"\nRequired: \"<name>,<amount>,<distance>,"
-					"<count>,<minmaxdist>\"",
-					strOp.c_str());
-		}
+		// Value at this location
+		double dValue = dataState[pr.first][pr.second];
 
-		// Output announcement
-		char szBuffer[128];
+		// Apply operator
+		if (op == ThresholdOp::GreaterThan) {
+			if (dValue > dTargetValue) {
+				return true;
+			}
 
-		std::string strDescription;
-		strDescription += m_strVariable;
+		} else if (op == ThresholdOp::LessThan) {
+			if (dValue < dTargetValue) {
+				return true;
+			}
 
-		if (m_dDeltaAmount == 0.0) {
-			_EXCEPTIONT("For closed contour op, delta amount must be non-zero");
-		}
-		if (m_dDistance <= 0.0) {
-			_EXCEPTIONT("For closed contour op, distance must be positive");
-		}
-		if (m_nCount <= 0) {
-			_EXCEPTIONT("For closed contour op, count must be positive");
-		}
-		if (m_dMinMaxDist < 0.0) {
-			_EXCEPTIONT("For closed contour op, min/max dist must be nonnegative");
-		}
+		} else if (op == ThresholdOp::GreaterThanEqualTo) {
+			if (dValue >= dTargetValue) {
+				return true;
+			}
 
-		if (m_dDeltaAmount < 0.0) {
-			Announce("%s decreases by %f over %f deg (%i samples)"
-				   " (max search %f deg)",
-				m_strVariable.c_str(),
-				-m_dDeltaAmount,
-				m_dDistance,
-				m_nCount,
-				m_dMinMaxDist);
+		} else if (op == ThresholdOp::LessThanEqualTo) {
+			if (dValue <= dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::EqualTo) {
+			if (dValue == dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::NotEqualTo) {
+			if (dValue != dTargetValue) {
+				return true;
+			}
 
 		} else {
-			Announce("%s increases by %f over %f degrees (%i samples)"
-					" (min search %f deg)",
-				m_strVariable.c_str(),
-				m_dDeltaAmount,
-				m_dDistance,
-				m_nCount,
-				m_dMinMaxDist);
+			_EXCEPTIONT("Invalid operation");
+		}
+
+		// Special case: zero distance
+		if (dMaxDist == 0.0) {
+			return false;
+		}
+
+		// Add all neighbors of this point
+		std::pair<int,int> prWest(pr.first, (pr.second + nLon - 1) % nLon);
+		if (setNodesVisited.find(prWest) == setNodesVisited.end()) {
+			if (!fRegional) {
+				queueNodes.push(prWest);
+			} else if (pr.second >= 0) {
+				queueNodes.push(prWest);
+			}
+		}
+
+		std::pair<int,int> prEast(pr.first, (pr.second + 1) % nLon);
+		if (setNodesVisited.find(prEast) == setNodesVisited.end()) {
+			if (!fRegional) {
+				queueNodes.push(prEast);
+			} else if (pr.second <= nLon-1) {
+				queueNodes.push(prEast);
+			}
+		}
+
+		std::pair<int,int> prNorth(pr.first + 1, pr.second);
+		if ((prNorth.first < nLat) &&
+			(setNodesVisited.find(prNorth) == setNodesVisited.end())
+		) {
+			queueNodes.push(prNorth);
+		}
+
+		std::pair<int,int> prSouth(pr.first - 1, pr.second);
+		if ((prSouth.first >= 0) &&
+			(setNodesVisited.find(prSouth) == setNodesVisited.end())
+		) {
+			queueNodes.push(prSouth);
 		}
 	}
 
-public:
-	///	<summary>
-	///		Variable name.
-	///	</summary>
-	std::string m_strVariable;
-
-	///	<summary>
-	///		Threshold amount.  If positive this represents a minimum
-	///		increase.  If negative this represents a minimum decrease.
-	///	</summary>
-	double m_dDeltaAmount;
-
-	///	<summary>
-	///		Threshold distance.
-	///	</summary>
-	double m_dDistance;
-
-	///	<summary>
-	///		Number of nodes used to evaluate closed contour.
-	///	</summary>
-	int m_nCount;
-
-	///	<summary>
-	///		Distance to search for min or max.
-	///	</summary>
-	double m_dMinMaxDist;
-};
+	return false;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -842,6 +1141,9 @@ try {
 	// Closed contour commands
 	std::string strClosedContourCmd;
 
+	// Threshold commands
+	std::string strThresholdCmd;
+
 	// Minimum Laplacian value
 	double dMinLaplacian;
 
@@ -875,6 +1177,7 @@ try {
 		CommandLineDoubleD(dNoWarmCoreDist, "nowarmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dVortDist, "vortdist", 0.0, "(degrees)");
 		CommandLineString(strClosedContourCmd, "closedcontourcmd", "");
+		CommandLineString(strThresholdCmd, "thresholdcmd", "");
 		//CommandLineDoubleD(dMinLaplacian, "minlaplacian", 0.0, "(Pa / degree^2)");
 		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
 		//CommandLineBool(fAppend, "append");
@@ -924,7 +1227,8 @@ try {
 		for (int i = 0; i <= strClosedContourCmd.length(); i++) {
 
 			if ((i == strClosedContourCmd.length()) ||
-				(strClosedContourCmd[i] == ';')
+				(strClosedContourCmd[i] == ';') ||
+				(strClosedContourCmd[i] == ':')
 			) {
 				std::string strSubStr =
 					strClosedContourCmd.substr(iLast, i - iLast);
@@ -932,6 +1236,33 @@ try {
 				int iNextOp = (int)(vecClosedContourOp.size());
 				vecClosedContourOp.resize(iNextOp + 1);
 				vecClosedContourOp[iNextOp].Parse(strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	// Parse the closed contour command string
+	std::vector<ThresholdOp> vecThresholdOp;
+
+	if (strThresholdCmd != "") {
+		AnnounceStartBlock("Parsing threshold operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strThresholdCmd.length(); i++) {
+
+			if ((i == strThresholdCmd.length()) ||
+				(strThresholdCmd[i] == ';') ||
+				(strThresholdCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strThresholdCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecThresholdOp.size());
+				vecThresholdOp.resize(iNextOp + 1);
+				vecThresholdOp[iNextOp].Parse(strSubStr);
 
 				iLast = i + 1;
 			}
@@ -1154,6 +1485,7 @@ try {
 		int nRejectedLaplacian = 0;
 
 		DataVector<int> vecRejectedClosedContour(vecClosedContourOp.size());
+		DataVector<int> vecRejectedThreshold(vecThresholdOp.size());
 
 		// Eliminate based on maximum latitude
 		if (dMaxLatitude != 0.0) {
@@ -1517,6 +1849,11 @@ try {
 			NcVar * varDataState =
 				ncInput.get_var(vecClosedContourOp[ccc].m_strVariable.c_str());
 
+			if (varDataState == NULL) {
+				_EXCEPTION1("Cannot find variable \"%s\" in input file",
+					vecClosedContourOp[ccc].m_strVariable.c_str());
+			}
+
 			varDataState->set_cur(t,0,0);
 			varDataState->get(&(dataState[0][0]), 1, nLat, nLon);
 
@@ -1546,6 +1883,56 @@ try {
 					setNewCandidates.insert(*iterCandidate);
 				} else {
 					vecRejectedClosedContour[ccc]++;
+				}
+			}
+
+			setCandidates = setNewCandidates;
+		}
+
+		// Eliminate based on thresholds
+		for (int tc = 0; tc < vecThresholdOp.size(); tc++) {
+
+			std::set< std::pair<int, int> > setNewCandidates;
+
+			// Load relevant data
+			DataMatrix<float> dataState(nLat, nLon);
+			
+			NcVar * varDataState =
+				ncInput.get_var(vecThresholdOp[tc].m_strVariable.c_str());
+
+			if (varDataState == NULL) {
+				_EXCEPTION1("Cannot find variable \"%s\" in input file",
+					vecThresholdOp[tc].m_strVariable.c_str());
+			}
+
+			varDataState->set_cur(t,0,0);
+			varDataState->get(&(dataState[0][0]), 1, nLat, nLon);
+
+			// Loop through all pressure minima
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+				// Determine if the threshold is satisfied
+				bool fSatisfiesThreshold =
+					SatisfiesThreshold(
+						dataLat,
+						dataLon,
+						dataState,
+						iterCandidate->first,
+						iterCandidate->second,
+						vecThresholdOp[tc].m_eOp,
+						vecThresholdOp[tc].m_dValue,
+						vecThresholdOp[tc].m_dDistance,
+						fRegional
+					);
+
+				// If not rejected, add to new pressure minima array
+				if (fSatisfiesThreshold) {
+					setNewCandidates.insert(*iterCandidate);
+				} else {
+					vecRejectedThreshold[tc]++;
 				}
 			}
 
@@ -1616,6 +2003,12 @@ try {
 			Announce("Rejected: (contour %s): %i",
 					vecClosedContourOp[ccc].m_strVariable.c_str(),
 					vecRejectedClosedContour[ccc]);
+		}
+
+		for (int tc = 0; tc < vecRejectedThreshold.GetRows(); tc++) {
+			Announce("Rejected: (thresh. %s): %i",
+					vecThresholdOp[tc].m_strVariable.c_str(),
+					vecRejectedThreshold[tc]);
 		}
 
 		// Determine wind maximum at all pressure minima
