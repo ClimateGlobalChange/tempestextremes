@@ -126,6 +126,8 @@ void pv_vars_calc(
   NcVar *plev,
   double & lat_res,
   double & lon_res,
+  double & dphi,
+  double & dlambda,
   double & p_res,
   DataVector<double> & coriolis,
   DataVector<double> & cosphi
@@ -133,7 +135,9 @@ void pv_vars_calc(
   double radius = 6371000.0;
   double pi = 4.0*std::atan(1.0);
   double radian = 180.0/pi;
-  double sigma = std::pow(7.2921, -5.0);
+  double sigma = 7.2921*std::pow(10.0, -5.0);
+  std::cout<<"Check: radius is "<<radius<<", pi is "<<pi<<", radian is "\
+    <<radian<<", and sigma is "<<sigma<<std::endl;
   //std::cout<<"Initiating var calcs."<<std::endl;
   int nLat = lat->get_dim(0)->size();
   DataVector<double> latVec(nLat);
@@ -150,9 +154,11 @@ void pv_vars_calc(
   plev->set_cur((long) 0);
   plev->get(&(pVec[0]), np);
   
-
+ 
   lat_res = latVec[2]-latVec[1];
   lon_res = lonVec[2]-lonVec[1];
+  dphi = lat_res/radian;
+  dlambda = lon_res/radian;
   p_res = pVec[2]-pVec[1];
   for (int i=0; i<nLat; i++){
     double sinphi = std::sin(latVec[i]/radian);
@@ -225,20 +231,56 @@ void rVort_calc(
   DataMatrix4D<double> UMat(nTime, nPlev, nLat, nLon);
   U->set_cur(0,0,0,0);
   U->get(&(UMat[0][0][0][0]),nTime, nPlev, nLat, nLon);
+/*  std::cout<<"Calculations check: U at 0 is "<<UMat[10][5][0][50]\
+    <<", at end is "<<UMat[10][5][nLat-1][50]<<"; dphi is "<<dphi\
+    <<" and cosphi at 10 is "<<cosphi[10]<<std::endl;
+  std::cout<<"Calculations check: V at 0 is "<<VMat[10][5][30][0]\
+    <<", at end is "<<VMat[10][5][30][nLon-1]<<"; dlambda is "<<dlambda\
+    <<" and cosphi at 10 is "<<cosphi[10]<<std::endl;
+*/
 //OUTPUT: Partial derivatives
 //U WRT PHI
   DataMatrix4D<double> dUdphi(nTime, nPlev, nLat, nLon);
   for (int t=0; t<nTime; t++){
     for (int p=0; p<nPlev; p++){
       for (int b=0; b<nLon; b++){
-        dUdphi[t][p][0][b]=0;
-        dUdphi[t][p][nLat-1][b]=0.0;
-        for (int a=0; a<(nLat-1); a++){
-          dUdphi[t][p][a][b]=(UMat[t][p][a+1][b]-UMat[t][p][a-1][b])/(2.0*dphi);
+        dUdphi[t][p][0][b]=(-UMat[t][p][2][b]*cosphi[2]\
+          +4.0*UMat[t][p][1][b]*cosphi[1]\
+          -3.0*UMat[t][p][0][b]*cosphi[0])/(2.0*dphi);
+        dUdphi[t][p][nLat-1][b]=(3.0*UMat[t][p][nLat-1][b]*cosphi[nLat-1]\
+          -4.0*UMat[t][p][nLat-2][b]*cosphi[nLat-2]\
+          +UMat[t][p][nLat-3][b]*cosphi[nLat-3])/(2.0*dphi);
+        for (int a=1; a<(nLat-1); a++){
+          dUdphi[t][p][a][b]=(UMat[t][p][a+1][b]*cosphi[a+1]\
+           -UMat[t][p][a-1][b]*cosphi[a-1])/(2.0*dphi);
         }
       }
     }
   }
+  std::cout<<"Dudphi check: at time=10, phi=0, p=7, lon=50, dudphi is "<<dUdphi[10][7][0][50]\
+    <<" and at phi=end "<<dUdphi[10][7][nLat-1][50]<<". At phi=30, "<<dUdphi[10][7][30][50]\
+    <<" and phi=60 "<<dUdphi[10][7][60][50]<<std::endl;
+  /*for (int t=0; t<nTime; t++){
+    for (int p=0; p<nPlev; p++){
+      for (int a=1; a<(nLat-1); a++){
+        for (int b=0; b<nLon; b++){
+          dUdphi[t][p][a][b]=(UMat[t][p][a+1][b]*cosphi[a+1]\
+           -UMat[t][p][a-1][b]*cosphi[a-1])/(2.0*dphi);
+        }
+      }
+    }
+  }*/
+
+
+ /* //Lat end cases: set to 0 because of pole singularities causing error
+  for (int t=0; t<nTime; t++){
+    for (int p=0; p<nPlev; p++){
+      for (int b=0; b<nLon; b++){
+        dUdphi[t][p][0][b] = 0.0;
+        dUdphi[t][p][nLat-1][b] = 0.0;
+      }
+    }
+  }*/
 
   //V WRT LAMBDA
   DataMatrix4D<double> dVdl(nTime, nPlev, nLat, nLon);
@@ -253,17 +295,33 @@ void rVort_calc(
       }
     }
   }
-
+  std::cout<<"DVdlambda check: at time=10,  p=7, phi=30, lon=0, dVdlambda is "\
+    <<dVdl[10][7][30][0]<<" and at lon=end "<<dVdl[10][7][30][nLon-1]\
+    <<". At lon=20, "<<dVdl[10][7][30][20]<<" and lon=60 "\
+    <<dVdl[10][7][30][60]<<std::endl;
   DataMatrix4D<double>RVMat(nTime, nPlev, nLat, nLon);
   for (int t=0; t<nTime; t++){
     for (int p=0; p<nPlev; p++){
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
-          RVMat[t][p][a][b] = (1.0/radius*cosphi[a])*(dVdl[t][p][a][b]-dUdphi[t][p][a][b]);
+          RVMat[t][p][a][b] = (1.0/(radius*cosphi[a]))*(dVdl[t][p][a][b]-dUdphi[t][p][a][b]);
         }
       }
     }
   }
+
+  //Lat end cases: set to 0 because of pole singularities causing error
+  for (int t=0; t<nTime; t++){
+    for (int p=0; p<nPlev; p++){
+      for (int b=0; b<nLon; b++){
+        RVMat[t][p][0][b] = 0.0;
+        RVMat[t][p][nLat-1][b] = 0.0;
+      }
+    }
+  }
+  std::cout<<"Final check: RV at (10,7,30,50) is "<<RVMat[10][7][30][50]<<std::endl;
+
+
   std::cout<<"Finished calculating relative vorticity."<<std::endl;
   vorticity->set_cur(0,0,0,0);
   vorticity->put(&(RVMat[0][0][0][0]),nTime, nPlev, nLat, nLon);
@@ -281,6 +339,8 @@ void PV_calc(
         DataVector<double>cosphi,
 	double dphi,
 	double dlambda,
+        double lat_res,
+        double lon_res,
 	NcVar *PV,
         NcVar *intPV){
 
@@ -319,8 +379,8 @@ void PV_calc(
   DataMatrix4D<double> du_dp(nTime, nPlev, nLat, nLon);
   DataMatrix4D<double> dv_dp(nTime, nPlev, nLat, nLon);
 
-  double dp1 = pVec[1]-pVec[0];
-  double dp2 = pVec[nPlev-1]-pVec[nPlev-2];
+  double dp1 = std::fabs(pVec[1]-pVec[0]);
+  double dp2 = std::fabs(pVec[nPlev-1]-pVec[nPlev-2]);
   for (int t=0; t<nTime; t++){
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
@@ -335,7 +395,7 @@ void PV_calc(
         dv_dp[t][nPlev-1][a][b] = (3.0*VMat[t][nPlev-1][a][b]-4.0*VMat[t][nPlev-2][a][b]\
           +VMat[t][nPlev-3][a][b])/(2.0*dp2);
         for (int p=1; p<(nPlev-1); p++){
-          double dp = pVec[p+1]-pVec[p];
+          double dp = std::fabs(pVec[p+1]-pVec[p]);
           dpt_dp[t][p][a][b] = (PTMat[t][p+1][a][b]-PTMat[t][p-1][a][b])/(2.0*dp);
           du_dp[t][p][a][b] = (UMat[t][p+1][a][b]-UMat[t][p-1][a][b])/(2.0*dp);
           dv_dp[t][p][a][b] = (VMat[t][p+1][a][b]-VMat[t][p-1][a][b])/(2.0*dp);
@@ -417,8 +477,8 @@ void PV_calc(
   double PVtop;
   
 //Eliminate polar regions from calculations
-  int i10 = 10/dphi;
-  int i171 = 171/dphi;
+  int i10 = std::fabs(10/lat_res);
+  int i171 = std::fabs(171/lat_res);
   int int_length = abs(pos_bot - pos_top);
   double diff_levs = abs(pVec[pos_bot]-pVec[pos_top]);
 //  std::cout<<"Length of modified pressure axis is "<<int_length<<std::endl;

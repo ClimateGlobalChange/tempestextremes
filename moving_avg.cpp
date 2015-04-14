@@ -8,6 +8,7 @@
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
+#include "TimeObj.h"
 
 #include "DataVector.h"
 #include "DataMatrix.h"
@@ -21,6 +22,7 @@
 #include <string>
 #include <cstdio>
 #include <iostream>
+#include <sstream>
 
 //Copied from StitchBlobs
 void GetInputFileList(
@@ -59,6 +61,16 @@ void GetInputFileList(
 
         fclose(fp);
 }
+
+/*bool containsLeap(NcVar *timeVals, std::string units){
+  std::vector<std::string> unitsSplit;
+  std::stringstream unitsStream(units);
+  std::string word;
+  while (std::getline(unitsStream, word, " ")){
+    unitsSplit.push_back(word);
+  }
+  std::cout<<"Test: first word is "<<unitsSplit[0]<<std::endl;
+}*/
 
 int main(int argc, char **argv){
   NcError error(NcError::verbose_nonfatal);
@@ -106,11 +118,17 @@ int main(int argc, char **argv){
 
   int yearLen = 365;
   //if the calendar contains leap years, need to check for extra day
-/*  if (leap){
-    std::string timeUnits = timeVal->get_att("units");
+  if (leap){
+    NcAtt *timeUnits = timeVal->get_att("units");
+    if (timeUnits==NULL){
+      _EXCEPTIONT("Time variable has no units attribute.");
+    }
+    std::string strUnits = timeUnits->as_string(0);
+   // NcAtt *timeCal = timeVal->get_att("calendar");
+    std::cout<<"Time units are "<< strUnits <<std::endl;
+   
+  }
 
-
-  }*/
 
   //Length of 31 days axis
   int arrLen = int(31.0/tRes);

@@ -23,7 +23,7 @@
 
 //////////////////////////////////////////////////////////////////////// 
 int main(int argc, char **argv){
-  NcError error(NcError::verbose_fatal);
+  NcError error(NcError::verbose_nonfatal);
 
   try {
 
@@ -117,6 +117,20 @@ int main(int argc, char **argv){
   NcVar *uvar = readin.get_var("U");
   NcVar *vvar = readin.get_var("V");
 
+  //DEBUG: Check that variable values are the same
+  DataMatrix4D<double>UMat(time_len,lev_len,lat_len,lon_len);
+  DataMatrix4D<double>VMat(time_len,lev_len,lat_len,lon_len);
+
+  uvar->set_cur(0,0,0,0);
+  uvar->get(&(UMat[0][0][0][0]),time_len,lev_len,lat_len,lon_len);
+
+  vvar->set_cur(0,0,0,0);
+  vvar->get(&(VMat[0][0][0][0]),time_len,lev_len,lat_len,lon_len);
+  for (int t=0; t<time_len; t++){
+    std::cout<<"Check: at t="<<t<<", p=5,lat=10,lon=50, U is "<<UMat[t][5][10][50]\
+    <<" and V is "<<VMat[t][5][10][50]<<std::endl;
+  }
+
   //Create output file
   NcFile file_out(strfile_out.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
 
@@ -141,7 +155,7 @@ int main(int argc, char **argv){
 
     DataVector<double> levPa(lev_len);
     for (int p=0; p<lev_len; p++){
-      levPa[p] = levhPa[0]*100.0;
+      levPa[p] = levhPa[p]*100.0;
     }
     lev_vals->set_cur((long) 0);
     lev_vals->put(&(levPa[0]),lev_len);
@@ -158,25 +172,31 @@ int main(int argc, char **argv){
   DataVector<double> coriolis(lat_len);
   DataVector<double> cosphi(lat_len);
 
+  double lat_res;
+  double lon_res;
+
   double dphi;
   double dlambda;
   double dp;
 
-  pv_vars_calc(lat_vals, lon_vals, lev_vals, dphi, dlambda, dp, coriolis, cosphi);
+  pv_vars_calc(lat_vals, lon_vals, lev_vals, lat_res, lon_res,\
+    dphi, dlambda, dp, coriolis, cosphi);
   std::cout<<"dphi: "<<dphi<<" dlambda: "<<dlambda<<" dp: "<<dp<<std::endl;
-
+  std::cout<<"After vars calc check: coriolis and cosphi at 10 are "<<coriolis[10]<<\
+    " and "<<cosphi[10]<<std::endl;
   //Calculate PT and add to outfile
   NcVar *pt_var = file_out.add_var("PT", ncDouble, out_time, out_plev, out_lat, out_lon);
   PT_calc(temp, lev_vals, pt_var);
 
   //Calculate relative vorticity and add to outfile
-  NcVar *rvort_var = file_out.add_var("REL_VORT", ncDouble, out_time, out_plev, out_lat, out_lon);
+  NcVar *rvort_var = file_out.add_var("RV", ncDouble, out_time, out_plev, out_lat, out_lon);
   rVort_calc(uvar, vvar, dphi, dlambda, cosphi, rvort_var);
 
   NcVar *pv_var = file_out.add_var("PV", ncDouble, out_time, out_plev, out_lat, out_lon);
   NcVar *intpv_var = file_out.add_var("IPV", ncDouble, out_time, out_lat, out_lon);
-  PV_calc(uvar, vvar, pt_var, rvort_var, lev_vals, coriolis,cosphi, dphi, dlambda, pv_var, intpv_var);
+  PV_calc(uvar, vvar, pt_var, rvort_var, lev_vals, coriolis,cosphi, dphi, dlambda, lat_res, lon_res, pv_var, intpv_var);
 
+  std::cout<<"About to close files."<<std::endl;
  //Close input files
   readin.close();
 

@@ -42,6 +42,8 @@ void pv_vars_calc(
   NcVar *plev,
   double & lat_res,
   double & lon_res,
+  double & dphi,
+  double & dlambda,
   double & p_res,
   DataVector<double> & coriolis,
   DataVector<double> & cosphi
@@ -75,6 +77,8 @@ void PV_calc(
         DataVector<double> cosphi,
         double dphi,
         double dlambda,
+        double lat_res,
+        double lon_res,
         NcVar *PV,
         NcVar *intPV);
 
