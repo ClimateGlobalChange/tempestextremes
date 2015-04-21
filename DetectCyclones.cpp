@@ -499,8 +499,8 @@ DonePressureMaxima:
 void FindLocalMinMax(
 	bool fMinimum,
 	const DataMatrix<float> & data,
-	const DataVector<double> & dataLon,
 	const DataVector<double> & dataLat,
+	const DataVector<double> & dataLon,
 	int iLat,
 	int iLon,
 	double dMaxDist,
@@ -768,8 +768,8 @@ bool HasClosedContour(
 		FindLocalMinMax(
 			(dDeltaAmt > 0.0),
 			dataState,
-			dataLon,
 			dataLat,
+			dataLon,
 			iLat0,
 			iLon0,
 			dMinMaxDist,
@@ -1082,6 +1082,116 @@ bool SatisfiesThreshold(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Find the maximum value of a field near the given point.
+///	</summary>
+///	<param name="dMaxDist">
+///		Maximum distance from the initial point in degrees.
+///	</param>
+void FindLocalAverage(
+	const DataMatrix<float> & data,
+	const DataVector<double> & dataLat,
+	const DataVector<double> & dataLon,
+	int iLat,
+	int iLon,
+	double dMaxDist,
+	float & dAverage,
+	float & dMaxValue
+) {
+	// Verify that dMaxDist is less than 180.0
+	if (dMaxDist > 180.0) {
+		_EXCEPTIONT("MaxDist must be less than 180.0");
+	}
+
+	// Number of latitudes and longitudes
+	const int nLat = dataLat.GetRows();
+	const int nLon = dataLon.GetRows();
+
+	// Queue of nodes that remain to be visited
+	std::queue< std::pair<int, int> > queueNodes;
+	queueNodes.push( std::pair<int, int>(iLat, iLon) );
+
+	// Set of nodes that have already been visited
+	std::set< std::pair<int, int> > setNodesVisited;
+
+	// Latitude and longitude at the origin
+	double dLat0 = dataLat[iLat];
+	double dLon0 = dataLon[iLon];
+
+	// Sum
+	float dSum = 0.0f;
+	float dArea = 0.0f;
+
+	// Reset average
+	dAverage = 0.0f;
+
+	// Reset maximum value
+	dMaxValue = data[iLat][iLon];
+
+	// Loop through all latlon elements
+	while (queueNodes.size() != 0) {
+		std::pair<int, int> pr = queueNodes.front();
+		queueNodes.pop();
+
+		if (setNodesVisited.find(pr) != setNodesVisited.end()) {
+			continue;
+		}
+
+		setNodesVisited.insert(pr);
+
+		double dLatThis = dataLat[pr.first];
+		double dLonThis = dataLon[pr.second];
+
+		// Great circle distance to this element
+		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
+				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0));
+
+		if (dR > dMaxDist) {
+			continue;
+		}
+
+		// Add value to sum
+		float dLocalArea = cos(dLatThis);
+
+		dArea += dLocalArea;
+		dSum += data[pr.first][pr.second] * dLocalArea;
+
+		if (data[pr.first][pr.second] > dMaxValue) {
+			dMaxValue = data[pr.first][pr.second];
+		}
+
+		// Add all neighbors of this point
+		std::pair<int,int> prWest(pr.first, (pr.second + nLon - 1) % nLon);
+		if (setNodesVisited.find(prWest) == setNodesVisited.end()) {
+			queueNodes.push(prWest);
+		}
+
+		std::pair<int,int> prEast(pr.first, (pr.second + 1) % nLon);
+		if (setNodesVisited.find(prEast) == setNodesVisited.end()) {
+			queueNodes.push(prEast);
+		}
+
+		std::pair<int,int> prNorth(pr.first + 1, pr.second);
+		if ((prNorth.first < nLat) &&
+			(setNodesVisited.find(prNorth) == setNodesVisited.end())
+		) {
+			queueNodes.push(prNorth);
+		}
+
+		std::pair<int,int> prSouth(pr.first - 1, pr.second);
+		if ((prSouth.first >= 0) &&
+			(setNodesVisited.find(prSouth) == setNodesVisited.end())
+		) {
+			queueNodes.push(prSouth);
+		}
+	}
+
+	// Set average
+	dAverage = dSum / dArea;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 	NcError error(NcError::verbose_nonfatal);
@@ -1150,6 +1260,9 @@ try {
 	// Distance to search for maximum wind speed
 	double dWindSpDist;
 
+	// Distance to search for precipitation statistics (avg and max)
+	double dPrectDist;
+
 	// Append to output file
 	bool fAppend;
 
@@ -1180,6 +1293,7 @@ try {
 		CommandLineString(strThresholdCmd, "thresholdcmd", "");
 		//CommandLineDoubleD(dMinLaplacian, "minlaplacian", 0.0, "(Pa / degree^2)");
 		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
+		CommandLineDoubleD(dPrectDist, "prectdist", -1.0, "(degrees)");
 		//CommandLineBool(fAppend, "append");
 		CommandLineBool(fOutputHeader, "out_header");
 		CommandLineInt(iVerbosityLevel, "verbosity", 0);
@@ -1366,6 +1480,7 @@ try {
 	NcVar * varVvel = ncInput.get_var(strVName.c_str());
 	NcVar * varT200 = ncInput.get_var("T200");
 	NcVar * varT500 = ncInput.get_var("T500");
+	NcVar * varPrect = ncInput.get_var("PRECT");
 
 	if (varUvel == NULL) {
 		_EXCEPTION1("No variable \"%s\" found in input file", strUName.c_str());
@@ -1378,6 +1493,10 @@ try {
 	}
 	if (varT500 == NULL) {
 		_EXCEPTIONT("No variable \"T500\" found in input file");
+	}
+
+	if ((varPrect == NULL) && (dPrectDist >= 0.0)) {
+		_EXCEPTIONT("No variable \"PRECT\" found in input file");
 	}
 
 	// Storage for auxiliary variables
@@ -1393,6 +1512,8 @@ try {
 	DataMatrix<float> dataDel2PSL(nLat, nLon);
 
 	DataMatrix<float> dataPHIS(nLat, nLon);
+
+	DataMatrix<float> dataPrect(nLat, nLon);
 
 	// Topography variable
 	NcVar * varPHIS = NULL;
@@ -1456,6 +1577,11 @@ try {
 
 		varT500->set_cur(t,0,0);
 		varT500->get(&(dataT500[0][0]), 1, nLat, nLon);
+
+		if ((varPrect != NULL) && (dPrectDist >= 0.0)) {
+			varPrect->set_cur(t,0,0);
+			varPrect->get(&(dataPrect[0][0]), 1, nLat, nLon);
+		}
 
 		// Compute wind magnitude
 		for (int j = 0; j < nLat; j++) {
@@ -2028,8 +2154,8 @@ try {
 				FindLocalMinMax(
 					false,
 					dataUMag850,
-					dataLon,
 					dataLat,
+					dataLon,
 					iterCandidate->first,
 					iterCandidate->second,
 					dWindSpDist,
@@ -2042,8 +2168,37 @@ try {
 				vecRMaxWindSp.push_back(dRMaxWind);
 			}
 		}
-
 		AnnounceEndBlock("Done");
+
+		// Determine average and maximum PRECT
+		std::vector<float> vecPrectAvg;
+		std::vector<float> vecPrectMax;
+
+		if (dPrectDist >= 0.0) {
+			AnnounceStartBlock("Finding PRECT average and maximum");
+
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+				float dAverage;
+				float dMaxValue;
+
+				FindLocalAverage(
+					dataPrect,
+					dataLat,
+					dataLon,
+					iterCandidate->first,
+					iterCandidate->second,
+					dPrectDist,
+					dAverage,
+					dMaxValue);
+
+				vecPrectAvg.push_back(dAverage);
+				vecPrectMax.push_back(dMaxValue);
+			}
+			AnnounceEndBlock("Done");
+		}
 
 		// Write results to file
 		{
@@ -2115,7 +2270,7 @@ try {
 			std::set< std::pair<int, int> >::const_iterator iterCandidate
 				= setCandidates.begin();
 			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-				fprintf(fpOutput, "%i\t%i\t%i\t%3.6f\t%3.6f\t%2.6f\t%3.6f\t%6.6f\n",
+				fprintf(fpOutput, "%i\t%i\t%i\t%3.6f\t%3.6f\t%2.6f\t%3.6f\t%6.6f",
 					iCandidateCount,
 					iterCandidate->second,
 					iterCandidate->first,
@@ -2124,6 +2279,14 @@ try {
 					vecMaxWindSp[iCandidateCount],
 					vecRMaxWindSp[iCandidateCount],
 					dataPSL[iterCandidate->first][iterCandidate->second]);
+
+				if (dPrectDist >= 0.0) {
+					fprintf(fpOutput, "\t%1.5e\t%1.5e\n",
+						vecPrectAvg[iCandidateCount],
+						vecPrectMax[iCandidateCount]);
+				} else {
+					fprintf(fpOutput, "\n");
+				}
 
 				iCandidateCount++;
 			}
