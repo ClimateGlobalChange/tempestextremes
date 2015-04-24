@@ -231,13 +231,6 @@ void rVort_calc(
   DataMatrix4D<double> UMat(nTime, nPlev, nLat, nLon);
   U->set_cur(0,0,0,0);
   U->get(&(UMat[0][0][0][0]),nTime, nPlev, nLat, nLon);
-/*  std::cout<<"Calculations check: U at 0 is "<<UMat[10][5][0][50]\
-    <<", at end is "<<UMat[10][5][nLat-1][50]<<"; dphi is "<<dphi\
-    <<" and cosphi at 10 is "<<cosphi[10]<<std::endl;
-  std::cout<<"Calculations check: V at 0 is "<<VMat[10][5][30][0]\
-    <<", at end is "<<VMat[10][5][30][nLon-1]<<"; dlambda is "<<dlambda\
-    <<" and cosphi at 10 is "<<cosphi[10]<<std::endl;
-*/
 //OUTPUT: Partial derivatives
 //U WRT PHI
   DataMatrix4D<double> dUdphi(nTime, nPlev, nLat, nLon);
@@ -257,9 +250,6 @@ void rVort_calc(
       }
     }
   }
-  std::cout<<"Dudphi check: at time=10, phi=0, p=7, lon=50, dudphi is "<<dUdphi[10][7][0][50]\
-    <<" and at phi=end "<<dUdphi[10][7][nLat-1][50]<<". At phi=30, "<<dUdphi[10][7][30][50]\
-    <<" and phi=60 "<<dUdphi[10][7][60][50]<<std::endl;
   /*for (int t=0; t<nTime; t++){
     for (int p=0; p<nPlev; p++){
       for (int a=1; a<(nLat-1); a++){
@@ -295,10 +285,6 @@ void rVort_calc(
       }
     }
   }
-  std::cout<<"DVdlambda check: at time=10,  p=7, phi=30, lon=0, dVdlambda is "\
-    <<dVdl[10][7][30][0]<<" and at lon=end "<<dVdl[10][7][30][nLon-1]\
-    <<". At lon=20, "<<dVdl[10][7][30][20]<<" and lon=60 "\
-    <<dVdl[10][7][30][60]<<std::endl;
   DataMatrix4D<double>RVMat(nTime, nPlev, nLat, nLon);
   for (int t=0; t<nTime; t++){
     for (int p=0; p<nPlev; p++){
@@ -319,8 +305,6 @@ void rVort_calc(
       }
     }
   }
-  std::cout<<"Final check: RV at (10,7,30,50) is "<<RVMat[10][7][30][50]<<std::endl;
-
 
   std::cout<<"Finished calculating relative vorticity."<<std::endl;
   vorticity->set_cur(0,0,0,0);
@@ -470,6 +454,15 @@ void PV_calc(
       std::cout<<"500 mb position is at x="<<x<<std::endl;
     }
   }
+ //if level axis starts at ground, reverse positions
+  if (pos_top>pos_bot){
+    std::cout<<"Reversing axis positions."<<std::endl;
+    int temp = pos_bot;
+    pos_bot = pos_top;
+    pos_top = temp;
+  }
+
+
   DataMatrix3D<double> iPVMat(nTime, nLat, nLon);
 
   double PVbot;
@@ -479,32 +472,38 @@ void PV_calc(
 //Eliminate polar regions from calculations
   int i10 = std::fabs(10/lat_res);
   int i171 = std::fabs(171/lat_res);
-  int int_length = abs(pos_bot - pos_top);
-  double diff_levs = abs(pVec[pos_bot]-pVec[pos_top]);
+  double modLevLen = pos_bot-pos_top;
 //  std::cout<<"Length of modified pressure axis is "<<int_length<<std::endl;
 
-  //Fill array with integrated values
+//Set top/bottom 10 degrees latitude to 0 for PV
   for (int t=0; t<nTime; t++){
-    for (int b=0; b<nLon; b++){
-      for (int a=0; a<i10; a++){
-        iPVMat[t][a][b] = 0.0;
-      }
-      for (int a=i10; a<i171; a++){
-        PVtop = PVMat[t][pos_top][a][b];
-        PVbot = PVMat[t][pos_bot][a][b];
-        PVmid = 2.0*PVMat[t][pos_top+1][a][b];
-        for (int x=2; x<int_length; x++){
-          PVmid+= 2.0*PVMat[t][pos_top+x][a][b];
-         // std::cout<<"Added value from position "<<pos_top+x<<", where pressure is "\
-          << pVec[pos_top+x]<<" Pa"<<std::endl;
+    for (int p=0; p<nPlev; p++){
+      for (int b=0; b<nLon; b++){
+        for (int a=0; a<i10; a++){
+          PVMat[t][p][a][b] = 0.0;
         }
-        iPVMat[t][a][b] = (PVtop+PVmid+PVbot)/(2.0*diff_levs);
-      }
-      for (int a=i171; a<nLat; a++){
-        iPVMat[t][a][b]=0.0;
+        for (int a=i171; a<nLat; a++){
+          PVMat[t][p][a][b] = 0.0;
+        }
       }
     }
   }
+
+  //Calculate integration parts
+  for (int t=0; t<nTime; t++){
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        PVtop = PVMat[t][pos_top][a][b];
+        PVbot = PVMat[t][pos_bot][a][b];
+        PVmid = 0.0;
+        for (int p=(pos_top+1); p<pos_bot; p++){
+          PVmid+=2.0*PVMat[t][p][a][b];
+        }
+        iPVMat[t][a][b] = (PVtop+PVbot+PVmid)/(2.0*modLevLen);
+      }
+    }
+  }
+ 
   intPV->set_cur(0,0,0,0);
   intPV->put(&(iPVMat[0][0][0]),nTime,nLat,nLon);
   std::cout<<"Finished integrating PV."<<std::endl;

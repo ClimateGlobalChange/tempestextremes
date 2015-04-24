@@ -126,10 +126,6 @@ int main(int argc, char **argv){
 
   vvar->set_cur(0,0,0,0);
   vvar->get(&(VMat[0][0][0][0]),time_len,lev_len,lat_len,lon_len);
-  for (int t=0; t<time_len; t++){
-    std::cout<<"Check: at t="<<t<<", p=5,lat=10,lon=50, U is "<<UMat[t][5][10][50]\
-    <<" and V is "<<VMat[t][5][10][50]<<std::endl;
-  }
 
   //Create output file
   NcFile file_out(strfile_out.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);

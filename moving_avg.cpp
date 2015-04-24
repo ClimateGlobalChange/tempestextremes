@@ -62,28 +62,116 @@ void GetInputFileList(
         fclose(fp);
 }
 
-/*bool containsLeap(NcVar *timeVals, std::string units){
-  std::vector<std::string> unitsSplit;
-  std::stringstream unitsStream(units);
-  std::string word;
-  while (std::getline(unitsStream, word, " ")){
-    unitsSplit.push_back(word);
-  }
-  std::cout<<"Test: first word is "<<unitsSplit[0]<<std::endl;
-}*/
+//Copied from DetectCyclones
+
+void ParseTimeDouble(
+        const std::string & strTimeUnits,
+        const std::string & strTimeCalendar,
+        double dTime,
+        int & nDateYear,
+        int & nDateMonth,
+        int & nDateDay,
+        int & nDateHour
+) {
+        // Get calendar type
+        Time::CalendarType cal;
+        if ((strTimeCalendar.length() >= 6) &&
+                (strncmp(strTimeCalendar.c_str(), "noleap", 6) == 0)
+        ) {
+                cal = Time::CalendarNoLeap;
+
+        } else if (
+                (strTimeCalendar.length() >= 8) &&
+                (strncmp(strTimeCalendar.c_str(), "standard", 8) == 0)
+        ) {
+                cal = Time::CalendarStandard;
+
+        } else if (
+                (strTimeCalendar.length() >= 9) &&
+                (strncmp(strTimeCalendar.c_str(), "gregorian", 9) == 0)
+        ) {
+                cal = Time::CalendarStandard;
+
+        } else {
+                _EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
+        }
+
+        // Time format is "days since ..."
+        if ((strTimeUnits.length() >= 11) &&
+            (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
+        ) {
+                std::string strSubStr = strTimeUnits.substr(11);
+                Time time(cal);
+                time.FromFormattedString(strSubStr);
+
+                int nDays = static_cast<int>(dTime);
+                time.AddDays(nDays);
+
+                int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
+                time.AddSeconds(nSeconds);
+
+                Announce("Time (YMDS): %i %i %i %i",
+                                time.GetYear(),
+                                time.GetMonth(),
+                                time.GetDay(),
+                                time.GetSecond());
+
+                nDateYear = time.GetYear();
+                nDateMonth = time.GetMonth();
+                nDateDay = time.GetDay();
+                nDateHour = time.GetSecond() / 3600;
+
+                //printf("%s\n", strSubStr.c_str());
+        // Time format is "hours since ..."
+        } else if (
+            (strTimeUnits.length() >= 12) &&
+            (strncmp(strTimeUnits.c_str(), "hours since ", 12) == 0)
+        ) {
+                std::string strSubStr = strTimeUnits.substr(12);
+                Time time(cal);
+                time.FromFormattedString(strSubStr);
+
+                int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 3600.0);
+                time.AddSeconds(nSeconds);
+
+                Announce("Time (YMDS): %i %i %i %i",
+                                time.GetYear(),
+                                time.GetMonth(),
+                                time.GetDay(),
+                                time.GetSecond());
+
+                nDateYear = time.GetYear();
+                nDateMonth = time.GetMonth();
+                nDateDay = time.GetDay();
+                nDateHour = time.GetSecond() / 3600;
+
+                //printf("%s\n", strSubStr.c_str());
+
+        } else {
+                _EXCEPTIONT("Unknown \"time::units\" format");
+        }
+        //_EXCEPTION();
+}
+
+
+
+
+
+
+
+
+
 
 int main(int argc, char **argv){
   NcError error(NcError::verbose_nonfatal);
 
   try{
   std::string fileList;
-  bool leap;
   std::string strfile_out;
 
   BeginCommandLine()
-    CommandLineString(fileList, "in", "");
+    CommandLineString(fileList, "inlist", "");
     CommandLineString(strfile_out, "out", "");
-    CommandLineBool(leap, "leap");
     ParseCommandLine(argc, argv);
 
   EndCommandLine(argv)
@@ -93,6 +181,8 @@ int main(int argc, char **argv){
   std::vector<std::string> InputFiles;
   GetInputFileList(fileList, InputFiles);
   int nFiles = InputFiles.size();
+
+  std::cout << "Opening first file."<<std::endl;
 
   //Open first file 
   NcFile infile(InputFiles[0].c_str());
@@ -116,19 +206,29 @@ int main(int argc, char **argv){
 
   double tRes = timeVec[1]-timeVec[0];
 
-  int yearLen = 365;
-  //if the calendar contains leap years, need to check for extra day
-  if (leap){
-    NcAtt *timeUnits = timeVal->get_att("units");
-    if (timeUnits==NULL){
-      _EXCEPTIONT("Time variable has no units attribute.");
-    }
-    std::string strUnits = timeUnits->as_string(0);
-   // NcAtt *timeCal = timeVal->get_att("calendar");
-    std::cout<<"Time units are "<< strUnits <<std::endl;
-   
+//  std::cout<<"Getting time unit information,"<<std::endl;
+
+  NcAtt *attTime = timeVal->get_att("units");
+  if (attTime == NULL){
+    _EXCEPTIONT("Time variable has no units attribute.");
   }
 
+  std::string strTimeUnits = attTime->as_string(0);
+
+  NcAtt *attCal = timeVal->get_att("calendar");
+  std::string strCalendar = attCal->as_string(0);
+
+  std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
+
+
+  
+  int yearLen = 365;
+  //if the calendar contains leap years, need to check for extra day
+ // bool leap = false;
+  int dateYear;
+  int dateMonth;
+  int dateDay;
+  int dateHour;
 
   //Length of 31 days axis
   int arrLen = int(31.0/tRes);
@@ -137,22 +237,39 @@ int main(int argc, char **argv){
   DataMatrix3D<double> avgStoreVals(yearLen,nLat,nLon);
   DataMatrix3D<double> avgCounts(yearLen,nLat,nLon);
 
-  //Date in which to start storing averaged values
-  int dateIndex = int(timeVec[0])%yearLen+15;
-  //Start date of first file
-  double startTime = std::fmod(timeVec[0],yearLen);
-  std::cout<<"Will start storing value "<<startTime<<" at index "<<dateIndex<<std::endl;
+  //Check whether file contains a Feb 29
+  bool leap = false;
 
+  int i=0;
+  int leapYearIndex;
+
+  //If there is a leap year, store the first occurrence of the leap year date
+  while (i<nTime && leap==false){
+    ParseTimeDouble(strTimeUnits, strCalendar, timeVec[i], dateYear,\
+      dateMonth, dateDay, dateHour);
+    if (dateMonth==2 && dateDay==29){
+      std::cout<<"This file contains a leap year day at index "<<i<<std::endl;
+      leap = true;
+      leapYearIndex = i;
+    }
+    i++;
+  }
+
+
+
+  //Number of time steps per day
+  int nSteps = 1/tRes;
+
+  //Date index in which to start storing averaged values
+  int dateIndex = int(timeVec[0])%yearLen+15;
+
+  double endTime = timeVec[nTime-1];
   //Keeps track of index within 31-day array
   int currArrIndex = 0;
 
-  //number of time steps in day
-  int nSteps = 1/tRes;
-  std::cout<<"Number of steps in day is "<<nSteps<<std::endl;
-
   //3D 31-day array
   DataMatrix3D<double> currFillData(arrLen,nLat,nLon);
-  std::cout<<"Initialized fill array."<<std::endl;
+//  std::cout<<"Initialized fill array."<<std::endl;
 
   bool newFile=false;
   int tEnd;
@@ -166,21 +283,26 @@ int main(int argc, char **argv){
   else{
     tEnd = nTime;
   }
-  std::cout<<"Entering first while loop. tEnd is "<<tEnd<<\
+//  std::cout<<"Entering first while loop. tEnd is "<<tEnd<<\
     " and array length is "<<arrLen<<std::endl;
   //Initialize array with first 31 values
   while (currArrIndex<arrLen){
     for (int t=tStart; t<tEnd; t++){
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
+          if (leap){
+            if (t>=leapYearIndex&&t<=(leapYearIndex+nSteps)){
+              std::cout<<"leap year index is "<<leapYearIndex\
+                <<" and t is currently "<<t<<". Skipping."<<std::endl;
+              t++;
+            }
+          }
           currFillData[currArrIndex][a][b] = IPVData[t][a][b];
+          std::cout<<"t is "<<t<<" and array index is "<<currArrIndex<<std::endl;
         }
       }
       currArrIndex+=1;
-      //currTimeIndex+=1;
     }
-   // std::cout<<"Current fill array index is "<<currArrIndex<<\
-      " and time index is "<<currTimeIndex<<std::endl;
     //if new file needs to be opened, open it
     if (currArrIndex < arrLen){
       infile.close();
@@ -199,13 +321,37 @@ int main(int argc, char **argv){
       inPV->set_cur(0,0,0);
       inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
       newFile = false;
+      leap = false;
 
       //Time variable
       NcVar *timeVal = infile.get_var("time");
       DataVector<double> timeVec(nTime);
       timeVal->set_cur((long) 0);
       timeVal->get(&(timeVec[0]),nTime);
-      //currTimeIndex = 0;
+
+      std::cout<<"Check: end time was "<<endTime<<" and new start time is "\
+        <<timeVec[0]<<std::endl;
+      double contCheck = std::fabs(timeVec[0]-endTime);
+      std::cout<<"Check: difference between old end time and new start time is "\
+        <<contCheck<<" and tRes is "<< tRes<<std::endl;
+      if (contCheck>tRes){
+        _EXCEPTIONT("New file is not continuous with previous file."); 
+      }
+
+      //check for leap year days in this file
+      i=0;
+      while (i<nTime && leap==false){
+        ParseTimeDouble(strTimeUnits, strCalendar, timeVec[i], dateYear,\
+          dateMonth, dateDay, dateHour);
+        if (dateMonth==2 && dateDay==29){
+          std::cout<<"This file contains a leap year day at index "<<i<<std::endl;
+          leap = true;
+          leapYearIndex = i;
+        }
+        i++;
+      }
+
+      endTime = timeVec[nTime-1];
 
       //check that tEnd doesn't exceed 31 days
       int tCheck = currArrIndex + nTime;
@@ -231,7 +377,6 @@ int main(int argc, char **argv){
  //increase count by 1
   for (int a=0; a<nLat; a++){
     for (int b=0; b<nLon; b++){
-      //avgStoreVals[dateIndex][a][b] = avgStoreVals[dateIndex][a][b]/arrLen;
       avgCounts[dateIndex][a][b] +=1.0;
     }
   }
@@ -269,6 +414,19 @@ int main(int argc, char **argv){
     timeVal->set_cur((long) 0);
     timeVal->get(&(timeVec[0]),nTime);
 
+    leap = false;
+    i=0;
+    while (i<nTime && leap==false){
+      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[i], dateYear,\
+        dateMonth, dateDay, dateHour);
+      if (dateMonth==2 && dateDay==29){
+        std::cout<<"This file contains a leap year day at index "<<i<<std::endl;
+        leap = true;
+        leapYearIndex = i;
+      }
+      i++;
+    }
+
     tStart = 0;
     tEnd = tStart + nSteps;
   }
@@ -276,6 +434,15 @@ int main(int argc, char **argv){
   while (x<nFiles){
     //Advance to the next day and overwrite one day in the 31-day array
     std::cout<<"tStart: "<<tStart<<" tEnd: "<<tEnd<<std::endl;
+    //Check that current replacement day isn't a Feb 29
+    if (leap){
+      if (tStart == leapYearIndex){
+        tStart += nSteps;
+        tEnd += nSteps;
+        std::cout<<"Because of leap year, tStart/tEnd now "<<tStart<<" "<<tEnd<<std::endl;
+      }
+    }  
+
 
     std::cout<<"Replacing day starting at array index "<<currArrIndex<<std::endl;
     for (int t=tStart; t<tEnd; t++){

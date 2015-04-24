@@ -24,7 +24,7 @@ LDFILES= -lnetcdf -lnetcdf_c++ -L.
 CLIVAR_FILES = CLIVAR_blocks.cpp Announce.cpp NetCDFUtilities.cpp CLIVAR_block_utilities.cpp interpolate.cpp
 CLIVAR_CFILES =
 
-BLOCK_FILES = moving_avg.cpp Announce.cpp NetCDFUtilities.cpp  CLIVAR_block_utilities.cpp 
+BLOCK_FILES = moving_avg.cpp Announce.cpp NetCDFUtilities.cpp TimeObj.cpp  CLIVAR_block_utilities.cpp 
 BLOCK_CFILES = 
 
 DEV_FILES = devIPV.cpp Announce.cpp NetCDFUtilities.cpp CLIVAR_block_utilities.cpp
