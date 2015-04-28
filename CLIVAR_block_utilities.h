@@ -74,7 +74,7 @@ void pv_vars_calc(
 void PT_calc(
         NcVar *T, 
         NcVar *pLev, 
-        NcVar *PT
+        DataMatrix4D<double> &PTMat
 );
 
 //Function that calculates relative vorticity
@@ -84,15 +84,15 @@ void rVort_calc(
         double dphi,
         double dlambda,
         DataVector<double> cosphi,
-        NcVar *vorticity
+        DataMatrix4D<double> & RVMat
 );
 
 //Function that calculates PV
 void PV_calc(
         NcVar *U,
         NcVar *V,
-        NcVar *PT,
-        NcVar *rVort,
+        DataMatrix4D<double> PTMat,
+        DataMatrix4D<double> RVMat,
         NcVar *pVals,
         DataVector<double> coriolis,
         DataVector<double> cosphi,

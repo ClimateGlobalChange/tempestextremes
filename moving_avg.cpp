@@ -190,6 +190,7 @@ int main(int argc, char **argv){
   int nLat = infile.get_dim("lat")->size();
   int nLon = infile.get_dim("lon")->size();
 
+
   //IPV variable and data matrix
   NcVar *inPV = infile.get_var("IPV");
 
@@ -206,8 +207,6 @@ int main(int argc, char **argv){
 
   double tRes = timeVec[1]-timeVec[0];
 
-//  std::cout<<"Getting time unit information,"<<std::endl;
-
   NcAtt *attTime = timeVal->get_att("units");
   if (attTime == NULL){
     _EXCEPTIONT("Time variable has no units attribute.");
@@ -216,6 +215,9 @@ int main(int argc, char **argv){
   std::string strTimeUnits = attTime->as_string(0);
 
   NcAtt *attCal = timeVal->get_att("calendar");
+  if(attCal==NULL){
+    _EXCEPTIONT("Time variable has no calendar attribute.");
+  }
   std::string strCalendar = attCal->as_string(0);
 
   std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;

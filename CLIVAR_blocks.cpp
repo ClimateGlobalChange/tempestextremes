@@ -119,14 +119,14 @@ int main(int argc, char **argv){
   NcVar *vvar = readin.get_var("V");
 
   //DEBUG: Check that variable values are the same
-  DataMatrix4D<double>UMat(time_len,lev_len,lat_len,lon_len);
-  DataMatrix4D<double>VMat(time_len,lev_len,lat_len,lon_len);
+//  DataMatrix4D<double>UMat(time_len,lev_len,lat_len,lon_len);
+//  DataMatrix4D<double>VMat(time_len,lev_len,lat_len,lon_len);
 
-  uvar->set_cur(0,0,0,0);
-  uvar->get(&(UMat[0][0][0][0]),time_len,lev_len,lat_len,lon_len);
+//  uvar->set_cur(0,0,0,0);
+//  uvar->get(&(UMat[0][0][0][0]),time_len,lev_len,lat_len,lon_len);
 
-  vvar->set_cur(0,0,0,0);
-  vvar->get(&(VMat[0][0][0][0]),time_len,lev_len,lat_len,lon_len);
+//  vvar->set_cur(0,0,0,0);
+//  vvar->get(&(VMat[0][0][0][0]),time_len,lev_len,lat_len,lon_len);
 
   //Create output file
   NcFile file_out(strfile_out.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
@@ -178,20 +178,25 @@ int main(int argc, char **argv){
 
   pv_vars_calc(lat_vals, lon_vals, lev_vals, lat_res, lon_res,\
     dphi, dlambda, dp, coriolis, cosphi);
-  std::cout<<"dphi: "<<dphi<<" dlambda: "<<dlambda<<" dp: "<<dp<<std::endl;
-  std::cout<<"After vars calc check: coriolis and cosphi at 10 are "<<coriolis[10]<<\
+//  std::cout<<"dphi: "<<dphi<<" dlambda: "<<dlambda<<" dp: "<<dp<<std::endl;
+//  std::cout<<"After vars calc check: coriolis and cosphi at 10 are "<<coriolis[10]<<\
     " and "<<cosphi[10]<<std::endl;
-  //Calculate PT and add to outfile
-  NcVar *pt_var = file_out.add_var("PT", ncDouble, out_time, out_plev, out_lat, out_lon);
-  PT_calc(temp, lev_vals, pt_var);
+  //Calculate PT 
+
+  DataMatrix4D<double> PTVar(time_len,lev_len,lat_len,lon_len);
+//  NcVar *pt_var = file_out.add_var("PT", ncDouble, out_time, out_plev, out_lat, out_lon);
+  PT_calc(temp, lev_vals, PTVar);
 
   //Calculate relative vorticity and add to outfile
-  NcVar *rvort_var = file_out.add_var("RV", ncDouble, out_time, out_plev, out_lat, out_lon);
-  rVort_calc(uvar, vvar, dphi, dlambda, cosphi, rvort_var);
+
+  DataMatrix4D<double>RVVar(time_len,lev_len,lat_len,lon_len);
+//  NcVar *rvort_var = file_out.add_var("RV", ncDouble, out_time, out_plev, out_lat, out_lon);
+  rVort_calc(uvar, vvar, dphi, dlambda, cosphi, RVVar);
 
   NcVar *pv_var = file_out.add_var("PV", ncDouble, out_time, out_plev, out_lat, out_lon);
   NcVar *intpv_var = file_out.add_var("IPV", ncDouble, out_time, out_lat, out_lon);
-  PV_calc(uvar, vvar, pt_var, rvort_var, lev_vals, coriolis,cosphi, dphi, dlambda, lat_res, lon_res, pv_var, intpv_var);
+  PV_calc(uvar, vvar, PTVar, RVVar, lev_vals, coriolis,cosphi, dphi, dlambda,\
+    lat_res, lon_res, pv_var, intpv_var);
 
   std::cout<<"About to close files."<<std::endl;
  //Close input files

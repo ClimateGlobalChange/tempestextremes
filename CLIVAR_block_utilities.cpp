@@ -175,7 +175,7 @@ void interpolate_lev(NcVar *var,
   int nLon = var->get_dim(3)->size();
   int npLev = pLev->get_dim(0)->size();
 
-  std::cout<<"Dimensions: Time: "<<nTime<<", hybrid level: "<<nLev\
+ // std::cout<<"Dimensions: Time: "<<nTime<<", hybrid level: "<<nLev\
     << " lat: " << nLat << " lon: " << nLon << " plev: " << npLev<<std::endl;
 
   //Matrix to store PS
@@ -277,7 +277,7 @@ void pv_vars_calc(
   double pi = 4.0*std::atan(1.0);
   double radian = 180.0/pi;
   double sigma = 7.2921*std::pow(10.0, -5.0);
-  std::cout<<"Check: radius is "<<radius<<", pi is "<<pi<<", radian is "\
+//  std::cout<<"Check: radius is "<<radius<<", pi is "<<pi<<", radian is "\
     <<radian<<", and sigma is "<<sigma<<std::endl;
   //std::cout<<"Initiating var calcs."<<std::endl;
   int nLat = lat->get_dim(0)->size();
@@ -313,7 +313,7 @@ void pv_vars_calc(
 void PT_calc(
 	NcVar *T, 
 	NcVar *pLev, 
-	NcVar *PT
+	DataMatrix4D<double> &PTMat
 ){
   int nTime = T->get_dim(0)->size();
   int nPlev = T->get_dim(1)->size();
@@ -331,7 +331,7 @@ void PT_calc(
   pLev->get(&(pVec[0]), nPlev);
 
   //OUTPUT: PT
-  DataMatrix4D<double> PTMat(nTime, nPlev, nLat, nLon);
+//  DataMatrix4D<double> PTMat(nTime, nPlev, nLat, nLon);
   for (int t=0; t<nTime; t++){
     for (int p=0; p<nPlev; p++){
       for (int a=0; a<nLat; a++){
@@ -343,8 +343,8 @@ void PT_calc(
       }
     }
   }
-  PT->set_cur(0,0,0,0);
-  PT->put(&(PTMat[0][0][0][0]), nTime, nPlev, nLat, nLon);
+ // PT->set_cur(0,0,0,0);
+ // PT->put(&(PTMat[0][0][0][0]), nTime, nPlev, nLat, nLon);
   std::cout<<"Finished calculating PT."<<std::endl;
 }
 ///////////////////////////////////////////////////////////////////////
@@ -356,7 +356,7 @@ void rVort_calc(
 	double dphi,
 	double dlambda,
 	DataVector<double> cosphi,
-	NcVar *vorticity
+	DataMatrix4D<double> & RVMat
 ){
   int nTime = U->get_dim(0)->size();
   int nPlev = U->get_dim(1)->size();
@@ -426,7 +426,7 @@ void rVort_calc(
       }
     }
   }
-  DataMatrix4D<double>RVMat(nTime, nPlev, nLat, nLon);
+  //DataMatrix4D<double>RVMat(nTime, nPlev, nLat, nLon);
   for (int t=0; t<nTime; t++){
     for (int p=0; p<nPlev; p++){
       for (int a=0; a<nLat; a++){
@@ -448,8 +448,8 @@ void rVort_calc(
   }
 
   std::cout<<"Finished calculating relative vorticity."<<std::endl;
-  vorticity->set_cur(0,0,0,0);
-  vorticity->put(&(RVMat[0][0][0][0]),nTime, nPlev, nLat, nLon);
+ // vorticity->set_cur(0,0,0,0);
+ // vorticity->put(&(RVMat[0][0][0][0]),nTime, nPlev, nLat, nLon);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -457,8 +457,8 @@ void rVort_calc(
 void PV_calc(
 	NcVar *U, 
 	NcVar *V, 
-	NcVar *PT, 
-	NcVar *rVort,
+	DataMatrix4D<double> PTMat,
+	DataMatrix4D<double> RVMat,
         NcVar *pVals, 	
 	DataVector<double> coriolis,
         DataVector<double>cosphi,
@@ -477,8 +477,8 @@ void PV_calc(
   //Input matrices
   DataMatrix4D<double> UMat(nTime, nPlev, nLat, nLon);
   DataMatrix4D<double> VMat(nTime, nPlev, nLat, nLon);
-  DataMatrix4D<double> PTMat(nTime, nPlev, nLat, nLon);
-  DataMatrix4D<double> RVMat(nTime, nPlev, nLat, nLon);
+//  DataMatrix4D<double> PTMat(nTime, nPlev, nLat, nLon);
+//  DataMatrix4D<double> RVMat(nTime, nPlev, nLat, nLon);
 
   //Load data
   U->set_cur(0,0,0,0); 
@@ -487,11 +487,11 @@ void PV_calc(
   V->set_cur(0,0,0,0);
   V->get(&(VMat[0][0][0][0]), nTime, nPlev, nLat, nLon);
 
-  PT->set_cur(0,0,0,0);
-  PT->get(&(PTMat[0][0][0][0]), nTime, nPlev, nLat, nLon);
+//  PT->set_cur(0,0,0,0);
+//  PT->get(&(PTMat[0][0][0][0]), nTime, nPlev, nLat, nLon);
 
-  rVort->set_cur(0,0,0,0);
-  rVort->get(&(RVMat[0][0][0][0]), nTime, nPlev, nLat, nLon);
+//  rVort->set_cur(0,0,0,0);
+//  rVort->get(&(RVMat[0][0][0][0]), nTime, nPlev, nLat, nLon);
 
   //Pressure axis values
   DataVector<double> pVec(nPlev);
