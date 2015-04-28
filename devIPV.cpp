@@ -20,7 +20,7 @@
 #include <cstring>
 #include <vector>
 
-//Copied from StitchBlobs
+/*//Copied from StitchBlobs
 void GetInputFileList(
         const std::string & strInputFileList,
                 std::vector<std::string> & vecInputFiles
@@ -57,9 +57,10 @@ void GetInputFileList(
 
         fclose(fp);
 }
-
+*/
 void calcDevs(NcVar *inIPV, 
               NcVar *outDev, 
+              NcVar *outADev,
               NcVar *outPosIntDev,
               NcVar *avgIPV, 
               NcVar *inTime, 
@@ -102,8 +103,8 @@ void calcDevs(NcVar *inIPV,
 
 
 //Matrix for output data
-  DataMatrix3D<double>devMat(nTime,nLat,nLon);
-
+  DataMatrix3D<double> devMat(nTime,nLat,nLon);
+  DataMatrix3D<double> aDevMat(nTime,nLat,nLon);
 //Each day needs to correspond to one of the averaged days
 //Find the start date that corresponds to one of those days
   double startTime = std::fmod(timeVec[0],365);
@@ -124,17 +125,37 @@ void calcDevs(NcVar *inIPV,
       for (int b=0; b<nLon; b++){
         for (int t=0; t<nSteps; t++){
           devMat[d*nSteps+t][a][b] = IPVMat[d*nSteps+t][a][b]-avgMat[avgIndex][a][b];
-          if (a<5 && b<5){
-            std::cout<< "Dev matrix index is "<<d*nSteps+t<<" and avg index is "\
-              <<avgIndex<<std::endl;
-          }
+        //  if (a<5 && b<5){
+        //    std::cout<< "Dev matrix index is "<<d*nSteps+t<<" and avg index is "\
+        //      <<avgIndex<<std::endl;
+        //  }
         }
       }
     }
     avgIndex+=1;
   }
+
+  //implement 2-day
+  for (int t=0; t<nTime; t++){
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        if (t<2*nSteps){
+          aDevMat[t][a][b] = devMat[t][a][b];
+        }
+        else{
+          for (int n=0; n<2*nSteps; n++){
+            aDevMat[t][a][b]+=devMat[t-n][a][b];
+          }
+          aDevMat[t][a][b] = aDevMat[t][a][b]/float(2*nSteps);
+        }
+      }
+    }
+  }
   outDev->set_cur(0,0,0);
   outDev->put(&(devMat[0][0][0]),nTime,nLat,nLon);
+
+  outADev->set_cur(0,0,0);
+  outADev->put(&(aDevMat[0][0][0]),nTime,nLat,nLon);
 
 //Divide matrix by PV anomaly value 
 //We are looking for negative anomalies in NH and positive anomalies in SH
@@ -147,7 +168,7 @@ void calcDevs(NcVar *inIPV,
   for (int t=0; t<nTime; t++){
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
-        double divDev = devMat[t][a][b]/PVAnom;
+        double divDev = aDevMat[t][a][b]/PVAnom;
         //SH: positive anomalies
         if (latVec[a]<0){
           double pos = (divDev+std::fabs(divDev))/2.0;
@@ -237,9 +258,10 @@ int main(int argc, char **argv){
 
       //Create variables for Deviations
       NcVar *devOut = outfile.add_var("DIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
+      NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
       NcVar *devIntOut = outfile.add_var("INT_DIPV",ncInt,tDimOut,latDimOut,lonDimOut);
 
-      calcDevs(IPVData, devOut, devIntOut, AIPVData, inTime, avgTimeVals, inLat, anomVal);
+      calcDevs(IPVData, devOut, aDevOut, devIntOut, AIPVData, inTime, avgTimeVals, inLat, anomVal);
  
       infile.close();
       outfile.close();

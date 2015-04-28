@@ -18,6 +18,145 @@
 #include <cmath>
 #include <cstring>
 
+
+
+//Copied from StitchBlobs
+void GetInputFileList(
+        const std::string & strInputFileList,
+                std::vector<std::string> & vecInputFiles
+        ) {
+                FILE * fp = fopen(strInputFileList.c_str(), "r");
+
+                char szBuffer[1024];
+                for (;;) {
+                        fgets(szBuffer, 1024, fp);
+
+                        if (feof(fp)) {
+                                break;
+                        }
+
+                        // Remove end-of-line characters
+                        for (;;) {
+                                int nLen = strlen(szBuffer);
+                                if ((szBuffer[nLen-1] == '\n') ||
+                                        (szBuffer[nLen-1] == '\r') ||
+                                        (szBuffer[nLen-1] == ' ')
+                                ) {
+                                        szBuffer[nLen-1] = '\0';
+                                        continue;
+                                }
+                                break;
+                        }
+
+                        vecInputFiles.push_back(szBuffer);
+        }
+
+        if (vecInputFiles.size() == 0) {
+                _EXCEPTION1("No files found in file \"%s\"", strInputFileList.c_str());
+        }
+
+        fclose(fp);
+}
+
+
+
+
+
+
+//Copied from DetectCyclones
+
+void ParseTimeDouble(
+        const std::string & strTimeUnits,
+        const std::string & strTimeCalendar,
+        double dTime,
+        int & nDateYear,
+        int & nDateMonth,
+        int & nDateDay,
+        int & nDateHour
+) {
+        // Get calendar type
+        Time::CalendarType cal;
+        if ((strTimeCalendar.length() >= 6) &&
+                (strncmp(strTimeCalendar.c_str(), "noleap", 6) == 0)
+        ) {
+                cal = Time::CalendarNoLeap;
+
+        } else if (
+                (strTimeCalendar.length() >= 8) &&
+                (strncmp(strTimeCalendar.c_str(), "standard", 8) == 0)
+        ) {
+                cal = Time::CalendarStandard;
+
+        } else if (
+                (strTimeCalendar.length() >= 9) &&
+                (strncmp(strTimeCalendar.c_str(), "gregorian", 9) == 0)
+        ) {
+                cal = Time::CalendarStandard;
+
+        } else {
+                _EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
+        }
+
+       // Time format is "days since ..."
+        if ((strTimeUnits.length() >= 11) &&
+            (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
+        ) {
+                std::string strSubStr = strTimeUnits.substr(11);
+                Time time(cal);
+                time.FromFormattedString(strSubStr);
+
+                int nDays = static_cast<int>(dTime);
+                time.AddDays(nDays);
+
+                int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
+                time.AddSeconds(nSeconds);
+
+                Announce("Time (YMDS): %i %i %i %i",
+                                time.GetYear(),
+                                time.GetMonth(),
+                                time.GetDay(),
+                                time.GetSecond());
+
+                nDateYear = time.GetYear();
+                nDateMonth = time.GetMonth();
+                nDateDay = time.GetDay();
+                nDateHour = time.GetSecond() / 3600;
+
+                //printf("%s\n", strSubStr.c_str());
+        // Time format is "hours since ..."
+        } else if (
+            (strTimeUnits.length() >= 12) &&
+            (strncmp(strTimeUnits.c_str(), "hours since ", 12) == 0)
+        ) {
+                std::string strSubStr = strTimeUnits.substr(12);
+                Time time(cal);
+                time.FromFormattedString(strSubStr);
+
+                int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 3600.0);
+                time.AddSeconds(nSeconds);
+
+                Announce("Time (YMDS): %i %i %i %i",
+                                time.GetYear(),
+                                time.GetMonth(),
+                                time.GetDay(),
+                                time.GetSecond());
+
+                nDateYear = time.GetYear();
+                nDateMonth = time.GetMonth();
+                nDateDay = time.GetDay();
+                nDateHour = time.GetSecond() / 3600;
+
+        } else {
+                _EXCEPTIONT("Unknown \"time::units\" format");
+        }
+        //_EXCEPTION();
+}
+
+
+
+
+
+
 ///////////////////////////////////////////////////////////////////////////////////////
 //Function to interpolate variables from hybrid levels to pressure levels
 void interpolate_lev(NcVar *var, 

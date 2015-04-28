@@ -24,7 +24,7 @@
 #include <iostream>
 #include <sstream>
 
-//Copied from StitchBlobs
+/*//Copied from StitchBlobs
 void GetInputFileList(
         const std::string & strInputFileList,
                 std::vector<std::string> & vecInputFiles
@@ -61,9 +61,9 @@ void GetInputFileList(
 
         fclose(fp);
 }
-
+*/
 //Copied from DetectCyclones
-
+/*
 void ParseTimeDouble(
         const std::string & strTimeUnits,
         const std::string & strTimeCalendar,
@@ -152,7 +152,7 @@ void ParseTimeDouble(
         }
         //_EXCEPTION();
 }
-
+*/
 
 
 

@@ -20,6 +20,24 @@
 #include <cmath>
 #include <cstring>
 
+//Copied from StitchBlobs
+void GetInputFileList(
+        const std::string & strInputFileList,
+                std::vector<std::string> & vecInputFiles
+);
+
+void ParseTimeDouble(
+        const std::string & strTimeUnits,
+        const std::string & strTimeCalendar,
+        double dTime,
+        int & nDateYear,
+        int & nDateMonth,
+        int & nDateDay,
+        int & nDateHour
+); 
+
+
+
 //Function to interpolate variables from hybrid levels to pressure levels
 void interpolate_lev(NcVar *var,
                      NcVar *hyam,
