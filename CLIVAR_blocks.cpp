@@ -56,7 +56,8 @@ int main(int argc, char **argv){
      _EXCEPTIONT("No input file (--in) specified");
   }
   if (strfile_out == "") {
-     _EXCEPTIONT("No output file (--out) specified");
+     strfile_out = strfile_in;
+     strfile_out = strfile_out.replace(strfile_out.end()-3,strfile_out.end(),"_integ.nc");
   }
 
   //If variables need interpolating, do this first!i  

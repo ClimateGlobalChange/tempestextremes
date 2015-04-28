@@ -21,13 +21,13 @@ LDFILES= -lnetcdf -lnetcdf_c++ -L.
 ######################################
 #ADDED MY FILES HERE!
 ######################################
-CLIVAR_FILES = CLIVAR_blocks.cpp Announce.cpp NetCDFUtilities.cpp CLIVAR_block_utilities.cpp interpolate.cpp
+CLIVAR_FILES = CLIVAR_blocks.cpp Announce.cpp NetCDFUtilities.cpp CLIVAR_block_utilities.cpp interpolate.cpp TimeObj.cpp
 CLIVAR_CFILES =
 
 BLOCK_FILES = moving_avg.cpp Announce.cpp NetCDFUtilities.cpp TimeObj.cpp  CLIVAR_block_utilities.cpp 
 BLOCK_CFILES = 
 
-DEV_FILES = devIPV.cpp Announce.cpp NetCDFUtilities.cpp CLIVAR_block_utilities.cpp
+DEV_FILES = devIPV.cpp Announce.cpp NetCDFUtilities.cpp CLIVAR_block_utilities.cpp TimeObj.cpp
 DEV_CFILES = 
 ######################################
 

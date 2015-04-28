@@ -15,10 +15,13 @@
 #include "DataVector.h"
 #include "DataMatrix3D.h"
 #include "DataMatrix4D.h"
+#include "TimeObj.h"
+#include "Announce.h"
 
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
+#include <vector>
 
 //Copied from StitchBlobs
 void GetInputFileList(
