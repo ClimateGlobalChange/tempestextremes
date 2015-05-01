@@ -121,8 +121,8 @@ void calcDevs(bool leap,
           for (int n=0; n<2*nSteps; n++){
             aDevMat[t][a][b]+=devMat[t-n][a][b];
           }
+          aDevMat[t][a][b] = aDevMat[t][a][b]/float(2*nSteps); 
         }
-        aDevMat[t][a][b] = aDevMat[t][a][b]/float(2*nSteps); 
       }
     }
   }
