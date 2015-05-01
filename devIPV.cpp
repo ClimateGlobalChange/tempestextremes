@@ -20,45 +20,9 @@
 #include <cstring>
 #include <vector>
 
-/*//Copied from StitchBlobs
-void GetInputFileList(
-        const std::string & strInputFileList,
-                std::vector<std::string> & vecInputFiles
-        ) {
-                FILE * fp = fopen(strInputFileList.c_str(), "r");
-
-                char szBuffer[1024];
-                for (;;) {
-                        fgets(szBuffer, 1024, fp);
-
-                        if (feof(fp)) {
-                                break;
-                        }
-
-                        // Remove end-of-line characters
-                        for (;;) {
-                                int nLen = strlen(szBuffer);
-                                if ((szBuffer[nLen-1] == '\n') ||
-                                        (szBuffer[nLen-1] == '\r') ||
-                                        (szBuffer[nLen-1] == ' ')
-                                ) {
-                                        szBuffer[nLen-1] = '\0';
-                                        continue;
-                                }
-                                break;
-                        }
-
-                        vecInputFiles.push_back(szBuffer);
-        }
-
-        if (vecInputFiles.size() == 0) {
-                _EXCEPTION1("No files found in file \"%s\"", strInputFileList.c_str());
-        }
-
-        fclose(fp);
-}
-*/
-void calcDevs(NcVar *inIPV, 
+void calcDevs(bool leap,
+              int leapYearIndex,
+              NcVar *inIPV, 
               NcVar *outDev, 
               NcVar *outADev,
               NcVar *outPosIntDev,
@@ -66,6 +30,7 @@ void calcDevs(NcVar *inIPV,
               NcVar *inTime, 
               NcVar *avgTime,
               NcVar *lat,
+              NcVar *outTime,
               double PVAnom){
 
   int nTime = inIPV->get_dim(0)->size();
@@ -103,39 +68,49 @@ void calcDevs(NcVar *inIPV,
 
 
 //Matrix for output data
-  DataMatrix3D<double> devMat(nTime,nLat,nLon);
-  DataMatrix3D<double> aDevMat(nTime,nLat,nLon);
-//Each day needs to correspond to one of the averaged days
-//Find the start date that corresponds to one of those days
-  double startTime = std::fmod(timeVec[0],365);
-  std::cout<<"First day in time axis is day "<<startTime<<std::endl;
+//Eliminate one day if contains Feb 29
+  int nOutTime;
+  if (leap){
+    nOutTime = nTime-nSteps;
+  }
+  else{
+    nOutTime = nTime;
+  }
 
-//First index in average array
-  int avgIndex = int(startTime)-1;
+  DataMatrix3D<double> devMat(nOutTime,nLat,nLon);
+  DataMatrix3D<double> aDevMat(nOutTime,nLat,nLon);
 
 //Number of days in IPV
   int nDays = nTime*tRes;
 
   std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
 
+  int startAvgIndex = (int(timeVec[0])%365)-1;
 
-//Calculate deviations
-  for (int d=0; d<nDays; d++){
-    for (int a=0; a<nLat; a++){
-      for (int b=0; b<nLon; b++){
-        for (int t=0; t<nSteps; t++){
-          devMat[d*nSteps+t][a][b] = IPVMat[d*nSteps+t][a][b]-avgMat[avgIndex][a][b];
-        //  if (a<5 && b<5){
-        //    std::cout<< "Dev matrix index is "<<d*nSteps+t<<" and avg index is "\
-        //      <<avgIndex<<std::endl;
-        //  }
-        }
+//Deal with skipped days          
+  int d=0;
+  DataVector<double> newTime(nOutTime);
+
+  for (int t=0; t<nTime; t++){
+    if (leap){
+      while (t>=leapYearIndex&&t<(leapYearIndex+nSteps)){
+        t++;
       }
     }
-    avgIndex+=1;
+    int nDayIncrease = d/nSteps;
+    std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        devMat[t][a][b] = IPVMat[t][a][b]-avgMat[startAvgIndex+nDayIncrease][a][b];
+      }
+    }
+    newTime[d] = timeVec[t];
+    d++;
   }
+  outTime->set_cur((long) 0);
+  outTime->put(&(newTime[0]),nOutTime);
 
-  //implement 2-day
+  //implement 2-day smoothing
   for (int t=0; t<nTime; t++){
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
@@ -146,16 +121,16 @@ void calcDevs(NcVar *inIPV,
           for (int n=0; n<2*nSteps; n++){
             aDevMat[t][a][b]+=devMat[t-n][a][b];
           }
-          aDevMat[t][a][b] = aDevMat[t][a][b]/float(2*nSteps);
         }
+        aDevMat[t][a][b] = aDevMat[t][a][b]/float(2*nSteps); 
       }
     }
   }
   outDev->set_cur(0,0,0);
-  outDev->put(&(devMat[0][0][0]),nTime,nLat,nLon);
+  outDev->put(&(devMat[0][0][0]),nOutTime,nLat,nLon);
 
   outADev->set_cur(0,0,0);
-  outADev->put(&(aDevMat[0][0][0]),nTime,nLat,nLon);
+  outADev->put(&(aDevMat[0][0][0]),nOutTime,nLat,nLon);
 
 //Divide matrix by PV anomaly value 
 //We are looking for negative anomalies in NH and positive anomalies in SH
@@ -163,9 +138,9 @@ void calcDevs(NcVar *inIPV,
   lat->set_cur((long) 0);
   lat->get(&(latVec[0]),nLat);
 
-  DataMatrix3D<int> posIntDevs(nTime,nLat,nLon);
+  DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
 
-  for (int t=0; t<nTime; t++){
+  for (int t=0; t<nOutTime; t++){
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
         double divDev = aDevMat[t][a][b]/PVAnom;
@@ -183,7 +158,7 @@ void calcDevs(NcVar *inIPV,
     }
   }
   outPosIntDev->set_cur(0,0,0);
-  outPosIntDev->put(&(posIntDevs[0][0][0]),nTime,nLat,nLon);
+  outPosIntDev->put(&(posIntDevs[0][0][0]),nOutTime,nLat,nLon);
 }
 
 
@@ -201,7 +176,7 @@ int main(int argc, char **argv){
     std::string avgName;
 
     BeginCommandLine()
-      CommandLineString(fileList, "in", "");
+      CommandLineString(fileList, "inlist", "");
       CommandLineString(avgName, "avg", "");
       ParseCommandLine(argc, argv);
     EndCommandLine(argv);
@@ -240,17 +215,68 @@ int main(int argc, char **argv){
       NcVar *inLon = infile.get_var("lon");
       NcVar *IPVData = infile.get_var("IPV");
 
+      NcAtt *attTime = inTime->get_att("units");
+      if (attTime == NULL){
+        _EXCEPTIONT("Time variable has no units attribute.");
+      }
+
+      std::string strTimeUnits = attTime->as_string(0);
+
+      NcAtt *attCal = inTime->get_att("calendar");
+      if(attCal==NULL){
+        _EXCEPTIONT("Time variable has no calendar attribute.");
+      }
+      std::string strCalendar = attCal->as_string(0);
+
+      std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
+
+
+
+      //check if file is leap year file
+      bool leap = false;
+      DataVector<double> timeVals(nTime);
+      inTime->set_cur((long) 0);
+      inTime->get(&(timeVals[0]),nTime);
+
+      int dateYear; 
+      int dateMonth;
+      int dateDay;
+      int dateHour;
+
+      int nSteps = int(1.0/(timeVals[1]-timeVals[0]));
+      int i=0;
+      int leapYearIndex=0;
+
+      while (i<nTime && leap==false){
+        ParseTimeDouble(strTimeUnits, strCalendar, timeVals[i], dateYear,\
+          dateMonth, dateDay, dateHour);
+        if (dateMonth==2 && dateDay==29 && dateHour==0){
+          std::cout<<"This file contains a leap year day at index "<<i<<std::endl;
+          leap = true;
+          leapYearIndex = i;
+        }
+        i++;
+      }
+
       //Create output file that corresponds to IPV data
       std::string strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
         InputFiles[x].end(), "_devs.nc");
 
       NcFile outfile(strOutFile.c_str(), NcFile::Replace, NULL,0,NcFile::Offset64Bits);
-      NcDim *tDimOut = outfile.add_dim("time",nTime);
+      int nOutTime;
+      if (leap){
+        nOutTime = nTime-nSteps;
+      }
+      else{
+        nOutTime = nTime;
+      }
+      NcDim *tDimOut = outfile.add_dim("time",nOutTime);
       NcDim *latDimOut = outfile.add_dim("lat",nLat);
       NcDim *lonDimOut = outfile.add_dim("lon",nLon);
 
       NcVar *tVarOut = outfile.add_var("time",ncDouble,tDimOut);
-      copy_dim_var(inTime,tVarOut);
+      CopyNcVarAttributes(inTime,tVarOut);      
+
       NcVar *latVarOut = outfile.add_var("lat",ncDouble,latDimOut);
       copy_dim_var(inLat,latVarOut);
       NcVar *lonVarOut = outfile.add_var("lon",ncDouble,lonDimOut);
@@ -259,9 +285,10 @@ int main(int argc, char **argv){
       //Create variables for Deviations
       NcVar *devOut = outfile.add_var("DIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
       NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
-      NcVar *devIntOut = outfile.add_var("INT_DIPV",ncInt,tDimOut,latDimOut,lonDimOut);
+      NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
 
-      calcDevs(IPVData, devOut, aDevOut, devIntOut, AIPVData, inTime, avgTimeVals, inLat, anomVal);
+      calcDevs(leap, leapYearIndex, IPVData, devOut, aDevOut, devIntOut, AIPVData, inTime,\
+        avgTimeVals, inLat, tVarOut, anomVal);
  
       infile.close();
       outfile.close();

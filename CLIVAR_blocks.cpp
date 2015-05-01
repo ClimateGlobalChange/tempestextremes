@@ -162,6 +162,9 @@ int main(int argc, char **argv){
   }
 
   copy_dim_var(timevar, time_vals);
+  if (time_vals->get_att("calendar") == NULL){
+    time_vals->add_att("calendar","standard");
+  }
   copy_dim_var(latvar, lat_vals);
   copy_dim_var(lonvar, lon_vals);
 

@@ -24,141 +24,6 @@
 #include <iostream>
 #include <sstream>
 
-/*//Copied from StitchBlobs
-void GetInputFileList(
-        const std::string & strInputFileList,
-                std::vector<std::string> & vecInputFiles
-        ) {
-                FILE * fp = fopen(strInputFileList.c_str(), "r");
-
-                char szBuffer[1024];
-                for (;;) {
-                        fgets(szBuffer, 1024, fp);
-
-                        if (feof(fp)) {
-                                break;
-                        }
-
-                        // Remove end-of-line characters
-                        for (;;) {
-                                int nLen = strlen(szBuffer);
-                                if ((szBuffer[nLen-1] == '\n') ||
-                                        (szBuffer[nLen-1] == '\r') ||
-                                        (szBuffer[nLen-1] == ' ')
-                                ) {
-                                        szBuffer[nLen-1] = '\0';
-                                        continue;
-                                }
-                                break;
-                        }
-
-                        vecInputFiles.push_back(szBuffer);
-        }
-
-        if (vecInputFiles.size() == 0) {
-                _EXCEPTION1("No files found in file \"%s\"", strInputFileList.c_str());
-        }
-
-        fclose(fp);
-}
-*/
-//Copied from DetectCyclones
-/*
-void ParseTimeDouble(
-        const std::string & strTimeUnits,
-        const std::string & strTimeCalendar,
-        double dTime,
-        int & nDateYear,
-        int & nDateMonth,
-        int & nDateDay,
-        int & nDateHour
-) {
-        // Get calendar type
-        Time::CalendarType cal;
-        if ((strTimeCalendar.length() >= 6) &&
-                (strncmp(strTimeCalendar.c_str(), "noleap", 6) == 0)
-        ) {
-                cal = Time::CalendarNoLeap;
-
-        } else if (
-                (strTimeCalendar.length() >= 8) &&
-                (strncmp(strTimeCalendar.c_str(), "standard", 8) == 0)
-        ) {
-                cal = Time::CalendarStandard;
-
-        } else if (
-                (strTimeCalendar.length() >= 9) &&
-                (strncmp(strTimeCalendar.c_str(), "gregorian", 9) == 0)
-        ) {
-                cal = Time::CalendarStandard;
-
-        } else {
-                _EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
-        }
-
-        // Time format is "days since ..."
-        if ((strTimeUnits.length() >= 11) &&
-            (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
-        ) {
-                std::string strSubStr = strTimeUnits.substr(11);
-                Time time(cal);
-                time.FromFormattedString(strSubStr);
-
-                int nDays = static_cast<int>(dTime);
-                time.AddDays(nDays);
-
-                int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
-                time.AddSeconds(nSeconds);
-
-                Announce("Time (YMDS): %i %i %i %i",
-                                time.GetYear(),
-                                time.GetMonth(),
-                                time.GetDay(),
-                                time.GetSecond());
-
-                nDateYear = time.GetYear();
-                nDateMonth = time.GetMonth();
-                nDateDay = time.GetDay();
-                nDateHour = time.GetSecond() / 3600;
-
-                //printf("%s\n", strSubStr.c_str());
-        // Time format is "hours since ..."
-        } else if (
-            (strTimeUnits.length() >= 12) &&
-            (strncmp(strTimeUnits.c_str(), "hours since ", 12) == 0)
-        ) {
-                std::string strSubStr = strTimeUnits.substr(12);
-                Time time(cal);
-                time.FromFormattedString(strSubStr);
-
-                int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 3600.0);
-                time.AddSeconds(nSeconds);
-
-                Announce("Time (YMDS): %i %i %i %i",
-                                time.GetYear(),
-                                time.GetMonth(),
-                                time.GetDay(),
-                                time.GetSecond());
-
-                nDateYear = time.GetYear();
-                nDateMonth = time.GetMonth();
-                nDateDay = time.GetDay();
-                nDateHour = time.GetSecond() / 3600;
-
-                //printf("%s\n", strSubStr.c_str());
-
-        } else {
-                _EXCEPTIONT("Unknown \"time::units\" format");
-        }
-        //_EXCEPTION();
-}
-*/
-
-
-
-
-
-
 
 
 
@@ -290,15 +155,15 @@ int main(int argc, char **argv){
   //Initialize array with first 31 values
   while (currArrIndex<arrLen){
     for (int t=tStart; t<tEnd; t++){
+      if (leap){
+        while (t>=leapYearIndex&&t<(leapYearIndex+nSteps)){
+          std::cout<<"leap year index is "<<leapYearIndex\
+            <<" and t is currently "<<t<<". Skipping."<<std::endl;
+          t++;
+        }
+      }
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
-          if (leap){
-            if (t>=leapYearIndex&&t<=(leapYearIndex+nSteps)){
-              std::cout<<"leap year index is "<<leapYearIndex\
-                <<" and t is currently "<<t<<". Skipping."<<std::endl;
-              t++;
-            }
-          }
           currFillData[currArrIndex][a][b] = IPVData[t][a][b];
           std::cout<<"t is "<<t<<" and array index is "<<currArrIndex<<std::endl;
         }
@@ -345,7 +210,7 @@ int main(int argc, char **argv){
       while (i<nTime && leap==false){
         ParseTimeDouble(strTimeUnits, strCalendar, timeVec[i], dateYear,\
           dateMonth, dateDay, dateHour);
-        if (dateMonth==2 && dateDay==29){
+        if (dateMonth==2 && dateDay==29 && dateHour==0){
           std::cout<<"This file contains a leap year day at index "<<i<<std::endl;
           leap = true;
           leapYearIndex = i;
@@ -421,7 +286,7 @@ int main(int argc, char **argv){
     while (i<nTime && leap==false){
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[i], dateYear,\
         dateMonth, dateDay, dateHour);
-      if (dateMonth==2 && dateDay==29){
+      if (dateMonth==2 && dateDay==29 && dateHour==0){
         std::cout<<"This file contains a leap year day at index "<<i<<std::endl;
         leap = true;
         leapYearIndex = i;
@@ -441,9 +306,10 @@ int main(int argc, char **argv){
       if (tStart == leapYearIndex){
         tStart += nSteps;
         tEnd += nSteps;
-        std::cout<<"Because of leap year, tStart/tEnd now "<<tStart<<" "<<tEnd<<std::endl;
+        std::cout<<"Currently day is leap day; new start time is "<<tStart\
+         <<" and new end time is "<<tEnd<<std::endl;
       }
-    }  
+    } 
 
 
     std::cout<<"Replacing day starting at array index "<<currArrIndex<<std::endl;
