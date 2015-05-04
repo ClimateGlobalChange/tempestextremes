@@ -84,9 +84,12 @@ int main(int argc, char **argv){
     _EXCEPTIONT("Time variable has no calendar attribute.");
   }
   std::string strCalendar = attCal->as_string(0);
-
+  if (strncmp(strCalendar.c_str(), "gregorian",9)==0){
+    std::cout<< "Changing calendar type to standard."<<std::endl;
+    strCalendar = "standard";
+  }
   std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
-
+ 
 
   
   int yearLen = 365;
@@ -114,6 +117,7 @@ int main(int argc, char **argv){
 
   //If there is a leap year, store the first occurrence of the leap year date
   while (i<nTime && leap==false){
+    std::cout<<"Check: current time value is "<<timeVec[i]<<std::endl;
     ParseTimeDouble(strTimeUnits, strCalendar, timeVec[i], dateYear,\
       dateMonth, dateDay, dateHour);
     if (i==0){

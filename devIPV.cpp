@@ -271,6 +271,7 @@ int main(int argc, char **argv){
       int leapYearIndex=0;
       int startIndex;
       while (i<nTime && leap==false){
+        std::cout<<"Check: time value is "<<timeVals[i]<<std::endl;
         ParseTimeDouble(strTimeUnits, strCalendar, timeVals[i], dateYear,\
           dateMonth, dateDay, dateHour);
 //        std::cout<<"month is "<<dateMonth<<" and day is "<<dateDay<<std::endl;
