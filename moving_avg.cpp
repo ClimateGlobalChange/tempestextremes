@@ -352,7 +352,7 @@ int main(int argc, char **argv){
         avgCounts[dateIndex][a][b] += 1.0;
       }
     }
-    std::cout<<"date index count is "<<avgCounts[dateIndex][1][1]<<std::endl;
+    std::cout<<"date index count is "<<avgCounts[dateIndex][1][1]<<" for date index "<<dateIndex<<std::endl;
     dateIndex+=1;
     //periodic boundary condition for year
     if(dateIndex>=yearLen){

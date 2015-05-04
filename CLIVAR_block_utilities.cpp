@@ -124,7 +124,7 @@ void ParseTimeDouble(
         } else {
                 _EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
         }
-
+        std::cout<<"Time to string: calendar is "<<cal<<std::endl;
        // Time format is "days since ..."
         if ((strTimeUnits.length() >= 11) &&
             (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
