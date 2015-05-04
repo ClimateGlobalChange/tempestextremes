@@ -65,7 +65,7 @@ void GetInputFileList(
 
 int DayInYear(int nMonth, int nDay){
   int day=0;
-
+  std::cout<<"nMonth is "<<nMonth<<std::endl;
   if (nMonth>1){
     for (int x=1; x<nMonth; x++){
       std::cout<<"Month is currently "<<x;

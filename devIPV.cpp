@@ -263,6 +263,7 @@ int main(int argc, char **argv){
       while (i<nTime && leap==false){
         ParseTimeDouble(strTimeUnits, strCalendar, timeVals[i], dateYear,\
           dateMonth, dateDay, dateHour);
+//        std::cout<<"month is "<<dateMonth<<" and day is "<<dateDay<<std::endl;
         if (i==0){
           int day = DayInYear(dateMonth,dateDay);
           startIndex = day-1;
