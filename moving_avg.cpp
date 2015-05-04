@@ -117,7 +117,7 @@ int main(int argc, char **argv){
 
   //If there is a leap year, store the first occurrence of the leap year date
   while (i<nTime && leap==false){
-    std::cout<<"Check: current time value is "<<timeVec[i]<<std::endl;
+    std::cout<<"Check: for i = "<<i<<", current time value is "<<timeVec[i]<<std::endl;
     ParseTimeDouble(strTimeUnits, strCalendar, timeVec[i], dateYear,\
       dateMonth, dateDay, dateHour);
     if (i==0){
