@@ -102,9 +102,13 @@ void calcDevs(bool leap,
     }
     int nDayIncrease = d/nSteps;
     std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
+    int currAvgIndex = startAvgIndex + nDayIncrease;
+    if (currAvgIndex>364){
+      currAvgIndex-=365;
+    }
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
-        devMat[t][a][b] = IPVMat[t][a][b]-avgMat[startAvgIndex+nDayIncrease][a][b];
+        devMat[t][a][b] = IPVMat[t][a][b]-avgMat[currAvgIndex][a][b];
       }
     }
     newTime[d] = timeVec[t];
