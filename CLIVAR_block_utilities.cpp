@@ -66,21 +66,23 @@ void GetInputFileList(
 int DayInYear(int nMonth, int nDay){
   int day=0;
 
-  for (int x=1; x<nMonth; x++){
-    std::cout<<"Month is currently "<<x;
-    if (x==2){
-      day += 28;
-      std::cout<<". Adding 28 days.";
+  if (nMonth>1){
+    for (int x=1; x<nMonth; x++){
+      std::cout<<"Month is currently "<<x;
+      if (x==2){
+        day += 28;
+        std::cout<<". Adding 28 days.";
+      }
+      else if (x==4 || x==6 || x==9 || x==11){
+        day +=30;
+        std::cout<<". Adding 30 days.";
+      }
+      else{
+        day +=31;
+        std::cout<<". Adding 31 days.";
+      }
+      std::cout<<" Total number of days currently "<<day<<std::endl;
     }
-    else if (x==4 || x==6 || x==9 || x==11){
-      day +=30;
-      std::cout<<". Adding 30 days.";
-    }
-    else{
-      day +=31;
-      std::cout<<" .Adding 31 days.";
-    }
-    std::cout<<" Total number of days currently "<<day<<std::endl;
   }
   day+=nDay;
   std::cout<<"Final day value is "<<day<<std::endl;

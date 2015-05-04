@@ -132,12 +132,15 @@ void calcDevs(bool leap,
       }
     }
   }
+
+  std::cout<<"Finished smoothing."<<std::endl;
   outDev->set_cur(0,0,0);
   outDev->put(&(devMat[0][0][0]),nOutTime,nLat,nLon);
+  std::cout<<"Wrote devs to file."<<std::endl;
 
   outADev->set_cur(0,0,0);
   outADev->put(&(aDevMat[0][0][0]),nOutTime,nLat,nLon);
-
+  std::cout<<"Wrote smoothed devs to file."<<std::endl;
 //Divide matrix by PV anomaly value 
 //We are looking for negative anomalies in NH and positive anomalies in SH
   DataVector<double> latVec(nLat);
@@ -165,6 +168,7 @@ void calcDevs(bool leap,
   }
   outPosIntDev->set_cur(0,0,0);
   outPosIntDev->put(&(posIntDevs[0][0][0]),nOutTime,nLat,nLon);
+  std::cout<<"Wrote integer values to file."<<std::endl;
 }
 
 
@@ -207,7 +211,10 @@ int main(int argc, char **argv){
 
     for (int x=0; x<nFiles; x++){
 
-      NcFile infile(InputFiles[0].c_str());
+      NcFile infile(InputFiles[x].c_str());
+      if(!infile.is_valid()){
+        _EXCEPTION1("Unable to open file \"%s\".",InputFiles[0].c_str());
+      }
       NcDim *tDim = infile.get_dim("time");
       NcDim *latDim = infile.get_dim("lat");
       NcDim *lonDim = infile.get_dim("lon");
