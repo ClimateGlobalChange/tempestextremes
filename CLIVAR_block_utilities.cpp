@@ -586,9 +586,10 @@ void PV_calc(
   int pos_bot;
 
   for (int x=0; x<nPlev; x++){
-    if (abs(pVec[x]-15000.0)<0.0001){
+    std::cout<<"pvec value is currently "<<pVec[x]<<std::endl;
+    if (std::fabs(pVec[x]-15000.0)<0.0001){
       pos_top = x;
-      std::cout<<"150 mb position is at x="<<x<<std::endl;
+      std::cout<<"diff is "<<std::fabs(pVec[x]-15000.0)<<", 150 mb position is at x="<<x<<std::endl;
     }
     if (abs(pVec[x]-50000.0)<0.0001){
       pos_bot = x;

@@ -153,6 +153,7 @@ int main(int argc, char **argv){
     DataVector<double> levPa(lev_len);
     for (int p=0; p<lev_len; p++){
       levPa[p] = levhPa[p]*100.0;
+      std::cout<<"Converting from hPa to Pa; new value is "<<levPa[p]<<std::endl;
     }
     lev_vals->set_cur((long) 0);
     lev_vals->put(&(levPa[0]),lev_len);
