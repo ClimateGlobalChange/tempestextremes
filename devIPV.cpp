@@ -55,7 +55,7 @@ void calcDevs(bool leap,
   double tRes = timeVec[1]-timeVec[0];
   int nSteps = 1/tRes;
 
-  std::cout<<"Time resolution is "<<tRes<< "and steps per day is "<<nSteps<<std::endl;
+  std::cout<<"Time resolution is "<<tRes<< " and steps per day is "<<nSteps<<std::endl;
  
 //avg IPV
   int avgDay = avgIPV->get_dim(0)->size();
@@ -101,7 +101,7 @@ void calcDevs(bool leap,
       }
     }
     int nDayIncrease = d/nSteps;
-    std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
+  //  std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
     int currAvgIndex = startAvgIndex + nDayIncrease;
     if (currAvgIndex>364){
       currAvgIndex-=365;
@@ -157,15 +157,21 @@ void calcDevs(bool leap,
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
         double divDev = aDevMat[t][a][b]/PVAnom;
+        if (a<20 && b<20){
+          std::cout<<"adev value is "<<aDevMat[t][a][b]\
+           <<" and divDev value is "<<divDev<<std::endl;
+        }
         //SH: positive anomalies
         if (latVec[a]<0){
+    //      std::cout<<"Latitude is "<<latVec[a];
           double pos = (divDev+std::fabs(divDev))/2.0;
           posIntDevs[t][a][b] = int(pos);
+      //    std::cout<<" pos is "<<pos<<" and integer value is "<<int(pos)<<std::endl;
         }
         //NH: negative anomalies
         else if (latVec[a]>=0){
           double neg = (divDev-std::fabs(divDev))/2.0;
-          posIntDevs[t][a][b] = int(neg);
+          posIntDevs[t][a][b] = -int(neg);
         }
       }
     }
@@ -210,7 +216,7 @@ int main(int argc, char **argv){
     
     //averaged IPV
     NcVar *AIPVData = avgFile.get_var("AIPV");
-    double anomVal = std::pow(1.3,-6);
+    double anomVal = 1.3*std::pow(10,-6);
     //Open IPV files
 
     for (int x=0; x<nFiles; x++){
