@@ -22,6 +22,7 @@
 
 void calcDevs(bool leap,
               int leapYearIndex,
+              int startAvgIndex,
               NcVar *inIPV, 
               NcVar *outDev, 
               NcVar *outADev,
@@ -85,7 +86,9 @@ void calcDevs(bool leap,
 
   std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
 
-  int startAvgIndex = (int(timeVec[0])%365)-1;
+//  int startAvgIndex = (int(timeVec[0])%365)-1;
+//  std::cout<<"first time value is "<<timeVec[0]<<", modulo is "<<int(timeVec[0])%365<<std::endl;
+//  std::cout<<"Starting index for average file is "<<startAvgIndex<<std::endl;
 
 //Deal with skipped days          
   int d=0;
@@ -105,10 +108,13 @@ void calcDevs(bool leap,
       }
     }
     newTime[d] = timeVec[t];
+    std::cout<<"d is "<<d<<" and t is "<<t<<std::endl;
     d++;
   }
   outTime->set_cur((long) 0);
   outTime->put(&(newTime[0]),nOutTime);
+
+  std::cout<<"About to implement smoothing."<<std::endl;
 
   //implement 2-day smoothing
   for (int t=0; t<nTime; t++){
@@ -246,10 +252,14 @@ int main(int argc, char **argv){
       int nSteps = int(1.0/(timeVals[1]-timeVals[0]));
       int i=0;
       int leapYearIndex=0;
-
+      int startIndex;
       while (i<nTime && leap==false){
         ParseTimeDouble(strTimeUnits, strCalendar, timeVals[i], dateYear,\
           dateMonth, dateDay, dateHour);
+        if (i==0){
+          int day = DayInYear(dateMonth,dateDay);
+          startIndex = day-1;
+        }
         if (dateMonth==2 && dateDay==29 && dateHour==0){
           std::cout<<"This file contains a leap year day at index "<<i<<std::endl;
           leap = true;
@@ -287,7 +297,7 @@ int main(int argc, char **argv){
       NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
       NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
 
-      calcDevs(leap, leapYearIndex, IPVData, devOut, aDevOut, devIntOut, AIPVData, inTime,\
+      calcDevs(leap, leapYearIndex, startIndex, IPVData, devOut, aDevOut, devIntOut, AIPVData, inTime,\
         avgTimeVals, inLat, tVarOut, anomVal);
  
       infile.close();

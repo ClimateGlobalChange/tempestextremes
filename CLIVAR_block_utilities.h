@@ -29,6 +29,9 @@ void GetInputFileList(
                 std::vector<std::string> & vecInputFiles
 );
 
+int DayInYear(int nMonth,
+              int nDay);
+
 void ParseTimeDouble(
         const std::string & strTimeUnits,
         const std::string & strTimeCalendar,

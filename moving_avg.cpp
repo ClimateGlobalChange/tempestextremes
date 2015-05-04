@@ -110,10 +110,17 @@ int main(int argc, char **argv){
   int i=0;
   int leapYearIndex;
 
+  int dateIndex;
+
   //If there is a leap year, store the first occurrence of the leap year date
   while (i<nTime && leap==false){
     ParseTimeDouble(strTimeUnits, strCalendar, timeVec[i], dateYear,\
       dateMonth, dateDay, dateHour);
+    if (i==0){
+      int day = DayInYear(dateMonth,dateDay);
+      dateIndex = day + 15;
+      std::cout <<"Day is "<<day<<", so date index is "<<dateIndex<<std::endl;
+    }
     if (dateMonth==2 && dateDay==29){
       std::cout<<"This file contains a leap year day at index "<<i<<std::endl;
       leap = true;
@@ -128,7 +135,7 @@ int main(int argc, char **argv){
   int nSteps = 1/tRes;
 
   //Date index in which to start storing averaged values
-  int dateIndex = int(timeVec[0])%yearLen+15;
+//  int dateIndex = int(timeVec[0])%yearLen+15;
 
   double endTime = timeVec[nTime-1];
   //Keeps track of index within 31-day array
