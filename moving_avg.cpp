@@ -165,7 +165,9 @@ int main(int argc, char **argv){
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
           currFillData[currArrIndex][a][b] = IPVData[t][a][b];
-          std::cout<<"t is "<<t<<" and array index is "<<currArrIndex<<std::endl;
+          if (a==0 && b==0){
+            std::cout<<"t is "<<t<<" and array index is "<<currArrIndex<<std::endl;
+          }
         }
       }
       currArrIndex+=1;
