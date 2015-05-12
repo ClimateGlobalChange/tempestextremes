@@ -89,12 +89,9 @@ int main(int argc, char **argv){
     strCalendar = "standard";
   }
   std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
- 
 
-  
+//Parse time units of first file to determine start date 
   int yearLen = 365;
-  //if the calendar contains leap years, need to check for extra day
- // bool leap = false;
   int dateYear;
   int dateMonth;
   int dateDay;
@@ -107,49 +104,40 @@ int main(int argc, char **argv){
   DataMatrix3D<double> avgStoreVals(yearLen,nLat,nLon);
   DataMatrix3D<double> avgCounts(yearLen,nLat,nLon);
 
-  //Check whether file contains a Feb 29
+
+  //Start date of first file
+  ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0], dateYear,\
+    dateMonth, dateDay, dateHour);
+
+  int day = DayInYear(dateMonth,dateDay);
+  dateIndex = day + 15;
+
   bool leap = false;
+  if (strCalendar!="noleap" && dateMonth<=2){
+    //Check whether file contains a Feb 29
 
-  int i=0;
-  int leapYearIndex;
+    int leapYear;
+    int leapMonth;
+    int leapDay;
+    int leapHour;
+    ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
+      leapMonth, leapDay, leapHour);
 
-  int dateIndex;
-
-  //If there is a leap year, store the first occurrence of the leap year date
-  while (i<nTime && leap==false){
-    std::cout<<"Check: for i = "<<i<<", current time value is "<<timeVec[i]<<std::endl;
-    ParseTimeDouble(strTimeUnits, strCalendar, timeVec[i], dateYear,\
-      dateMonth, dateDay, dateHour);
-    if (i==0){
-      int day = DayInYear(dateMonth,dateDay);
-      dateIndex = day + 15;
-      std::cout <<"Day is "<<day<<", so date index is "<<dateIndex<<std::endl;
-    }
-    if (dateMonth==2 && dateDay==29){
-      std::cout<<"This file contains a leap year day at index "<<i<<std::endl;
+    if ((leapMonth==2 && leapDay==29) || (dateMonth==2&&leapMonth==3)){
+      //Check when parsing the indices
       leap = true;
-      leapYearIndex = i;
     }
-    i++;
   }
-
-
 
   //Number of time steps per day
   int nSteps = 1/tRes;
 
-  //Date index in which to start storing averaged values
-//  int dateIndex = int(timeVec[0])%yearLen+15;
-
   double endTime = timeVec[nTime-1];
-  //Keeps track of index within 31-day array
   int currArrIndex = 0;
 
   //3D 31-day array
   DataMatrix3D<double> currFillData(arrLen,nLat,nLon);
-//  std::cout<<"Initialized fill array."<<std::endl;
 
-  bool newFile=false;
   int tEnd;
   //File counter
   int x=0;
@@ -161,16 +149,22 @@ int main(int argc, char **argv){
   else{
     tEnd = nTime;
   }
-//  std::cout<<"Entering first while loop. tEnd is "<<tEnd<<\
-    " and array length is "<<arrLen<<std::endl;
-  //Initialize array with first 31 values
+
+
+  //First while loop: open files and fill until 31 days array full
   while (currArrIndex<arrLen){
     for (int t=tStart; t<tEnd; t++){
       if (leap){
-        while (t>=leapYearIndex&&t<(leapYearIndex+nSteps)){
-          std::cout<<"leap year index is "<<leapYearIndex\
-            <<" and t is currently "<<t<<". Skipping."<<std::endl;
-          t++;
+      //Check if time is a leap year date
+        ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
+          leapMonth,leapDay,leapHour);
+        if (leapMonth==2 && leapDay == 29){
+          while (leapMonth ==2 && leapDay ==29){
+            std::cout<<"Leap day! Skipping this step."<<std::endl;
+            t++;
+            ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
+              leapMonth, leapDay, leapHour);
+          }
         }
       }
       for (int a=0; a<nLat; a++){
@@ -181,10 +175,9 @@ int main(int argc, char **argv){
           }
         }
       }
-      currArrIndex+=1;
+      currArrIndex++;
     }
-    //if new file needs to be opened, open it
-    if (currArrIndex < arrLen){
+    if (currArrIndex<arrLen){
       infile.close();
       //Open new file
       x+=1;
@@ -200,8 +193,6 @@ int main(int argc, char **argv){
 
       inPV->set_cur(0,0,0);
       inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
-      newFile = false;
-      leap = false;
 
       //Time variable
       NcVar *timeVal = infile.get_var("time");
@@ -209,6 +200,8 @@ int main(int argc, char **argv){
       timeVal->set_cur((long) 0);
       timeVal->get(&(timeVec[0]),nTime);
 
+
+      //Check for continuous files
       std::cout<<"Check: end time was "<<endTime<<" and new start time is "\
         <<timeVec[0]<<std::endl;
       double contCheck = std::fabs(timeVec[0]-endTime);
@@ -218,17 +211,23 @@ int main(int argc, char **argv){
         _EXCEPTIONT("New file is not continuous with previous file."); 
       }
 
+      //reset leap year check
+      leap = false;
+
       //check for leap year days in this file
-      i=0;
-      while (i<nTime && leap==false){
-        ParseTimeDouble(strTimeUnits, strCalendar, timeVec[i], dateYear,\
-          dateMonth, dateDay, dateHour);
-        if (dateMonth==2 && dateDay==29 && dateHour==0){
-          std::cout<<"This file contains a leap year day at index "<<i<<std::endl;
+      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0], dateYear,\
+        dateMonth, dateDay, dateHour);
+
+      if (strCalendar!="noleap" && dateMonth<=2){
+      //Check whether file contains a Feb 29
+
+        ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
+          leapMonth, leapDay, leapHour);
+
+        if ((leapMonth==2 && leapDay==29) || (dateMonth==2 && leapMonth==3)){
+        //Check when parsing the indices
           leap = true;
-          leapYearIndex = i;
         }
-        i++;
       }
 
       endTime = timeVec[nTime-1];
@@ -268,11 +267,13 @@ int main(int argc, char **argv){
   //Enter while loop
   std::cout<<"Entering while loop!"<<std::endl;
 
-  tStart = tEnd;
-  tEnd = tStart + nSteps;
-  //Check if new file needs to be opened
-  if (tEnd >nTime){
-    std::cout<<"Time dimension exceeded."<<std::endl;
+//Check if new file needs to be opened
+  if (tEnd<nTime){
+    tStart = tEnd;
+    tEnd = tStart + nSteps;
+  }
+  else if (tEnd >=nTime){
+    std::cout<<"Reached end of previous file."<<std::endl;
     infile.close();
     x+=1;
     NcFile infile(InputFiles[x].c_str());
@@ -295,18 +296,17 @@ int main(int argc, char **argv){
     timeVal->get(&(timeVec[0]),nTime);
 
     leap = false;
-    i=0;
-    while (i<nTime && leap==false){
-      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[i], dateYear,\
-        dateMonth, dateDay, dateHour);
-      if (dateMonth==2 && dateDay==29 && dateHour==0){
-        std::cout<<"This file contains a leap year day at index "<<i<<std::endl;
+    ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0], dateYear,\
+      dateMonth, dateDay, dateHour);
+    if (strCalendar!="noleap" && dateMonth<=2){
+      //Check whether file contains a Feb 29
+      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
+        leapMonth, leapDay, leapHour);
+      if ((leapMonth==2 && leapDay==29) || (dateMonth==2 && leapMonth==3)){
+      //Check when parsing the indices
         leap = true;
-        leapYearIndex = i;
       }
-      i++;
     }
-
     tStart = 0;
     tEnd = tStart + nSteps;
   }
@@ -316,16 +316,17 @@ int main(int argc, char **argv){
     std::cout<<"tStart: "<<tStart<<" tEnd: "<<tEnd<<std::endl;
     //Check that current replacement day isn't a Feb 29
     if (leap){
-      if (tStart == leapYearIndex){
-        tStart += nSteps;
-        tEnd += nSteps;
-        std::cout<<"Currently day is leap day; new start time is "<<tStart\
-         <<" and new end time is "<<tEnd<<std::endl;
-      }
-    } 
+      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[tStart], leapYear,\
+        leapMonth, leapDay, leapHour);
+      if (leapMonth==2 && leapDay ==29){
+        tStart = tEnd;
+        tEnd = tStart + nSteps;
+        std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
+          <<tStart<<" and "<<tEnd<<std::endl;
+      } 
+    }
 
-
-    std::cout<<"Replacing day starting at array index "<<currArrIndex<<std::endl;
+    std::cout<<"Replacing day in fill array starting at array index "<<currArrIndex<<std::endl;
     for (int t=tStart; t<tEnd; t++){
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
@@ -338,7 +339,7 @@ int main(int argc, char **argv){
       <<" and array length is "<<arrLen<<std::endl;    
     //check for periodic boundary condition for 31 day array
     if (currArrIndex>=arrLen){
-      std::cout<<"Periodic boundary: 31 day length exceeded."<<std::endl;
+      std::cout<<"Periodic boundary: 31 day length met or exceeded."<<std::endl;
       currArrIndex-=arrLen;
       std::cout<<"currArrIndex is now "<<currArrIndex<<std::endl;
     }
@@ -361,14 +362,14 @@ int main(int argc, char **argv){
     //periodic boundary condition for year
     if(dateIndex>=yearLen){
       dateIndex-=yearLen;
-      std::cout<<"dateIndex is now "<<dateIndex<<std::endl;
+      std::cout<<"Periodic boundary: end of year array reached. dateIndex is now "<<dateIndex<<std::endl;
     }
-    tStart = tEnd;
-    tEnd = tStart + nSteps;
-    std::cout<<"tEnd is currently "<<tEnd<<std::endl;
-
+    if (tEnd<nTime){
+      tStart = tEnd;
+      tEnd = tStart + nSteps;
+    }
    //Check if new file needs to be opened
-    if (tEnd>nTime){
+    else if (tEnd>=nTime){
       std::cout<<"Time dimension exceeded."<<std::endl;
       infile.close();
       std::cout<<"Closed file "<<InputFiles[x]<<std::endl;
