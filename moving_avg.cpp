@@ -172,9 +172,9 @@ int main(int argc, char **argv){
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
           currFillData[currArrIndex][a][b] = IPVData[t][a][b];
-          if (a==0 && b==0){
-            std::cout<<"t is "<<t<<" and array index is "<<currArrIndex<<std::endl;
-          }
+//          if (a==0 && b==0){
+  //          std::cout<<"t is "<<t<<" and array index is "<<currArrIndex<<std::endl;
+    //      }
         }
       }
       currArrIndex++;
@@ -204,10 +204,10 @@ int main(int argc, char **argv){
 
 
       //Check for continuous files
-      std::cout<<"Check: end time was "<<endTime<<" and new start time is "\
+     // std::cout<<"Check: end time was "<<endTime<<" and new start time is "\
         <<timeVec[0]<<std::endl;
       double contCheck = std::fabs(timeVec[0]-endTime);
-      std::cout<<"Check: difference between old end time and new start time is "\
+     // std::cout<<"Check: difference between old end time and new start time is "\
         <<contCheck<<" and tRes is "<< tRes<<std::endl;
       if (contCheck>tRes){
         _EXCEPTIONT("New file is not continuous with previous file."); 
@@ -242,7 +242,7 @@ int main(int argc, char **argv){
       else{
         tEnd = nTime;
       }
-      std::cout<<"tEnd is "<<tEnd<<std::endl;
+     // std::cout<<"tEnd is "<<tEnd<<std::endl;
     }
     
   }
@@ -261,8 +261,9 @@ int main(int argc, char **argv){
       avgCounts[dateIndex][a][b] +=1.0;
     }
   }
-
-  std::cout<<"Filled for date index "<<dateIndex<<std::endl;
+  
+  std::cout<<"Filled for date index "<<dateIndex<<"; Value at 50,50 is "\
+    << avgStoreVals[dateIndex][50][50]<<std::endl;
   dateIndex+=1;
   currArrIndex = 0;
 
@@ -275,11 +276,11 @@ int main(int argc, char **argv){
     tEnd = tStart + nSteps;
   }
   else if (tEnd >=nTime){
-    std::cout<<"Reached end of previous file."<<std::endl;
+  //  std::cout<<"Reached end of previous file."<<std::endl;
     infile.close();
     x+=1;
     NcFile infile(InputFiles[x].c_str());
-    std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
+  //  std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
     nTime = infile.get_dim("time")->size();
     nLat = infile.get_dim("lat")->size();
     nLon = infile.get_dim("lon")->size();
@@ -315,7 +316,7 @@ int main(int argc, char **argv){
 
   while (x<nFiles){
     //Advance to the next day and overwrite one day in the 31-day array
-    std::cout<<"tStart: "<<tStart<<" tEnd: "<<tEnd<<std::endl;
+  //  std::cout<<"tStart: "<<tStart<<" tEnd: "<<tEnd<<std::endl;
     //Check that current replacement day isn't a Feb 29
     if (leap){
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[tStart], leapYear,\
@@ -328,7 +329,7 @@ int main(int argc, char **argv){
       } 
     }
 
-    std::cout<<"Replacing day in fill array starting at array index "<<currArrIndex<<std::endl;
+  //  std::cout<<"Replacing day in fill array starting at array index "<<currArrIndex<<std::endl;
     for (int t=tStart; t<tEnd; t++){
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
@@ -337,7 +338,7 @@ int main(int argc, char **argv){
       }
       currArrIndex+=1;
     }
-    std::cout<<"currArrIndex is currently "<<currArrIndex\
+  //  std::cout<<"currArrIndex is currently "<<currArrIndex\
       <<" and array length is "<<arrLen<<std::endl;    
     //check for periodic boundary condition for 31 day array
     if (currArrIndex>=arrLen){
@@ -359,7 +360,11 @@ int main(int argc, char **argv){
         avgCounts[dateIndex][a][b] += 1.0;
       }
     }
-    std::cout<<"date index count is "<<avgCounts[dateIndex][1][1]<<" for date index "<<dateIndex<<std::endl;
+
+    std::cout<<"Filled for date index "<<dateIndex<<"; Value at 50,50 is "\
+      << avgStoreVals[dateIndex][50][50]<<std::endl;
+
+   // std::cout<<"date index count is "<<avgCounts[dateIndex][1][1]<<" for date index "<<dateIndex<<std::endl;
     dateIndex+=1;
     //periodic boundary condition for year
     if(dateIndex>=yearLen){
@@ -372,13 +377,13 @@ int main(int argc, char **argv){
     }
    //Check if new file needs to be opened
     else if (tEnd>=nTime){
-      std::cout<<"Time dimension exceeded."<<std::endl;
+     // std::cout<<"Time dimension exceeded."<<std::endl;
       infile.close();
-      std::cout<<"Closed file "<<InputFiles[x]<<std::endl;
+     // std::cout<<"Closed file "<<InputFiles[x]<<std::endl;
       x+=1;
       if (x<nFiles){
       NcFile infile(InputFiles[x].c_str());
-      std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
+     // std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
       nTime = infile.get_dim("time")->size();
       nLat = infile.get_dim("lat")->size();
       nLon = infile.get_dim("lon")->size();
@@ -405,10 +410,13 @@ int main(int argc, char **argv){
   for (int t=0; t<yearLen; t++){
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
-        avgStoreVals[t][a][b] = avgStoreVals[t][a][b]/(avgCounts[t][a][b]*31.0);
+        avgStoreVals[t][a][b] = avgStoreVals[t][a][b]/(avgCounts[t][a][b]*31.0*nSteps);
       }
     }
   }
+  std::cout<<"AvgCounts at 0,50,50 is "<<avgCounts[0][50][50]<<" so value divided by "\
+    <<avgCounts[0][50][50]*31.0<<std::endl;
+  std::cout<<"Value at 0,50,50 is "<< avgStoreVals[0][50][50]<<std::endl;
 
   //Get existing file info to copy to output file
 
