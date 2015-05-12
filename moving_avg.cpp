@@ -92,10 +92,10 @@ int main(int argc, char **argv){
 
 //Parse time units of first file to determine start date 
   int yearLen = 365;
-  int dateYear;
-  int dateMonth;
-  int dateDay;
-  int dateHour;
+  int dateYear=0;
+  int dateMonth=0;
+  int dateDay=0;
+  int dateHour=0;
 
   //Length of 31 days axis
   int arrLen = int(31.0/tRes);
@@ -110,16 +110,18 @@ int main(int argc, char **argv){
     dateMonth, dateDay, dateHour);
 
   int day = DayInYear(dateMonth,dateDay);
-  dateIndex = day + 15;
+  int dateIndex = day + 15;
+
+  int leapYear=0;
+  int leapMonth=0;
+  int leapDay=0;
+  int leapHour=0;
+
 
   bool leap = false;
   if (strCalendar!="noleap" && dateMonth<=2){
     //Check whether file contains a Feb 29
 
-    int leapYear;
-    int leapMonth;
-    int leapDay;
-    int leapHour;
     ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
       leapMonth, leapDay, leapHour);
 
@@ -387,7 +389,6 @@ int main(int argc, char **argv){
 
       inPV->set_cur(0,0,0);
       inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
-      newFile = false;
 
       //Time variable
       NcVar *timeVal = infile.get_var("time");
