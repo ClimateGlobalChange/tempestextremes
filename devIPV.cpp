@@ -51,6 +51,9 @@ void calcDevs(bool leap,
   inTime->set_cur((long) 0);
   inTime->get(&(timeVec[0]),nTime);
 
+  std::string strTimeUnits = inTime->get_att("units")->as_string(0);
+  std::string strCalendar = inTime->get_att("calendar")->as_string(0);
+
   double tRes = timeVec[1]-timeVec[0];
   int nSteps = 1/tRes;
 
@@ -276,7 +279,7 @@ int main(int argc, char **argv){
         dateMonth, dateDay, dateHour);
 
       int day = DayInYear(dateMonth,dateDay);
-      startIndex = day-1;
+      int startIndex = day-1;
 
       int nSteps = int(1.0/(timeVals[1]-timeVals[0]));
      
