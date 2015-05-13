@@ -21,7 +21,6 @@
 #include <vector>
 
 void calcDevs(bool leap,
-              int leapYearIndex,
               int startAvgIndex,
               NcVar *inIPV, 
               NcVar *outDev, 
@@ -73,6 +72,7 @@ void calcDevs(bool leap,
   int nOutTime;
   if (leap){
     nOutTime = nTime-nSteps;
+    std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
   }
   else{
     nOutTime = nTime;
@@ -94,11 +94,23 @@ void calcDevs(bool leap,
   int d=0;
   DataVector<double> newTime(nOutTime);
 
+  int leapYear=0;
+  int leapMonth=0;
+  int leapDay=0;
+  int leapHour=0;
+
   for (int t=0; t<nTime; t++){
     if (leap){
-      while (t>=leapYearIndex&&t<(leapYearIndex+nSteps)){
-        t++;
-      }
+      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
+        leapMonth, leapDay, leapHour);
+      if (leapMonth==2 && leapDay == 29){
+        while (leapMonth ==2 && leapDay == 29){
+          std::cout<<"Leap day! Skipping this step."<<std::endl;
+          t++;
+          ParseTimeDouble(strTimeUnits,strCalendar, timeVec[t],leapYear,\
+            leapMonth,leapDay,leapHour);
+        }
+      }      
     }
     int nDayIncrease = d/nSteps;
   //  std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
@@ -112,7 +124,7 @@ void calcDevs(bool leap,
       }
     }
     newTime[d] = timeVec[t];
-    std::cout<<"d is "<<d<<" and t is "<<t<<std::endl;
+    std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
     d++;
   }
   outTime->set_cur((long) 0);
@@ -157,16 +169,10 @@ void calcDevs(bool leap,
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
         double divDev = aDevMat[t][a][b]/PVAnom;
-        if (a<20 && b<20){
-          std::cout<<"adev value is "<<aDevMat[t][a][b]\
-           <<" and divDev value is "<<divDev<<std::endl;
-        }
         //SH: positive anomalies
         if (latVec[a]<0){
-    //      std::cout<<"Latitude is "<<latVec[a];
           double pos = (divDev+std::fabs(divDev))/2.0;
           posIntDevs[t][a][b] = int(pos);
-      //    std::cout<<" pos is "<<pos<<" and integer value is "<<int(pos)<<std::endl;
         }
         //NH: negative anomalies
         else if (latVec[a]>=0){
@@ -266,26 +272,28 @@ int main(int argc, char **argv){
       int dateDay;
       int dateHour;
 
+      ParseTimeDouble(strTimeUnits, strCalendar, timeVals[0], dateYear,\
+        dateMonth, dateDay, dateHour);
+
+      int day = DayInYear(dateMonth,dateDay);
+      startIndex = day-1;
+
       int nSteps = int(1.0/(timeVals[1]-timeVals[0]));
-      int i=0;
-      int leapYearIndex=0;
-      int startIndex;
-      while (i<nTime && leap==false){
-        std::cout<<"Check: time value is "<<timeVals[i]<<std::endl;
-        ParseTimeDouble(strTimeUnits, strCalendar, timeVals[i], dateYear,\
-          dateMonth, dateDay, dateHour);
-//        std::cout<<"month is "<<dateMonth<<" and day is "<<dateDay<<std::endl;
-        if (i==0){
-          int day = DayInYear(dateMonth,dateDay);
-          startIndex = day-1;
-        }
-        if (dateMonth==2 && dateDay==29 && dateHour==0){
-          std::cout<<"This file contains a leap year day at index "<<i<<std::endl;
+     
+      int leapYear = 0;
+      int leapMonth = 0;
+      int leapDay = 0;
+      int leapHour = 0;
+
+      if (strCalendar!="noleap" && dateMonth <=2){
+        ParseTimeDouble(strTimeUnits, strCalendar, timeVals[nTime-1], leapYear,\
+          leapMonth, leapDay, leapHour);
+        if ((leapMonth==2 && leapDay == 29) || (dateMonth ==2 && leapMonth == 3)){
           leap = true;
-          leapYearIndex = i;
-        }
-        i++;
+        }     
+
       }
+      
 
       //Create output file that corresponds to IPV data
       std::string strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
@@ -316,7 +324,7 @@ int main(int argc, char **argv){
       NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
       NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
 
-      calcDevs(leap, leapYearIndex, startIndex, IPVData, devOut, aDevOut, devIntOut, AIPVData, inTime,\
+      calcDevs(leap, startIndex, IPVData, devOut, aDevOut, devIntOut, AIPVData, inTime,\
         avgTimeVals, inLat, tVarOut, anomVal);
  
       infile.close();

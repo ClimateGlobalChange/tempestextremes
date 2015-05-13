@@ -158,11 +158,12 @@ void ParseTimeDouble(
             (strncmp(strTimeUnits.c_str(), "hours since ", 12) == 0)
         ) {
                 std::string strSubStr = strTimeUnits.substr(12);
-                std::cout<<"Debug (hours since): strSubStr is "<<strSubStr<<std::endl;
+//                std::cout<<"Debug (hours since): strSubStr is "<<strSubStr<<std::endl;
                 Time time(cal);
                 time.FromFormattedString(strSubStr);
 
                 int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 3600.0);
+                std::cout<<"ParseTimeDouble debug: nSeconds is "<<nSeconds<<std::endl; 
                 time.AddSeconds(nSeconds);
 
                 Announce("Time (YMDS): %i %i %i %i",
