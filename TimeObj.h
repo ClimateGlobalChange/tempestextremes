@@ -200,6 +200,16 @@ public:
 	}
 
 	///	<summary>
+	///		Add a number of hours to the Time.
+	///	</summary>
+	inline void AddHours(int nHours) {
+		m_iDay += (nHours / 24);
+		m_iSecond += (nHours % 24) * 3600;
+
+		NormalizeTime();
+	}
+
+	///	<summary>
 	///		Add a number of days to the Time.
 	///	</summary>
 	inline void AddDays(int nDays) {
