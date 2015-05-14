@@ -414,6 +414,9 @@ try {
 	// Maximum topographic height for a detection
 	double dMaxTopoHeight;
 
+	// Merge distance
+	double dMergeDist;
+
 	// Require temperature maxima at T200 and T500 within this distance
 	double dWarmCoreDist;
 
@@ -454,6 +457,7 @@ try {
 		CommandLineDoubleD(dMinLatitude, "minlat", 0.0, "(degrees)");
 		CommandLineString(strTopoFile, "topofile", "");
 		CommandLineDoubleD(dMaxTopoHeight, "maxtopoht", 0.0, "(m)");
+		CommandLineDoubleD(dMergeDist, "mergedist", 0.0, "(degrees)");
 		CommandLineDoubleD(dWarmCoreDist, "warmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dNoWarmCoreDist, "nowarmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dVortDist, "vortdist", 0.0, "(degrees)");
@@ -668,6 +672,7 @@ try {
 		int nTotalPressureMinima = setPressureMinima.size();
 		int nRejectedLatitude = 0;
 		int nRejectedTopography = 0;
+		int nRejectedMerge = 0;
 		int nRejectedVortMax = 0;
 		int nRejectedWarmCore = 0;
 		int nRejectedNoWarmCore = 0;
@@ -731,6 +736,84 @@ try {
 				}
 			}
 
+			setPressureMinima = setNewPressureMinima;
+		}
+
+		// Eliminate based on merge distance
+		if (dMergeDist != 0.0) {
+			std::set< std::pair<int, int> > setNewPressureMinima;
+
+			// Calculate spherical distance
+			double dSphDist = 2.0 * sin(0.5 * dMergeDist / 180.0 * M_PI);
+
+			// Create a new KD Tree containing all nodes
+			kdtree * kdMerge = kd_create(3);
+
+			std::set< std::pair<int, int> >::const_iterator iterPSL
+				= setPressureMinima.begin();
+			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+				double dLat = dataLat[iterPSL->first];
+				double dLon = dataLon[iterPSL->second];
+
+				double dX = cos(dLon) * cos(dLat);
+				double dY = sin(dLon) * cos(dLat);
+				double dZ = sin(dLat);
+
+				kd_insert3(kdMerge, dX, dY, dZ, (void*)(&(*iterPSL)));
+			}
+
+			// Loop through all PSL find set of nearest neighbors
+			iterPSL = setPressureMinima.begin();
+			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+				double dLat = dataLat[iterPSL->first];
+				double dLon = dataLon[iterPSL->second];
+
+				double dX = cos(dLon) * cos(dLat);
+				double dY = sin(dLon) * cos(dLat);
+				double dZ = sin(dLat);
+
+				// Find all neighbors within dSphDist
+				kdres * kdresMerge =
+					kd_nearest_range3(kdMerge, dX, dY, dZ, dSphDist);
+
+				// Number of neighbors
+				int nNeighbors = kd_res_size(kdresMerge);
+				if (nNeighbors == 0) {
+					setNewPressureMinima.insert(*iterPSL);
+
+				} else {
+					double dPSL = dataPSL[iterPSL->first][iterPSL->second];
+
+					bool fMinima = true;
+					for (;;) {
+						std::pair<int,int> * ppr =
+							(std::pair<int,int> *)(kd_res_item_data(kdresMerge));
+
+						if (dataPSL[ppr->first][ppr->second] < dPSL) {
+							fMinima = false;
+							break;
+						}
+
+						int iHasMore = kd_res_next(kdresMerge);
+						if (!iHasMore) {
+							break;
+						}
+					}
+
+					if (fMinima) {
+						setNewPressureMinima.insert(*iterPSL);
+					} else {
+						nRejectedMerge++;
+					}
+				}
+
+				kd_res_free(kdresMerge);
+			}
+
+			// Destroy the KD Tree
+			kd_free(kdMerge);
+
+			// Update set of pressure minima
 			setPressureMinima = setNewPressureMinima;
 		}
 
@@ -1144,6 +1227,7 @@ try {
 		Announce("Total candidates: %i", setPressureMinima.size());
 		Announce("Rejected (    latitude): %i", nRejectedLatitude);
 		Announce("Rejected (  topography): %i", nRejectedTopography);
+		Announce("Rejected (      merged): %i", nRejectedMerge);
 		Announce("Rejected (no vort max ): %i", nRejectedVortMax);
 		Announce("Rejected (   warm core): %i", nRejectedWarmCore);
 		Announce("Rejected (no warm core): %i", nRejectedNoWarmCore);
