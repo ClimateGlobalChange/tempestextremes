@@ -37,18 +37,333 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		A class storing a thresholding operator.
+///	</summary>
+class ThresholdOp {
+
+public:
+	///	<summary>
+	///		Possible operations.
+	///	</summary>
+	enum Operation {
+		GreaterThan,
+		LessThan,
+		GreaterThanEqualTo,
+		LessThanEqualTo,
+		EqualTo,
+		NotEqualTo
+	};
+
+public:
+	///	<summary>
+	///		Parse a threshold operator string.
+	///	</summary>
+	void Parse(
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Variable,
+			ReadMode_Op,
+			ReadMode_Value,
+			ReadMode_Distance,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Variable;
+
+		// Loop through string
+		int iLast = 0;
+		for (int i = 0; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in column name
+				if (eReadMode == ReadMode_Variable) {
+
+					m_strVariable = strSubStr;
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Op;
+
+				// Read in operation
+				} else if (eReadMode == ReadMode_Op) {
+					if (strSubStr == ">") {
+						m_eOp = GreaterThan;
+					} else if (strSubStr == "<") {
+						m_eOp = LessThan;
+					} else if (strSubStr == ">=") {
+						m_eOp = GreaterThanEqualTo;
+					} else if (strSubStr == "<=") {
+						m_eOp = LessThanEqualTo;
+					} else if (strSubStr == "=") {
+						m_eOp = EqualTo;
+					} else if (strSubStr == "!=") {
+						m_eOp = NotEqualTo;
+					} else {
+						_EXCEPTION1("Threshold invalid operation \"%s\"",
+							strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Value;
+
+				// Read in value
+				} else if (eReadMode == ReadMode_Value) {
+					m_dValue = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Distance;
+
+				// Read in minimum count
+				} else if (eReadMode == ReadMode_Distance) {
+					m_dDistance = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
+							"\nRequired: \"<name>,<operation>"
+							",<value>,<distance>\"",
+							strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
+					"\nRequired: \"<name>,<operation>,<value>,<distance>\"",
+					strOp.c_str());
+		}
+
+		if (m_dDistance < 0.0) {
+			_EXCEPTIONT("For threshold op, distance must be nonnegative");
+		}
+
+		// Output announcement
+		char szBuffer[128];
+		sprintf(szBuffer, "%s", m_strVariable.c_str());
+
+		std::string strDescription = szBuffer;
+		if (m_eOp == GreaterThan) {
+			strDescription += " is greater than ";
+		} else if (m_eOp == LessThan) {
+			strDescription += " is less than ";
+		} else if (m_eOp == GreaterThanEqualTo) {
+			strDescription += " is greater than or equal to ";
+		} else if (m_eOp == LessThanEqualTo) {
+			strDescription += " is less than or equal to ";
+		} else if (m_eOp == EqualTo) {
+			strDescription += " is equal to ";
+		} else if (m_eOp == NotEqualTo) {
+			strDescription += " is not equal to ";
+		}
+
+		sprintf(szBuffer, "%f within %f degrees",
+			m_dValue, m_dDistance);
+		strDescription += szBuffer;
+
+		Announce("%s", strDescription.c_str());
+	}
+
+public:
+	///	<summary>
+	///		Variable to use for thresholding.
+	///	</summary>
+	std::string m_strVariable;
+
+	///	<summary>
+	///		Operation.
+	///	</summary>
+	Operation m_eOp;
+
+	///	<summary>
+	///		Threshold value.
+	///	</summary>
+	double m_dValue;
+
+	///	<summary>
+	///		Distance to search for threshold value
+	///	</summary>
+	double m_dDistance;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class describing a general closed contour operation.
+///	</summary>
+class ClosedContourOp {
+
+public:
+	///	<summary>
+	///		Parse a closed contour operation string.
+	///	</summary>
+	void Parse(
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Variable,
+			ReadMode_Distance,
+			ReadMode_Amount,
+			ReadMode_Count,
+			ReadMode_MinMaxDist,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Variable;
+
+		// Loop through string
+		int iLast = 0;
+		for (int i = 0; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in variable name
+				if (eReadMode == ReadMode_Variable) {
+					m_strVariable = strSubStr;
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Amount;
+
+				// Read in amount
+				} else if (eReadMode == ReadMode_Amount) {
+					m_dDeltaAmount = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Distance;
+
+				// Read in distance
+				} else if (eReadMode == ReadMode_Distance) {
+					m_dDistance = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Count;
+
+				// Read in count
+				} else if (eReadMode == ReadMode_Count) {
+					m_nCount = atoi(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_MinMaxDist;
+
+				// Read in min/max distance
+				} else if (eReadMode == ReadMode_MinMaxDist) {
+					m_dMinMaxDist = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nToo many entries in closed contour op \"%s\""
+						"\nRequired: \"<name>,<amount>,<distance>,"
+						"<count>,<minmaxdist>\"",
+						strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("\nInsufficient entries in closed contour op \"%s\""
+					"\nRequired: \"<name>,<amount>,<distance>,"
+					"<count>,<minmaxdist>\"",
+					strOp.c_str());
+		}
+
+		// Output announcement
+		char szBuffer[128];
+
+		std::string strDescription;
+		strDescription += m_strVariable;
+
+		if (m_dDeltaAmount == 0.0) {
+			_EXCEPTIONT("For closed contour op, delta amount must be non-zero");
+		}
+		if (m_dDistance <= 0.0) {
+			_EXCEPTIONT("For closed contour op, distance must be positive");
+		}
+		if (m_nCount <= 0) {
+			_EXCEPTIONT("For closed contour op, count must be positive");
+		}
+		if (m_dMinMaxDist < 0.0) {
+			_EXCEPTIONT("For closed contour op, min/max dist must be nonnegative");
+		}
+
+		if (m_dDeltaAmount < 0.0) {
+			Announce("%s decreases by %f over %f deg (%i samples)"
+				   " (max search %f deg)",
+				m_strVariable.c_str(),
+				-m_dDeltaAmount,
+				m_dDistance,
+				m_nCount,
+				m_dMinMaxDist);
+
+		} else {
+			Announce("%s increases by %f over %f degrees (%i samples)"
+					" (min search %f deg)",
+				m_strVariable.c_str(),
+				m_dDeltaAmount,
+				m_dDistance,
+				m_nCount,
+				m_dMinMaxDist);
+		}
+	}
+
+public:
+	///	<summary>
+	///		Variable name.
+	///	</summary>
+	std::string m_strVariable;
+
+	///	<summary>
+	///		Threshold amount.  If positive this represents a minimum
+	///		increase.  If negative this represents a minimum decrease.
+	///	</summary>
+	double m_dDeltaAmount;
+
+	///	<summary>
+	///		Threshold distance.
+	///	</summary>
+	double m_dDistance;
+
+	///	<summary>
+	///		Number of nodes used to evaluate closed contour.
+	///	</summary>
+	int m_nCount;
+
+	///	<summary>
+	///		Distance to search for min or max.
+	///	</summary>
+	double m_dMinMaxDist;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Find the locations of all minima in the given DataMatrix.
 ///	</summary>
 void FindAllLocalMinima(
 	const DataMatrix<float> & data,
-	std::set< std::pair<int, int> > & setMinima
+	std::set< std::pair<int, int> > & setMinima,
+	bool fRegional
 ) {
-	int nLon = data.GetColumns();
-	int nLat = data.GetRows();
+	const int nLon = data.GetColumns();
+	const int nLat = data.GetRows();
+
+	const int nLonBegin = (fRegional)?(1):(0);
+	const int nLonEnd   = (fRegional)?(nLon-1):(nLon);
 
 	// Check interior nodes
 	for (int j = 1; j < nLat-1; j++) {
-	for (int i = 0; i < nLon; i++) {
+	for (int i = nLonBegin; i < nLonEnd; i++) {
 
 		bool fMinimum = true;
 		for (int q = -1; q <= 1; q++) {
@@ -58,12 +373,12 @@ void FindAllLocalMinima(
 
 			if (data[jx][ix] < data[j][i]) {
 				fMinimum = false;
-				goto DonePressureMinima;
+				goto DoneCandidates;
 			}
 		}
 		}
 
-DonePressureMinima:
+DoneCandidates:
 		if (fMinimum) {
 			setMinima.insert(std::pair<int,int>(j,i));
 		}
@@ -109,13 +424,17 @@ DonePressureMinima:
 ///	</summary>
 void FindAllLocalMaxima(
 	const DataMatrix<float> & data,
-	std::set< std::pair<int, int> > & setMaxima
+	std::set< std::pair<int, int> > & setMaxima,
+	bool fRegional
 ) {
-	int nLon = data.GetColumns();
-	int nLat = data.GetRows();
+	const int nLon = data.GetColumns();
+	const int nLat = data.GetRows();
+
+	const int nLonBegin = (fRegional)?(1):(0);
+	const int nLonEnd   = (fRegional)?(nLon-1):(nLon);
 
 	for (int j = 1; j < nLat-1; j++) {
-	for (int i = 0; i < nLon; i++) {
+	for (int i = nLonBegin; i < nLonEnd; i++) {
 
 		bool fMaximum = true;
 		for (int q = -1; q <= 1; q++) {
@@ -172,21 +491,23 @@ DonePressureMaxima:
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		Find the maximum value of a field near the given point.
+///		Find the minimum/maximum value of a field near the given point.
 ///	</summary>
 ///	<param name="dMaxDist">
 ///		Maximum distance from the initial point in degrees.
 ///	</param>
-void FindLocalMaximum(
+void FindLocalMinMax(
+	bool fMinimum,
 	const DataMatrix<float> & data,
-	const DataVector<double> & dataLon,
 	const DataVector<double> & dataLat,
+	const DataVector<double> & dataLon,
 	int iLat,
 	int iLon,
 	double dMaxDist,
 	std::pair<int, int> & prMaximum,
 	float & dMaxValue,
-	float & dRMax
+	float & dRMax,
+	bool fRegional
 ) {
 	// Verify that dMaxDist is less than 180.0
 	if (dMaxDist > 180.0) {
@@ -236,21 +557,38 @@ void FindLocalMaximum(
 		}
 
 		// Check for new local maximum
-		if (data[pr.first][pr.second] > dMaxValue) {
-			prMaximum = pr;
-			dMaxValue = data[pr.first][pr.second];
-			dRMax = dR;
+		if (fMinimum) {
+			if (data[pr.first][pr.second] < dMaxValue) {
+				prMaximum = pr;
+				dMaxValue = data[pr.first][pr.second];
+				dRMax = dR;
+			}
+
+		} else {
+			if (data[pr.first][pr.second] > dMaxValue) {
+				prMaximum = pr;
+				dMaxValue = data[pr.first][pr.second];
+				dRMax = dR;
+			}
 		}
 
 		// Add all neighbors of this point
 		std::pair<int,int> prWest(pr.first, (pr.second + nLon - 1) % nLon);
 		if (setNodesVisited.find(prWest) == setNodesVisited.end()) {
-			queueNodes.push(prWest);
+			if (!fRegional) {
+				queueNodes.push(prWest);
+			} else if (pr.second >= 0) {
+				queueNodes.push(prWest);
+			}
 		}
 
 		std::pair<int,int> prEast(pr.first, (pr.second + 1) % nLon);
 		if (setNodesVisited.find(prEast) == setNodesVisited.end()) {
-			queueNodes.push(prEast);
+			if (!fRegional) {
+				queueNodes.push(prEast);
+			} else if (pr.second <= nLon-1) {
+				queueNodes.push(prEast);
+			}
 		}
 
 		std::pair<int,int> prNorth(pr.first + 1, pr.second);
@@ -318,7 +656,20 @@ void ParseTimeDouble(
 	} else {
 		_EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
 	}
+/*
+	Time time(Time::CalendarStandard);
+	time.FromFormattedString("1800-01-01 00:00:00");
+	printf("%1.15e %i\n", 3600.0 * 1577832.0, (int)(3600.0 * 1577832.0));
+	time.AddHours(1577832);
 
+	Announce("Time (YMDS): %i %i %i %i",
+			time.GetYear(),
+			time.GetMonth(),
+			time.GetDay(),
+			time.GetSecond());
+
+	_EXCEPTION();
+*/
 	// Time format is "days since ..."
 	if ((strTimeUnits.length() >= 11) &&
 	    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
@@ -339,6 +690,7 @@ void ParseTimeDouble(
 				time.GetDay(),
 				time.GetSecond());
 
+
 		nDateYear = time.GetYear();
 		nDateMonth = time.GetMonth();
 		nDateDay = time.GetDay();
@@ -355,8 +707,7 @@ void ParseTimeDouble(
 		Time time(cal);
 		time.FromFormattedString(strSubStr);
 
-		int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 3600.0);
-		time.AddSeconds(nSeconds);
+		time.AddHours(static_cast<int>(dTime));
 
 		Announce("Time (YMDS): %i %i %i %i",
 				time.GetYear(),
@@ -379,6 +730,481 @@ void ParseTimeDouble(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Determine if the given field has a closed contour about this point.
+///	</summary>
+bool HasClosedContour(
+	const DataVector<double> & dataLat,
+	const DataVector<double> & dataLon,
+	const DataMatrix<float> & dataState,
+	const int iLat0,
+	const int iLon0,
+	double dDeltaAmt,
+	double dDeltaDist,
+	int nDeltaCount,
+	double dMinMaxDist,
+	bool fRegional
+) {
+	// Verify arguments
+	if (dDeltaAmt == 0.0) {
+		_EXCEPTIONT("Closed contour amount must be non-zero");
+	}
+	if (dDeltaDist <= 0.0) {
+		_EXCEPTIONT("Closed contour distance must be positive");
+	}
+	if (nDeltaCount <= 0) {
+		_EXCEPTIONT("Number of sample points for closed contour "
+			"must be positive");
+	}
+
+	// Grid spacing
+	const int nLat = dataLat.GetRows();
+	const int nLon = dataLon.GetRows();
+
+	const double dDeltaLat = (dataLat[1] - dataLat[0]);
+	const double dDeltaLon = (dataLon[1] - dataLon[0]);
+
+	// Find min/max near point
+	int iLat;
+	int iLon;
+
+	if (dMinMaxDist == 0.0) {
+		iLat = iLat0;
+		iLon = iLon0;
+
+	// Find a local minimum / maximum
+	} else {
+		std::pair<int, int> prExtrema;
+		float dValue;
+		float dR;
+
+		FindLocalMinMax(
+			(dDeltaAmt > 0.0),
+			dataState,
+			dataLat,
+			dataLon,
+			iLat0,
+			iLon0,
+			dMinMaxDist,
+			prExtrema,
+			dValue,
+			dR,
+			fRegional);
+
+		iLat = prExtrema.first;
+		iLon = prExtrema.second;
+	}
+
+	// Coordinates of detection point	
+	double dLat = dataLat[iLat];
+	double dLon = dataLon[iLon];
+
+	// This location in Cartesian geometry
+	double dX0 = cos(dLon) * cos(dLat);
+	double dY0 = sin(dLon) * cos(dLat);
+	double dZ0 = sin(dLat);
+
+	// Pick a quasi-arbitrary reference direction
+	double dX1;
+	double dY1;
+	double dZ1;
+	if ((fabs(dX0) >= fabs(dY0)) && (fabs(dX0) >= fabs(dZ0))) {
+		dX1 = dX0;
+		dY1 = dY0 + 1.0;
+		dZ1 = dZ0;
+	} else if ((fabs(dY0) >= fabs(dX0)) && (fabs(dY0) >= fabs(dZ0))) {
+		dX1 = dX0;
+		dY1 = dY0;
+		dZ1 = dZ0 + 1.0;
+	} else {
+		dX1 = dX0 + 1.0;
+		dY1 = dY0;
+		dZ1 = dZ0;
+	}
+
+	// Project perpendicular to detection location
+	double dDot = dX1 * dX0 + dY1 * dY0 + dZ1 * dZ0;
+
+	dX1 -= dDot * dX0;
+	dY1 -= dDot * dY0;
+	dZ1 -= dDot * dZ0;
+
+	// Normalize
+	double dMag1 = sqrt(dX1 * dX1 + dY1 * dY1 + dZ1 * dZ1);
+
+	if (dMag1 < 1.0e-12) {
+		_EXCEPTIONT("Logic error");
+	}
+
+	double dScale1 = tan(dDeltaDist * M_PI / 180.0) / dMag1;
+
+	dX1 *= dScale1;
+	dY1 *= dScale1;
+	dZ1 *= dScale1;
+
+	// Verify dot product is zero
+	dDot = dX0 * dX1 + dY0 * dY1 + dZ0 * dZ1;
+	if (fabs(dDot) > 1.0e-12) {
+		_EXCEPTIONT("Logic error");
+	}
+
+	// Cross product (magnitude automatically 
+	double dCrossX = dY0 * dZ1 - dZ0 * dY1;
+	double dCrossY = dZ0 * dX1 - dX0 * dZ1;
+	double dCrossZ = dX0 * dY1 - dY0 * dX1;
+
+	// Obtain reference value
+	float dRefValue = dataState[iLat][iLon];
+
+	// Output closed contour details
+	AnnounceStartBlock(2, "Closed contour:");
+	Announce(2, "Storm at (%i, %i) : (%1.5f, %1.5f)",
+		iLat0, iLon0, dataLat[iLat0] * 180.0 / M_PI, dataLon[iLon0] * 180.0 / M_PI);
+	Announce(2, "Extrema at (%i, %i) : (%1.5f, %1.5f) : %1.5e",
+		iLat, iLon, dLat * 180.0 / M_PI, dLon * 180.0 / M_PI, dRefValue);
+
+	// Loop through all sample points
+	for (int a = 0; a < nDeltaCount; a++) {
+
+		// Angle of rotation
+		double dAngle = 2.0 * M_PI
+			* static_cast<double>(a)
+			/ static_cast<double>(nDeltaCount);
+
+		// Calculate new rotated vector
+		double dX2 = dX0 + dX1 * cos(dAngle) + dCrossX * sin(dAngle);
+		double dY2 = dY0 + dY1 * cos(dAngle) + dCrossY * sin(dAngle);
+		double dZ2 = dZ0 + dZ1 * cos(dAngle) + dCrossZ * sin(dAngle);
+
+		double dMag2 = sqrt(dX2 * dX2 + dY2 * dY2 + dZ2 * dZ2);
+
+		dX2 /= dMag2;
+		dY2 /= dMag2;
+		dZ2 /= dMag2;
+
+		// Calculate new lat/lon location
+		double dLat2 = asin(dZ2);
+		double dLon2 = atan2(dY2, dX2);
+
+		if (dLon2 < dataLon[0]) {
+			dLon2 += 2.0 * M_PI;
+		}
+/*
+		printf("%i : %3.2f %3.2f : %3.2f %3.2f\n",
+			a,
+			dLat * 180.0 / M_PI,
+			dLon * 180.0 / M_PI,
+			dLat2 * 180.0 / M_PI,
+			dLon2 * 180.0 / M_PI);
+*/
+		int j = static_cast<int>((dLat2 - dataLat[0]) / dDeltaLat + 0.5);
+		int i = static_cast<int>((dLon2 - dataLon[0]) / dDeltaLon + 0.5);
+
+		if (!fRegional) {
+			if (i == nLon) {
+				i = nLon-1;
+			}
+			if (j == nLat) {
+				j = nLat-1;
+			}
+		}
+
+		//printf("%i %i : %i %i\n", iLat, iLon, j, i);
+
+		// Check for insufficient distance
+		if ((i == iLon) && (j == iLat)) {
+			_EXCEPTIONT("Closed contour distance insufficient; increase value");
+		}
+
+		// Check for out of bounds
+		if ((i < 0) || (j < 0) || (i >= nLon) || (j >= nLat)) {
+			if (fRegional) {
+				Announce(2, "Point (%i, %i) out of bounds, returning", j, i);
+				AnnounceEndBlock(2, NULL);
+				return false;
+			}
+			_EXCEPTION4("Logic error %i/%i, %i/%i", i, nLon, j, nLat);
+		}
+
+		Announce(2, "Checking point (%i, %i) : (%1.5f %1.5f) : %1.5e",
+			j, i, dLat2 * 180.0 / M_PI, dLon2 * 180.0 / M_PI, dataState[j][i]);
+
+		// Verify sufficient increase in value
+		if (dDeltaAmt > 0.0) {
+			if (dataState[j][i] - dRefValue < dDeltaAmt) {
+				Announce(2, "Failed criteria; returning");
+				AnnounceEndBlock(2, NULL);
+				return false;
+			}
+
+		// Verify sufficient decrease in value
+		} else {
+			if (dRefValue - dataState[j][i] < -dDeltaAmt) {
+				Announce(2, "Failed criteria; returning");
+				AnnounceEndBlock(2, NULL);
+				return false;
+			}
+		}
+	}
+
+	Announce(2, "Passed criteria; returning");
+	AnnounceEndBlock(2, NULL);
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Determine if the given field satisfies the threshold.
+///	</summary>
+bool SatisfiesThreshold(
+	const DataVector<double> & dataLat,
+	const DataVector<double> & dataLon,
+	const DataMatrix<float> & dataState,
+	const int iLat,
+	const int iLon,
+	const ThresholdOp::Operation op,
+	const double dTargetValue,
+	const double dMaxDist,
+	bool fRegional
+) {
+	// Verify that dMaxDist is less than 180.0
+	if (dMaxDist > 180.0) {
+		_EXCEPTIONT("MaxDist must be less than 180.0");
+	}
+
+	// Number of latitudes and longitudes
+	const int nLat = dataLat.GetRows();
+	const int nLon = dataLon.GetRows();
+
+	// Queue of nodes that remain to be visited
+	std::queue< std::pair<int, int> > queueNodes;
+	std::pair<int, int> pr0(iLat, iLon);
+	queueNodes.push(pr0);
+
+	// Set of nodes that have already been visited
+	std::set< std::pair<int, int> > setNodesVisited;
+
+	// Latitude and longitude at the origin
+	double dLat0 = dataLat[iLat];
+	double dLon0 = dataLon[iLon];
+
+	// Loop through all latlon elements
+	while (queueNodes.size() != 0) {
+		std::pair<int, int> pr = queueNodes.front();
+		queueNodes.pop();
+
+		if (setNodesVisited.find(pr) != setNodesVisited.end()) {
+			continue;
+		}
+
+		setNodesVisited.insert(pr);
+
+		double dLatThis = dataLat[pr.first];
+		double dLonThis = dataLon[pr.second];
+
+		// Great circle distance to this element
+		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
+				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0));
+
+		if (pr != pr0) {
+			if (dR > dMaxDist) {
+				continue;
+			}
+		}
+
+		// Value at this location
+		double dValue = dataState[pr.first][pr.second];
+
+		// Apply operator
+		if (op == ThresholdOp::GreaterThan) {
+			if (dValue > dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::LessThan) {
+			if (dValue < dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::GreaterThanEqualTo) {
+			if (dValue >= dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::LessThanEqualTo) {
+			if (dValue <= dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::EqualTo) {
+			if (dValue == dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::NotEqualTo) {
+			if (dValue != dTargetValue) {
+				return true;
+			}
+
+		} else {
+			_EXCEPTIONT("Invalid operation");
+		}
+
+		// Special case: zero distance
+		if (dMaxDist == 0.0) {
+			return false;
+		}
+
+		// Add all neighbors of this point
+		std::pair<int,int> prWest(pr.first, (pr.second + nLon - 1) % nLon);
+		if (setNodesVisited.find(prWest) == setNodesVisited.end()) {
+			if (!fRegional) {
+				queueNodes.push(prWest);
+			} else if (pr.second >= 0) {
+				queueNodes.push(prWest);
+			}
+		}
+
+		std::pair<int,int> prEast(pr.first, (pr.second + 1) % nLon);
+		if (setNodesVisited.find(prEast) == setNodesVisited.end()) {
+			if (!fRegional) {
+				queueNodes.push(prEast);
+			} else if (pr.second <= nLon-1) {
+				queueNodes.push(prEast);
+			}
+		}
+
+		std::pair<int,int> prNorth(pr.first + 1, pr.second);
+		if ((prNorth.first < nLat) &&
+			(setNodesVisited.find(prNorth) == setNodesVisited.end())
+		) {
+			queueNodes.push(prNorth);
+		}
+
+		std::pair<int,int> prSouth(pr.first - 1, pr.second);
+		if ((prSouth.first >= 0) &&
+			(setNodesVisited.find(prSouth) == setNodesVisited.end())
+		) {
+			queueNodes.push(prSouth);
+		}
+	}
+
+	return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Find the maximum value of a field near the given point.
+///	</summary>
+///	<param name="dMaxDist">
+///		Maximum distance from the initial point in degrees.
+///	</param>
+void FindLocalAverage(
+	const DataMatrix<float> & data,
+	const DataVector<double> & dataLat,
+	const DataVector<double> & dataLon,
+	int iLat,
+	int iLon,
+	double dMaxDist,
+	float & dAverage,
+	float & dMaxValue
+) {
+	// Verify that dMaxDist is less than 180.0
+	if (dMaxDist > 180.0) {
+		_EXCEPTIONT("MaxDist must be less than 180.0");
+	}
+
+	// Number of latitudes and longitudes
+	const int nLat = dataLat.GetRows();
+	const int nLon = dataLon.GetRows();
+
+	// Queue of nodes that remain to be visited
+	std::queue< std::pair<int, int> > queueNodes;
+	queueNodes.push( std::pair<int, int>(iLat, iLon) );
+
+	// Set of nodes that have already been visited
+	std::set< std::pair<int, int> > setNodesVisited;
+
+	// Latitude and longitude at the origin
+	double dLat0 = dataLat[iLat];
+	double dLon0 = dataLon[iLon];
+
+	// Sum
+	float dSum = 0.0f;
+	float dArea = 0.0f;
+
+	// Reset average
+	dAverage = 0.0f;
+
+	// Reset maximum value
+	dMaxValue = data[iLat][iLon];
+
+	// Loop through all latlon elements
+	while (queueNodes.size() != 0) {
+		std::pair<int, int> pr = queueNodes.front();
+		queueNodes.pop();
+
+		if (setNodesVisited.find(pr) != setNodesVisited.end()) {
+			continue;
+		}
+
+		setNodesVisited.insert(pr);
+
+		double dLatThis = dataLat[pr.first];
+		double dLonThis = dataLon[pr.second];
+
+		// Great circle distance to this element
+		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
+				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0));
+
+		if (dR > dMaxDist) {
+			continue;
+		}
+
+		// Add value to sum
+		float dLocalArea = cos(dLatThis);
+
+		dArea += dLocalArea;
+		dSum += data[pr.first][pr.second] * dLocalArea;
+
+		if (data[pr.first][pr.second] > dMaxValue) {
+			dMaxValue = data[pr.first][pr.second];
+		}
+
+		// Add all neighbors of this point
+		std::pair<int,int> prWest(pr.first, (pr.second + nLon - 1) % nLon);
+		if (setNodesVisited.find(prWest) == setNodesVisited.end()) {
+			queueNodes.push(prWest);
+		}
+
+		std::pair<int,int> prEast(pr.first, (pr.second + 1) % nLon);
+		if (setNodesVisited.find(prEast) == setNodesVisited.end()) {
+			queueNodes.push(prEast);
+		}
+
+		std::pair<int,int> prNorth(pr.first + 1, pr.second);
+		if ((prNorth.first < nLat) &&
+			(setNodesVisited.find(prNorth) == setNodesVisited.end())
+		) {
+			queueNodes.push(prNorth);
+		}
+
+		std::pair<int,int> prSouth(pr.first - 1, pr.second);
+		if ((prSouth.first >= 0) &&
+			(setNodesVisited.find(prSouth) == setNodesVisited.end())
+		) {
+			queueNodes.push(prSouth);
+		}
+	}
+
+	// Set average
+	dAverage = dSum / dArea;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 	NcError error(NcError::verbose_nonfatal);
@@ -396,11 +1222,20 @@ try {
 	// Output file
 	std::string strOutputFile;
 
+	// Variable to search for the minimum
+	std::string strSearchByMin;
+
+	// Variable to search for the maximum
+	std::string strSearchByMax;
+
 	// Zonal velocity name
 	std::string strUName;
 
 	// Meridional velocity name
 	std::string strVName;
+
+	// Data is regional
+	bool fRegional;
 
 	// Maximum latitude for detection
 	double dMaxLatitude;
@@ -426,14 +1261,11 @@ try {
 	// Require 850hPa vorticity maxima within this distance
 	double dVortDist;
 
-	// Distance to evaluate delta SLP
-	double dDeltaSLPDist;
+	// Closed contour commands
+	std::string strClosedContourCmd;
 
-	// Amount to require SLP increase
-	double dDeltaSLPAmt;
-
-	// Number of rotations
-	int nDeltaSLPCount;
+	// Threshold commands
+	std::string strThresholdCmd;
 
 	// Minimum Laplacian value
 	double dMinLaplacian;
@@ -441,18 +1273,27 @@ try {
 	// Distance to search for maximum wind speed
 	double dWindSpDist;
 
+	// Distance to search for precipitation statistics (avg and max)
+	double dPrectDist;
+
 	// Append to output file
 	bool fAppend;
 
 	// Output header
 	bool fOutputHeader;
 
+	// Verbosity level
+	int iVerbosityLevel;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
 		CommandLineString(strOutputFile, "out", "");
+		CommandLineStringD(strSearchByMin, "searchbymin", "", "(default PSL)");
+		CommandLineString(strSearchByMax, "searchbymax", "");
 		CommandLineString(strUName, "uname", "U850");
 		CommandLineString(strVName, "vname", "V850");
+		CommandLineBool(fRegional, "regional");
 		CommandLineDoubleD(dMaxLatitude, "maxlat", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinLatitude, "minlat", 0.0, "(degrees)");
 		CommandLineString(strTopoFile, "topofile", "");
@@ -461,18 +1302,22 @@ try {
 		CommandLineDoubleD(dWarmCoreDist, "warmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dNoWarmCoreDist, "nowarmcoredist", 0.0, "(degrees)");
 		CommandLineDoubleD(dVortDist, "vortdist", 0.0, "(degrees)");
-		CommandLineDoubleD(dDeltaSLPDist, "deltaslpdist", 0.0, "(degrees)");
-		CommandLineDoubleD(dDeltaSLPAmt, "deltaslpamt", 0.0, "(Pa)");
-		CommandLineInt(nDeltaSLPCount, "deltaslpcount", 8);
-		CommandLineDoubleD(dMinLaplacian, "minlaplacian", 0.0, "(Pa / degree^2)");
+		CommandLineString(strClosedContourCmd, "closedcontourcmd", "");
+		CommandLineString(strThresholdCmd, "thresholdcmd", "");
+		//CommandLineDoubleD(dMinLaplacian, "minlaplacian", 0.0, "(Pa / degree^2)");
 		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
+		CommandLineDoubleD(dPrectDist, "prectdist", -1.0, "(degrees)");
 		//CommandLineBool(fAppend, "append");
 		CommandLineBool(fOutputHeader, "out_header");
+		CommandLineInt(iVerbosityLevel, "verbosity", 0);
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
 
 	AnnounceBanner();
+
+	// Set verbosity level
+	AnnounceSetVerbosityLevel(iVerbosityLevel);
 
 	// Check input
 	if (strInputFile.length() == 0) {
@@ -488,6 +1333,69 @@ try {
 	if ((dWarmCoreDist != 0.0) && (dNoWarmCoreDist != 0.0)) {
 		_EXCEPTIONT("Only one of --warmcoredist and --nowarmcoredist"
 			   " may be active");
+	}
+
+	// Only one of search by min or search by max should be specified
+	if ((strSearchByMin == "") && (strSearchByMax == "")) {
+		strSearchByMin = "PSL";
+	}
+	if ((strSearchByMin != "") && (strSearchByMax != "")) {
+		_EXCEPTIONT("Only one of --searchbymin or --searchbymax can"
+			" be specified");
+	}
+
+	// Parse the closed contour command string
+	std::vector<ClosedContourOp> vecClosedContourOp;
+
+	if (strClosedContourCmd != "") {
+		AnnounceStartBlock("Parsing closed contour operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strClosedContourCmd.length(); i++) {
+
+			if ((i == strClosedContourCmd.length()) ||
+				(strClosedContourCmd[i] == ';') ||
+				(strClosedContourCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strClosedContourCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecClosedContourOp.size());
+				vecClosedContourOp.resize(iNextOp + 1);
+				vecClosedContourOp[iNextOp].Parse(strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	// Parse the closed contour command string
+	std::vector<ThresholdOp> vecThresholdOp;
+
+	if (strThresholdCmd != "") {
+		AnnounceStartBlock("Parsing threshold operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strThresholdCmd.length(); i++) {
+
+			if ((i == strThresholdCmd.length()) ||
+				(strThresholdCmd[i] == ';') ||
+				(strThresholdCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strThresholdCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecThresholdOp.size());
+				vecThresholdOp.resize(iNextOp + 1);
+				vecThresholdOp[iNextOp].Parse(strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
 	}
 
 	// Check minimum latitude and maximum latitude
@@ -525,8 +1433,8 @@ try {
 		_EXCEPTIONT("No variable \"lon\" found in input file");
 	}
 
-	int nLat = dimLat->size();
-	int nLon = dimLon->size();
+	const int nLat = dimLat->size();
+	const int nLon = dimLon->size();
 
 	DataVector<double> dataLat(nLat);
 	varLat->get(dataLat, nLat);
@@ -561,15 +1469,32 @@ try {
 	varTime->get(dTime, nTime);
 
 	// Get auxiliary variables
-	NcVar * varPSL  = ncInput.get_var("PSL");
+	bool fSearchByMinima = false;
+	NcVar * varSearch;
+	if (strSearchByMin != "") {
+		fSearchByMinima = true;
+		varSearch = ncInput.get_var(strSearchByMin.c_str());
+		if (varSearch == NULL) {
+			_EXCEPTION1("Unable to find variable \"%s\"",
+				strSearchByMin.c_str());
+		}
+
+	} else {
+		fSearchByMinima = false;
+		varSearch = ncInput.get_var(strSearchByMax.c_str());
+		if (varSearch == NULL) {
+			_EXCEPTION1("Unable to find variable \"%s\"",
+				strSearchByMax.c_str());
+		}
+	}
+
+	NcVar * varPSL = ncInput.get_var("PSL");
 	NcVar * varUvel = ncInput.get_var(strUName.c_str());
 	NcVar * varVvel = ncInput.get_var(strVName.c_str());
 	NcVar * varT200 = ncInput.get_var("T200");
 	NcVar * varT500 = ncInput.get_var("T500");
+	NcVar * varPrect = ncInput.get_var("PRECT");
 
-	if (varPSL == NULL) {
-		_EXCEPTIONT("No variable \"PSL\" found in input file");
-	}
 	if (varUvel == NULL) {
 		_EXCEPTION1("No variable \"%s\" found in input file", strUName.c_str());
 	}
@@ -583,7 +1508,12 @@ try {
 		_EXCEPTIONT("No variable \"T500\" found in input file");
 	}
 
+	if ((varPrect == NULL) && (dPrectDist >= 0.0)) {
+		_EXCEPTIONT("No variable \"PRECT\" found in input file");
+	}
+
 	// Storage for auxiliary variables
+	DataMatrix<float> dataSearch(nLat, nLon);
 	DataMatrix<float> dataPSL(nLat, nLon);
 	DataMatrix<float> dataUvel(nLat, nLon);
 	DataMatrix<float> dataVvel(nLat, nLon);
@@ -595,6 +1525,8 @@ try {
 	DataMatrix<float> dataDel2PSL(nLat, nLon);
 
 	DataMatrix<float> dataPHIS(nLat, nLon);
+
+	DataMatrix<float> dataPrect(nLat, nLon);
 
 	// Topography variable
 	NcVar * varPHIS = NULL;
@@ -634,12 +1566,16 @@ try {
 
 	// Loop through all times
 	for (int t = 0; t < nTime; t++) {
+	//for (int t = 0; t < 1; t++) {
 
 		char szStartBlock[128];
 		sprintf(szStartBlock, "Time %i", t);
 		AnnounceStartBlock(szStartBlock);
 
 		// Get the auxiliary variables
+		varSearch->set_cur(t,0,0);
+		varSearch->get(&(dataSearch[0][0]), 1, nLat, nLon);
+
 		varPSL->set_cur(t,0,0);
 		varPSL->get(&(dataPSL[0][0]), 1, nLat, nLon);
 
@@ -655,6 +1591,11 @@ try {
 		varT500->set_cur(t,0,0);
 		varT500->get(&(dataT500[0][0]), 1, nLat, nLon);
 
+		if ((varPrect != NULL) && (dPrectDist >= 0.0)) {
+			varPrect->set_cur(t,0,0);
+			varPrect->get(&(dataPrect[0][0]), 1, nLat, nLon);
+		}
+
 		// Compute wind magnitude
 		for (int j = 0; j < nLat; j++) {
 		for (int i = 0; i < nLon; i++) {
@@ -665,83 +1606,89 @@ try {
 		}
 
 		// Tag all pressure minima
-		std::set< std::pair<int, int> > setPressureMinima;
-		FindAllLocalMinima(dataPSL, setPressureMinima);
+		std::set< std::pair<int, int> > setCandidates;
+		if (strSearchByMin != "") {
+			FindAllLocalMinima(dataSearch, setCandidates, fRegional);
+		} else {
+			FindAllLocalMaxima(dataSearch, setCandidates, fRegional);
+		}
 
 		// Total number of pressure minima
-		int nTotalPressureMinima = setPressureMinima.size();
+		int nTotalCandidates = setCandidates.size();
 		int nRejectedLatitude = 0;
 		int nRejectedTopography = 0;
 		int nRejectedMerge = 0;
 		int nRejectedVortMax = 0;
 		int nRejectedWarmCore = 0;
 		int nRejectedNoWarmCore = 0;
-		int nRejectedClosedContour = 0;
 		int nRejectedLaplacian = 0;
+
+		DataVector<int> vecRejectedClosedContour(vecClosedContourOp.size());
+		DataVector<int> vecRejectedThreshold(vecThresholdOp.size());
 
 		// Eliminate based on maximum latitude
 		if (dMaxLatitude != 0.0) {
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				double dLat = dataLat[iterPSL->first];
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				double dLat = dataLat[iterCandidate->first];
 
 				if (fabs(dLat) <= dMaxLatitude) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 				} else {
 					nRejectedLatitude++;
 				}
 			}
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
 		// Eliminate based on minimum latitude
 		if (dMinLatitude != 0.0) {
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				double dLat = dataLat[iterPSL->first];
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				double dLat = dataLat[iterCandidate->first];
 
 				if (fabs(dLat) >= dMinLatitude) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 				} else {
 					nRejectedLatitude++;
 				}
 			}
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
 		// Eliminate based on maximum topographic height
 		if (dMaxTopoHeight != 0.0) {
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				float dPHIS = dataPHIS[iterPSL->first][iterPSL->second];
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				float dPHIS = dataPHIS[iterCandidate->first][iterCandidate->second];
 
 				double dTopoHeight =
 					static_cast<double>(dPHIS / ParamGravity);
 
 				if (dTopoHeight <= dMaxTopoHeight) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 				} else {
 					nRejectedTopography++;
 				}
 			}
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
 		// Eliminate based on merge distance
 		if (dMergeDist != 0.0) {
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
 			// Calculate spherical distance
 			double dSphDist = 2.0 * sin(0.5 * dMergeDist / 180.0 * M_PI);
@@ -749,24 +1696,24 @@ try {
 			// Create a new KD Tree containing all nodes
 			kdtree * kdMerge = kd_create(3);
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				double dLat = dataLat[iterPSL->first];
-				double dLon = dataLon[iterPSL->second];
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				double dLat = dataLat[iterCandidate->first];
+				double dLon = dataLon[iterCandidate->second];
 
 				double dX = cos(dLon) * cos(dLat);
 				double dY = sin(dLon) * cos(dLat);
 				double dZ = sin(dLat);
 
-				kd_insert3(kdMerge, dX, dY, dZ, (void*)(&(*iterPSL)));
+				kd_insert3(kdMerge, dX, dY, dZ, (void*)(&(*iterCandidate)));
 			}
 
 			// Loop through all PSL find set of nearest neighbors
-			iterPSL = setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				double dLat = dataLat[iterPSL->first];
-				double dLon = dataLon[iterPSL->second];
+			iterCandidate = setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				double dLat = dataLat[iterCandidate->first];
+				double dLon = dataLon[iterCandidate->second];
 
 				double dX = cos(dLon) * cos(dLat);
 				double dY = sin(dLon) * cos(dLat);
@@ -779,19 +1726,28 @@ try {
 				// Number of neighbors
 				int nNeighbors = kd_res_size(kdresMerge);
 				if (nNeighbors == 0) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 
 				} else {
-					double dPSL = dataPSL[iterPSL->first][iterPSL->second];
+					double dValue =
+						dataSearch[iterCandidate->first][iterCandidate->second];
 
-					bool fMinima = true;
+					bool fExtrema = true;
 					for (;;) {
 						std::pair<int,int> * ppr =
 							(std::pair<int,int> *)(kd_res_item_data(kdresMerge));
 
-						if (dataPSL[ppr->first][ppr->second] < dPSL) {
-							fMinima = false;
-							break;
+						if (fSearchByMinima) {
+							if (dataSearch[ppr->first][ppr->second] < dValue) {
+								fExtrema = false;
+								break;
+							}
+
+						} else {
+							if (dataSearch[ppr->first][ppr->second] > dValue) {
+								fExtrema = false;
+								break;
+							}
 						}
 
 						int iHasMore = kd_res_next(kdresMerge);
@@ -800,8 +1756,8 @@ try {
 						}
 					}
 
-					if (fMinima) {
-						setNewPressureMinima.insert(*iterPSL);
+					if (fExtrema) {
+						setNewCandidates.insert(*iterCandidate);
 					} else {
 						nRejectedMerge++;
 					}
@@ -814,7 +1770,7 @@ try {
 			kd_free(kdMerge);
 
 			// Update set of pressure minima
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
 		// Eliminate based on presence of vorticity maximum
@@ -823,11 +1779,14 @@ try {
 			float dDeltaLat = static_cast<float>(dataLat[1] - dataLat[0]);
 			float dDeltaLon = static_cast<float>(dataLon[1] - dataLon[0]);
 
+			int iLonBegin = (fRegional)?(1):(0);
+			int iLonEnd   = (fRegional)?(nLon-1):(nLon);
+
 			DataMatrix<float> dataZETA850(nLat, nLon);
 
 			// Compute vorticity
 			for (int j = 1; j < nLat-1; j++) {
-			for (int i = 0; i < nLon; i++) {
+			for (int i = iLonBegin; i < iLonEnd; i++) {
 
 				int inext = (i + 1) % nLon;
 				int jnext = (j + 1);
@@ -851,7 +1810,7 @@ try {
 
 			// Find all vorticity maxima
 			std::set< std::pair<int, int> > setZETA850Maxima;
-			FindAllLocalMaxima(dataZETA850, setZETA850Maxima);
+			FindAllLocalMaxima(dataZETA850, setZETA850Maxima, fRegional);
 
 			// Construct KD tree for ZETA850
 			kdtree * kdZETA850Maxima = kd_create(3);
@@ -870,13 +1829,13 @@ try {
 			}
 
 			// Remove pressure minima that are near temperature maxima
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				double dLat = dataLat[iterPSL->first];
-				double dLon = dataLon[iterPSL->second];
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				double dLat = dataLat[iterCandidate->first];
+				double dLon = dataLon[iterCandidate->second];
 
 				double dX = cos(dLon) * cos(dLat);
 				double dY = sin(dLon) * cos(dLat);
@@ -899,7 +1858,7 @@ try {
 
 				// Reject storms with no warm core
 				if (dZETA850dist <= dVortDist) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 				} else {
 					nRejectedVortMax++;
 				}
@@ -907,17 +1866,17 @@ try {
 
 			kd_free(kdZETA850Maxima);
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
 		// Detect presence of warm core near PSL min
 		if ((dWarmCoreDist != 0.0) || (dNoWarmCoreDist != 0.0)) {
 
 			std::set< std::pair<int, int> > setT200Maxima;
-			FindAllLocalMaxima(dataT200, setT200Maxima);
+			FindAllLocalMaxima(dataT200, setT200Maxima, fRegional);
 
 			std::set< std::pair<int, int> > setT500Maxima;
-			FindAllLocalMaxima(dataT500, setT500Maxima);
+			FindAllLocalMaxima(dataT500, setT500Maxima, fRegional);
 
 			// Construct KD tree for T200
 			kdtree * kdT200Maxima = kd_create(3);
@@ -952,13 +1911,13 @@ try {
 			}
 
 			// Remove pressure minima that are near temperature maxima
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				double dLat = dataLat[iterPSL->first];
-				double dLon = dataLon[iterPSL->second];
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				double dLat = dataLat[iterCandidate->first];
+				double dLon = dataLon[iterCandidate->second];
 
 				double dX = cos(dLon) * cos(dLat);
 				double dY = sin(dLon) * cos(dLat);
@@ -995,7 +1954,7 @@ try {
 					if ((dT200dist >= dNoWarmCoreDist) ||
 						(dT500dist >= dNoWarmCoreDist)
 					) {
-						setNewPressureMinima.insert(*iterPSL);
+						setNewCandidates.insert(*iterCandidate);
 					} else {
 						nRejectedWarmCore++;
 					}
@@ -1006,7 +1965,7 @@ try {
 					if ((dT200dist <= dWarmCoreDist) &&
 						(dT500dist <= dWarmCoreDist)
 					) {
-						setNewPressureMinima.insert(*iterPSL);
+						setNewCandidates.insert(*iterCandidate);
 					} else {
 						nRejectedNoWarmCore++;
 					}
@@ -1016,162 +1975,107 @@ try {
 			kd_free(kdT200Maxima);
 			kd_free(kdT500Maxima);
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
-		// Eliminate based on minimum SLP increase away from PSL min
-		if (dDeltaSLPDist != 0.0) {
+		// Eliminate based on closed contours
+		for (int ccc = 0; ccc < vecClosedContourOp.size(); ccc++) {
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			double dDeltaLat = (dataLat[1] - dataLat[0]);
-			double dDeltaLon = (dataLon[1] - dataLon[0]);
+			// Load relevant data
+			DataMatrix<float> dataState(nLat, nLon);
+			
+			NcVar * varDataState =
+				ncInput.get_var(vecClosedContourOp[ccc].m_strVariable.c_str());
 
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			if (varDataState == NULL) {
+				_EXCEPTION1("Cannot find variable \"%s\" in input file",
+					vecClosedContourOp[ccc].m_strVariable.c_str());
+			}
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				
-				double dLat = dataLat[iterPSL->first];
-				double dLon = dataLon[iterPSL->second];
+			varDataState->set_cur(t,0,0);
+			varDataState->get(&(dataState[0][0]), 1, nLat, nLon);
 
-				// This PSL location on the sphere
-				double dX0 = cos(dLon) * cos(dLat);
-				double dY0 = sin(dLon) * cos(dLat);
-				double dZ0 = sin(dLat);
+			// Loop through all pressure minima
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
 
-				// Pick a quasi-arbitrary reference direction
-				double dX1;
-				double dY1;
-				double dZ1;
-				if ((fabs(dX0) >= fabs(dY0)) && (fabs(dX0) >= fabs(dZ0))) {
-					dX1 = dX0;
-					dY1 = dY0 + 1.0;
-					dZ1 = dZ0;
-				} else if ((fabs(dY0) >= fabs(dX0)) && (fabs(dY0) >= fabs(dZ0))) {
-					dX1 = dX0;
-					dY1 = dY0;
-					dZ1 = dZ0 + 1.0;
-				} else {
-					dX1 = dX0 + 1.0;
-					dY1 = dY0;
-					dZ1 = dZ0;
-				}
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
-				// Project perpendicular to PSL location
-				double dDot = dX1 * dX0 + dY1 * dY0 + dZ1 * dZ0;
-
-				dX1 -= dDot * dX0;
-				dY1 -= dDot * dY0;
-				dZ1 -= dDot * dZ0;
-
-				// Normalize
-				double dMag1 = sqrt(dX1 * dX1 + dY1 * dY1 + dZ1 * dZ1);
-
-				if (dMag1 < 1.0e-12) {
-					_EXCEPTIONT("Logic error");
-				}
-
-				double dScale1 = tan(dDeltaSLPDist * M_PI / 180.0) / dMag1;
-
-				dX1 *= dScale1;
-				dY1 *= dScale1;
-				dZ1 *= dScale1;
-
-				// Verify dot product is zero
-				dDot = dX0 * dX1 + dY0 * dY1 + dZ0 * dZ1;
-				if (fabs(dDot) > 1.0e-12) {
-					_EXCEPTIONT("Logic error");
-				}
-
-				// Cross product (magnitude automatically 
-				double dCrossX = dY0 * dZ1 - dZ0 * dY1;
-				double dCrossY = dZ0 * dX1 - dX0 * dZ1;
-				double dCrossZ = dX0 * dY1 - dY0 * dX1;
-
-				// Obtain reference PSL
-				float dRefPSL = dataPSL[iterPSL->first][iterPSL->second];
-
-				// Loop through all directions
-				bool fReject = false;
-
-				for (int a = 0; a < nDeltaSLPCount; a++) {
-
-					// Angle of rotation
-					double dAngle = 2.0 * M_PI
-						* static_cast<double>(a)
-						/ static_cast<double>(nDeltaSLPCount);
-
-					// Calculate new rotated vector
-					double dX2 = dX0 + dX1 * cos(dAngle) + dCrossX * sin(dAngle);
-					double dY2 = dY0 + dY1 * cos(dAngle) + dCrossY * sin(dAngle);
-					double dZ2 = dZ0 + dZ1 * cos(dAngle) + dCrossZ * sin(dAngle);
-
-					double dMag2 = sqrt(dX2 * dX2 + dY2 * dY2 + dZ2 * dZ2);
-
-					dX2 /= dMag2;
-					dY2 /= dMag2;
-					dZ2 /= dMag2;
-
-					// Calculate new lat/lon location
-					double dLat2 = asin(dZ2);
-					double dLon2 = atan2(dY2, dX2);
-
-					if (dLon2 < 0.0) {
-						dLon2 += 2.0 * M_PI;
-					}
-/*
-					printf("%i : %3.2f %3.2f : %3.2f %3.2f\n",
-						a,
-						dLat * 180.0 / M_PI,
-						dLon * 180.0 / M_PI,
-						dLat2 * 180.0 / M_PI,
-						dLon2 * 180.0 / M_PI);
-*/
-					int j = (dLat2 + 0.5 * M_PI) / dDeltaLat;
-					int i = (dLon2) / dDeltaLon;
-
-					if (i == nLon) {
-						i = nLon-1;
-					}
-					if (j == nLat) {
-						j = nLat-1;
-					}
-
-					// Check for insufficient distance
-					if ((i == iterPSL->second) && (j == iterPSL->first)) {
-						_EXCEPTIONT(
-							"--deltaslpdist insufficient; increase value");
-					}
-
-					// Check for out of bounds
-					if ((i < 0) || (j < 0) || (i >= nLon) || (j >= nLat)) {
-						_EXCEPTION4("Logic error %i/%i, %i/%i", i, nLon, j, nLat);
-					}
-
-					// Verify sufficient increase in PSL
-					if (dataPSL[j][i] - dRefPSL < dDeltaSLPAmt) {
-						fReject = true;
-/*
-						if (dataLat[j] < -1.0) {
-							printf("DeltaSLP failed in cell lat %i (%1.2f) lon %i (%1.2f))\n", iterPSL->first, dataLat[iterPSL->first] * 180.0 / M_PI, iterPSL->second, dataLon[iterPSL->second] * 180.0 / M_PI);
-							printf("DeltaSLP failed in cell lat %i (%1.2f) lon %i (%1.2f))\n", j, dataLat[j] * 180.0 / M_PI, i, dataLon[i] * 180.0 / M_PI);
-							printf("SLP: %1.5e %1.5e\n", dataPSL[j][i], dRefPSL);
-						}
-*/
-						break;
-					}
-				}
+				// Determine if pressure minima have a closed contour
+				bool fHasClosedContour =
+					HasClosedContour(
+						dataLat,
+						dataLon,
+						dataState,
+						iterCandidate->first,
+						iterCandidate->second,
+						vecClosedContourOp[ccc].m_dDeltaAmount,
+						vecClosedContourOp[ccc].m_dDistance,
+						vecClosedContourOp[ccc].m_nCount,
+						vecClosedContourOp[ccc].m_dMinMaxDist,
+						fRegional
+					);
 
 				// If not rejected, add to new pressure minima array
-				if (!fReject) {
-					setNewPressureMinima.insert(*iterPSL);
+				if (fHasClosedContour) {
+					setNewCandidates.insert(*iterCandidate);
 				} else {
-					nRejectedClosedContour++;
+					vecRejectedClosedContour[ccc]++;
 				}
 			}
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
+		}
 
+		// Eliminate based on thresholds
+		for (int tc = 0; tc < vecThresholdOp.size(); tc++) {
+
+			std::set< std::pair<int, int> > setNewCandidates;
+
+			// Load relevant data
+			DataMatrix<float> dataState(nLat, nLon);
+			
+			NcVar * varDataState =
+				ncInput.get_var(vecThresholdOp[tc].m_strVariable.c_str());
+
+			if (varDataState == NULL) {
+				_EXCEPTION1("Cannot find variable \"%s\" in input file",
+					vecThresholdOp[tc].m_strVariable.c_str());
+			}
+
+			varDataState->set_cur(t,0,0);
+			varDataState->get(&(dataState[0][0]), 1, nLat, nLon);
+
+			// Loop through all pressure minima
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+				// Determine if the threshold is satisfied
+				bool fSatisfiesThreshold =
+					SatisfiesThreshold(
+						dataLat,
+						dataLon,
+						dataState,
+						iterCandidate->first,
+						iterCandidate->second,
+						vecThresholdOp[tc].m_eOp,
+						vecThresholdOp[tc].m_dValue,
+						vecThresholdOp[tc].m_dDistance,
+						fRegional
+					);
+
+				// If not rejected, add to new pressure minima array
+				if (fSatisfiesThreshold) {
+					setNewCandidates.insert(*iterCandidate);
+				} else {
+					vecRejectedThreshold[tc]++;
+				}
+			}
+
+			setCandidates = setNewCandidates;
 		}
 
 		// Eliminate based on minimum the Laplacian of pressure at the PSL min
@@ -1179,14 +2083,14 @@ try {
 			float dDeltaLat = static_cast<float>(dataLat[1] - dataLat[0]);
 			float dDeltaLon = static_cast<float>(dataLon[1] - dataLon[0]);
 
-			std::set< std::pair<int, int> > setNewPressureMinima;
+			std::set< std::pair<int, int> > setNewCandidates;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
-				int i = iterPSL->second;
-				int j = iterPSL->first;
+				int i = iterCandidate->second;
+				int j = iterCandidate->first;
 
 				int inext = (i + 1) % nLon;
 				int jnext = (j + 1);
@@ -1215,56 +2119,99 @@ try {
 				dLaplacian *= (M_PI / 180.0) * (M_PI / 180.0);
 
 				if (dLaplacian >= dMinLaplacian) {
-					setNewPressureMinima.insert(*iterPSL);
+					setNewCandidates.insert(*iterCandidate);
 				} else {
 					nRejectedLaplacian++;
 				}
 			}
 
-			setPressureMinima = setNewPressureMinima;
+			setCandidates = setNewCandidates;
 		}
 
-		Announce("Total candidates: %i", setPressureMinima.size());
+		Announce("Total candidates: %i", setCandidates.size());
 		Announce("Rejected (    latitude): %i", nRejectedLatitude);
 		Announce("Rejected (  topography): %i", nRejectedTopography);
 		Announce("Rejected (      merged): %i", nRejectedMerge);
-		Announce("Rejected (no vort max ): %i", nRejectedVortMax);
+		Announce("Rejected ( no vort max): %i", nRejectedVortMax);
 		Announce("Rejected (   warm core): %i", nRejectedWarmCore);
 		Announce("Rejected (no warm core): %i", nRejectedNoWarmCore);
-		Announce("Rejected ( closed cont): %i", nRejectedClosedContour);
-		Announce("Rejected (   laplacian): %i", nRejectedLaplacian);
+		//Announce("Rejected ( slp contour): %i", nRejectedSLPClosedContour);
+		//Announce("Rejected (temp contour): %i", nRejectedTempClosedContour);
+
+		for (int ccc = 0; ccc < vecRejectedClosedContour.GetRows(); ccc++) {
+			Announce("Rejected: (contour %s): %i",
+					vecClosedContourOp[ccc].m_strVariable.c_str(),
+					vecRejectedClosedContour[ccc]);
+		}
+
+		for (int tc = 0; tc < vecRejectedThreshold.GetRows(); tc++) {
+			Announce("Rejected: (thresh. %s): %i",
+					vecThresholdOp[tc].m_strVariable.c_str(),
+					vecRejectedThreshold[tc]);
+		}
 
 		// Determine wind maximum at all pressure minima
 		AnnounceStartBlock("Searching for maximum winds");
 		std::vector<float> vecMaxWindSp;
 		std::vector<float> vecRMaxWindSp;
 		{
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
 				std::pair<int, int> prMaximum;
 
 				float dRMaxWind;
 				float dMaxWindSp;
 
-				FindLocalMaximum(
+				FindLocalMinMax(
+					false,
 					dataUMag850,
-					dataLon,
 					dataLat,
-					iterPSL->first,
-					iterPSL->second,
+					dataLon,
+					iterCandidate->first,
+					iterCandidate->second,
 					dWindSpDist,
 					prMaximum,
 					dMaxWindSp,
-					dRMaxWind);
+					dRMaxWind,
+					fRegional);
 
 				vecMaxWindSp.push_back(dMaxWindSp);
 				vecRMaxWindSp.push_back(dRMaxWind);
 			}
 		}
-
 		AnnounceEndBlock("Done");
+
+		// Determine average and maximum PRECT
+		std::vector<float> vecPrectAvg;
+		std::vector<float> vecPrectMax;
+
+		if (dPrectDist >= 0.0) {
+			AnnounceStartBlock("Finding PRECT average and maximum");
+
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+				float dAverage;
+				float dMaxValue;
+
+				FindLocalAverage(
+					dataPrect,
+					dataLat,
+					dataLon,
+					iterCandidate->first,
+					iterCandidate->second,
+					dPrectDist,
+					dAverage,
+					dMaxValue);
+
+				vecPrectAvg.push_back(dAverage);
+				vecPrectMax.push_back(dMaxValue);
+			}
+			AnnounceEndBlock("Done");
+		}
 
 		// Write results to file
 		{
@@ -1327,24 +2274,32 @@ try {
 				nDateYear,
 				nDateMonth,
 				nDateDay,
-				static_cast<int>(setPressureMinima.size()),
+				static_cast<int>(setCandidates.size()),
 				nDateHour);
 
 			// Write candidate information
 			int iCandidateCount = 0;
 
-			std::set< std::pair<int, int> >::const_iterator iterPSL
-				= setPressureMinima.begin();
-			for (; iterPSL != setPressureMinima.end(); iterPSL++) {
-				fprintf(fpOutput, "%i\t%i\t%i\t%3.6f\t%3.6f\t%2.6f\t%3.6f\t%6.6f\n",
+			std::set< std::pair<int, int> >::const_iterator iterCandidate
+				= setCandidates.begin();
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+				fprintf(fpOutput, "%i\t%i\t%i\t%3.6f\t%3.6f\t%2.6f\t%3.6f\t%6.6f",
 					iCandidateCount,
-					iterPSL->second,
-					iterPSL->first,
-					dataLon[iterPSL->second] * 180.0 / M_PI,
-					dataLat[iterPSL->first]  * 180.0 / M_PI,
+					iterCandidate->second,
+					iterCandidate->first,
+					dataLon[iterCandidate->second] * 180.0 / M_PI,
+					dataLat[iterCandidate->first]  * 180.0 / M_PI,
 					vecMaxWindSp[iCandidateCount],
 					vecRMaxWindSp[iCandidateCount],
-					dataPSL[iterPSL->first][iterPSL->second]);
+					dataPSL[iterCandidate->first][iterCandidate->second]);
+
+				if (dPrectDist >= 0.0) {
+					fprintf(fpOutput, "\t%1.5e\t%1.5e\n",
+						vecPrectAvg[iCandidateCount],
+						vecPrectMax[iCandidateCount]);
+				} else {
+					fprintf(fpOutput, "\n");
+				}
 
 				iCandidateCount++;
 			}
