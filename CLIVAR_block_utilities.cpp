@@ -138,6 +138,7 @@ void ParseTimeDouble(
                 time.AddDays(nDays);
 
                 int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
+                std::cout<<"ParseTimeDouble (days) debug: nSeconds is "<<nSeconds<<std::endl;
                 time.AddSeconds(nSeconds);
 
                 Announce("Time (YMDS): %i %i %i %i",
@@ -161,8 +162,13 @@ void ParseTimeDouble(
 //                std::cout<<"Debug (hours since): strSubStr is "<<strSubStr<<std::endl;
                 Time time(cal);
                 time.FromFormattedString(strSubStr);
+                
+                std::cout<<"ParseTimeDouble (hours) debug: dTime is "<<dTime<<std::endl;
 
-                int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 3600.0);
+                double testVal = dTime*3600.0;
+                std::cout<<"Value inside static cast is "<<testVal<<std::endl;
+          //      int nSeconds = static_cast<int>(std::fmod(dTime, 1.0) * 3600.0);
+                int nSeconds = static_cast<int>(dTime*3600.0);
                 std::cout<<"ParseTimeDouble debug: nSeconds is "<<nSeconds<<std::endl; 
                 time.AddSeconds(nSeconds);
 
