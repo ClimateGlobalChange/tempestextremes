@@ -656,7 +656,20 @@ void ParseTimeDouble(
 	} else {
 		_EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
 	}
+/*
+	Time time(Time::CalendarStandard);
+	time.FromFormattedString("1800-01-01 00:00:00");
+	printf("%1.15e %i\n", 3600.0 * 1577832.0, (int)(3600.0 * 1577832.0));
+	time.AddHours(1577832);
 
+	Announce("Time (YMDS): %i %i %i %i",
+			time.GetYear(),
+			time.GetMonth(),
+			time.GetDay(),
+			time.GetSecond());
+
+	_EXCEPTION();
+*/
 	// Time format is "days since ..."
 	if ((strTimeUnits.length() >= 11) &&
 	    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
@@ -677,6 +690,7 @@ void ParseTimeDouble(
 				time.GetDay(),
 				time.GetSecond());
 
+
 		nDateYear = time.GetYear();
 		nDateMonth = time.GetMonth();
 		nDateDay = time.GetDay();
@@ -693,8 +707,7 @@ void ParseTimeDouble(
 		Time time(cal);
 		time.FromFormattedString(strSubStr);
 
-		int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 3600.0);
-		time.AddSeconds(nSeconds);
+		time.AddHours(static_cast<int>(dTime));
 
 		Announce("Time (YMDS): %i %i %i %i",
 				time.GetYear(),
