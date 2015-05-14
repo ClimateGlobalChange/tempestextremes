@@ -25,10 +25,24 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+extern int g_iVerbosityLevel;
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Set the verbosity level.
+///	</summary>
+void AnnounceSetVerbosityLevel(int iVerbosityLevel);
+
 ///	<summary>
 ///		Begin a new announcement block.
 ///	</summary>
 void AnnounceStartBlock(const char * szText);
+
+///	<summary>
+///		Begin a new announcement block.
+///	</summary>
+void AnnounceStartBlock(int iVerbosity, const char * szText);
 
 ///	<summary>
 ///		End an announcement block.
@@ -36,9 +50,19 @@ void AnnounceStartBlock(const char * szText);
 void AnnounceEndBlock(const char * szText);
 
 ///	<summary>
+///		End an announcement block.
+///	</summary>
+void AnnounceEndBlock(int iVerbosity, const char * szText);
+
+///	<summary>
 ///		Make an announcement.
 ///	</summary>
 void Announce(const char * szText, ...);
+
+///	<summary>
+///		Make an announcement.
+///	</summary>
+void Announce(int iVerbosity, const char * szText, ...);
 
 ///	<summary>
 ///		Create a banner / separator containing the specified text.

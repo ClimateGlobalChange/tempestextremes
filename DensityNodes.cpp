@@ -115,6 +115,9 @@ try {
 	// Number of longitudes in output
 	int nLon;
 
+	// Number of latitudes / longitudes per bin
+	int nBin;
+
 	// Include poles when computing latitude array
 	bool fWithPoles;
 
@@ -130,6 +133,7 @@ try {
 		CommandLineInt(iLatIxCol, "ilatcol", 9);
 		CommandLineInt(nLat, "nlat", 0);
 		CommandLineInt(nLon, "nlon", 0);
+		CommandLineInt(nBin, "nbin", 1);
 		CommandLineBool(fWithPoles, "withpoles");
 
 		ParseCommandLine(argc, argv);
@@ -165,6 +169,14 @@ try {
 	if (nLon == 0) {
 		_EXCEPTIONT("UNIMPLEMENTED: --nlon must be specified currently");
 	}
+	
+	// Verify that nbin divides latitudes and longitudes
+	if (nLat % nBin != 0) {
+		_EXCEPTIONT("--nbin must divide --nlat equally");
+	}
+	if (nLon % nBin != 0) {
+		_EXCEPTIONT("--nbin must divide --nlon equally");
+	}
 
 	// Input file list
 	std::vector<std::string> vecInputFiles;
@@ -180,7 +192,7 @@ try {
 
 	// Density
 	DataMatrix<int> nCounts;
-	nCounts.Initialize(nLat, nLon);
+	nCounts.Initialize(nLat / nBin, nLon / nBin);
 
 	// Loop through all files in list
 	AnnounceStartBlock("Processing files");
@@ -272,7 +284,9 @@ try {
 					setLocations.begin();
 
 				for (; iterLocations != setLocations.end(); iterLocations++) {
-					nCounts[iterLocations->first][iterLocations->second]++;
+					int iLatBin = iterLocations->first / nBin;
+					int iLonBin = iterLocations->second / nBin;
+					nCounts[iLatBin][iLonBin]++;
 				}
 
 				setLocations.clear();
@@ -289,7 +303,9 @@ try {
 				setLocations.begin();
 
 			for (; iterLocations != setLocations.end(); iterLocations++) {
-				nCounts[iterLocations->first][iterLocations->second]++;
+				int iLatBin = iterLocations->first / nBin;
+				int iLonBin = iterLocations->second / nBin;
+				nCounts[iLatBin][iLonBin]++;
 			}
 		}
 
@@ -309,8 +325,8 @@ try {
 	}
 
 	// Create output
-	NcDim * dimLat = ncOutput.add_dim("lat", nLat);
-	NcDim * dimLon = ncOutput.add_dim("lon", nLon);
+	NcDim * dimLat = ncOutput.add_dim("lat", nLat / nBin);
+	NcDim * dimLon = ncOutput.add_dim("lon", nLon / nBin);
 
 	NcVar * varLat = ncOutput.add_var("lat", ncDouble, dimLat);
 	NcVar * varLon = ncOutput.add_var("lon", ncDouble, dimLon);
@@ -318,30 +334,31 @@ try {
 	varLat->add_att("units", "degrees_north");
 	varLon->add_att("units", "degrees_east");
 
-	DataVector<double> dLat(nLat);
-	DataVector<double> dLon(nLon);
+	DataVector<double> dLat(nLat / nBin);
+	DataVector<double> dLon(nLon / nBin);
 
 	if (fWithPoles) {
-		for (int j = 0; j < nLat; j++) {
+		for (int j = 0; j < nLat / nBin; j++) {
 			dLat[j] = -90.0
 				+ 180.0 * static_cast<double>(j)
-					/ static_cast<double>(nLat-1);
+					/ static_cast<double>(nLat / nBin - 1);
 		}
 
 	} else {
-		for (int j = 0; j < nLat; j++) {
+		for (int j = 0; j < nLat / nBin; j++) {
 			dLat[j] = -90.0
 				+ 180.0 * (static_cast<double>(j) + 0.5)
-					/ static_cast<double>(nLat);
+					/ static_cast<double>(nLat / nBin);
 		}
 	}
 
-	for (int i = 0; i < nLon; i++) {
-		dLon[i] = 360.0 * static_cast<double>(i) / static_cast<double>(nLon);
+	for (int i = 0; i < nLon / nBin; i++) {
+		dLon[i] = 360.0 * static_cast<double>(i)
+			/ static_cast<double>(nLon / nBin);
 	}
 
-	varLat->put(&(dLat[0]), nLat);
-	varLon->put(&(dLon[0]), nLon);
+	varLat->put(&(dLat[0]), nLat / nBin);
+	varLon->put(&(dLon[0]), nLon / nBin);
 
 	// Output counts
 	NcVar * varCount =
@@ -351,7 +368,7 @@ try {
 			dimLat,
 			dimLon);
 
-	varCount->put(&(nCounts[0][0]), nLat, nLon);
+	varCount->put(&(nCounts[0][0]), nLat / nBin, nLon / nBin);
 
 	ncOutput.close();
 

@@ -27,6 +27,13 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		Verbosity level.
+///	</summary>
+int g_iVerbosityLevel = 0;
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Maximum announcement buffer size.
 ///	</summary>
 static const int AnnouncementBufferSize = 1024;
@@ -50,6 +57,12 @@ static int s_nIndentationLevel = 0;
 ///		Flag indicating whether a start block is still dangling.
 ///	</summary>
 static bool s_fBlockFlag = false;
+
+///////////////////////////////////////////////////////////////////////////////
+
+void AnnounceSetVerbosityLevel(int iVerbosityLevel) {
+	g_iVerbosityLevel = iVerbosityLevel;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -94,6 +107,19 @@ void AnnounceStartBlock(const char * szText) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void AnnounceStartBlock(
+	int iVerbosity,
+	const char * szText
+) {
+	if (iVerbosity > g_iVerbosityLevel) {
+		return;
+	}
+
+	AnnounceStartBlock(szText);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void AnnounceEndBlock(const char * szText) {
 	// Do not remove a block at minimum indentation level
 	if (s_nIndentationLevel == 0) {
@@ -132,6 +158,19 @@ void AnnounceEndBlock(const char * szText) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void AnnounceEndBlock(
+	int iVerbosity,
+	const char * szText
+) {
+	if (iVerbosity > g_iVerbosityLevel) {
+		return;
+	}
+
+	AnnounceEndBlock(szText);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void Announce(const char * szText, ...) {
 
 #ifdef USE_MPI
@@ -144,6 +183,66 @@ void Announce(const char * szText, ...) {
 		return;
 	}
 #endif
+
+	// Turn off the block flag
+	if (s_fBlockFlag) {
+		printf("\n");
+		s_fBlockFlag = false;
+	}
+
+	// If no text, return
+	if (szText == NULL) {
+		return;
+	}
+
+	// Output buffer
+	char szBuffer[AnnouncementBufferSize];
+
+	va_list arguments;
+
+	// Initialize the argument list
+	va_start(arguments, szText);
+
+	// Write to string
+	vsprintf(szBuffer, szText, arguments);
+
+	// Cleans up the argument list
+	va_end(arguments);
+
+	// Output with proper indentation
+	int i;
+	for (i = 0; i < s_nIndentationLevel; i++) {
+		printf("..");
+	}
+	printf("%s", szBuffer);
+	printf("\n");
+
+	fflush(NULL);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Announce(
+	int iVerbosity,
+	const char * szText,
+	...
+) {
+
+#ifdef USE_MPI
+	// Retrieve the rank of this processor
+	int nRank;
+
+	MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
+
+	if (nRank > 0) {
+		return;
+	}
+#endif
+
+	// Check verbosity
+	if (iVerbosity > g_iVerbosityLevel) {
+		return;
+	}
 
 	// Turn off the block flag
 	if (s_fBlockFlag) {
