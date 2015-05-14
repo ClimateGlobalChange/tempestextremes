@@ -92,101 +92,101 @@ int DayInYear(int nMonth, int nDay){
 
 
 //Copied from DetectCyclones
-
 void ParseTimeDouble(
-        const std::string & strTimeUnits,
-        const std::string & strTimeCalendar,
-        double dTime,
-        int & nDateYear,
-        int & nDateMonth,
-        int & nDateDay,
-        int & nDateHour
+	const std::string & strTimeUnits,
+	const std::string & strTimeCalendar,
+	double dTime,
+	int & nDateYear,
+	int & nDateMonth,
+	int & nDateDay,
+	int & nDateHour
 ) {
-        // Get calendar type
-        Time::CalendarType cal;
-        if ((strTimeCalendar.length() >= 6) &&
-                (strncmp(strTimeCalendar.c_str(), "noleap", 6) == 0)
-        ) {
-                cal = Time::CalendarNoLeap;
+	// Get calendar type
+	Time::CalendarType cal;
+	if ((strTimeCalendar.length() >= 6) &&
+		(strncmp(strTimeCalendar.c_str(), "noleap", 6) == 0)
+	) {
+		cal = Time::CalendarNoLeap;
 
-        } else if (
-                (strTimeCalendar.length() >= 8) &&
-                (strncmp(strTimeCalendar.c_str(), "standard", 8) == 0)
-        ) {
-                cal = Time::CalendarStandard;
+	} else if (
+		(strTimeCalendar.length() >= 8) &&
+		(strncmp(strTimeCalendar.c_str(), "standard", 8) == 0)
+	) {
+		cal = Time::CalendarStandard;
 
-        } else if (
-                (strTimeCalendar.length() >= 9) &&
-                (strncmp(strTimeCalendar.c_str(), "gregorian", 9) == 0)
-        ) {
-                cal = Time::CalendarStandard;
+	} else {
+		_EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
+	}
+/*
+	Time time(Time::CalendarStandard);
+	time.FromFormattedString("1800-01-01 00:00:00");
+	printf("%1.15e %i\n", 3600.0 * 1577832.0, (int)(3600.0 * 1577832.0));
+	time.AddHours(1577832);
 
-        } else {
-                _EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
-        }
-        std::cout<<"Time to string: calendar is "<<cal<<std::endl;
-       // Time format is "days since ..."
-        if ((strTimeUnits.length() >= 11) &&
-            (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
-        ) {
-                std::string strSubStr = strTimeUnits.substr(11);
-                std::cout<<"Debug (days since): strSubStr is "<<strSubStr<<std::endl;
-                Time time(cal);
-                time.FromFormattedString(strSubStr);
+	Announce("Time (YMDS): %i %i %i %i",
+			time.GetYear(),
+			time.GetMonth(),
+			time.GetDay(),
+			time.GetSecond());
 
-                int nDays = static_cast<int>(dTime);
-                time.AddDays(nDays);
+	_EXCEPTION();
+*/
+	// Time format is "days since ..."
+	if ((strTimeUnits.length() >= 11) &&
+	    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
+	) {
+		std::string strSubStr = strTimeUnits.substr(11);
+		Time time(cal);
+		time.FromFormattedString(strSubStr);
 
-                int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
-                std::cout<<"ParseTimeDouble (days) debug: nSeconds is "<<nSeconds<<std::endl;
-                time.AddSeconds(nSeconds);
+		int nDays = static_cast<int>(dTime);
+		time.AddDays(nDays);
 
-                Announce("Time (YMDS): %i %i %i %i",
-                                time.GetYear(),
-                                time.GetMonth(),
-                                time.GetDay(),
-                                time.GetSecond());
+		int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
+		time.AddSeconds(nSeconds);
 
-                nDateYear = time.GetYear();
-                nDateMonth = time.GetMonth();
-                nDateDay = time.GetDay();
-                nDateHour = time.GetSecond() / 3600;
+		Announce("Time (YMDS): %i %i %i %i",
+				time.GetYear(),
+				time.GetMonth(),
+				time.GetDay(),
+				time.GetSecond());
 
-                //printf("%s\n", strSubStr.c_str());
-        // Time format is "hours since ..."
-        } else if (
-            (strTimeUnits.length() >= 12) &&
-            (strncmp(strTimeUnits.c_str(), "hours since ", 12) == 0)
-        ) {
-                std::string strSubStr = strTimeUnits.substr(12);
-//                std::cout<<"Debug (hours since): strSubStr is "<<strSubStr<<std::endl;
-                Time time(cal);
-                time.FromFormattedString(strSubStr);
-                
-                std::cout<<"ParseTimeDouble (hours) debug: dTime is "<<dTime<<std::endl;
 
-                double testVal = dTime*3600.0;
-                std::cout<<"Value inside static cast is "<<testVal<<std::endl;
-          //      int nSeconds = static_cast<int>(std::fmod(dTime, 1.0) * 3600.0);
-                int nSeconds = static_cast<int>(dTime*3600.0);
-                std::cout<<"ParseTimeDouble debug: nSeconds is "<<nSeconds<<std::endl; 
-                time.AddSeconds(nSeconds);
+		nDateYear = time.GetYear();
+		nDateMonth = time.GetMonth();
+		nDateDay = time.GetDay();
+		nDateHour = time.GetSecond() / 3600;
 
-                Announce("Time (YMDS): %i %i %i %i",
-                                time.GetYear(),
-                                time.GetMonth(),
-                                time.GetDay(),
-                                time.GetSecond());
+		//printf("%s\n", strSubStr.c_str());
 
-                nDateYear = time.GetYear();
-                nDateMonth = time.GetMonth();
-                nDateDay = time.GetDay();
-                nDateHour = time.GetSecond() / 3600;
+	// Time format is "hours since ..."
+	} else if (
+	    (strTimeUnits.length() >= 12) &&
+	    (strncmp(strTimeUnits.c_str(), "hours since ", 12) == 0)
+	) {
+		std::string strSubStr = strTimeUnits.substr(12);
+		Time time(cal);
+		time.FromFormattedString(strSubStr);
 
-        } else {
-                _EXCEPTIONT("Unknown \"time::units\" format");
-        }
-        //_EXCEPTION();
+		time.AddHours(static_cast<int>(dTime));
+
+		Announce("Time (YMDS): %i %i %i %i",
+				time.GetYear(),
+				time.GetMonth(),
+				time.GetDay(),
+				time.GetSecond());
+
+		nDateYear = time.GetYear();
+		nDateMonth = time.GetMonth();
+		nDateDay = time.GetDay();
+		nDateHour = time.GetSecond() / 3600;
+
+		//printf("%s\n", strSubStr.c_str());
+
+	} else {
+		_EXCEPTIONT("Unknown \"time::units\" format");
+	}
+	//_EXCEPTION();
 }
 
 
