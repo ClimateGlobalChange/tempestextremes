@@ -280,7 +280,7 @@ int main(int argc, char **argv){
     << avgStoreVals[dateIndex][50][50]<<std::endl;
   dateIndex+=1;
   currArrIndex = 0;
-
+  double time1 = timeVec[0];
 /*//Check if new file needs to be opened
   if (tEnd<nTime){
     std::cout<<"Still have data left on current file. Will continue on."<<std::endl;
@@ -349,8 +349,9 @@ int main(int argc, char **argv){
 */
   std::cout<<"6: Entering while loop!"<<std::endl;
   std::cout<<"Before entering: start, end is "<<tStart<<", "<<tEnd<<std::endl;
+  DataVector<double>timeDebug(nTime);
   bool newFile = false;
-
+  double time2 = 0.0;
   while (x<nFiles){
     std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
       <<nTime<<std::endl;
@@ -386,6 +387,7 @@ int main(int argc, char **argv){
       std::cout<<"8: Closed "<<InputFiles[x]<<std::endl;
       x+=1;
       NcFile infile(InputFiles[x].c_str());
+      newFile = false;
       std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
       nTime = infile.get_dim("time")->size();
       nLat = infile.get_dim("lat")->size();
@@ -401,8 +403,11 @@ int main(int argc, char **argv){
       //Time variable
       NcVar *timeVal = infile.get_var("time");
       DataVector<double> timeVec(nTime);
+      DataVector<double> timeDebug(nTime);
       timeVal->set_cur((long) 0);
       timeVal->get(&(timeVec[0]),nTime);
+      timeVal->set_cur((long) 0);
+      timeVal->get(&(timeDebug[0]),nTime);
 
       leap = false;
 
@@ -421,12 +426,16 @@ int main(int argc, char **argv){
           leap = true;
         }
       }
+      time2 = timeVec[0];
       tStart = 0;
       tEnd = tStart + nSteps;
     }
+    std::cout<<"Checking existence of time Debug: "<<timeDebug[0]<<std::endl;
     std::cout<<"DEBUG for fill: tStart, tEnd are "<<tStart<<", "<<tEnd\
       <<". Now parsing dates for those times."<<std::endl;
+    double time3 = timeVec[0];
 
+    printf("Time 1: %10f Time 2: %10f Time 3: %10f\n",time1,time2,time3);
 
     int checkYear;
     int checkMonth;
@@ -441,6 +450,10 @@ int main(int argc, char **argv){
     for (int t=tStart; t<tEnd; t++){
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
+          if (a==50 && b==50){
+            std::cout<<"Adding value "<<IPVData[t][a][b]<<"; M/D is "\
+              <<checkMonth<<"/"<<checkDay<<std::endl;
+          }
           currFillData[currArrIndex][a][b] = IPVData[t][a][b];
         }
       }
