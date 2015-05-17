@@ -282,8 +282,8 @@ int main(int argc, char **argv){
     << avgStoreVals[dateIndex][50][50]<<std::endl;
   dateIndex+=1;
   currArrIndex = 0;
-  double time1 = timeVec[0];
-/*//Check if new file needs to be opened
+
+//Check if new file needs to be opened
   if (tEnd<nTime){
     std::cout<<"Still have data left on current file. Will continue on."<<std::endl;
     tStart = tEnd;
@@ -292,7 +292,7 @@ int main(int argc, char **argv){
   else if(tEnd>=nTime){
     std::cout<<"Reached end of previous file."<<std::endl;
     infile.close();
-    std::cout<<"6: Closed "<<InputFiles[x]<<std::endl;
+    std::cout<<"Closed "<<InputFiles[x]<<std::endl;
     x+=1;
     NcFile infile(InputFiles[x].c_str());
     std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
@@ -302,41 +302,28 @@ int main(int argc, char **argv){
 
     //IPV variable
     NcVar *inPV = infile.get_var("IPV");
-    DataMatrix3D<double> IPVData(nTime,nLat,nLon);
+    IPVData.Initialize(nTime,nLat,nLon);
 
     inPV->set_cur(0,0,0);
     inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
 
     //Time variable
     NcVar *timeVal = infile.get_var("time");
-   // DataVector<double> timeVec(nTime);
-    DataVector<double>timeDebug(nTime);
-    timeVal->set_cur((long) 0);
-   // timeVal->get(&(timeVec[0]),nTime);
-    timeVal->get(&(timeDebug[0]),nTime);
-    std::cout<<"Made time debug vector."<<std::endl;
-    testVal = 2005;
-    std::cout<<"7: Debug: parsing time values into string, before entering while loop. nTime is "\
-      <<nTime<<std::endl;
-    for (int t=0; t<nTime; t++){
-      ParseTimeDouble(strTimeUnits,strCalendar,timeVec[t],dateYear,\
-      dateMonth,dateDay,dateHour);
-    }
+    timeVec.Initialize(nTime);
 
+    timeVal->set_cur((long) 0);
+    timeVal->get(&(timeVec[0]),nTime);
 
     leap = false;
  
-   // ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0], dateYear,\
+    ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0], dateYear,\
       dateMonth, dateDay, dateHour);
-    ParseTimeDouble(strTimeUnits,strCalendar,timeDebug[0],dateYear,\
-      dateMonth,dateDay,dateHour);
+
     if (strCalendar!="noleap" && dateMonth<=2){
       //Check whether file contains a Feb 29
       std::cout<<"Checking leap year status."<<std::endl;
-//      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
+      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
         leapMonth, leapDay, leapHour);
-        ParseTimeDouble(strTimeUnits,strCalendar,timeDebug[nTime-1],leapYear,\
-          leapMonth,leapDay,leapHour);
       if ((leapMonth==2 && leapDay==29) || (dateMonth==2 && leapMonth==3)){
       //Check when parsing the indices
         std::cout<<"May contain leap day. Will check."<<std::endl;
@@ -345,149 +332,153 @@ int main(int argc, char **argv){
     }
     tStart = 0;
     tEnd = tStart + nSteps;
-   // time1 = timeVec[0];
-    time1 = timeDebug[0];
   }
-*/
+
   std::cout<<"6: Entering while loop!"<<std::endl;
   std::cout<<"Before entering: start, end is "<<tStart<<", "<<tEnd<<std::endl;
  // DataVector<double>timeDebug(nTime);
   bool newFile = false;
-  double time2 = 0.0;
-  while (x<(nFiles-1)){
+
+  while (x<nFiles){
     std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
       <<nTime<<std::endl;
-    //Check tEnd value
+
+    if (leap==true){
+      std::cout<<"Checking date for leap day."<<std::endl;
+      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[tStart], leapYear,\
+        leapMonth, leapDay, leapHour);
+      if (leapMonth==2 && leapDay ==29){
+        tStart = tEnd;
+        tEnd = tStart + nSteps;
+        std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
+          <<tStart<<" and "<<tEnd<<std::endl;
+      } 
+    }
     if (tEnd>=nTime){
       newFile = true;
     }
-    else{
-      std::cout<<"Still have data left on current file. Will continue on."<<std::endl;
-      tStart = tEnd;
-      tEnd = tStart + nSteps;
-      //Check for leap year
-      if (leap==true){
-        std::cout<<"Checking date for leap day."<<std::endl;
-        ParseTimeDouble(strTimeUnits, strCalendar, timeVec[tStart], leapYear,\
-          leapMonth, leapDay, leapHour);
-        if (leapMonth==2 && leapDay ==29){
-          tStart = tEnd;
-          tEnd = tStart + nSteps;
-          std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
-            <<tStart<<" and "<<tEnd<<std::endl;
-        } 
+    if (newFile==false){
+      std::cout<<"DEBUG for fill: tStart, tEnd are "<<tStart<<", "<<tEnd\
+        <<". Now parsing dates for those times."<<std::endl;
+
+
+      for (int t=tStart; t<tEnd; t++){
+        for (int a=0; a<nLat; a++){
+          for (int b=0; b<nLon; b++){
+            currFillData[currArrIndex][a][b] = IPVData[t][a][b];
+          }
+        }
+        currArrIndex+=1;
       }
-      //Re-check tEnd
+      std::cout<<"Filled array for "<<currArrIndex-1<<std::endl;
+      //check for periodic boundary condition for 31 day array
+      if (currArrIndex>=arrLen){
+        std::cout<<"Periodic boundary: 31 day length met or exceeded."<<std::endl;
+        currArrIndex-=arrLen;
+        std::cout<<"currArrIndex is now "<<currArrIndex<<std::endl;
+      }
+   //Fill date with sum of new array values
+      for (int t=0; t<arrLen; t++){
+        for (int a=0; a<nLat; a++){
+          for (int b=0; b<nLon; b++){
+            avgStoreVals[dateIndex][a][b] += currFillData[t][a][b];
+          }
+        }
+      }
+      //increase count
+      for (int a=0; a<nLat; a++){
+        for (int b=0; b<nLon; b++){
+          avgCounts[dateIndex][a][b] += 1.0;
+        }
+      }
+      dateIndex+=1;
+      //periodic boundary condition for year
+      if(dateIndex>=yearLen){
+        dateIndex-=yearLen;
+        std::cout<<"Periodic boundary: end of year array reached. dateIndex is now "\
+          <<dateIndex<<std::endl;
+      }
+
+      //Check tEnd value
       if (tEnd>=nTime){
         newFile = true;
       }
+      else{
+        std::cout<<"Still have data left on current file. Will continue on."<<std::endl;
+        tStart = tEnd;
+        tEnd = tStart + nSteps;
+        //Check for leap year
+        if (leap==true){
+          std::cout<<"Checking date for leap day."<<std::endl;
+          ParseTimeDouble(strTimeUnits, strCalendar, timeVec[tStart], leapYear,\
+            leapMonth, leapDay, leapHour);
+          if (leapMonth==2 && leapDay ==29){
+            tStart = tEnd;
+            tEnd = tStart + nSteps;
+            std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
+              <<tStart<<" and "<<tEnd<<std::endl;
+          } 
+        }
+        //Re-check tEnd
+        if (tEnd>=nTime){
+          newFile = true;
+        }
+      }
     }
-
-    if(newFile==true){
+    else if(newFile==true){
       std::cout<<"Reached end of file."<<std::endl;
       infile.close();
       std::cout<<"8: Closed "<<InputFiles[x]<<std::endl;
       x+=1;
-      NcFile infile(InputFiles[x].c_str());
-      newFile = false;
-      std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
-      nTime = infile.get_dim("time")->size();
-      nLat = infile.get_dim("lat")->size();
-      nLon = infile.get_dim("lon")->size();
+      if (x<(nFiles-1)){
+
+        NcFile infile(InputFiles[x].c_str());
+        newFile = false;
+        std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
+        nTime = infile.get_dim("time")->size();
+        nLat = infile.get_dim("lat")->size();
+        nLon = infile.get_dim("lon")->size();
 
       //IPV variable
-      NcVar *inPV = infile.get_var("IPV");
+        NcVar *inPV = infile.get_var("IPV");
       //DataMatrix3D<double> IPVData(nTime,nLat,nLon);
-      IPVData.Initialize(nTime, nLat, nLon);
+        IPVData.Initialize(nTime, nLat, nLon);
 
-      inPV->set_cur(0,0,0);
-      inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
+        inPV->set_cur(0,0,0);
+        inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
 
       //Time variable
-      NcVar *timeVal = infile.get_var("time");
+        NcVar *timeVal = infile.get_var("time");
       //DataVector<double> timeVec(nTime);
       //DataVector<double> timeDebug(nTime);
-      timeVec.Initialize(nTime);
+        timeVec.Initialize(nTime);
      // timeDebug.Initialize(nTime);
-      timeVal->set_cur((long) 0);
-      timeVal->get(&(timeVec[0]),nTime);
+        timeVal->set_cur((long) 0);
+        timeVal->get(&(timeVec[0]),nTime);
      // timeVal->set_cur((long) 0);
      // timeVal->get(&(timeDebug[0]),nTime);
 
-      leap = false;
+        leap = false;
 
-      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0], dateYear,\
-        dateMonth, dateDay, dateHour);
+        ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0], dateYear,\
+          dateMonth, dateDay, dateHour);
 
-      if (strCalendar!="noleap" && dateMonth<=2){
+        if (strCalendar!="noleap" && dateMonth<=2){
         //Check whether file contains a Feb 29
-        std::cout<<"Checking leap year status."<<std::endl;
-        ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
+          std::cout<<"Checking leap year status."<<std::endl;
+          ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
           leapMonth, leapDay, leapHour);
 
-        if ((leapMonth==2 && leapDay==29) || (dateMonth==2 && leapMonth==3)){
+          if ((leapMonth==2 && leapDay==29) || (dateMonth==2 && leapMonth==3)){
         //Check when parsing the indices
-          std::cout<<"May contain leap day. Will check."<<std::endl;
-          leap = true;
+            std::cout<<"May contain leap day. Will check."<<std::endl;
+            leap = true;
+          }
         }
+        tStart = 0;
+        tEnd = tStart + nSteps;
       }
-      time2 = timeVec[0];
-      tStart = 0;
-      tEnd = tStart + nSteps;
-    }
-  //  std::cout<<"Checking existence of time Debug: "<<timeDebug[0]<<std::endl;
-    std::cout<<"DEBUG for fill: tStart, tEnd are "<<tStart<<", "<<tEnd\
-      <<". Now parsing dates for those times."<<std::endl;
-    double time3 = timeVec[0];
-
- /*   printf("Time 1: %10f Time 2: %10f Time 3: %10f\n",time1,time2,time3);
-
-    int checkYear;
-    int checkMonth;
-    int checkDay;
-    int checkHour;
-    ParseTimeDouble(strTimeUnits,strCalendar,timeVec[tStart],checkYear,\
-      checkMonth,checkDay,checkHour);
-    ParseTimeDouble(strTimeUnits,strCalendar,timeVec[tEnd],checkYear,\
-      checkMonth,checkDay,checkHour);*/
-
-
-    for (int t=tStart; t<tEnd; t++){
-      for (int a=0; a<nLat; a++){
-        for (int b=0; b<nLon; b++){
-          currFillData[currArrIndex][a][b] = IPVData[t][a][b];
-        }
-      }
-      currArrIndex+=1;
-    }
-    std::cout<<"Filled array for "<<currArrIndex-1<<std::endl;
-    //check for periodic boundary condition for 31 day array
-    if (currArrIndex>=arrLen){
-      std::cout<<"Periodic boundary: 31 day length met or exceeded."<<std::endl;
-      currArrIndex-=arrLen;
-      std::cout<<"currArrIndex is now "<<currArrIndex<<std::endl;
-    }
- //Fill date with sum of new array values
-    for (int t=0; t<arrLen; t++){
-      for (int a=0; a<nLat; a++){
-        for (int b=0; b<nLon; b++){
-          avgStoreVals[dateIndex][a][b] += currFillData[t][a][b];
-        }
-      }
-    }
-    //increase count
-    for (int a=0; a<nLat; a++){
-      for (int b=0; b<nLon; b++){
-        avgCounts[dateIndex][a][b] += 1.0;
-      }
-    }
-    dateIndex+=1;
-    //periodic boundary condition for year
-    if(dateIndex>=yearLen){
-      dateIndex-=yearLen;
-      std::cout<<"Periodic boundary: end of year array reached. dateIndex is now "\
-        <<dateIndex<<std::endl;
-    }
+    }    
   }
 
  
