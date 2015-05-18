@@ -114,7 +114,12 @@ void ParseTimeDouble(
 	) {
 		cal = Time::CalendarStandard;
 
-	} else {
+	} else if (
+                (strTimeCalendar.length() >=9) &&
+                (strncmp(strTimeCalendar.c_str(), "gregorian",9)==0)
+        ) {
+                cal = Time::CalendarStandard;
+        } else {
 		_EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
 	}
 /*

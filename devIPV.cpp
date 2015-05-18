@@ -54,7 +54,14 @@ void calcDevs(bool leap,
   std::string strTimeUnits = inTime->get_att("units")->as_string(0);
   std::string strCalendar = inTime->get_att("calendar")->as_string(0);
 
-  double tRes = timeVec[1]-timeVec[0];
+  double tRes;
+  if ((strTimeUnits.length() >= 11) && \
+    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
+    tRes = timeVec[1]-timeVec[0];
+  }
+  else{
+    tRes = (timeVec[1]-timeVec[0])/24.0;
+  }
   int nSteps = 1/tRes;
 
   std::cout<<"Time resolution is "<<tRes<< " and steps per day is "<<nSteps<<std::endl;
@@ -107,16 +114,22 @@ void calcDevs(bool leap,
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
         leapMonth, leapDay, leapHour);
       if (leapMonth==2 && leapDay == 29){
-        while (leapMonth ==2 && leapDay == 29){
+       /* while (leapMonth ==2 && leapDay == 29){
           std::cout<<"Leap day! Skipping this step."<<std::endl;
           t++;
           ParseTimeDouble(strTimeUnits,strCalendar, timeVec[t],leapYear,\
             leapMonth,leapDay,leapHour);
-        }
+        }*/
+        std::cout<<"Leap day! Skipping day."<<std::endl;
+        t+=nSteps;
       }      
     }
+    if (t>=nTime){
+      std::cout<<"t equals or exceeds nTime. Leaving loop."<<std::endl;
+      break;
+    }
     int nDayIncrease = d/nSteps;
-  //  std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
+    std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
     int currAvgIndex = startAvgIndex + nDayIncrease;
     if (currAvgIndex>364){
       currAvgIndex-=365;
@@ -136,7 +149,7 @@ void calcDevs(bool leap,
   std::cout<<"About to implement smoothing."<<std::endl;
 
   //implement 2-day smoothing
-  for (int t=0; t<nTime; t++){
+  for (int t=0; t<nOutTime; t++){
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
         if (t<2*nSteps){
@@ -281,7 +294,16 @@ int main(int argc, char **argv){
       int day = DayInYear(dateMonth,dateDay);
       int startIndex = day-1;
 
-      int nSteps = int(1.0/(timeVals[1]-timeVals[0]));
+    //  int nSteps = int(1.0/(timeVals[1]-timeVals[0]));
+      double tRes;
+      if ((strTimeUnits.length() >= 11) && \
+        (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
+        tRes = timeVals[1]-timeVals[0];
+      }
+      else{
+        tRes = (timeVals[1]-timeVals[0])/24.0;
+      }
+      int nSteps = 1/tRes;
      
       int leapYear = 0;
       int leapMonth = 0;
