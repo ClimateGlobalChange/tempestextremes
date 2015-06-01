@@ -5,7 +5,7 @@
 ///    \version March 24, 2015
 
 #include "interpolate.h"
-#include "CLIVAR_block_utilities.h"
+#include "blockingUtilities.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
 #include "DataVector.h"

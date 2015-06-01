@@ -21,13 +21,13 @@ LDFILES= -lnetcdf -lnetcdf_c++ -L.
 ######################################
 #ADDED MY FILES HERE!
 ######################################
-CLIVAR_FILES = CLIVAR_blocks.cpp Announce.cpp NetCDFUtilities.cpp CLIVAR_block_utilities.cpp interpolate.cpp TimeObj.cpp
+CLIVAR_FILES = blockingPV.cpp Announce.cpp NetCDFUtilities.cpp blockingUtilities.cpp interpolate.cpp TimeObj.cpp
 CLIVAR_CFILES =
 
-BLOCK_FILES = moving_avg.cpp Announce.cpp NetCDFUtilities.cpp TimeObj.cpp  CLIVAR_block_utilities.cpp 
+BLOCK_FILES = blockingAvg.cpp Announce.cpp NetCDFUtilities.cpp TimeObj.cpp  blockingUtilities.cpp 
 BLOCK_CFILES = 
 
-DEV_FILES = devIPV.cpp Announce.cpp NetCDFUtilities.cpp CLIVAR_block_utilities.cpp TimeObj.cpp
+DEV_FILES = blockingDevs.cpp Announce.cpp NetCDFUtilities.cpp blockingUtilities.cpp TimeObj.cpp
 DEV_CFILES = 
 ######################################
 
@@ -52,7 +52,7 @@ include Make.defs
 ##
 ## Build instructions
 ##
-all: StitchNodes StitchBlobs DetectCyclones DensityNodes CLIVAR_blocks AvgIPV DevIPV
+all: StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs
 
 StitchNodes: $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
@@ -66,18 +66,18 @@ DetectCyclones: $(DETECTCYCLONES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DETECTCYCLONES_C
 DensityNodes: $(DENSITYNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENSITYNODES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(DENSITYNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENSITYNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 
-CLIVAR_blocks: $(CLIVAR_FILES:%.cpp=$(BUILDDIR)/%.o) $(CLIVAR_CFILES:%.c=$(BUILDDIR)/%.o)
+blockingPV: $(CLIVAR_FILES:%.cpp=$(BUILDDIR)/%.o) $(CLIVAR_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(CLIVAR_FILES:%.cpp=$(BUILDDIR)/%.o) $(CLIVAR_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 
-AvgIPV: $(BLOCK_FILES:%.cpp=$(BUILDDIR)/%.o) $(BLOCK_CFILES:%.c=$(BUILDDIR)/%.o)
+blockingAvg: $(BLOCK_FILES:%.cpp=$(BUILDDIR)/%.o) $(BLOCK_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(BLOCK_FILES:%.cpp=$(BUILDDIR)/%.o) $(BLOCK_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
-DevIPV: $(DEV_FILES:%.cpp=$(BUILDDIR)/%.o) $(DEV_CFILES:%.c=$(BUILDDIR)/%.o)
+blockingDevs: $(DEV_FILES:%.cpp=$(BUILDDIR)/%.o) $(DEV_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(DEV_FILES:%.cpp=$(BUILDDIR)/%.o) $(DEV_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 
 ## Clean
 ##
 clean:
-	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes CLIVAR_blocks AvgIPV DevIPV
+	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs
 	rm -rf $(DEPDIR)
 	rm -rf $(BUILDDIR)
 
