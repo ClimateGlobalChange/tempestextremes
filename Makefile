@@ -29,6 +29,9 @@ BLOCK_CFILES =
 
 DEV_FILES = blockingDevs.cpp Announce.cpp NetCDFUtilities.cpp blockingUtilities.cpp TimeObj.cpp
 DEV_CFILES = 
+
+DENS_FILES = densityCalculations.cpp Announce.cpp NetCDFUtilities.cpp blockingUtilities.cpp
+DENS_CFILES =  
 ######################################
 
 STITCHNODES_FILES= StitchNodes.cpp Announce.cpp
@@ -73,11 +76,12 @@ blockingAvg: $(BLOCK_FILES:%.cpp=$(BUILDDIR)/%.o) $(BLOCK_CFILES:%.c=$(BUILDDIR)
 	$(CC) $(LDFLAGS) -o $@ $(BLOCK_FILES:%.cpp=$(BUILDDIR)/%.o) $(BLOCK_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 blockingDevs: $(DEV_FILES:%.cpp=$(BUILDDIR)/%.o) $(DEV_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(DEV_FILES:%.cpp=$(BUILDDIR)/%.o) $(DEV_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
-
+blockingDensity: $(DENS_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENS_CFILES:%.c=$(BUILDDIR)/%.o)
+	$(CC) $(LDFLAGS) -o $@ $(DENS_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENS_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 ## Clean
 ##
 clean:
-	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs
+	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs blockingDensity
 	rm -rf $(DEPDIR)
 	rm -rf $(BUILDDIR)
 
