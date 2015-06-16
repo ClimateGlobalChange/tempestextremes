@@ -30,7 +30,7 @@ BLOCK_CFILES =
 DEV_FILES = blockingDevs.cpp Announce.cpp NetCDFUtilities.cpp blockingUtilities.cpp TimeObj.cpp
 DEV_CFILES = 
 
-DENS_FILES = densityCalculations.cpp Announce.cpp NetCDFUtilities.cpp blockingUtilities.cpp
+DENS_FILES = densityCalculations.cpp Announce.cpp NetCDFUtilities.cpp blockingUtilities.cpp TimeObj.cpp
 DENS_CFILES =  
 ######################################
 
@@ -55,7 +55,7 @@ include Make.defs
 ##
 ## Build instructions
 ##
-all: StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs
+all: StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs blockingDensity
 
 StitchNodes: $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
