@@ -1,8 +1,8 @@
 /////////////////////////////////////////
 ///
-///    \file CLIVAR_blocks.cpp
+///    \file blockingPV.cpp
 //     \author Marielle Pinheiro
-///    \version February 3, 2015
+///    \version June 12, 2015
 ///
 
 
@@ -60,7 +60,7 @@ int main(int argc, char **argv){
      strfile_out = strfile_out.replace(strfile_out.end()-3,strfile_out.end(),"_integ.nc");
   }
 
-  //If variables need interpolating, do this first!i  
+  //If variables need interpolating, do this first!  
   if (interp_check) {
     if (strfile_2d == "") {
        _EXCEPTIONT("No input file (--in2d) specified");
@@ -86,10 +86,6 @@ int main(int argc, char **argv){
     readin_out.close();
     strfile_in = interp_file;
   }
- /* else{
-    //Read input file
-    NcFile readin(strfile_in.c_str());
-  }*/
 
   NcFile readin(strfile_in.c_str());
   if (!readin.is_valid()) {
@@ -118,16 +114,6 @@ int main(int argc, char **argv){
   NcVar *uvar = readin.get_var("U");
   NcVar *vvar = readin.get_var("V");
 
-  //DEBUG: Check that variable values are the same
-//  DataMatrix4D<double>UMat(time_len,lev_len,lat_len,lon_len);
-//  DataMatrix4D<double>VMat(time_len,lev_len,lat_len,lon_len);
-
-//  uvar->set_cur(0,0,0,0);
-//  uvar->get(&(UMat[0][0][0][0]),time_len,lev_len,lat_len,lon_len);
-
-//  vvar->set_cur(0,0,0,0);
-//  vvar->get(&(VMat[0][0][0][0]),time_len,lev_len,lat_len,lon_len);
-
   //Create output file
   NcFile file_out(strfile_out.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
 
@@ -153,7 +139,6 @@ int main(int argc, char **argv){
     DataVector<double> levPa(lev_len);
     for (int p=0; p<lev_len; p++){
       levPa[p] = levhPa[p]*100.0;
-      std::cout<<"Converting from hPa to Pa; new value is "<<levPa[p]<<std::endl;
     }
     lev_vals->set_cur((long) 0);
     lev_vals->put(&(levPa[0]),lev_len);
@@ -182,19 +167,13 @@ int main(int argc, char **argv){
 
   pv_vars_calc(lat_vals, lon_vals, lev_vals, lat_res, lon_res,\
     dphi, dlambda, dp, coriolis, cosphi);
-//  std::cout<<"dphi: "<<dphi<<" dlambda: "<<dlambda<<" dp: "<<dp<<std::endl;
-//  std::cout<<"After vars calc check: coriolis and cosphi at 10 are "<<coriolis[10]<<\
-    " and "<<cosphi[10]<<std::endl;
-  //Calculate PT 
 
+//Calculate PT
   DataMatrix4D<double> PTVar(time_len,lev_len,lat_len,lon_len);
-//  NcVar *pt_var = file_out.add_var("PT", ncDouble, out_time, out_plev, out_lat, out_lon);
   PT_calc(temp, lev_vals, PTVar);
 
   //Calculate relative vorticity and add to outfile
-
   DataMatrix4D<double>RVVar(time_len,lev_len,lat_len,lon_len);
-//  NcVar *rvort_var = file_out.add_var("RV", ncDouble, out_time, out_plev, out_lat, out_lon);
   rVort_calc(uvar, vvar, dphi, dlambda, cosphi, RVVar);
 
   NcVar *pv_var = file_out.add_var("PV", ncDouble, out_time, out_plev, out_lat, out_lon);

@@ -1,9 +1,8 @@
 /////////////////////////////////////
-///     \file moving_avg.cpp
+///     \file blockingAvg.cpp
 ///     \author Marielle Pinheiro
 ///     \version March 26, 2015
 
-//#include "StitchBlobs.cpp"
 #include "blockingUtilities.h"
 #include "CommandLine.h"
 #include "Exception.h"
@@ -43,15 +42,13 @@ int main(int argc, char **argv){
   GetInputFileList(fileList, InputFiles);
   int nFiles = InputFiles.size();
 
-  std::cout << "1: Opening first file."<<std::endl;
+//  std::cout << "1: Opening first file."<<std::endl;
 
   //Open first file 
   NcFile infile(InputFiles[0].c_str());
   int nTime = infile.get_dim("time")->size();
   int nLat = infile.get_dim("lat")->size();
   int nLon = infile.get_dim("lon")->size();
-
-  int testVal = 2001;
 
   //IPV variable and data matrix
   NcVar *inPV = infile.get_var("IPV");
@@ -83,14 +80,14 @@ int main(int argc, char **argv){
     std::cout<< "Changing calendar type to standard."<<std::endl;
     strCalendar = "standard";
   }
-  std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
+//  std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
 
   double tRes;
   if ((strTimeUnits.length() >= 11) && \
     (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
     tRes = timeVec[1]-timeVec[0];
   }
-  else{
+  else {
     tRes = (timeVec[1]-timeVec[0])/24.0;
   }
 
@@ -114,7 +111,7 @@ int main(int argc, char **argv){
 
   int day = DayInYear(dateMonth,dateDay);
   int dateIndex = day + 15;
-  std::cout<<"2: Day # "<<day<<" in the year (date index "<<dateIndex<<")"<<std::endl;
+//  std::cout<<"Day # "<<day<<" in the year (date index "<<dateIndex<<")"<<std::endl;
 
   int leapYear=0;
   int leapMonth=0;
@@ -155,7 +152,7 @@ int main(int argc, char **argv){
   else{
     tEnd = nTime;
   }
-  std::cout<<"3: tStart: "<<tStart<<" tEnd: "<<tEnd<<std::endl;
+//  std::cout<<"3: tStart: "<<tStart<<" tEnd: "<<tEnd<<std::endl;
 
   //First while loop: open files and fill until 31 days array full
   while (currArrIndex<arrLen){
@@ -181,12 +178,12 @@ int main(int argc, char **argv){
       currArrIndex++;
     }
 
-    std::cout<<"currArrIndex is "<<currArrIndex<<" and arrLen is "<<arrLen<<std::endl;
+  //  std::cout<<"currArrIndex is "<<currArrIndex<<" and arrLen is "<<arrLen<<std::endl;
     if (currArrIndex<arrLen){
       infile.close();
       //Open new file
       x+=1;
-      std::cout<<"4: Opening new file "<<InputFiles[x]<<std::endl;
+  //    std::cout<<"4: Opening new file "<<InputFiles[x]<<std::endl;
       NcFile infile(InputFiles[x].c_str());
       nTime = infile.get_dim("time")->size();
       nLat = infile.get_dim("lat")->size();
@@ -218,7 +215,7 @@ int main(int argc, char **argv){
       }
 
 
-      std::cout<<"Check: difference between old end time and new start time is "\
+    //  std::cout<<"Check: difference between old end time and new start time is "\
         <<contCheck<<" and tRes is "<< tRes<<std::endl;
       if (contCheck>tRes){
         _EXCEPTIONT("New file is not continuous with previous file."); 
@@ -250,7 +247,7 @@ int main(int argc, char **argv){
      
       int tCheck = currArrIndex + nTime;
 
-      std::cout<<"currArrIndex is "<<currArrIndex<<" and tCheck is "<<tCheck<<std::endl;
+  //    std::cout<<"currArrIndex is "<<currArrIndex<<" and tCheck is "<<tCheck<<std::endl;
       if (tCheck > arrLen){
         tEnd = arrLen-currArrIndex;
       }
@@ -261,8 +258,8 @@ int main(int argc, char **argv){
     }
     
   }
-  std::cout<<"tStart currently "<<tStart<<" and tEnd "<<tEnd<<std::endl;
-  std::cout<<"5: Finished filling first array. Now averaging and saving to year array."<<std::endl;
+//  std::cout<<"tStart currently "<<tStart<<" and tEnd "<<tEnd<<std::endl;
+//  std::cout<<"5: Finished filling first array. Now averaging and saving to year array."<<std::endl;
   //Fill yearly array with sum of 31 days
   for (int t=0; t<arrLen; t++){
     for (int a=0; a<nLat; a++){
@@ -278,7 +275,7 @@ int main(int argc, char **argv){
     }
   }
   
-  std::cout<<"Filled for date index "<<dateIndex<<"; Value at 50,50 is "\
+//  std::cout<<"Filled for date index "<<dateIndex<<"; Value at 50,50 is "\
     << avgStoreVals[dateIndex][50][50]<<std::endl;
   dateIndex+=1;
   currArrIndex = 0;
@@ -295,7 +292,7 @@ int main(int argc, char **argv){
     std::cout<<"Closed "<<InputFiles[x]<<std::endl;
     x+=1;
     NcFile infile(InputFiles[x].c_str());
-    std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
+  //  std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
     nTime = infile.get_dim("time")->size();
     nLat = infile.get_dim("lat")->size();
     nLon = infile.get_dim("lon")->size();
@@ -334,13 +331,13 @@ int main(int argc, char **argv){
     tEnd = tStart + nSteps;
   }
 
-  std::cout<<"6: Entering while loop!"<<std::endl;
-  std::cout<<"Before entering: start, end is "<<tStart<<", "<<tEnd<<std::endl;
+//  std::cout<<"6: Entering while loop!"<<std::endl;
+//  std::cout<<"Before entering: start, end is "<<tStart<<", "<<tEnd<<std::endl;
  // DataVector<double>timeDebug(nTime);
   bool newFile = false;
 
   while (x<nFiles){
-    std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
+  //  std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
       <<nTime<<std::endl;
 
     if (leap==true){
@@ -358,7 +355,7 @@ int main(int argc, char **argv){
       newFile = true;
     }
     if (newFile==false){
-      std::cout<<"DEBUG for fill: tStart, tEnd are "<<tStart<<", "<<tEnd\
+    //  std::cout<<"DEBUG for fill: tStart, tEnd are "<<tStart<<", "<<tEnd\
         <<". Now parsing dates for those times."<<std::endl;
 
 

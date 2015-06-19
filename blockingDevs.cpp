@@ -33,9 +33,12 @@ void calcDevs(bool leap,
               NcVar *outTime,
               double PVAnom){
 
-  int nTime = inIPV->get_dim(0)->size();
-  int nLat = inIPV->get_dim(1)->size();
-  int nLon = inIPV->get_dim(2)->size();
+  int nTime,nLat,nLon,nSteps,avgDay,nOutTime;
+  double tRes;
+
+  nTime = inIPV->get_dim(0)->size();
+  nLat = inIPV->get_dim(1)->size();
+  nLon = inIPV->get_dim(2)->size();
 
 //keep sign consistent!
   if (PVAnom<0){
@@ -54,7 +57,6 @@ void calcDevs(bool leap,
   std::string strTimeUnits = inTime->get_att("units")->as_string(0);
   std::string strCalendar = inTime->get_att("calendar")->as_string(0);
 
-  double tRes;
   if ((strTimeUnits.length() >= 11) && \
     (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
     tRes = timeVec[1]-timeVec[0];
@@ -62,12 +64,10 @@ void calcDevs(bool leap,
   else{
     tRes = (timeVec[1]-timeVec[0])/24.0;
   }
-  int nSteps = 1/tRes;
-
-  std::cout<<"Time resolution is "<<tRes<< " and steps per day is "<<nSteps<<std::endl;
+  nSteps = 1/tRes;
  
 //avg IPV
-  int avgDay = avgIPV->get_dim(0)->size();
+  avgDay = avgIPV->get_dim(0)->size();
   DataMatrix3D<double> avgMat(avgDay,nLat,nLon);
   avgIPV->set_cur(0,0,0);
   avgIPV->get(&(avgMat[0][0][0]),avgDay,nLat,nLon);
@@ -79,7 +79,6 @@ void calcDevs(bool leap,
 
 //Matrix for output data
 //Eliminate one day if contains Feb 29
-  int nOutTime;
   if (leap){
     nOutTime = nTime-nSteps;
     std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
@@ -93,12 +92,8 @@ void calcDevs(bool leap,
 
 //Number of days in IPV
   int nDays = nTime*tRes;
-
   std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
 
-//  int startAvgIndex = (int(timeVec[0])%365)-1;
-//  std::cout<<"first time value is "<<timeVec[0]<<", modulo is "<<int(timeVec[0])%365<<std::endl;
-//  std::cout<<"Starting index for average file is "<<startAvgIndex<<std::endl;
 
 //Deal with skipped days          
   int d=0;
@@ -147,6 +142,8 @@ void calcDevs(bool leap,
   outTime->put(&(newTime[0]),nOutTime);
 
   std::cout<<"About to implement smoothing."<<std::endl;
+  double div = (double) 2*nSteps;
+  double invDiv = 1.0/div;
 
   //implement 2-day smoothing
   for (int t=0; t<nOutTime; t++){
@@ -159,7 +156,7 @@ void calcDevs(bool leap,
           for (int n=0; n<2*nSteps; n++){
             aDevMat[t][a][b]+=devMat[t-n][a][b];
           }
-          aDevMat[t][a][b] = aDevMat[t][a][b]/float(2*nSteps); 
+          aDevMat[t][a][b] = aDevMat[t][a][b]*invDiv; 
         }
       }
     }
@@ -180,19 +177,20 @@ void calcDevs(bool leap,
   lat->get(&(latVec[0]),nLat);
 
   DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
-
+  double invAnom = 1.0/PVAnom;
+  double divDev,pos,neg;
   for (int t=0; t<nOutTime; t++){
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
-        double divDev = aDevMat[t][a][b]/PVAnom;
+        divDev = aDevMat[t][a][b]*invAnom;
         //SH: positive anomalies
         if (latVec[a]<0){
-          double pos = (divDev+std::fabs(divDev))/2.0;
+          pos = (divDev+std::fabs(divDev))*0.5;
           posIntDevs[t][a][b] = int(pos);
         }
         //NH: negative anomalies
         else if (latVec[a]>=0){
-          double neg = (divDev-std::fabs(divDev))/2.0;
+          neg = (divDev-std::fabs(divDev))*0.5;
           posIntDevs[t][a][b] = -int(neg);
         }
       }
@@ -224,21 +222,24 @@ int main(int argc, char **argv){
     EndCommandLine(argv);
     AnnounceBanner();
 
+   int nFiles,avgTime,nTime,nLat,nLon;
+   double anomVal = 1.3*std::pow(10,-6);
+
    //Create list of input files
     std::vector<std::string> InputFiles;
     GetInputFileList(fileList, InputFiles);
-    int nFiles = InputFiles.size();
+    nFiles = InputFiles.size();
 
     //Open averages file
     NcFile avgFile(avgName.c_str());
 
     //time data (average)
-    int avgTime = avgFile.get_dim("time")->size();
+    avgTime = avgFile.get_dim("time")->size();
     NcVar *avgTimeVals = avgFile.get_var("time");
     
     //averaged IPV
     NcVar *AIPVData = avgFile.get_var("AIPV");
-    double anomVal = 1.3*std::pow(10,-6);
+
     //Open IPV files
 
     for (int x=0; x<nFiles; x++){
@@ -251,9 +252,9 @@ int main(int argc, char **argv){
       NcDim *latDim = infile.get_dim("lat");
       NcDim *lonDim = infile.get_dim("lon");
       
-      int nTime = tDim->size();
-      int nLat = latDim->size();
-      int nLon = lonDim->size();
+      nTime = tDim->size();
+      nLat = latDim->size();
+      nLon = lonDim->size();
 
       NcVar *inTime = infile.get_var("time");
       NcVar *inLat = infile.get_var("lat");
