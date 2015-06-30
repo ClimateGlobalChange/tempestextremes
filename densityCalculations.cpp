@@ -100,13 +100,11 @@ int main(int argc, char ** argv){
     NcVar * lonVar = readin.get_var("lon");
 
     NcVar * inVar = readin.get_var(varName.c_str());
-  
-    NcFile readout(outFile.c_str());
+    NcFile readout(outFile.c_str(),NcFile::Replace, NULL,0,NcFile::Offset64Bits);
     NcDim * outLat = readout.add_dim("lat", latLen);
     NcDim * outLon = readout.add_dim("lon", lonLen);
     NcVar * outLatVar = readout.add_var("lat",ncDouble,outLat);
     NcVar * outLonVar = readout.add_var("lon",ncDouble,outLon);
-
     copy_dim_var(latVar,outLatVar);
     copy_dim_var(lonVar,outLonVar);
 

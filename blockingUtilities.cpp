@@ -289,7 +289,6 @@ void copy_dim_var(
   DataVector<double> inVec(varLen);
   inVar->set_cur((long) 0);
   inVar->get(&(inVec[0]), varLen);
-
 //Copy data to new outgoing variable
   outVar->set_cur((long) 0);
   outVar->put(&(inVec[0]), varLen);
