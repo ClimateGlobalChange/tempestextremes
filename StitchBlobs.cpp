@@ -276,20 +276,22 @@ void GetAllTimes(
 			_EXCEPTIONT("No dimension \"time\" found in input file");
 		}
 
-		NcVar * varTime = ncFile.get_var("time");
-		if (varTime == NULL) {
-			_EXCEPTIONT("No variable \"time\" found in input file");
-		}
-
 		int nTime = dimTime->size();
 
-		DataVector<double> dTime;
-		dTime.Initialize(nTime);
+		NcVar * varTime = ncFile.get_var("time");
+		if (varTime == NULL) {
+			for (int t = 0; t < nTime; t++) {
+				vecTimes.push_back(static_cast<double>(t));
+			}
 
-		varTime->get(dTime, nTime);
+		} else {
+			DataVector<double> dTime;
+			dTime.Initialize(nTime);
 
-		for (int t = 0; t < nTime; t++) {
-			vecTimes.push_back(dTime[t]);
+			varTime->get(dTime, nTime);
+			for (int t = 0; t < nTime; t++) {
+				vecTimes.push_back(dTime[t]);
+			}
 		}
 	}
 
@@ -301,7 +303,7 @@ void GetAllTimes(
 
 int main(int argc, char** argv) {
 
-	NcError error(NcError::verbose_nonfatal);
+	NcError error(NcError::silent_nonfatal);
 
 try {
 
@@ -326,6 +328,9 @@ try {
 	// Minimum number of timesteps
 	int nMinTime;
 
+	// Operate on a regional patch (no periodic boundaries)
+	bool fRegional;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -335,6 +340,7 @@ try {
 		CommandLineString(strOutputVariable, "outvar", "");
 		CommandLineInt(nMinPatchSize, "minsize", 1);
 		CommandLineInt(nMinTime, "mintime", 1);
+		CommandLineBool(fRegional, "regional");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -488,6 +494,11 @@ try {
 		// Load in indicator variable
 		NcVar * varIndicator = ncInput.get_var(strVariable.c_str());
 
+		if (varIndicator == NULL) {
+			_EXCEPTION1("Unable to load variable \"%s\"",
+				strVariable.c_str());
+		}
+
 		if (varIndicator->num_dims() != 3) {
 			_EXCEPTION1("Incorrect number of dimensions for \"%s\" (3 expected)",
 				strVariable.c_str());
@@ -617,8 +628,50 @@ try {
 						}
 					}
 
-					// Insert neighbors
-					if (pr.lat == 0) {
+					// Insert neighbors (regional case)
+					if (fRegional) {
+						setNeighbors.insert(
+							LatLonPair(pr.lat, pr.lon));
+
+						if (pr.lon != 0) {
+							setNeighbors.insert(
+								LatLonPair(pr.lat, pr.lon-1));
+						}
+						if (pr.lon != nLon-1) {
+							setNeighbors.insert(
+								LatLonPair(pr.lat, pr.lon+1));
+						}
+
+						if (pr.lat != 0) {
+							setNeighbors.insert(
+								LatLonPair(pr.lat-1, pr.lon));
+
+							if (pr.lon != 0) {
+								setNeighbors.insert(
+									LatLonPair(pr.lat-1, pr.lon-1));
+							}
+							if (pr.lon != nLon-1) {
+								setNeighbors.insert(
+									LatLonPair(pr.lat-1, pr.lon+1));
+							}
+						}
+
+						if (pr.lat != nLat-1) {
+							setNeighbors.insert(
+								LatLonPair(pr.lat+1, pr.lon));
+
+							if (pr.lon != 0) {
+								setNeighbors.insert(
+									LatLonPair(pr.lat+1, pr.lon-1));
+							}
+							if (pr.lon != nLon-1) {
+								setNeighbors.insert(
+									LatLonPair(pr.lat+1, pr.lon+1));
+							}
+						}
+
+					// Insert neighbors (global case)
+					} else if (pr.lat == 0) {
 						for (int i = 0; i < nLon; i++) {
 							setNeighbors.insert(LatLonPair(0, i));
 						}
@@ -933,13 +986,16 @@ try {
 	{
 		NcFile ncInput(vecInputFiles[0].c_str());
 
-		NcVar * varTime = ncInput.get_var("time");
 		NcVar * varLat = ncInput.get_var("lat");
 		NcVar * varLon = ncInput.get_var("lon");
 
-		CopyNcVarAttributes(varTime, varOutputTime);
 		CopyNcVarAttributes(varLat, varOutputLat);
 		CopyNcVarAttributes(varLon, varOutputLon);
+
+		NcVar * varTime = ncInput.get_var("time");
+		if (varTime != NULL) {
+			CopyNcVarAttributes(varTime, varOutputTime);
+		}
 	}
 
 	NcVar * varData =
