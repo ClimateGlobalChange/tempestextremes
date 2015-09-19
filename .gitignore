@@ -36,3 +36,7 @@ cyclones
 cyclones_tempest
 
 DetectCyclonesUnstructured
+
+cyclones_tempest
+
+*.dat

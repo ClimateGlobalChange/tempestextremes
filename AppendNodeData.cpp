@@ -468,6 +468,9 @@ try {
 			}
 		}
 
+		// Adjust one-indexed time
+		iTime--;
+
 		if ((iLat < 0) || (iLat >= nLat)) {
 			_EXCEPTION1("Latitude index (%i) out of range", iLat);
 		}
@@ -495,7 +498,7 @@ try {
 			_EXCEPTION1("File \"%s\" does not contain variable \"PRECT\"",
 				vecDataFiles[iFile].c_str());
 		}
-		
+
 		varPRECT->set_cur(iTime - vecTimes[iFile], 0, 0);
 		varPRECT->get(&(dPRECT[0][0]), 1, nLat, nLon);
 
