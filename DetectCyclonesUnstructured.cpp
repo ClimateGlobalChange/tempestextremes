@@ -1851,17 +1851,25 @@ try {
 
 			std::set<int>::const_iterator iterCandidate = setCandidates.begin();
 			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-/*
-				fprintf(fpOutput, "%i\t%i\t%i\t%3.6f\t%3.6f\t%2.6f\t%3.6f\t%6.6f",
-					iCandidateCount,
-					iterCandidate->second,
-					iterCandidate->first,
+
+				fprintf(fpOutput, "%i", iCandidateCount);
+
+				if (grid.m_nGridDim.size() == 1) {
+					fprintf(fpOutput, "\t%i", *iterCandidate);
+
+				} else if (grid.m_nGridDim.size() == 2) {
+					fprintf(fpOutput, "\t%i\t%i",
+						(*iterCandidate) % static_cast<int>(grid.m_nGridDim[1]),
+						(*iterCandidate) / static_cast<int>(grid.m_nGridDim[1]));
+				}
+
+				fprintf(fpOutput, "\t%3.6f\t%3.6f\n",
 					grid.m_dLon[*iterCandidate] * 180.0 / M_PI,
-					grid.m_dLat[*iterCandidate]  * 180.0 / M_PI,
-					vecMaxWindSp[iCandidateCount],
-					vecRMaxWindSp[iCandidateCount]);
+					grid.m_dLat[*iterCandidate]  * 180.0 / M_PI);
+					//vecMaxWindSp[iCandidateCount],
+					//vecRMaxWindSp[iCandidateCount]);
 					//dataPSL[*iterCandidate]);
-*/
+
 /*
 				if (dPrectDist >= 0.0) {
 					fprintf(fpOutput, "\t%1.5e\t%1.5e\n",
