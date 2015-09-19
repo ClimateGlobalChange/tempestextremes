@@ -217,32 +217,32 @@ struct Tag {
 ///	</summary>
 void GetInputFileList(
 	const std::string & strInputFileList,
-	std::vector<std::string> & vecInputFiles
-) {
-	FILE * fp = fopen(strInputFileList.c_str(), "r");
+		std::vector<std::string> & vecInputFiles
+	) {
+		FILE * fp = fopen(strInputFileList.c_str(), "r");
 
-	char szBuffer[1024];
-	for (;;) {
-		fgets(szBuffer, 1024, fp);
-
-		if (feof(fp)) {
-			break;
-		}
-
-		// Remove end-of-line characters
+		char szBuffer[1024];
 		for (;;) {
-			int nLen = strlen(szBuffer);
-			if ((szBuffer[nLen-1] == '\n') ||
-				(szBuffer[nLen-1] == '\r') ||
-				(szBuffer[nLen-1] == ' ')
-			) {
-				szBuffer[nLen-1] = '\0';
-				continue;
-			}
-			break;
-		}
+			fgets(szBuffer, 1024, fp);
 
-		vecInputFiles.push_back(szBuffer);
+			if (feof(fp)) {
+				break;
+			}
+
+			// Remove end-of-line characters
+			for (;;) {
+				int nLen = strlen(szBuffer);
+				if ((szBuffer[nLen-1] == '\n') ||
+					(szBuffer[nLen-1] == '\r') ||
+					(szBuffer[nLen-1] == ' ')
+				) {
+					szBuffer[nLen-1] = '\0';
+					continue;
+				}
+				break;
+			}
+
+			vecInputFiles.push_back(szBuffer);
 	}
 
 	if (vecInputFiles.size() == 0) {

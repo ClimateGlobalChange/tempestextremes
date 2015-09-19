@@ -40,3 +40,9 @@ DetectCyclonesUnstructured
 cyclones_tempest
 
 *.dat
+
+CLIVAR_blocks
+
+AvgIPV
+
+DensityNodes
