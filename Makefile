@@ -24,6 +24,9 @@ STITCHNODES_CFILES= kdtree.c
 STITCHBLOBS_FILES= StitchBlobs.cpp Announce.cpp NetCDFUtilities.cpp
 STITCHBLOBS_CFILES= kdtree.c
 
+DETECTCYCLONESUNSTRUCTURED_FILES= DetectCyclonesUnstructured.cpp Announce.cpp TimeObj.cpp
+DETECTCYCLONESUNSTRUCTURED_CFILES= kdtree.c
+
 DETECTCYCLONES_FILES= DetectCyclones.cpp Announce.cpp TimeObj.cpp
 DETECTCYCLONES_CFILES= kdtree.c
 
@@ -42,7 +45,7 @@ include Make.defs
 ##
 ## Build instructions
 ##
-all: StitchNodes StitchBlobs DetectCyclones DensityNodes AppendNodeData
+all: StitchNodes StitchBlobs DetectCyclones DetectCyclonesUnstructured DensityNodes AppendNodeData
 
 StitchNodes: $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
@@ -52,6 +55,9 @@ StitchBlobs: $(STITCHBLOBS_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHBLOBS_CFILES:%.c
 
 DetectCyclones: $(DETECTCYCLONES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DETECTCYCLONES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(DETECTCYCLONES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DETECTCYCLONES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
+
+DetectCyclonesUnstructured: $(DETECTCYCLONESUNSTRUCTURED_FILES:%.cpp=$(BUILDDIR)/%.o) $(DETECTCYCLONESUNSTRUCTURED_CFILES:%.c=$(BUILDDIR)/%.o)
+	$(CC) $(LDFLAGS) -o $@ $(DETECTCYCLONESUNSTRUCTURED_FILES:%.cpp=$(BUILDDIR)/%.o) $(DETECTCYCLONESUNSTRUCTURED_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 
 DensityNodes: $(DENSITYNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENSITYNODES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(DENSITYNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENSITYNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
