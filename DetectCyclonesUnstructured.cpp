@@ -332,7 +332,6 @@ public:
 			ReadMode_Variable,
 			ReadMode_Distance,
 			ReadMode_Amount,
-			ReadMode_Count,
 			ReadMode_MinMaxDist,
 			ReadMode_Invalid
 		} eReadMode = ReadMode_Variable;
@@ -366,13 +365,6 @@ public:
 					m_dDistance = atof(strSubStr.c_str());
 
 					iLast = i + 1;
-					eReadMode = ReadMode_Count;
-
-				// Read in count
-				} else if (eReadMode == ReadMode_Count) {
-					m_nCount = atoi(strSubStr.c_str());
-
-					iLast = i + 1;
 					eReadMode = ReadMode_MinMaxDist;
 
 				// Read in min/max distance
@@ -386,7 +378,7 @@ public:
 				} else if (eReadMode == ReadMode_Invalid) {
 					_EXCEPTION1("\nToo many entries in closed contour op \"%s\""
 						"\nRequired: \"<name>,<amount>,<distance>,"
-						"<count>,<minmaxdist>\"",
+						"<minmaxdist>\"",
 						strOp.c_str());
 				}
 			}
@@ -395,7 +387,7 @@ public:
 		if (eReadMode != ReadMode_Invalid) {
 			_EXCEPTION1("\nInsufficient entries in closed contour op \"%s\""
 					"\nRequired: \"<name>,<amount>,<distance>,"
-					"<count>,<minmaxdist>\"",
+					"<minmaxdist>\"",
 					strOp.c_str());
 		}
 
@@ -411,29 +403,24 @@ public:
 		if (m_dDistance <= 0.0) {
 			_EXCEPTIONT("For closed contour op, distance must be positive");
 		}
-		if (m_nCount <= 0) {
-			_EXCEPTIONT("For closed contour op, count must be positive");
-		}
 		if (m_dMinMaxDist < 0.0) {
 			_EXCEPTIONT("For closed contour op, min/max dist must be nonnegative");
 		}
 
 		if (m_dDeltaAmount < 0.0) {
-			Announce("%s decreases by %f over %f deg (%i samples)"
+			Announce("%s decreases by %f over %f degrees"
 				   " (max search %f deg)",
 				m_strVariable.c_str(),
 				-m_dDeltaAmount,
 				m_dDistance,
-				m_nCount,
 				m_dMinMaxDist);
 
 		} else {
-			Announce("%s increases by %f over %f degrees (%i samples)"
+			Announce("%s increases by %f over %f degrees"
 					" (min search %f deg)",
 				m_strVariable.c_str(),
 				m_dDeltaAmount,
 				m_dDistance,
-				m_nCount,
 				m_dMinMaxDist);
 		}
 	}
@@ -456,14 +443,140 @@ public:
 	double m_dDistance;
 
 	///	<summary>
-	///		Number of nodes used to evaluate closed contour.
-	///	</summary>
-	int m_nCount;
-
-	///	<summary>
 	///		Distance to search for min or max.
 	///	</summary>
 	double m_dMinMaxDist;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class storing an output operator.
+///	</summary>
+class OutputOp {
+
+public:
+	///	<summary>
+	///		Possible operations.
+	///	</summary>
+	enum Operation {
+		Max,
+		Min,
+		Avg
+	};
+
+public:
+	///	<summary>
+	///		Parse a threshold operator string.
+	///	</summary>
+	void Parse(
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Variable,
+			ReadMode_Op,
+			ReadMode_Distance,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Variable;
+
+		// Loop through string
+		int iLast = 0;
+		for (int i = 0; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in column name
+				if (eReadMode == ReadMode_Variable) {
+
+					m_strVariable = strSubStr;
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Op;
+
+				// Read in operation
+				} else if (eReadMode == ReadMode_Op) {
+					if (strSubStr == "max") {
+						m_eOp = Max;
+					} else if (strSubStr == "min") {
+						m_eOp = Min;
+					} else if (strSubStr == "avg") {
+						m_eOp = Avg;
+					} else {
+						_EXCEPTION1("Output invalid operation \"%s\"",
+							strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Distance;
+
+				// Read in minimum count
+				} else if (eReadMode == ReadMode_Distance) {
+					m_dDistance = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
+							"\nRequired: \"<name>,<operation>,<distance>\"",
+							strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
+					"\nRequired: \"<name>,<operation>,<distance>\"",
+					strOp.c_str());
+		}
+
+		if (m_dDistance < 0.0) {
+			_EXCEPTIONT("For output op, distance must be nonnegative");
+		}
+
+		// Output announcement
+		std::string strDescription;
+
+		if (m_eOp == Max) {
+			strDescription += "Maximum of ";
+		} else if (m_eOp == Min) {
+			strDescription += "Minimum of ";
+		} else if (m_eOp == Avg) {
+			strDescription += "Average of ";
+		}
+
+		char szBuffer[128];
+
+		sprintf(szBuffer, "%s", m_strVariable.c_str());
+		strDescription += szBuffer;
+
+		sprintf(szBuffer, " within %f degrees", m_dDistance);
+		strDescription += szBuffer;
+
+		Announce("%s", strDescription.c_str());
+	}
+
+public:
+	///	<summary>
+	///		Variable to use for output.
+	///	</summary>
+	std::string m_strVariable;
+
+	///	<summary>
+	///		Operation.
+	///	</summary>
+	Operation m_eOp;
+
+	///	<summary>
+	///		Distance to use when applying operation.
+	///	</summary>
+	double m_dDistance;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -746,7 +859,6 @@ bool HasClosedContour(
 	const int ix0,
 	double dDeltaAmt,
 	double dDeltaDist,
-	int nDeltaCount,
 	double dMinMaxDist
 ) {
 	// Verify arguments
@@ -755,10 +867,6 @@ bool HasClosedContour(
 	}
 	if (dDeltaDist <= 0.0) {
 		_EXCEPTIONT("Closed contour distance must be positive");
-	}
-	if (nDeltaCount <= 0) {
-		_EXCEPTIONT("Number of sample points for closed contour "
-			"must be positive");
 	}
 
 	// Find min/max near point
@@ -782,6 +890,8 @@ bool HasClosedContour(
 			dValue,
 			dR);
 	}
+
+	//printf("%lu %lu : %lu %lu : %1.5f %1.5f\n", ix0 % grid.m_nGridDim[1], ix0 / grid.m_nGridDim[1], ixOrigin % grid.m_nGridDim[1], ixOrigin / grid.m_nGridDim[1], dataState[ix0], dataState[ixOrigin]);
 
 	// Set of visited nodes
 	std::set<int> setNodesVisited;
@@ -813,6 +923,8 @@ bool HasClosedContour(
 
 		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
 				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0));
+
+		//printf("-- (%lu %lu) %1.5f %1.5f\n", ix % grid.m_nGridDim[1], ix / grid.m_nGridDim[1], dR, dataState[ix] - dRefValue);
 
 		// Check great circle distance
 		if (dR > dDeltaDist) {
@@ -958,59 +1070,47 @@ bool SatisfiesThreshold(
 ///	<param name="dMaxDist">
 ///		Maximum distance from the initial point in degrees.
 ///	</param>
+template <typename real>
 void FindLocalAverage(
-	const DataMatrix<float> & data,
-	const DataVector<double> & dataLat,
-	const DataVector<double> & dataLon,
-	int iLat,
-	int iLon,
+	const SimpleGrid & grid,
+	const DataVector<real> & data,
+	int ix0,
 	double dMaxDist,
-	float & dAverage,
-	float & dMaxValue
+	float & dAverage
 ) {
 	// Verify that dMaxDist is less than 180.0
 	if (dMaxDist > 180.0) {
 		_EXCEPTIONT("MaxDist must be less than 180.0");
 	}
 
-	// Number of latitudes and longitudes
-	const int nLat = dataLat.GetRows();
-	const int nLon = dataLon.GetRows();
-
 	// Queue of nodes that remain to be visited
-	std::queue< std::pair<int, int> > queueNodes;
-	queueNodes.push( std::pair<int, int>(iLat, iLon) );
+	std::queue<int> queueNodes;
+	queueNodes.push(ix0);
 
 	// Set of nodes that have already been visited
-	std::set< std::pair<int, int> > setNodesVisited;
+	std::set<int> setNodesVisited;
 
 	// Latitude and longitude at the origin
-	double dLat0 = dataLat[iLat];
-	double dLon0 = dataLon[iLon];
+	double dLat0 = grid.m_dLat[ix0];
+	double dLon0 = grid.m_dLon[ix0];
 
-	// Sum
-	float dSum = 0.0f;
-	float dArea = 0.0f;
-
-	// Reset average
-	dAverage = 0.0f;
-
-	// Reset maximum value
-	dMaxValue = data[iLat][iLon];
+	// Number of points
+	float dSum = 0.0;
+	int nCount = 0;
 
 	// Loop through all latlon elements
 	while (queueNodes.size() != 0) {
-		std::pair<int, int> pr = queueNodes.front();
+		int ix = queueNodes.front();
 		queueNodes.pop();
 
-		if (setNodesVisited.find(pr) != setNodesVisited.end()) {
+		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
 			continue;
 		}
 
-		setNodesVisited.insert(pr);
+		setNodesVisited.insert(ix);
 
-		double dLatThis = dataLat[pr.first];
-		double dLonThis = dataLon[pr.second];
+		double dLatThis = grid.m_dLat[ix];
+		double dLonThis = grid.m_dLon[ix];
 
 		// Great circle distance to this element
 		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
@@ -1020,44 +1120,17 @@ void FindLocalAverage(
 			continue;
 		}
 
-		// Add value to sum
-		float dLocalArea = cos(dLatThis);
-
-		dArea += dLocalArea;
-		dSum += data[pr.first][pr.second] * dLocalArea;
-
-		if (data[pr.first][pr.second] > dMaxValue) {
-			dMaxValue = data[pr.first][pr.second];
-		}
+		// Check for new local extremum
+		dSum += data[ix];
+		nCount++;
 
 		// Add all neighbors of this point
-		std::pair<int,int> prWest(pr.first, (pr.second + nLon - 1) % nLon);
-		if (setNodesVisited.find(prWest) == setNodesVisited.end()) {
-			queueNodes.push(prWest);
-		}
-
-		std::pair<int,int> prEast(pr.first, (pr.second + 1) % nLon);
-		if (setNodesVisited.find(prEast) == setNodesVisited.end()) {
-			queueNodes.push(prEast);
-		}
-
-		std::pair<int,int> prNorth(pr.first + 1, pr.second);
-		if ((prNorth.first < nLat) &&
-			(setNodesVisited.find(prNorth) == setNodesVisited.end())
-		) {
-			queueNodes.push(prNorth);
-		}
-
-		std::pair<int,int> prSouth(pr.first - 1, pr.second);
-		if ((prSouth.first >= 0) &&
-			(setNodesVisited.find(prSouth) == setNodesVisited.end())
-		) {
-			queueNodes.push(prSouth);
+		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+			queueNodes.push(grid.m_vecConnectivity[ix][n]);
 		}
 	}
 
-	// Set average
-	dAverage = dSum / dArea;
+	dAverage = dSum / static_cast<float>(nCount);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1191,6 +1264,9 @@ try {
 	// Threshold commands
 	std::string strThresholdCmd;
 
+	// Output commands
+	std::string strOutputCmd;
+
 	// Minimum Laplacian value
 	double dMinLaplacian;
 
@@ -1218,8 +1294,9 @@ try {
 		CommandLineString(strTopoFile, "topofile", "");
 		CommandLineDoubleD(dMaxTopoHeight, "maxtopoht", 0.0, "(m)");
 		CommandLineDoubleD(dMergeDist, "mergedist", 0.0, "(degrees)");
-		CommandLineString(strClosedContourCmd, "closedcontourcmd", "");
-		CommandLineString(strThresholdCmd, "thresholdcmd", "");
+		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,dist,delta,minmaxdist;...]");
+		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
+		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,op,dist;...]");
 		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
 		CommandLineDoubleD(dPrectDist, "prectdist", -1.0, "(degrees)");
 		CommandLineBool(fOutputHeader, "out_header");
@@ -1309,6 +1386,33 @@ try {
 				int iNextOp = (int)(vecThresholdOp.size());
 				vecThresholdOp.resize(iNextOp + 1);
 				vecThresholdOp[iNextOp].Parse(strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	// Parse the output operator command string
+	std::vector<OutputOp> vecOutputOp;
+
+	if (strOutputCmd != "") {
+		AnnounceStartBlock("Parsing output operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strOutputCmd.length(); i++) {
+
+			if ((i == strOutputCmd.length()) ||
+				(strOutputCmd[i] == ';') ||
+				(strOutputCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strOutputCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecOutputOp.size());
+				vecOutputOp.resize(iNextOp + 1);
+				vecOutputOp[iNextOp].Parse(strSubStr);
 
 				iLast = i + 1;
 			}
@@ -1645,7 +1749,6 @@ try {
 						*iterCandidate,
 						vecClosedContourOp[ccc].m_dDeltaAmount,
 						vecClosedContourOp[ccc].m_dDistance,
-						vecClosedContourOp[ccc].m_nCount,
 						vecClosedContourOp[ccc].m_dMinMaxDist
 					);
 
@@ -1717,71 +1820,6 @@ try {
 					vecRejectedThreshold[tc]);
 		}
 
-/*
-		// Determine wind maximum at all pressure minima
-		AnnounceStartBlock("Searching for maximum winds");
-		std::vector<float> vecMaxWindSp;
-		std::vector<float> vecRMaxWindSp;
-		{
-			std::set< std::pair<int, int> >::const_iterator iterCandidate
-				= setCandidates.begin();
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-
-				std::pair<int, int> prMaximum;
-
-				float dRMaxWind;
-				float dMaxWindSp;
-
-				FindLocalMinMax(
-					false,
-					dataUMag850,
-					dataLat,
-					dataLon,
-					iterCandidate->first,
-					iterCandidate->second,
-					dWindSpDist,
-					prMaximum,
-					dMaxWindSp,
-					dRMaxWind,
-					fRegional);
-
-				vecMaxWindSp.push_back(dMaxWindSp);
-				vecRMaxWindSp.push_back(dRMaxWind);
-			}
-		}
-		AnnounceEndBlock("Done");
-*/
-/*
-		// Determine average and maximum PRECT
-		std::vector<float> vecPrectAvg;
-		std::vector<float> vecPrectMax;
-
-		if (dPrectDist >= 0.0) {
-			AnnounceStartBlock("Finding PRECT average and maximum");
-
-			std::set< std::pair<int, int> >::const_iterator iterCandidate
-				= setCandidates.begin();
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-
-				float dAverage;
-				float dMaxValue;
-
-				FindLocalAverage(
-					dataPrect,
-					dataLat,
-					dataLon,
-					iterCandidate->first,
-					iterCandidate->second,
-					dPrectDist,
-					dAverage,
-					dMaxValue);
-
-				vecPrectAvg.push_back(dAverage);
-				vecPrectMax.push_back(dMaxValue);
-			}
-			AnnounceEndBlock("Done");
-		}
-*/
 		// Write results to file
 		{
 			// Parse time information
@@ -1792,51 +1830,29 @@ try {
 			int nDateMonth;
 			int nDateDay;
 			int nDateHour;
-/*
-			if ((varDate != NULL) && (varDateSec != NULL)) {
-				int nDate;
-				int nDateSec;
 
-				varDate->set_cur(t);
-				varDate->get(&nDate, 1);
+			NcAtt * attTimeUnits = varTime->get_att("units");
+			if (attTimeUnits == NULL) {
+				_EXCEPTIONT("Variable \"time\" has no \"units\" attribute");
+			}
 
-				varDateSec->set_cur(t);
-				varDateSec->get(&nDateSec, 1);
-
-				ParseDate(
-					nDate,
-					nDateSec,
-					nDateYear,
-					nDateMonth,
-					nDateDay,
-					nDateHour);
-
-			} else {
-*/
-				NcAtt * attTimeUnits = varTime->get_att("units");
-				if (attTimeUnits == NULL) {
-					_EXCEPTIONT("Variable \"time\" has no \"units\" attribute");
-				}
-
-				std::string strTimeUnits = attTimeUnits->as_string(0);
+			std::string strTimeUnits = attTimeUnits->as_string(0);
 
 
-				std::string strTimeCalendar = "noleap";
-				NcAtt * attTimeCalendar = varTime->get_att("calendar");
-				if (attTimeUnits != NULL) {
-					strTimeCalendar = attTimeCalendar->as_string(0);
-				}
+			std::string strTimeCalendar = "noleap";
+			NcAtt * attTimeCalendar = varTime->get_att("calendar");
+			if (attTimeUnits != NULL) {
+				strTimeCalendar = attTimeCalendar->as_string(0);
+			}
 
-
-				ParseTimeDouble(
-					strTimeUnits,
-					strTimeCalendar,
-					dTime[t],
-					nDateYear,
-					nDateMonth,
-					nDateDay,
-					nDateHour);
-//			}
+			ParseTimeDouble(
+				strTimeUnits,
+				strTimeCalendar,
+				dTime[t],
+				nDateYear,
+				nDateMonth,
+				nDateDay,
+				nDateHour);
 
 			// Write time information
 			fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
@@ -1848,6 +1864,75 @@ try {
 
 			// Write candidate information
 			int iCandidateCount = 0;
+
+			// Apply output operators
+			DataMatrix<float> dOutput(setCandidates.size(), vecOutputOp.size());
+			for (int outc = 0; outc < vecOutputOp.size(); outc++) {
+
+				// Load the search variable data
+				DataVector<float> dataState(grid.GetSize());
+			
+				LoadGridData<float>(
+					ncInput, vecOutputOp[outc].m_strVariable.c_str(),
+					grid, dataState, t);
+
+				// Loop through all pressure minima
+				std::set<int>::const_iterator iterCandidate
+					= setCandidates.begin();
+
+				iCandidateCount = 0;
+				for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+					int ixExtremum;
+					float dValue;
+					float dRMax;
+
+					if (vecOutputOp[outc].m_eOp == OutputOp::Max) {
+						FindLocalMinMax<float>(
+							grid,
+							false,
+							dataState,
+							*iterCandidate,
+							vecOutputOp[outc].m_dDistance,
+							ixExtremum,
+							dValue,
+							dRMax);
+
+						dOutput[iCandidateCount][outc] = dValue;
+
+					} else if (vecOutputOp[outc].m_eOp == OutputOp::Min) {
+						FindLocalMinMax<float>(
+							grid,
+							true,
+							dataState,
+							*iterCandidate,
+							vecOutputOp[outc].m_dDistance,
+							ixExtremum,
+							dValue,
+							dRMax);
+
+						dOutput[iCandidateCount][outc] = dValue;
+
+					} else if (vecOutputOp[outc].m_eOp == OutputOp::Avg) {
+						FindLocalAverage<float>(
+							grid,
+							dataState,
+							*iterCandidate,
+							vecOutputOp[outc].m_dDistance,
+							dValue);
+
+						dOutput[iCandidateCount][outc] = dValue;
+
+					} else {
+						_EXCEPTIONT("Invalid Output operator");
+					}
+
+					iCandidateCount++;
+				}
+			}
+
+			// Output all candidates
+			iCandidateCount = 0;
 
 			std::set<int>::const_iterator iterCandidate = setCandidates.begin();
 			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
@@ -1863,22 +1948,17 @@ try {
 						(*iterCandidate) / static_cast<int>(grid.m_nGridDim[1]));
 				}
 
-				fprintf(fpOutput, "\t%3.6f\t%3.6f\n",
+				fprintf(fpOutput, "\t%3.6f\t%3.6f",
 					grid.m_dLon[*iterCandidate] * 180.0 / M_PI,
 					grid.m_dLat[*iterCandidate]  * 180.0 / M_PI);
-					//vecMaxWindSp[iCandidateCount],
-					//vecRMaxWindSp[iCandidateCount]);
-					//dataPSL[*iterCandidate]);
 
-/*
-				if (dPrectDist >= 0.0) {
-					fprintf(fpOutput, "\t%1.5e\t%1.5e\n",
-						vecPrectAvg[iCandidateCount],
-						vecPrectMax[iCandidateCount]);
-				} else {
-					fprintf(fpOutput, "\n");
+				for (int outc = 0; outc < vecOutputOp.size(); outc++) {
+					fprintf(fpOutput, "\t%3.6e",
+						dOutput[iCandidateCount][outc]);
 				}
-*/
+
+				fprintf(fpOutput, "\n");
+
 				iCandidateCount++;
 			}
 		}
