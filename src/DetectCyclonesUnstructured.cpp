@@ -48,8 +48,8 @@ public:
 	///		longitude-latitude grid.
 	///	</summary>
 	void GenerateLatitudeLongitude(
-		DataVector<double> vecLat,
-		DataVector<double> vecLon
+		const DataVector<double> & vecLat,
+		const DataVector<double> & vecLon
 	) {
 		int nLat = vecLat.GetRows();
 		int nLon = vecLon.GetRows();
@@ -93,14 +93,14 @@ public:
 	void FromFile(
 		const std::string & strGridInfoFile
 	) {
-		FILE * fp = fopen(strGridInfoFile.c_str(), "r");
-		if (fp == NULL) {
+		std::ifstream fsGrid(strGridInfoFile.c_str());
+		if (!fsGrid.is_open()) {
 			_EXCEPTION1("Unable to open file \"%s\"",
 				strGridInfoFile.c_str());
 		}
 
 		size_t nFaces;
-		fscanf(fp, "%lu", &nFaces);
+		fsGrid >> nFaces;
 
 		m_nGridDim.resize(1);
 		m_nGridDim[0] = nFaces;
@@ -111,17 +111,31 @@ public:
 
 		for (size_t f = 0; f < nFaces; f++) {
 			size_t sNeighbors;
-			fscanf(fp, "%lf", &(m_dLon[f]));
-			fscanf(fp, "%lf", &(m_dLat[f]));
-			fscanf(fp, "%lu", &sNeighbors);
+			char cComma;
+			fsGrid >> m_dLon[f];
+			fsGrid >> cComma;
+			fsGrid >> m_dLat[f];
+			fsGrid >> cComma;
+			fsGrid >> sNeighbors;
+			fsGrid >> cComma;
 
+			// Convert to radians
+			m_dLon[f] *= M_PI / 180.0;
+			m_dLat[f] *= M_PI / 180.0;
+
+			// Load connectivity
 			m_vecConnectivity[f].resize(sNeighbors);
 			for (size_t n = 0; n < sNeighbors; n++) {
-				fscanf(fp, "%i", &(m_vecConnectivity[f][n]));
+				fsGrid >> m_vecConnectivity[f][n];
+				if (n != sNeighbors-1) {
+					fsGrid >> cComma;
+				}
 				m_vecConnectivity[f][n]--;
 			}
-			if (feof(fp)) {
-				_EXCEPTIONT("Premature end of file");
+			if (fsGrid.eof()) {
+				if (f != nFaces-1) {
+					_EXCEPTIONT("Premature end of file");
+				}
 			}
 		}
 	}
@@ -906,6 +920,10 @@ bool HasClosedContour(
 	const double dLat0 = grid.m_dLat[ixOrigin];
 	const double dLon0 = grid.m_dLon[ixOrigin];
 
+	Announce(2, "Checking (%lu) : (%1.5f %1.5f)",
+		ixOrigin, dLat0, dLon0);
+
+
 	// Build up nodes
 	while (queueToVisit.size() != 0) {
 		int ix = queueToVisit.front();
@@ -923,6 +941,9 @@ bool HasClosedContour(
 
 		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
 				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0));
+
+		Announce(2, "-- (%lu) : (%1.5f %1.5f) : dx %1.5f",
+			ix, dLatThis, dLonThis, dR);
 
 		//printf("-- (%lu %lu) %1.5f %1.5f\n", ix % grid.m_nGridDim[1], ix / grid.m_nGridDim[1], dR, dataState[ix] - dRefValue);
 
@@ -1149,7 +1170,7 @@ void LoadGridData(
 	// Get pointer to variable
 	NcVar * var = ncFile.get_var(strVariable.c_str());
 	if (var == NULL) {
-		_EXCEPTION1("No variable \"%s\" found in topography file",
+		_EXCEPTION1("No variable \"%s\" found in file",
 			strVariable.c_str());
 	}
 
@@ -1267,15 +1288,6 @@ try {
 	// Output commands
 	std::string strOutputCmd;
 
-	// Minimum Laplacian value
-	double dMinLaplacian;
-
-	// Distance to search for maximum wind speed
-	double dWindSpDist;
-
-	// Distance to search for precipitation statistics (avg and max)
-	double dPrectDist;
-
 	// Output header
 	bool fOutputHeader;
 
@@ -1297,8 +1309,6 @@ try {
 		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,dist,delta,minmaxdist;...]");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,op,dist;...]");
-		CommandLineDoubleD(dWindSpDist, "windspdist", 0.0, "(degrees)");
-		CommandLineDoubleD(dPrectDist, "prectdist", -1.0, "(degrees)");
 		CommandLineBool(fOutputHeader, "out_header");
 		CommandLineInt(iVerbosityLevel, "verbosity", 0);
 
@@ -1937,8 +1947,6 @@ try {
 			std::set<int>::const_iterator iterCandidate = setCandidates.begin();
 			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
-				fprintf(fpOutput, "%i", iCandidateCount);
-
 				if (grid.m_nGridDim.size() == 1) {
 					fprintf(fpOutput, "\t%i", *iterCandidate);
 
@@ -1950,7 +1958,7 @@ try {
 
 				fprintf(fpOutput, "\t%3.6f\t%3.6f",
 					grid.m_dLon[*iterCandidate] * 180.0 / M_PI,
-					grid.m_dLat[*iterCandidate]  * 180.0 / M_PI);
+					grid.m_dLat[*iterCandidate] * 180.0 / M_PI);
 
 				for (int outc = 0; outc < vecOutputOp.size(); outc++) {
 					fprintf(fpOutput, "\t%3.6e",

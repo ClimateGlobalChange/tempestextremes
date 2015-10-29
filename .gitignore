@@ -16,3 +16,5 @@ test/*.nc
 test/*.dat
 
 test/*.txt
+
+test/*.g
