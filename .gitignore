@@ -1,13 +1,7 @@
 
-cam5_1_1degree_CLIVAR_climo.cam2.h2.0001-01-01-00000.nc-raw_cyclone.txt
+src/build/*
 
-nodes.txt
-
-traj.txt
-
-build/*
-
-depend/*
+src/depend/*
 
 *.swp
 
@@ -15,34 +9,10 @@ depend/*
 
 *.txt
 
-DetectCyclones
+bin/*
 
-StitchNodes
+test/*.nc
 
-StitchBlobs
+test/*.dat
 
-cyclones_out
-
-cyclones_traj.txt
-
-traj2.txt
-
-DensityNodes
-
-AppendNodeData
-
-cyclones
-
-cyclones_tempest
-
-DetectCyclonesUnstructured
-
-cyclones_tempest
-
-*.dat
-
-CLIVAR_blocks
-
-AvgIPV
-
-DensityNodes
+test/*.txt
