@@ -49,7 +49,8 @@ public:
 	///	</summary>
 	void GenerateLatitudeLongitude(
 		const DataVector<double> & vecLat,
-		const DataVector<double> & vecLon
+		const DataVector<double> & vecLon,
+		bool fRegional
 	) {
 		int nLat = vecLat.GetRows();
 		int nLon = vecLon.GetRows();
@@ -78,8 +79,14 @@ public:
 				m_vecConnectivity[ixs].push_back((j+1) * nLon + i);
 			}
 
-			m_vecConnectivity[ixs].push_back(j * nLon + ((i + 1) % nLon));
-			m_vecConnectivity[ixs].push_back(j * nLon + ((i + nLon - 1) % nLon));
+			if ((!fRegional) ||
+			    ((i != 0) && (i != nLon-1))
+			) {
+				m_vecConnectivity[ixs].push_back(
+					j * nLon + ((i + 1) % nLon));
+				m_vecConnectivity[ixs].push_back(
+					j * nLon + ((i + nLon - 1) % nLon));
+			}
 
 			ixs++;
 		}
@@ -172,6 +179,198 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		A class storing a parsed variable name.
+///	</summary>
+class Variable {
+
+public:
+	///	<summary>
+	///		Default constructor.
+	///	</summary>
+	Variable() :
+		m_strName(),
+		m_nSpecifiedDim(0)
+	{ }
+
+	///	<summary>
+	///		Constructor from variable name.
+	///	</summary>
+	Variable(
+		const std::string & strName
+	) :
+		m_strName(strName),
+		m_nSpecifiedDim(0)
+	{ }
+
+public:
+	///	<summary>
+	///		Parse the variable information from a string.  Return the index
+	///		of the first character after the variable information.
+	///	</summary>
+	int ParseFromString(
+		const std::string & strIn
+	) {
+		m_strName = "";
+		m_nSpecifiedDim = 0;
+
+		bool fDimMode = false;
+		std::string strDim;
+
+		for (int n = 0; n <= strIn.length(); n++) {
+			// Reading the variable name
+			if (!fDimMode) {
+				if (n == strIn.length()) {
+					m_strName = strIn;
+					return n;
+				}
+				if (strIn[n] == ',') {
+					m_strName = strIn.substr(0, n);
+					return (n+1);
+				}
+				if (strIn[n] == '(') {
+					m_strName = strIn.substr(0, n);
+					fDimMode = true;
+					continue;
+				}
+
+			// Reading in dimensions
+			} else {
+				if (m_nSpecifiedDim == 4) {
+					_EXCEPTIONT("Only 4 dimensions may be specified");
+				}
+				if (n == strIn.length()) {
+					_EXCEPTION1("Variable dimension list must be terminated"
+						" with ): %s", strIn.c_str());
+				}
+				if (strIn[n] == ',') {
+					if (strDim.length() == 0) {
+						_EXCEPTIONT("Invalid dimension index in variable");
+					}
+					m_iDim[m_nSpecifiedDim] = atoi(strDim.c_str());
+					m_nSpecifiedDim++;
+					strDim = "";
+
+				} else if (strIn[n] == ')') {
+					if (strDim.length() == 0) {
+						_EXCEPTIONT("Invalid dimension index in variable");
+					}
+					m_iDim[m_nSpecifiedDim] = atoi(strDim.c_str());
+					m_nSpecifiedDim++;
+					if (n == strIn.length()-1) {
+						return (n+1);
+					} else if (strIn[n+1] == ',') {
+						return (n+2);
+					}
+
+				} else {
+					strDim += strIn[n];
+				}
+			}
+		}
+
+		_EXCEPTION1("Malformed variable string \"%s\"", strIn.c_str());
+	}
+
+	///	<summary>
+	///		Get a string representation of this variable.
+	///	</summary>
+	std::string ToString() const {
+		char szBuffer[20];
+		std::string strOut = m_strName;
+		if (m_nSpecifiedDim == 0) {
+			return strOut;
+		}
+		strOut += "(";
+		for (int d = 0; d < m_nSpecifiedDim; d++) {
+			sprintf(szBuffer, "%i", m_iDim[d]);
+			strOut += szBuffer;
+			if (d != m_nSpecifiedDim-1) {
+				strOut += ",";
+			} else {
+				strOut += ")";
+			}
+		}
+		return strOut;
+	}
+
+	///	<summary>
+	///		Get this variable in the given NcFile.
+	///	</summary>
+	NcVar * GetFromNetCDF(
+		NcFile & ncFile,
+		int iTime = (-1)
+	) const {
+		NcVar * var = ncFile.get_var(m_strName.c_str());
+		if (var == NULL) {
+			_EXCEPTION1("Variable \"%s\" not found in input file",
+				m_strName.c_str());
+		}
+
+		int nVarDims = var->num_dims();
+		if ((nVarDims > 0) && (iTime != (-1))) {
+			if (strcmp(var->get_dim(0)->name(), "time") != 0) {
+				iTime = (-1);
+			}
+		}
+		if (iTime != (-1)) {
+			if ((nVarDims != m_nSpecifiedDim + 2) &&
+				(nVarDims != m_nSpecifiedDim + 3)
+			) {
+				_EXCEPTION1("Dimension size inconsistency in \"%s\"",
+					m_strName.c_str());
+			}
+		} else {
+			if ((nVarDims != m_nSpecifiedDim + 1) &&
+				(nVarDims != m_nSpecifiedDim + 2)
+			) {
+				_EXCEPTION1("Dimension size inconsistency in \"%s\"",
+					m_strName.c_str());
+			}
+		}
+
+		int nSetDims = 0;
+		long iDim[7];
+		memset(&(iDim[0]), 0, sizeof(int) * 7);
+
+		if (iTime != (-1)) {
+			iDim[0] = iTime;
+			nSetDims++;
+		}
+
+		if (m_nSpecifiedDim != 0) {
+			for (int i = 0; i < m_nSpecifiedDim; i++) {
+				iDim[nSetDims] = m_iDim[i];
+				nSetDims++;
+			}
+			iDim[nSetDims  ] = 0;
+			iDim[nSetDims+1] = 0;
+		}
+
+		var->set_cur(&(iDim[0]));
+
+		return var;
+	}
+
+public:
+	///	<summary>
+	///		Variable name.
+	///	</summary>
+	std::string m_strName;
+
+	///	<summary>
+	///		Number of dimensions specified.
+	///	</summary>
+	int m_nSpecifiedDim;
+
+	///	<summary>
+	///		Specified dimension values.
+	///	</summary>
+	int m_iDim[4];
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		A class storing a thresholding operator.
 ///	</summary>
 class ThresholdOp {
@@ -198,16 +397,17 @@ public:
 	) {
 		// Read mode
 		enum {
-			ReadMode_Variable,
 			ReadMode_Op,
 			ReadMode_Value,
 			ReadMode_Distance,
 			ReadMode_Invalid
-		} eReadMode = ReadMode_Variable;
+		} eReadMode = ReadMode_Op;
+
+		// Parse variable
+		int iLast = m_var.ParseFromString(strOp);
 
 		// Loop through string
-		int iLast = 0;
-		for (int i = 0; i <= strOp.length(); i++) {
+		for (int i = iLast; i <= strOp.length(); i++) {
 
 			// Comma-delineated
 			if ((i == strOp.length()) || (strOp[i] == ',')) {
@@ -215,16 +415,8 @@ public:
 				std::string strSubStr =
 					strOp.substr(iLast, i - iLast);
 
-				// Read in column name
-				if (eReadMode == ReadMode_Variable) {
-
-					m_strVariable = strSubStr;
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Op;
-
 				// Read in operation
-				} else if (eReadMode == ReadMode_Op) {
+				if (eReadMode == ReadMode_Op) {
 					if (strSubStr == ">") {
 						m_eOp = GreaterThan;
 					} else if (strSubStr == "<") {
@@ -280,10 +472,7 @@ public:
 		}
 
 		// Output announcement
-		char szBuffer[128];
-		sprintf(szBuffer, "%s", m_strVariable.c_str());
-
-		std::string strDescription = szBuffer;
+		std::string strDescription = m_var.ToString();
 		if (m_eOp == GreaterThan) {
 			strDescription += " is greater than ";
 		} else if (m_eOp == LessThan) {
@@ -298,6 +487,7 @@ public:
 			strDescription += " is not equal to ";
 		}
 
+		char szBuffer[128];
 		sprintf(szBuffer, "%f within %f degrees",
 			m_dValue, m_dDistance);
 		strDescription += szBuffer;
@@ -309,7 +499,7 @@ public:
 	///	<summary>
 	///		Variable to use for thresholding.
 	///	</summary>
-	std::string m_strVariable;
+	Variable m_var;
 
 	///	<summary>
 	///		Operation.
@@ -343,16 +533,17 @@ public:
 	) {
 		// Read mode
 		enum {
-			ReadMode_Variable,
-			ReadMode_Distance,
 			ReadMode_Amount,
+			ReadMode_Distance,
 			ReadMode_MinMaxDist,
 			ReadMode_Invalid
-		} eReadMode = ReadMode_Variable;
+		} eReadMode = ReadMode_Amount;
+
+		// Get variable information
+		int iLast = m_var.ParseFromString(strOp);
 
 		// Loop through string
-		int iLast = 0;
-		for (int i = 0; i <= strOp.length(); i++) {
+		for (int i = iLast; i <= strOp.length(); i++) {
 
 			// Comma-delineated
 			if ((i == strOp.length()) || (strOp[i] == ',')) {
@@ -360,15 +551,8 @@ public:
 				std::string strSubStr =
 					strOp.substr(iLast, i - iLast);
 
-				// Read in variable name
-				if (eReadMode == ReadMode_Variable) {
-					m_strVariable = strSubStr;
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Amount;
-
 				// Read in amount
-				} else if (eReadMode == ReadMode_Amount) {
+				if (eReadMode == ReadMode_Amount) {
 					m_dDeltaAmount = atof(strSubStr.c_str());
 
 					iLast = i + 1;
@@ -409,7 +593,7 @@ public:
 		char szBuffer[128];
 
 		std::string strDescription;
-		strDescription += m_strVariable;
+		strDescription += m_var.ToString();
 
 		if (m_dDeltaAmount == 0.0) {
 			_EXCEPTIONT("For closed contour op, delta amount must be non-zero");
@@ -424,7 +608,7 @@ public:
 		if (m_dDeltaAmount < 0.0) {
 			Announce("%s decreases by %f over %f degrees"
 				   " (max search %f deg)",
-				m_strVariable.c_str(),
+				m_var.ToString().c_str(),
 				-m_dDeltaAmount,
 				m_dDistance,
 				m_dMinMaxDist);
@@ -432,7 +616,7 @@ public:
 		} else {
 			Announce("%s increases by %f over %f degrees"
 					" (min search %f deg)",
-				m_strVariable.c_str(),
+				m_var.ToString().c_str(),
 				m_dDeltaAmount,
 				m_dDistance,
 				m_dMinMaxDist);
@@ -441,9 +625,9 @@ public:
 
 public:
 	///	<summary>
-	///		Variable name.
+	///		Variable to use for closed contour op.
 	///	</summary>
-	std::string m_strVariable;
+	Variable m_var;
 
 	///	<summary>
 	///		Threshold amount.  If positive this represents a minimum
@@ -488,15 +672,16 @@ public:
 	) {
 		// Read mode
 		enum {
-			ReadMode_Variable,
 			ReadMode_Op,
 			ReadMode_Distance,
 			ReadMode_Invalid
-		} eReadMode = ReadMode_Variable;
+		} eReadMode = ReadMode_Op;
+
+		// Get variable information
+		int iLast = m_var.ParseFromString(strOp);
 
 		// Loop through string
-		int iLast = 0;
-		for (int i = 0; i <= strOp.length(); i++) {
+		for (int i = iLast; i <= strOp.length(); i++) {
 
 			// Comma-delineated
 			if ((i == strOp.length()) || (strOp[i] == ',')) {
@@ -504,16 +689,8 @@ public:
 				std::string strSubStr =
 					strOp.substr(iLast, i - iLast);
 
-				// Read in column name
-				if (eReadMode == ReadMode_Variable) {
-
-					m_strVariable = strSubStr;
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Op;
-
 				// Read in operation
-				} else if (eReadMode == ReadMode_Op) {
+				if (eReadMode == ReadMode_Op) {
 					if (strSubStr == "max") {
 						m_eOp = Max;
 					} else if (strSubStr == "min") {
@@ -567,7 +744,7 @@ public:
 
 		char szBuffer[128];
 
-		sprintf(szBuffer, "%s", m_strVariable.c_str());
+		sprintf(szBuffer, "%s", m_var.ToString().c_str());
 		strDescription += szBuffer;
 
 		sprintf(szBuffer, " within %f degrees", m_dDistance);
@@ -580,7 +757,7 @@ public:
 	///	<summary>
 	///		Variable to use for output.
 	///	</summary>
-	std::string m_strVariable;
+	Variable m_var;
 
 	///	<summary>
 	///		Operation.
@@ -1162,78 +1339,66 @@ void FindLocalAverage(
 template <typename real>
 void LoadGridData(
 	NcFile & ncFile,
-	const std::string & strVariable,
+	const Variable & varObj,
 	const SimpleGrid & grid,
 	DataVector<real> & data,
-	int iDim0 = 0
+	int iTime = (-1)
 ) {
 	// Get pointer to variable
-	NcVar * var = ncFile.get_var(strVariable.c_str());
-	if (var == NULL) {
-		_EXCEPTION1("No variable \"%s\" found in file",
-			strVariable.c_str());
+	NcVar * var = varObj.GetFromNetCDF(ncFile, iTime);
+
+	// Check grid dimensions
+	int nVarDims = var->num_dims();
+	if (nVarDims < grid.m_nGridDim.size()) {
+		_EXCEPTION1("Variable \"%s\" has insufficient dimensions",
+			varObj.m_strName.c_str());
 	}
 
-	// Grid dimensions
 	int nSize = 0;
 	int nLat = 0;
 	int nLon = 0;
 
+	long nDataSize[7];
+	for (int i = 0; i < 7; i++) {
+		nDataSize[i] = 1;
+	}
+
+	// Latitude/longitude grid
 	if (grid.m_nGridDim.size() == 2) {
 		nLat = grid.m_nGridDim[0];
 		nLon = grid.m_nGridDim[1];
+
+		int nVarDimX0 = var->get_dim(nVarDims-2)->size();
+		int nVarDimX1 = var->get_dim(nVarDims-1)->size();
+
+		if (nVarDimX0 != nLat) {
+			_EXCEPTION1("Dimension mismatch with variable \"%s\" on \"lat\"",
+				varObj.m_strName.c_str());
+		}
+		if (nVarDimX1 != nLon) {
+			_EXCEPTION1("Dimension mismatch with variable \"%s\" on \"lon\"",
+				varObj.m_strName.c_str());
+		}
+
+		nDataSize[nVarDims-2] = nLat;
+		nDataSize[nVarDims-1] = nLon;
+
+	// Unstructured grid
 	} else if (grid.m_nGridDim.size() == 1) {
 		nSize = grid.m_nGridDim[0];
+
+		int nVarDimX0 = var->get_dim(nVarDims-1)->size();
+
+		if (nVarDimX0 != nSize) {
+			_EXCEPTION1("Dimension mismatch with variable \"%s\" on \"ncol\"",
+				varObj.m_strName.c_str());
+		}
+
+		nDataSize[nVarDims-1] = nSize;
 	}
 
-	// Load data
-	if (var->num_dims() == 3) {
-		if (nSize != 0) {
-			_EXCEPTION1("%s field inconsistent with grid",
-				strVariable.c_str());
-		}
-		if (var->get_dim(1)->size() != nLat) {
-			_EXCEPTION1("%s field inconsistent with grid",
-				strVariable.c_str());
-		}
-		if (var->get_dim(2)->size() != nLon) {
-			_EXCEPTION1("%s field inconsistent with grid",
-				strVariable.c_str());
-		}
-		var->set_cur(iDim0, 0, 0);
-		var->get(&(data[0]), 1, nLat, nLon);
-
-	} else if (var->num_dims() == 2) {
-		if (nSize != 0) {
-			if (var->get_dim(1)->size() != nSize) {
-				_EXCEPTION1("%s field inconsistent with grid",
-					strVariable.c_str());
-			}
-			var->set_cur(iDim0, 0);
-			var->get(&(data[0]), 1, nSize);
-
-		} else {
-			if (var->get_dim(0)->size() != nLat) {
-				_EXCEPTION1("%s field inconsistent with grid",
-					strVariable.c_str());
-			}
-			if (var->get_dim(1)->size() != nLon) {
-				_EXCEPTION1("%s field inconsistent with grid",
-					strVariable.c_str());
-			}
-			var->get(&(data[0]), nLat, nLon);
-		}
-
-	} else if (var->num_dims() == 1) {
-		if (var->get_dim(0)->size() != nSize) {
-			_EXCEPTION1("%s field inconsistent with grid",
-				strVariable.c_str());
-		}
-		var->get(&(data[0]), nSize);
-
-	} else {
-		_EXCEPTIONT("Invalid number of dimensions on variable \"PHIS\"");
-	}
+	// Load the data
+	var->get(&(data[0]), &(nDataSize[0]));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1288,6 +1453,9 @@ try {
 	// Output commands
 	std::string strOutputCmd;
 
+	// Regional (do not wrap longitudinal boundaries)
+	bool fRegional;
+
 	// Output header
 	bool fOutputHeader;
 
@@ -1309,6 +1477,7 @@ try {
 		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,dist,delta,minmaxdist;...]");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,op,dist;...]");
+		CommandLineBool(fRegional, "regional");
 		CommandLineBool(fOutputHeader, "out_header");
 		CommandLineInt(iVerbosityLevel, "verbosity", 0);
 
@@ -1340,13 +1509,13 @@ try {
 	}
 
 	bool fSearchByMinima = false;
-	std::string strSearchBy;
+	Variable varSearchBy;
 	if (strSearchByMin != "") {
-		strSearchBy = strSearchByMin;
+		varSearchBy.ParseFromString(strSearchByMin);
 		fSearchByMinima = true;
 	}
 	if (strSearchByMax != "") {
-		strSearchBy = strSearchByMax;
+		varSearchBy.ParseFromString(strSearchByMax);
 		fSearchByMinima = false;
 	}
 
@@ -1503,7 +1672,7 @@ try {
 		}
 
 		// Generate the SimpleGrid
-		grid.GenerateLatitudeLongitude(vecLat, vecLon);
+		grid.GenerateLatitudeLongitude(vecLat, vecLon, fRegional);
 	}
 
 	// Get time dimension
@@ -1538,7 +1707,7 @@ try {
 			_EXCEPTION1("Unable to open file \"%s\"", strTopoFile.c_str());
 		}
 
-		LoadGridData<float>(ncTopo, "PHIS", grid, dataPHIS);
+		LoadGridData<float>(ncTopo, Variable("PHIS"), grid, dataPHIS);
 	}
 
 	if ((strTopoFile == "") && (dMaxTopoHeight != 0.0)) {
@@ -1566,7 +1735,7 @@ try {
 		AnnounceStartBlock(szStartBlock);
 
 		// Load the data for the search variable
-		LoadGridData<float>(ncInput, strSearchBy.c_str(), grid, dataSearch, t);
+		LoadGridData<float>(ncInput, varSearchBy, grid, dataSearch, t);
 
 		// Tag all minima
 		std::set<int> setCandidates;
@@ -1734,45 +1903,6 @@ try {
 			setCandidates = setNewCandidates;
 		}
 
-		// Eliminate based on closed contours
-		for (int ccc = 0; ccc < vecClosedContourOp.size(); ccc++) {
-			std::set<int> setNewCandidates;
-
-			// Load the search variable data
-			DataVector<float> dataState(grid.GetSize());
-			
-			LoadGridData<float>(
-				ncInput, vecClosedContourOp[ccc].m_strVariable.c_str(),
-				grid, dataState, t);
-
-			// Loop through all pressure minima
-			std::set<int>::const_iterator iterCandidate
-				= setCandidates.begin();
-
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-
-				// Determine if pressure minima have a closed contour
-				bool fHasClosedContour =
-					HasClosedContour<float>(
-						grid,
-						dataState,
-						*iterCandidate,
-						vecClosedContourOp[ccc].m_dDeltaAmount,
-						vecClosedContourOp[ccc].m_dDistance,
-						vecClosedContourOp[ccc].m_dMinMaxDist
-					);
-
-				// If not rejected, add to new pressure minima array
-				if (fHasClosedContour) {
-					setNewCandidates.insert(*iterCandidate);
-				} else {
-					vecRejectedClosedContour[ccc]++;
-				}
-			}
-
-			setCandidates = setNewCandidates;
-		}
-
 		// Eliminate based on thresholds
 		for (int tc = 0; tc < vecThresholdOp.size(); tc++) {
 
@@ -1782,7 +1912,7 @@ try {
 			DataVector<float> dataState(grid.GetSize());
 			
 			LoadGridData<float>(
-				ncInput, vecThresholdOp[tc].m_strVariable.c_str(),
+				ncInput, vecThresholdOp[tc].m_var,
 				grid, dataState, t);
 
 			// Loop through all pressure minima
@@ -1813,21 +1943,60 @@ try {
 			setCandidates = setNewCandidates;
 		}
 
+		// Eliminate based on closed contours
+		for (int ccc = 0; ccc < vecClosedContourOp.size(); ccc++) {
+			std::set<int> setNewCandidates;
+
+			// Load the search variable data
+			DataVector<float> dataState(grid.GetSize());
+			
+			LoadGridData<float>(
+				ncInput, vecClosedContourOp[ccc].m_var,
+				grid, dataState, t);
+
+			// Loop through all pressure minima
+			std::set<int>::const_iterator iterCandidate
+				= setCandidates.begin();
+
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+				// Determine if pressure minima have a closed contour
+				bool fHasClosedContour =
+					HasClosedContour<float>(
+						grid,
+						dataState,
+						*iterCandidate,
+						vecClosedContourOp[ccc].m_dDeltaAmount,
+						vecClosedContourOp[ccc].m_dDistance,
+						vecClosedContourOp[ccc].m_dMinMaxDist
+					);
+
+				// If not rejected, add to new pressure minima array
+				if (fHasClosedContour) {
+					setNewCandidates.insert(*iterCandidate);
+				} else {
+					vecRejectedClosedContour[ccc]++;
+				}
+			}
+
+			setCandidates = setNewCandidates;
+		}
+
 		Announce("Total candidates: %i", setCandidates.size());
 		Announce("Rejected (  latitude): %i", nRejectedLatitude);
 		Announce("Rejected (topography): %i", nRejectedTopography);
 		Announce("Rejected (    merged): %i", nRejectedMerge);
 
-		for (int ccc = 0; ccc < vecRejectedClosedContour.GetRows(); ccc++) {
-			Announce("Rejected: (contour %s): %i",
-					vecClosedContourOp[ccc].m_strVariable.c_str(),
-					vecRejectedClosedContour[ccc]);
+		for (int tc = 0; tc < vecRejectedThreshold.GetRows(); tc++) {
+			Announce("Rejected (thresh. %s): %i",
+					vecThresholdOp[tc].m_var.m_strName.c_str(),
+					vecRejectedThreshold[tc]);
 		}
 
-		for (int tc = 0; tc < vecRejectedThreshold.GetRows(); tc++) {
-			Announce("Rejected: (thresh. %s): %i",
-					vecThresholdOp[tc].m_strVariable.c_str(),
-					vecRejectedThreshold[tc]);
+		for (int ccc = 0; ccc < vecRejectedClosedContour.GetRows(); ccc++) {
+			Announce("Rejected (contour %s): %i",
+					vecClosedContourOp[ccc].m_var.m_strName.c_str(),
+					vecRejectedClosedContour[ccc]);
 		}
 
 		// Write results to file
@@ -1883,7 +2052,7 @@ try {
 				DataVector<float> dataState(grid.GetSize());
 			
 				LoadGridData<float>(
-					ncInput, vecOutputOp[outc].m_strVariable.c_str(),
+					ncInput, vecOutputOp[outc].m_var,
 					grid, dataState, t);
 
 				// Loop through all pressure minima
