@@ -210,11 +210,19 @@ public:
 	int ParseFromString(
 		const std::string & strIn
 	) {
+		m_fOp = false;
 		m_strName = "";
 		m_nSpecifiedDim = 0;
+		m_varArg.clear();
 
 		bool fDimMode = false;
 		std::string strDim;
+
+		if (strIn.length() >= 1) {
+			if (strIn[0] == '_') {
+				m_fOp = true;
+			}
+		}
 
 		for (int n = 0; n <= strIn.length(); n++) {
 			// Reading the variable name
@@ -225,18 +233,23 @@ public:
 				}
 				if (strIn[n] == ',') {
 					m_strName = strIn.substr(0, n);
-					return (n+1);
+					return n;
 				}
 				if (strIn[n] == '(') {
 					m_strName = strIn.substr(0, n);
 					fDimMode = true;
 					continue;
 				}
+				if (strIn[n] == ')') {
+					m_strName = strIn.substr(0, n);
+					return n;
+				}
 
 			// Reading in dimensions
-			} else {
+			} else if (!m_fOp) {
 				if (m_nSpecifiedDim == 4) {
-					_EXCEPTIONT("Only 4 dimensions may be specified");
+					_EXCEPTIONT("Only 4 dimensions / arguments may "
+						"be specified");
 				}
 				if (n == strIn.length()) {
 					_EXCEPTION1("Variable dimension list must be terminated"
@@ -256,14 +269,29 @@ public:
 					}
 					m_iDim[m_nSpecifiedDim] = atoi(strDim.c_str());
 					m_nSpecifiedDim++;
-					if (n == strIn.length()-1) {
-						return (n+1);
-					} else if (strIn[n+1] == ',') {
-						return (n+2);
-					}
+					return (n+1);
 
 				} else {
 					strDim += strIn[n];
+				}
+
+			// Reading in arguments
+			} else {
+				if (m_nSpecifiedDim == 4) {
+					_EXCEPTIONT("Only 4 dimensions / arguments may "
+						"be specified");
+				}
+				if (n == strIn.length()) {
+					_EXCEPTION1("Op argument list must be terminated"
+						" with ): %s", strIn.c_str());
+				}
+				m_varArg.resize(m_nSpecifiedDim+1);
+				n += m_varArg[m_nSpecifiedDim]
+					.ParseFromString(strIn.substr(n));
+				m_nSpecifiedDim++;
+
+				if (strIn[n] == ')') {
+					return (n+1);
 				}
 			}
 		}
@@ -282,8 +310,12 @@ public:
 		}
 		strOut += "(";
 		for (int d = 0; d < m_nSpecifiedDim; d++) {
-			sprintf(szBuffer, "%i", m_iDim[d]);
-			strOut += szBuffer;
+			if (m_fOp) {
+				strOut += m_varArg[d].ToString();
+			} else {
+				sprintf(szBuffer, "%i", m_iDim[d]);
+				strOut += szBuffer;
+			}
 			if (d != m_nSpecifiedDim-1) {
 				strOut += ",";
 			} else {
@@ -300,6 +332,11 @@ public:
 		NcFile & ncFile,
 		int iTime = (-1)
 	) const {
+		if (m_fOp) {
+			_EXCEPTION1("Cannot call GetFromNetCDF() on operator \"%s\"",
+				m_strName.c_str());
+		}
+
 		NcVar * var = ncFile.get_var(m_strName.c_str());
 		if (var == NULL) {
 			_EXCEPTION1("Variable \"%s\" not found in input file",
@@ -351,7 +388,110 @@ public:
 		return var;
 	}
 
+	///	<summary>
+	///		Load a data block from the NcFile.
+	///	</summary>
+	template <typename real>
+	void LoadGridData(
+		NcFile & ncFile,
+		const SimpleGrid & grid,
+		DataVector<real> & data,
+		int iTime = (-1)
+	) {
+		// Get the data directly from a variable
+		if (!m_fOp) {
+			// Get pointer to variable
+			NcVar * var = GetFromNetCDF(ncFile, iTime);
+
+			// Check grid dimensions
+			int nVarDims = var->num_dims();
+			if (nVarDims < grid.m_nGridDim.size()) {
+				_EXCEPTION1("Variable \"%s\" has insufficient dimensions",
+					m_strName.c_str());
+			}
+
+			int nSize = 0;
+			int nLat = 0;
+			int nLon = 0;
+
+			long nDataSize[7];
+			for (int i = 0; i < 7; i++) {
+				nDataSize[i] = 1;
+			}
+
+			// Latitude/longitude grid
+			if (grid.m_nGridDim.size() == 2) {
+				nLat = grid.m_nGridDim[0];
+				nLon = grid.m_nGridDim[1];
+
+				int nVarDimX0 = var->get_dim(nVarDims-2)->size();
+				int nVarDimX1 = var->get_dim(nVarDims-1)->size();
+
+				if (nVarDimX0 != nLat) {
+					_EXCEPTION1("Dimension mismatch with variable"
+						" \"%s\" on \"lat\"",
+						m_strName.c_str());
+				}
+				if (nVarDimX1 != nLon) {
+					_EXCEPTION1("Dimension mismatch with variable"
+						" \"%s\" on \"lon\"",
+						m_strName.c_str());
+				}
+
+				nDataSize[nVarDims-2] = nLat;
+				nDataSize[nVarDims-1] = nLon;
+
+			// Unstructured grid
+			} else if (grid.m_nGridDim.size() == 1) {
+				nSize = grid.m_nGridDim[0];
+
+				int nVarDimX0 = var->get_dim(nVarDims-1)->size();
+
+				if (nVarDimX0 != nSize) {
+					_EXCEPTION1("Dimension mismatch with variable"
+						" \"%s\" on \"ncol\"",
+						m_strName.c_str());
+				}
+
+				nDataSize[nVarDims-1] = nSize;
+			}
+
+			// Load the data
+			var->get(&(data[0]), &(nDataSize[0]));
+			return;
+		}
+
+		// Evaluate an operator
+		if (m_strName == "_VECMAG") {
+			if (m_varArg.size() != 2) {
+				_EXCEPTION1("_VECMAG expects two arguments: %i given",
+					m_varArg.size());
+			}
+			DataVector<real> dataLeft(data.GetRows());
+			DataVector<real> dataRight(data.GetRows());
+
+			m_varArg[0].LoadGridData<real>(
+				ncFile, grid, dataLeft, iTime);
+			m_varArg[1].LoadGridData<real>(
+				ncFile, grid, dataRight, iTime);
+
+			for (int i = 0; i < data.GetRows(); i++) {
+				data[i] =
+					sqrt(dataLeft[i] * dataLeft[i]
+						+ dataRight[i] * dataRight[i]);
+			}
+
+		} else {
+			_EXCEPTION1("Unexpected operator \"%s\"", m_strName.c_str());
+		}
+	}
+
 public:
+	///	<summary>
+	///		Flag indicating this is an operator.
+	///	</summary>
+	bool m_fOp;
+
 	///	<summary>
 	///		Variable name.
 	///	</summary>
@@ -366,6 +506,12 @@ public:
 	///		Specified dimension values.
 	///	</summary>
 	int m_iDim[4];
+
+	///	<summary>
+	///		Specified operator arguments.
+	///	</summary>
+	std::vector<Variable> m_varArg;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -404,7 +550,7 @@ public:
 		} eReadMode = ReadMode_Op;
 
 		// Parse variable
-		int iLast = m_var.ParseFromString(strOp);
+		int iLast = m_var.ParseFromString(strOp) + 1;
 
 		// Loop through string
 		for (int i = iLast; i <= strOp.length(); i++) {
@@ -540,7 +686,7 @@ public:
 		} eReadMode = ReadMode_Amount;
 
 		// Get variable information
-		int iLast = m_var.ParseFromString(strOp);
+		int iLast = m_var.ParseFromString(strOp) + 1;
 
 		// Loop through string
 		for (int i = iLast; i <= strOp.length(); i++) {
@@ -678,7 +824,7 @@ public:
 		} eReadMode = ReadMode_Op;
 
 		// Get variable information
-		int iLast = m_var.ParseFromString(strOp);
+		int iLast = m_var.ParseFromString(strOp) + 1;
 
 		// Loop through string
 		for (int i = iLast; i <= strOp.length(); i++) {
@@ -1333,76 +1479,6 @@ void FindLocalAverage(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-///	<summary>
-///		Load a data block from the NcFile.
-///	</summary>
-template <typename real>
-void LoadGridData(
-	NcFile & ncFile,
-	const Variable & varObj,
-	const SimpleGrid & grid,
-	DataVector<real> & data,
-	int iTime = (-1)
-) {
-	// Get pointer to variable
-	NcVar * var = varObj.GetFromNetCDF(ncFile, iTime);
-
-	// Check grid dimensions
-	int nVarDims = var->num_dims();
-	if (nVarDims < grid.m_nGridDim.size()) {
-		_EXCEPTION1("Variable \"%s\" has insufficient dimensions",
-			varObj.m_strName.c_str());
-	}
-
-	int nSize = 0;
-	int nLat = 0;
-	int nLon = 0;
-
-	long nDataSize[7];
-	for (int i = 0; i < 7; i++) {
-		nDataSize[i] = 1;
-	}
-
-	// Latitude/longitude grid
-	if (grid.m_nGridDim.size() == 2) {
-		nLat = grid.m_nGridDim[0];
-		nLon = grid.m_nGridDim[1];
-
-		int nVarDimX0 = var->get_dim(nVarDims-2)->size();
-		int nVarDimX1 = var->get_dim(nVarDims-1)->size();
-
-		if (nVarDimX0 != nLat) {
-			_EXCEPTION1("Dimension mismatch with variable \"%s\" on \"lat\"",
-				varObj.m_strName.c_str());
-		}
-		if (nVarDimX1 != nLon) {
-			_EXCEPTION1("Dimension mismatch with variable \"%s\" on \"lon\"",
-				varObj.m_strName.c_str());
-		}
-
-		nDataSize[nVarDims-2] = nLat;
-		nDataSize[nVarDims-1] = nLon;
-
-	// Unstructured grid
-	} else if (grid.m_nGridDim.size() == 1) {
-		nSize = grid.m_nGridDim[0];
-
-		int nVarDimX0 = var->get_dim(nVarDims-1)->size();
-
-		if (nVarDimX0 != nSize) {
-			_EXCEPTION1("Dimension mismatch with variable \"%s\" on \"ncol\"",
-				varObj.m_strName.c_str());
-		}
-
-		nDataSize[nVarDims-1] = nSize;
-	}
-
-	// Load the data
-	var->get(&(data[0]), &(nDataSize[0]));
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 int main(int argc, char** argv) {
 
 	NcError error(NcError::verbose_nonfatal);
@@ -1738,7 +1814,8 @@ try {
 			_EXCEPTION1("Unable to open file \"%s\"", strTopoFile.c_str());
 		}
 
-		LoadGridData<float>(ncTopo, Variable("PHIS"), grid, dataPHIS);
+		Variable varPHIS("PHIS");
+		varPHIS.LoadGridData<float>(ncTopo, grid, dataPHIS);
 	}
 
 	if ((strTopoFile == "") && (dMaxTopoHeight != 0.0)) {
@@ -1766,7 +1843,7 @@ try {
 		AnnounceStartBlock(szStartBlock);
 
 		// Load the data for the search variable
-		LoadGridData<float>(ncInput, varSearchBy, grid, dataSearch, t);
+		varSearchBy.LoadGridData<float>(ncInput, grid, dataSearch, t);
 
 		// Tag all minima
 		std::set<int> setCandidates;
@@ -1943,9 +2020,8 @@ try {
 			// Load the search variable data
 			DataVector<float> dataState(grid.GetSize());
 			
-			LoadGridData<float>(
-				ncInput, vecThresholdOp[tc].m_var,
-				grid, dataState, t);
+			vecThresholdOp[tc].m_var.LoadGridData<float>(
+				ncInput, grid, dataState, t);
 
 			// Loop through all pressure minima
 			std::set<int>::const_iterator iterCandidate
@@ -1982,9 +2058,8 @@ try {
 			// Load the search variable data
 			DataVector<float> dataState(grid.GetSize());
 			
-			LoadGridData<float>(
-				ncInput, vecClosedContourOp[ccc].m_var,
-				grid, dataState, t);
+			vecClosedContourOp[ccc].m_var.LoadGridData<float>(
+				ncInput, grid, dataState, t);
 
 			// Loop through all pressure minima
 			std::set<int>::const_iterator iterCandidate
@@ -2021,9 +2096,8 @@ try {
 			// Load the search variable data
 			DataVector<float> dataState(grid.GetSize());
 			
-			LoadGridData<float>(
-				ncInput, vecNoClosedContourOp[ccc].m_var,
-				grid, dataState, t);
+			vecNoClosedContourOp[ccc].m_var.LoadGridData<float>(
+				ncInput, grid, dataState, t);
 
 			// Loop through all pressure minima
 			std::set<int>::const_iterator iterCandidate
@@ -2128,9 +2202,8 @@ try {
 				// Load the search variable data
 				DataVector<float> dataState(grid.GetSize());
 			
-				LoadGridData<float>(
-					ncInput, vecOutputOp[outc].m_var,
-					grid, dataState, t);
+				vecOutputOp[outc].m_var.LoadGridData<float>(
+					ncInput, grid, dataState, t);
 
 				// Loop through all pressure minima
 				std::set<int>::const_iterator iterCandidate
