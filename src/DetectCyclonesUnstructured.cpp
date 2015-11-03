@@ -2037,9 +2037,9 @@ try {
 						grid,
 						dataState,
 						*iterCandidate,
-						vecClosedContourOp[ccc].m_dDeltaAmount,
-						vecClosedContourOp[ccc].m_dDistance,
-						vecClosedContourOp[ccc].m_dMinMaxDist
+						vecNoClosedContourOp[ccc].m_dDeltaAmount,
+						vecNoClosedContourOp[ccc].m_dDistance,
+						vecNoClosedContourOp[ccc].m_dMinMaxDist
 					);
 
 				// If a closed contour is present, reject this candidate
