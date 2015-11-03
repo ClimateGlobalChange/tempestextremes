@@ -33,6 +33,9 @@ DETECTCYCLONES_CFILES= kdtree.c
 DENSITYNODES_FILES= DensityNodes.cpp Announce.cpp
 DENSITYNODES_CFILES=
 
+HISTOGRAMNODES_FILES= HistogramNodes.cpp Announce.cpp
+HISTOGRAMNODES_CFILES=
+
 APPENDNODEDATA_FILES= AppendNodeData.cpp Announce.cpp
 APPENDNODEDATA_CFILES=
 
@@ -45,7 +48,7 @@ include Make.defs
 ##
 ## Build instructions
 ##
-all: StitchNodes StitchBlobs DetectCyclones DetectCyclonesUnstructured DensityNodes AppendNodeData
+all: StitchNodes StitchBlobs DetectCyclones DetectCyclonesUnstructured DensityNodes HistogramNodes AppendNodeData
 	mkdir -p ../bin
 	mv $^ ../bin
 
@@ -64,6 +67,9 @@ DetectCyclonesUnstructured: $(DETECTCYCLONESUNSTRUCTURED_FILES:%.cpp=$(BUILDDIR)
 DensityNodes: $(DENSITYNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENSITYNODES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(DENSITYNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENSITYNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 
+HistogramNodes: $(HISTOGRAMNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(HISTOGRAMNODES_CFILES:%.c=$(BUILDDIR)/%.o)
+	$(CC) $(LDFLAGS) -o $@ $(HISTOGRAMNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(HISTOGRAMNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
+
 AppendNodeData: $(APPENDNODEDATA_FILES:%.cpp=$(BUILDDIR)/%.o) $(APPENDNODEDATA_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(APPENDNODEDATA_FILES:%.cpp=$(BUILDDIR)/%.o) $(APPENDNODEDATA_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 
@@ -71,7 +77,7 @@ AppendNodeData: $(APPENDNODEDATA_FILES:%.cpp=$(BUILDDIR)/%.o) $(APPENDNODEDATA_C
 ## Clean
 ##
 clean:
-	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes AppendNodeData
+	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes HistogramNodes AppendNodeData
 	rm -rf $(DEPDIR)
 	rm -rf $(BUILDDIR)
 
