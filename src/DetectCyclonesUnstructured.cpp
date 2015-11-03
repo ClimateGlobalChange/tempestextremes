@@ -2070,6 +2070,12 @@ try {
 					vecRejectedClosedContour[ccc]);
 		}
 
+		for (int ccc = 0; ccc < vecRejectedNoClosedContour.GetRows(); ccc++) {
+			Announce("Rejected (nocontour %s): %i",
+					vecNoClosedContourOp[ccc].m_var.m_strName.c_str(),
+					vecRejectedNoClosedContour[ccc]);
+		}
+
 		// Write results to file
 		{
 			// Parse time information
