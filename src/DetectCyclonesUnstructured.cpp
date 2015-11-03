@@ -1560,6 +1560,9 @@ try {
 	// Output commands
 	std::string strOutputCmd;
 
+	// Time stride
+	int nTimeStride;
+
 	// Regional (do not wrap longitudinal boundaries)
 	bool fRegional;
 
@@ -1585,6 +1588,7 @@ try {
 		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,dist,delta,minmaxdist;...]");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,op,dist;...]");
+		CommandLineInt(nTimeStride, "timestride", 1);
 		CommandLineBool(fRegional, "regional");
 		CommandLineBool(fOutputHeader, "out_header");
 		CommandLineInt(iVerbosityLevel, "verbosity", 0);
@@ -1863,7 +1867,7 @@ try {
 	}
 
 	// Loop through all times
-	for (int t = 0; t < nTime; t++) {
+	for (int t = 0; t < nTime; t += nTimeStride) {
 	//for (int t = 0; t < 1; t++) {
 
 		char szStartBlock[128];
