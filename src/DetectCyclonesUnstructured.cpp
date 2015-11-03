@@ -1447,6 +1447,9 @@ try {
 	// Closed contour commands
 	std::string strClosedContourCmd;
 
+	// Closed contour commands
+	std::string strNoClosedContourCmd;
+
 	// Threshold commands
 	std::string strThresholdCmd;
 
@@ -1475,6 +1478,7 @@ try {
 		CommandLineDoubleD(dMaxTopoHeight, "maxtopoht", 0.0, "(m)");
 		CommandLineDoubleD(dMergeDist, "mergedist", 0.0, "(degrees)");
 		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,dist,delta,minmaxdist;...]");
+		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,dist,delta,minmaxdist;...]");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,op,dist;...]");
 		CommandLineBool(fRegional, "regional");
@@ -1538,6 +1542,33 @@ try {
 				int iNextOp = (int)(vecClosedContourOp.size());
 				vecClosedContourOp.resize(iNextOp + 1);
 				vecClosedContourOp[iNextOp].Parse(strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	// Parse the no closed contour command string
+	std::vector<ClosedContourOp> vecNoClosedContourOp;
+
+	if (strNoClosedContourCmd != "") {
+		AnnounceStartBlock("Parsing no closed contour operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strNoClosedContourCmd.length(); i++) {
+
+			if ((i == strNoClosedContourCmd.length()) ||
+				(strNoClosedContourCmd[i] == ';') ||
+				(strNoClosedContourCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strNoClosedContourCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecNoClosedContourOp.size());
+				vecNoClosedContourOp.resize(iNextOp + 1);
+				vecNoClosedContourOp[iNextOp].Parse(strSubStr);
 
 				iLast = i + 1;
 			}
@@ -1754,6 +1785,7 @@ try {
 		int nRejectedMerge = 0;
 
 		DataVector<int> vecRejectedClosedContour(vecClosedContourOp.size());
+		DataVector<int> vecRejectedNoClosedContour(vecNoClosedContourOp.size());
 		DataVector<int> vecRejectedThreshold(vecThresholdOp.size());
 
 		// Eliminate based on maximum latitude
@@ -1960,7 +1992,7 @@ try {
 
 			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 
-				// Determine if pressure minima have a closed contour
+				// Determine if a closed contour is present
 				bool fHasClosedContour =
 					HasClosedContour<float>(
 						grid,
@@ -1976,6 +2008,45 @@ try {
 					setNewCandidates.insert(*iterCandidate);
 				} else {
 					vecRejectedClosedContour[ccc]++;
+				}
+			}
+
+			setCandidates = setNewCandidates;
+		}
+
+		// Eliminate based on no closed contours
+		for (int ccc = 0; ccc < vecNoClosedContourOp.size(); ccc++) {
+			std::set<int> setNewCandidates;
+
+			// Load the search variable data
+			DataVector<float> dataState(grid.GetSize());
+			
+			LoadGridData<float>(
+				ncInput, vecNoClosedContourOp[ccc].m_var,
+				grid, dataState, t);
+
+			// Loop through all pressure minima
+			std::set<int>::const_iterator iterCandidate
+				= setCandidates.begin();
+
+			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+
+				// Determine if a closed contour is present
+				bool fHasClosedContour =
+					HasClosedContour<float>(
+						grid,
+						dataState,
+						*iterCandidate,
+						vecClosedContourOp[ccc].m_dDeltaAmount,
+						vecClosedContourOp[ccc].m_dDistance,
+						vecClosedContourOp[ccc].m_dMinMaxDist
+					);
+
+				// If a closed contour is present, reject this candidate
+				if (fHasClosedContour) {
+					vecRejectedNoClosedContour[ccc]++;
+				} else {
+					setNewCandidates.insert(*iterCandidate);
 				}
 			}
 
