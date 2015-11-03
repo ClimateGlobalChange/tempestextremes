@@ -461,7 +461,7 @@ public:
 			return;
 		}
 
-		// Evaluate an operator
+		// Evaluate the vector magnitude operator
 		if (m_strName == "_VECMAG") {
 			if (m_varArg.size() != 2) {
 				_EXCEPTION1("_VECMAG expects two arguments: %i given",
@@ -479,6 +479,24 @@ public:
 				data[i] =
 					sqrt(dataLeft[i] * dataLeft[i]
 						+ dataRight[i] * dataRight[i]);
+			}
+
+		// Evaluate the minus operator
+		} else if (m_strName == "_DIFF") {
+			if (m_varArg.size() != 2) {
+				_EXCEPTION1("_VECMAG expects two arguments: %i given",
+					m_varArg.size());
+			}
+			DataVector<real> dataLeft(data.GetRows());
+			DataVector<real> dataRight(data.GetRows());
+
+			m_varArg[0].LoadGridData<real>(
+				ncFile, grid, dataLeft, iTime);
+			m_varArg[1].LoadGridData<real>(
+				ncFile, grid, dataRight, iTime);
+
+			for (int i = 0; i < data.GetRows(); i++) {
+				data[i] = dataLeft[i] - dataRight[i];
 			}
 
 		} else {
@@ -806,7 +824,9 @@ public:
 	enum Operation {
 		Max,
 		Min,
-		Avg
+		Avg,
+		MaxDist,
+		MinDist
 	};
 
 public:
@@ -843,6 +863,10 @@ public:
 						m_eOp = Min;
 					} else if (strSubStr == "avg") {
 						m_eOp = Avg;
+					} else if (strSubStr == "maxdist") {
+						m_eOp = MaxDist;
+					} else if (strSubStr == "mindist") {
+						m_eOp = MinDist;
 					} else {
 						_EXCEPTION1("Output invalid operation \"%s\"",
 							strSubStr.c_str());
@@ -886,6 +910,10 @@ public:
 			strDescription += "Minimum of ";
 		} else if (m_eOp == Avg) {
 			strDescription += "Average of ";
+		} else if (m_eOp == MaxDist) {
+			strDescription += "Distance to maximum of ";
+		} else if (m_eOp == MinDist) {
+			strDescription += "Distance to minimum of ";
 		}
 
 		char szBuffer[128];
@@ -2229,6 +2257,19 @@ try {
 
 						dOutput[iCandidateCount][outc] = dValue;
 
+					} else if (vecOutputOp[outc].m_eOp == OutputOp::MaxDist) {
+						FindLocalMinMax<float>(
+							grid,
+							false,
+							dataState,
+							*iterCandidate,
+							vecOutputOp[outc].m_dDistance,
+							ixExtremum,
+							dValue,
+							dRMax);
+
+						dOutput[iCandidateCount][outc] = dRMax;
+
 					} else if (vecOutputOp[outc].m_eOp == OutputOp::Min) {
 						FindLocalMinMax<float>(
 							grid,
@@ -2241,6 +2282,19 @@ try {
 							dRMax);
 
 						dOutput[iCandidateCount][outc] = dValue;
+
+					} else if (vecOutputOp[outc].m_eOp == OutputOp::MinDist) {
+						FindLocalMinMax<float>(
+							grid,
+							true,
+							dataState,
+							*iterCandidate,
+							vecOutputOp[outc].m_dDistance,
+							ixExtremum,
+							dValue,
+							dRMax);
+
+						dOutput[iCandidateCount][outc] = dRMax;
 
 					} else if (vecOutputOp[outc].m_eOp == OutputOp::Avg) {
 						FindLocalAverage<float>(
