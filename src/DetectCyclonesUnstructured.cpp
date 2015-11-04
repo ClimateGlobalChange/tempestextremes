@@ -188,6 +188,7 @@ public:
 	///		Default constructor.
 	///	</summary>
 	Variable() :
+		m_fOp(false),
 		m_strName(),
 		m_nSpecifiedDim(0)
 	{ }
@@ -198,6 +199,7 @@ public:
 	Variable(
 		const std::string & strName
 	) :
+		m_fOp(false),
 		m_strName(strName),
 		m_nSpecifiedDim(0)
 	{ }
