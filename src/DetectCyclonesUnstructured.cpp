@@ -404,6 +404,10 @@ public:
 		if (!m_fOp) {
 			// Get pointer to variable
 			NcVar * var = GetFromNetCDF(ncFile, iTime);
+			if (var == NULL) {
+				_EXCEPTION1("Variable \"%s\" not found in NetCDF file",
+					m_strName.c_str());
+			}
 
 			// Check grid dimensions
 			int nVarDims = var->num_dims();
@@ -1840,7 +1844,7 @@ try {
 	// Load topography data (if requested)
 	NcVar * varPHIS = NULL;
 
-	DataVector<float> dataPHIS;
+	DataVector<float> dataPHIS(grid.GetSize());
 
 	if (strTopoFile != "") {
 		NcFile ncTopo(strTopoFile.c_str());
