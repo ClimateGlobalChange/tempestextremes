@@ -36,6 +36,10 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+typedef std::vector<NcFile *> NcFileVector;
+
+///////////////////////////////////////////////////////////////////////////////
+
 ///	<summary>
 ///		A data structure describing the grid, including coordinates of
 ///		each data point and graph connectivity of elements.
@@ -331,7 +335,7 @@ public:
 	///		Get this variable in the given NcFile.
 	///	</summary>
 	NcVar * GetFromNetCDF(
-		NcFile & ncFile,
+		NcFileVector & vecFiles,
 		int iTime = (-1)
 	) const {
 		if (m_fOp) {
@@ -339,9 +343,15 @@ public:
 				m_strName.c_str());
 		}
 
-		NcVar * var = ncFile.get_var(m_strName.c_str());
+		NcVar * var = NULL;
+		for (int i = 0; i < vecFiles.size(); i++) {
+			var = vecFiles[i]->get_var(m_strName.c_str());
+			if (var != NULL) {
+				break;
+			}
+		}
 		if (var == NULL) {
-			_EXCEPTION1("Variable \"%s\" not found in input file",
+			_EXCEPTION1("Variable \"%s\" not found in input files",
 				m_strName.c_str());
 		}
 
@@ -391,11 +401,11 @@ public:
 	}
 
 	///	<summary>
-	///		Load a data block from the NcFile.
+	///		Load a data block from the NcFileVector.
 	///	</summary>
 	template <typename real>
 	void LoadGridData(
-		NcFile & ncFile,
+		NcFileVector & vecFiles,
 		const SimpleGrid & grid,
 		DataVector<real> & data,
 		int iTime = (-1)
@@ -403,7 +413,7 @@ public:
 		// Get the data directly from a variable
 		if (!m_fOp) {
 			// Get pointer to variable
-			NcVar * var = GetFromNetCDF(ncFile, iTime);
+			NcVar * var = GetFromNetCDF(vecFiles, iTime);
 			if (var == NULL) {
 				_EXCEPTION1("Variable \"%s\" not found in NetCDF file",
 					m_strName.c_str());
@@ -477,9 +487,9 @@ public:
 			DataVector<real> dataRight(data.GetRows());
 
 			m_varArg[0].LoadGridData<real>(
-				ncFile, grid, dataLeft, iTime);
+				vecFiles, grid, dataLeft, iTime);
 			m_varArg[1].LoadGridData<real>(
-				ncFile, grid, dataRight, iTime);
+				vecFiles, grid, dataRight, iTime);
 
 			for (int i = 0; i < data.GetRows(); i++) {
 				data[i] =
@@ -497,9 +507,9 @@ public:
 			DataVector<real> dataRight(data.GetRows());
 
 			m_varArg[0].LoadGridData<real>(
-				ncFile, grid, dataLeft, iTime);
+				vecFiles, grid, dataLeft, iTime);
 			m_varArg[1].LoadGridData<real>(
-				ncFile, grid, dataRight, iTime);
+				vecFiles, grid, dataRight, iTime);
 
 			for (int i = 0; i < data.GetRows(); i++) {
 				data[i] = dataLeft[i] - dataRight[i];
@@ -1515,7 +1525,7 @@ void FindLocalAverage(
 
 int main(int argc, char** argv) {
 
-	NcError error(NcError::verbose_nonfatal);
+	NcError error(NcError::silent_nonfatal);
 
 try {
 	// Gravitational constant
@@ -1547,9 +1557,6 @@ try {
 
 	// File containing information on topography
 	std::string strTopoFile;
-
-	// Maximum topographic height for a detection
-	double dMaxTopoHeight;
 
 	// Merge distance
 	double dMergeDist;
@@ -1587,8 +1594,6 @@ try {
 		CommandLineString(strSearchByMax, "searchbymax", "");
 		CommandLineDoubleD(dMaxLatitude, "maxlat", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinLatitude, "minlat", 0.0, "(degrees)");
-		CommandLineString(strTopoFile, "topofile", "");
-		CommandLineDoubleD(dMaxTopoHeight, "maxtopoht", 0.0, "(m)");
 		CommandLineDoubleD(dMergeDist, "mergedist", 0.0, "(degrees)");
 		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,dist,delta,minmaxdist;...]");
 		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,dist,delta,minmaxdist;...]");
@@ -1756,10 +1761,31 @@ try {
 	dMaxLatitude *= M_PI / 180.0;
 	dMinLatitude *= M_PI / 180.0;
 
-	// Load the netcdf file
-	NcFile ncInput(strInputFile.c_str());
-	if (!ncInput.is_valid()) {
-		_EXCEPTION1("Cannot open input file \"%s\"", strInputFile.c_str());
+	// Parse the input file list
+	NcFileVector vecFiles;
+	{
+		int iLast = 0;
+		for (int i = 0; i <= strInputFile.length(); i++) {
+			if ((i == strInputFile.length()) ||
+			    (strInputFile[i] == ';')
+			) {
+				std::string strFile =
+					strInputFile.substr(iLast, i - iLast);
+
+				NcFile * pNewFile = new NcFile(strFile.c_str());
+
+				if (!pNewFile->is_valid()) {
+					_EXCEPTION1("Cannot open input file \"%s\"",
+						strFile.c_str());
+				}
+
+				vecFiles.push_back(pNewFile);
+				iLast = i+1;
+			}
+		}
+	}
+	if (vecFiles.size() == 0) {
+		_EXCEPTIONT("At least one input file must be specified");
 	}
 
 	// Define the SimpleGrid
@@ -1779,22 +1805,22 @@ try {
 	// No connectivity file; check for latitude/longitude dimension
 	} else {
 
-		NcDim * dimLat = ncInput.get_dim("lat");
+		NcDim * dimLat = vecFiles[0]->get_dim("lat");
 		if (dimLat == NULL) {
 			_EXCEPTIONT("No dimension \"lat\" found in input file");
 		}
 
-		NcDim * dimLon = ncInput.get_dim("lon");
+		NcDim * dimLon = vecFiles[0]->get_dim("lon");
 		if (dimLon == NULL) {
 			_EXCEPTIONT("No dimension \"lon\" found in input file");
 		}
 
-		NcVar * varLat = ncInput.get_var("lat");
+		NcVar * varLat = vecFiles[0]->get_var("lat");
 		if (varLat == NULL) {
 			_EXCEPTIONT("No variable \"lat\" found in input file");
 		}
 
-		NcVar * varLon = ncInput.get_var("lon");
+		NcVar * varLon = vecFiles[0]->get_var("lon");
 		if (varLon == NULL) {
 			_EXCEPTIONT("No variable \"lon\" found in input file");
 		}
@@ -1821,12 +1847,12 @@ try {
 	}
 
 	// Get time dimension
-	NcDim * dimTime = ncInput.get_dim("time");
+	NcDim * dimTime = vecFiles[0]->get_dim("time");
 	if (dimTime == NULL) {
-		_EXCEPTIONT("No dimension \"time\" found in input file");
+		_EXCEPTIONT("No dimension \"time\" found in first input file");
 	}
 
-	NcVar * varTime = ncInput.get_var("time");
+	NcVar * varTime = vecFiles[0]->get_var("time");
 	if (varTime == NULL) {
 		_EXCEPTIONT("No variable \"time\" found in input file");
 	}
@@ -1840,25 +1866,6 @@ try {
 
 	// Search variable data
 	DataVector<float> dataSearch(grid.GetSize());
-
-	// Load topography data (if requested)
-	NcVar * varPHIS = NULL;
-
-	DataVector<float> dataPHIS(grid.GetSize());
-
-	if (strTopoFile != "") {
-		NcFile ncTopo(strTopoFile.c_str());
-		if (!ncTopo.is_valid()) {
-			_EXCEPTION1("Unable to open file \"%s\"", strTopoFile.c_str());
-		}
-
-		Variable varPHIS("PHIS");
-		varPHIS.LoadGridData<float>(ncTopo, grid, dataPHIS);
-	}
-
-	if ((strTopoFile == "") && (dMaxTopoHeight != 0.0)) {
-		_EXCEPTIONT("No topography file specified; required for --maxtopoht");
-	}
 
 	// Open output file
 	FILE * fpOutput = fopen(strOutputFile.c_str(), "w");
@@ -1881,7 +1888,7 @@ try {
 		AnnounceStartBlock(szStartBlock);
 
 		// Load the data for the search variable
-		varSearchBy.LoadGridData<float>(ncInput, grid, dataSearch, t);
+		varSearchBy.LoadGridData<float>(vecFiles, grid, dataSearch, t);
 
 		// Tag all minima
 		std::set<int> setCandidates;
@@ -1936,28 +1943,6 @@ try {
 					setNewCandidates.insert(*iterCandidate);
 				} else {
 					nRejectedLatitude++;
-				}
-			}
-
-			setCandidates = setNewCandidates;
-		}
-
-		// Eliminate based on maximum topographic height
-		if (dMaxTopoHeight != 0.0) {
-			std::set<int> setNewCandidates;
-
-			std::set<int>::const_iterator iterCandidate
-				= setCandidates.begin();
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-				float dPHIS = dataPHIS[*iterCandidate];
-
-				double dTopoHeight =
-					static_cast<double>(dPHIS / ParamGravity);
-
-				if (dTopoHeight <= dMaxTopoHeight) {
-					setNewCandidates.insert(*iterCandidate);
-				} else {
-					nRejectedTopography++;
 				}
 			}
 
@@ -2059,7 +2044,7 @@ try {
 			DataVector<float> dataState(grid.GetSize());
 			
 			vecThresholdOp[tc].m_var.LoadGridData<float>(
-				ncInput, grid, dataState, t);
+				vecFiles, grid, dataState, t);
 
 			// Loop through all pressure minima
 			std::set<int>::const_iterator iterCandidate
@@ -2097,7 +2082,7 @@ try {
 			DataVector<float> dataState(grid.GetSize());
 			
 			vecClosedContourOp[ccc].m_var.LoadGridData<float>(
-				ncInput, grid, dataState, t);
+				vecFiles, grid, dataState, t);
 
 			// Loop through all pressure minima
 			std::set<int>::const_iterator iterCandidate
@@ -2135,7 +2120,7 @@ try {
 			DataVector<float> dataState(grid.GetSize());
 			
 			vecNoClosedContourOp[ccc].m_var.LoadGridData<float>(
-				ncInput, grid, dataState, t);
+				vecFiles, grid, dataState, t);
 
 			// Loop through all pressure minima
 			std::set<int>::const_iterator iterCandidate
@@ -2241,7 +2226,7 @@ try {
 				DataVector<float> dataState(grid.GetSize());
 			
 				vecOutputOp[outc].m_var.LoadGridData<float>(
-					ncInput, grid, dataState, t);
+					vecFiles, grid, dataState, t);
 
 				// Loop through all pressure minima
 				std::set<int>::const_iterator iterCandidate
@@ -2359,7 +2344,9 @@ try {
 
 	fclose(fpOutput);
 
-	ncInput.close();
+	for (int i = 0; i < vecFiles.size(); i++) {
+		vecFiles[i]->close();
+	}
 
 	AnnounceEndBlock("Done");
 
