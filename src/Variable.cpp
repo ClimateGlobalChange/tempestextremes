@@ -230,6 +230,11 @@ NcVar * Variable::GetFromNetCDF(
 		if (strcmp(var->get_dim(0)->name(), "time") != 0) {
 			iTime = (-1);
 			m_fNoTimeInNcFile = true;
+		} else {
+			if (var->get_dim(0)->size() == 1) {
+				iTime = 0;
+				m_fNoTimeInNcFile = true;
+			}
 		}
 	}
 
@@ -294,6 +299,8 @@ void Variable::LoadGridData(
 		}
 		return;
 	}
+
+	//std::cout << "Loading " << ToString(varreg) << " " << iTime << std::endl;
 
 	// Allocate data
 	m_data.Initialize(grid.GetSize());
@@ -363,6 +370,12 @@ void Variable::LoadGridData(
 
 		// Load the data
 		var->get(&(m_data[0]), &(nDataSize[0]));
+
+		NcError err;
+		if (err.get_err() != NC_NOERR) {
+			_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
+		}
+
 		return;
 	}
 
