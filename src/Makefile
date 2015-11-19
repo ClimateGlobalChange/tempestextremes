@@ -24,7 +24,7 @@ STITCHNODES_CFILES= kdtree.c
 STITCHBLOBS_FILES= StitchBlobs.cpp Announce.cpp NetCDFUtilities.cpp
 STITCHBLOBS_CFILES= kdtree.c
 
-DETECTCYCLONESUNSTRUCTURED_FILES= DetectCyclonesUnstructured.cpp Announce.cpp TimeObj.cpp
+DETECTCYCLONESUNSTRUCTURED_FILES= DetectCyclonesUnstructured.cpp Announce.cpp TimeObj.cpp Variable.cpp
 DETECTCYCLONESUNSTRUCTURED_CFILES= kdtree.c
 
 DETECTCYCLONES_FILES= DetectCyclones.cpp Announce.cpp TimeObj.cpp
