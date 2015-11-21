@@ -4,7 +4,13 @@
 ///           \author Marielle Pinheiro
 ///           \version June 1, 2015
 
+/*This code is the third step in the potential vorticity code
+based on the Schwierz et al 2004 paper. It calculates deviations 
+from the average produced in the previous step (DIPV) and filters them with
+2-day smoothing (ADIPV), then divides ADIPV by the specified deviation 
+and outputs integer values (INT_ADIPV) which can then be used by StitchBlobs
 
+*/
 
 #include "blockingUtilities.h"
 #include "CommandLine.h"

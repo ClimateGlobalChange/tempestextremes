@@ -63,7 +63,7 @@ m.drawmeridians(lon_ticks,labels=[0,0,0,1])
 
 x,y = m(*np.meshgrid(lon,lat))
 #draw filled contours
-pv=m.contourf(x,y,dens,levels=np.arange(0,0.45,.025),extend='both')
+pv=m.contourf(x,y,dens,levels=np.arange(0,0.25,.025),extend='both')
 #add colorbar
 cb=plt.colorbar(pv)
 plt.title("PV* density for %s %d to %d"%(sys.argv[4],nc_year1-1,nc_year2-1))

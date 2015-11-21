@@ -5,8 +5,10 @@
 
 
 /*This code fills an array with 31 days (31*nsteps) of PV
-data 
-
+data and adds the sum of this array to the index of a 365-day
+array that corresponds to the center date of the 31-day array.
+The value for each day is then divided by the number of years *31*
+nsteps to get the daily average for the (n)-year period. 
 */
 #include "blockingUtilities.h"
 #include "CommandLine.h"
@@ -80,7 +82,6 @@ int main(int argc, char **argv){
   }
   std::string strCalendar = attCal->as_string(0);
   if (strncmp(strCalendar.c_str(), "gregorian",9)==0){
-    std::cout<< "Changing calendar type to standard."<<std::endl;
     strCalendar = "standard";
   }
 
@@ -129,7 +130,7 @@ int main(int argc, char **argv){
 
     if ((leapMonth==2 && leapDay==29) || (dateMonth==2&&leapMonth==3)){
       //Check when parsing the indices
-      std::cout<<"Might contain leap day. Will check."<<std::endl;
+    //  std::cout<<"Might contain leap day. Will check."<<std::endl;
       leap = true;
     }
   }
@@ -233,7 +234,7 @@ int main(int argc, char **argv){
 
         if ((leapMonth==2 && leapDay==29) || (dateMonth==2 && leapMonth==3)){
         //Check when parsing the indices
-          std::cout<<"May contain leap day. Will check."<<std::endl;
+        //  std::cout<<"May contain leap day. Will check."<<std::endl;
           leap = true;
         }
       }
@@ -250,7 +251,7 @@ int main(int argc, char **argv){
       else{
         tEnd = nTime;
       }
-      std::cout<<"tEnd is "<<tEnd<<std::endl;
+   //   std::cout<<"tEnd is "<<tEnd<<std::endl;
     }
     
   }
@@ -275,7 +276,7 @@ int main(int argc, char **argv){
 //Check if new file needs to be opened before entering while loop
 
   if(tEnd>=nTime){
-    std::cout<<"tEnd is "<<tEnd<<". Reached end of previous file."<<std::endl;
+ //   std::cout<<"tEnd is "<<tEnd<<". Reached end of previous file."<<std::endl;
     infile.close();
     std::cout<<"Closed "<<InputFiles[x]<<std::endl;
     x+=1;
@@ -305,12 +306,12 @@ int main(int argc, char **argv){
 
     if (strCalendar!="noleap" && dateMonth<=2){
       //Check whether file contains a Feb 29
-      std::cout<<"Checking leap year status."<<std::endl;
+   //   std::cout<<"Checking leap year status."<<std::endl;
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
         leapMonth, leapDay, leapHour);
       if ((leapMonth==2 && leapDay==29) || (dateMonth==2 && leapMonth==3)){
       //Check when parsing the indices
-        std::cout<<"May contain leap day. Will check."<<std::endl;
+     //   std::cout<<"May contain leap day. Will check."<<std::endl;
         leap = true;
       }
     }
@@ -325,15 +326,15 @@ int main(int argc, char **argv){
   }
 
   //entering while loop.
-  std::cout<<"Before entering: start, end is "<<tStart<<", "<<tEnd<<std::endl;
+//  std::cout<<"Before entering: start, end is "<<tStart<<", "<<tEnd<<std::endl;
   bool newFile = false;
 
   while (x<nFiles){
-    std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
+  //  std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
       <<nTime<<"; tStart/end is "<<tStart<<" and "<<tEnd<<std::endl;
      //1: check if current day is a leap day
     if (leap==true){
-      std::cout<<"Checking date for leap day."<<std::endl;
+    //  std::cout<<"Checking date for leap day."<<std::endl;
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[tStart], leapYear,\
         leapMonth, leapDay, leapHour);
       if (leapMonth==2 && leapDay ==29){
@@ -344,7 +345,7 @@ int main(int argc, char **argv){
       } 
       if (tEnd>nTime){
         newFile = true;
-        std::cout<<"For leap day file, reached EOF."<<std::endl;
+     //   std::cout<<"For leap day file, reached EOF."<<std::endl;
       }
     }
     //2: if new file needs to be opened, open it
@@ -382,13 +383,13 @@ int main(int argc, char **argv){
 
         if (strCalendar!="noleap" && dateMonth<=2){
         //Check whether file contains a Feb 29
-          std::cout<<"Checking leap year status."<<std::endl;
+     //     std::cout<<"Checking leap year status."<<std::endl;
           ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
           leapMonth, leapDay, leapHour);
 
           if ((leapMonth==2 && leapDay==29) || (dateMonth==2 && leapMonth==3)){
         //Check when parsing the indices
-            std::cout<<"May contain leap day. Will check."<<std::endl;
+       //     std::cout<<"May contain leap day. Will check."<<std::endl;
             leap = true;
           }
         }
@@ -429,7 +430,7 @@ int main(int argc, char **argv){
         for (int b=0; b<nLon; b++){
           avgCounts[dateIndex][a][b] += 1.0;
           if (a==50 && b==50){
-            std::cout<<" date index is "<<dateIndex<<" and count is "<<avgCounts[dateIndex][a][b]<<std::endl;
+       //     std::cout<<" date index is "<<dateIndex<<" and count is "<<avgCounts[dateIndex][a][b]<<std::endl;
           }
         }
       }
@@ -437,30 +438,30 @@ int main(int argc, char **argv){
       //periodic boundary condition for year
       if(dateIndex>=yearLen){
         dateIndex-=yearLen;
-        std::cout<<"Periodic boundary: date index is "<<dateIndex<<" and end of year array reached. dateIndex is now "\
+      //  std::cout<<"Periodic boundary: date index is "<<dateIndex<<" and end of year array reached. dateIndex is now "\
           <<dateIndex<<std::endl;
       }
 
       //
       if (tEnd<nTime){
-        std::cout<<"start/end/ntime:"<<tStart<<"/"<<tEnd<<"/"<<nTime<<". Still have data left on current file. Will continue on."<<std::endl;
+      //  std::cout<<"start/end/ntime:"<<tStart<<"/"<<tEnd<<"/"<<nTime<<". Still have data left on current file. Will continue on."<<std::endl;
         tStart = tEnd;
         tEnd = tStart + nSteps;
       //  std::cout<<"start/end now "<<tStart <<" and "<< tEnd <<std::endl;
         //Check for leap year
         if (leap==true){
-          std::cout<<"Checking date for leap day."<<std::endl;
+        //  std::cout<<"Checking date for leap day."<<std::endl;
           ParseTimeDouble(strTimeUnits, strCalendar, timeVec[tStart], leapYear,\
             leapMonth, leapDay, leapHour);
           if (leapMonth==2 && leapDay ==29){
             tStart = tEnd;
             tEnd = tStart + nSteps;
-            std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
+          //  std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
               <<tStart<<" and "<<tEnd<<std::endl;
           }
           //re-check tEnd
           if (tEnd>=nTime){
-            std::cout<<"After re-check of tEnd (leap day), reached EOF"<<std::endl;
+          //  std::cout<<"After re-check of tEnd (leap day), reached EOF"<<std::endl;
             newFile = true;
           } 
         }
@@ -476,12 +477,12 @@ int main(int argc, char **argv){
   for (int t=0; t<yearLen; t++){
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
-        if (a==50 && b==50){
-          std::cout<<"DEBUG: for t="<<t<<", value is "<<avgStoreVals[t][a][b]\
+   //     if (a==50 && b==50){
+       //   std::cout<<"DEBUG: for t="<<t<<", value is "<<avgStoreVals[t][a][b]\
             <<", count is "<<avgCounts[t][a][b]<<" and dividing by "<<avgCounts[t][a][b]*31.0*nSteps<<std::endl;
-        }
+     //   }
         avgStoreVals[t][a][b] = avgStoreVals[t][a][b]/(avgCounts[t][a][b]*31.0*nSteps);
-        if (a==50 && b==50) std::cout <<"Value is "<<avgStoreVals[t][a][b]<<std::endl;
+       // if (a==50 && b==50) std::cout <<"Value is "<<avgStoreVals[t][a][b]<<std::endl;
       }
     }
   }
