@@ -134,6 +134,6 @@ for x in $(seq 0 3); do
 
   ~/tempestextremes/StitchBlobs --inlist ${SFILES[$x]} --out $blobsfile --var INT_ADIPV --minsize 5 --mintime $nsteps
   ~/tempestextremes/blockingDensity --in $blobsfile --var INT_ADIPVtag --out $densfile
-  python ~/tempestextremes/plot_density.py $densfile ${SEASONS[$x]} $yi 
+  python ~/tempestextremes/plot_density.py $densfile ${SEASONS[$x]} $yi PV* 
 done
 

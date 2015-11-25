@@ -1,12 +1,12 @@
 /////////////////////////////////////////////
 ///
-///          \file CLIVAR_block_utilities.h
+///          \file blockingUtilities.h
 ///          \author Marielle Pinheiro
 ///          \version March 1, 2015
 ///
 
-#ifndef _CLIVARBLOCKUTIL_H_
-#define _CLIVARBLOCKUTIL_H_
+#ifndef _BLOCKINGUTILITIES_H_
+#define _BLOCKINGUTILITIES_H_
 
 ////////////////////////////////////////////////
 
@@ -106,4 +106,12 @@ void PV_calc(
         NcVar *PV,
         NcVar *intPV);
 
+//Function that calculates TM blocking index
+double GHcheck(double z_0,
+          double z_N,
+          double z_S,
+          double lat_0,
+          double lat_N,
+          double lat_S,
+          std::string hemi );
 #endif

@@ -36,5 +36,5 @@ x,y = m(*np.meshgrid(lon,lat))
 pv=m.contourf(x,y,dens,levels=np.arange(0,0.3,.025),extend='both')
 #add colorbar
 cb=plt.colorbar(pv)
-plt.title("PV* density for %s %s"%(sys.argv[2],sys.argv[3]))
+plt.title("%s density for %s %s"%(sys.argv[4],sys.argv[2],sys.argv[3]))
 plt.savefig(nc_out,bbox_inches='tight')

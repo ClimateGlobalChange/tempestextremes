@@ -31,7 +31,10 @@ DEV_FILES = blockingDevs.cpp Announce.cpp NetCDFUtilities.cpp blockingUtilities.
 DEV_CFILES = 
 
 DENS_FILES = densityCalculations.cpp Announce.cpp NetCDFUtilities.cpp blockingUtilities.cpp TimeObj.cpp
-DENS_CFILES =  
+DENS_CFILES = 
+
+GH_FILES = blockingGH.cpp Announce.cpp NetCDFUtilities.cpp interp_z500.cpp blockingUtilities.cpp TimeObj.cpp
+GH_CFILES =  
 ######################################
 
 STITCHNODES_FILES= StitchNodes.cpp Announce.cpp
@@ -55,7 +58,7 @@ include Make.defs
 ##
 ## Build instructions
 ##
-all: StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs blockingDensity
+all: StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs blockingDensity blockingGH
 
 StitchNodes: $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
@@ -78,10 +81,14 @@ blockingDevs: $(DEV_FILES:%.cpp=$(BUILDDIR)/%.o) $(DEV_CFILES:%.c=$(BUILDDIR)/%.
 	$(CC) $(LDFLAGS) -o $@ $(DEV_FILES:%.cpp=$(BUILDDIR)/%.o) $(DEV_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 blockingDensity: $(DENS_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENS_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(DENS_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENS_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
+
+blockingGH: $(GH_FILES:%.cpp=$(BUILDDIR)/%.o) $(GH_CFILES:%.c=$(BUILDDIR)/%.o)
+	$(CC) $(LDFLAGS) -o $@ $(GH_FILES:%.cpp=$(BUILDDIR)/%.o) $(GH_CFILES:%/c=$(BUILDDIR)/%.o) $(LDFILES)
+
 ## Clean
 ##
 clean:
-	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs blockingDensity
+	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs blockingDensity blockingGH
 	rm -rf $(DEPDIR)
 	rm -rf $(BUILDDIR)
 

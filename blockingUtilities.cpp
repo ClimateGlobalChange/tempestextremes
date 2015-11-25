@@ -674,4 +674,40 @@ void PV_calc(
 } 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
+double GHcheck(double z_0,
+          double z_N,
+          double z_S,
+          double lat_0,
+          double lat_N,
+          double lat_S,
+          std::string hemi ){
 
+  double GHGS;
+  double GHGN;
+  double gval;
+  //NH: GHGS>0, GHGN<-10m/deg lat
+  if (hemi =="N"){
+    GHGS = (z_0-z_S)/(lat_0-lat_S);
+    GHGN = (z_N-z_0)/(lat_N-lat_0);
+
+    if ((GHGS>0) && (GHGN < -10)){
+      gval=1.;
+    }
+    else gval=0.;
+  //SH: GHGN>0,GHGS<-10m/deg lat
+  }else if (hemi=="S"){
+    GHGS =-(z_S-z_0)/(lat_S-lat_0);
+    GHGN =-(z_0-z_N)/(lat_0-lat_N);
+
+    if ((GHGN>0) && (GHGS<-10)){
+      gval=1.;
+    }
+    else gval=0.;
+  }
+  else std::cout << "Error: invalid hemisphere specified."<<std::endl;
+/*  std::cout<<"Inputs: lat_0: "<<lat_0<<" lat_N: "<<lat_N<<" lat_S: "<<lat_S<<std::endl;
+  std::cout<<"Z values: Z_0: "<<z_0<<" Z_N: "<<z_N<<" Z_S: "<<z_S<<std::endl;
+  std::cout<<"For "<< hemi<<", GHGS and GHGN:"<<GHGS<<", "<<GHGN<<\
+    " returned "<<gval<<" (NH: GHGS>0 & GHGN<-10)"<<std::endl;*/
+  return(gval);
+}
