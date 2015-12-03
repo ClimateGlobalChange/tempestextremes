@@ -62,7 +62,7 @@ done
 #Calculate block average
 avg_outfile="ERA_avg/ERA_"$ys"_"$ye"_dailyavg.nc"
 if [ ! -e $avg_outfile ]; then
-  ~/tempestextremes/blockingAvg --inlist $AVG_INPUT --out $avg_outfile
+  ~/tempestextremes/blockingAvg --inlist $AVG_INPUT --out $avg_outfile --varname IPV --avgname AIPV
 fi
 
 c=0
@@ -78,7 +78,7 @@ done
 #echo $c " files missing"
 #calculate deviations
 #if [ c -gt 0 ]; then
-  ~/tempestextremes/blockingDevs --inlist $DEV_INPUT --avg $avg_outfile
+  ~/tempestextremes/blockingDevs --inlist $DEV_INPUT --avg $avg_outfile --varname IPV --avgname AIPV
 #fi
 
 nsteps=$((NDAYS*4))

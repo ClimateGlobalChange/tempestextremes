@@ -33,6 +33,9 @@ DEV_CFILES =
 DENS_FILES = densityCalculations.cpp Announce.cpp NetCDFUtilities.cpp blockingUtilities.cpp TimeObj.cpp
 DENS_CFILES = 
 
+VAR3D_FILES = var4Dto3D.cpp Announce.cpp NetCDFUtilities.cpp blockingUtilities.cpp TimeObj.cpp
+VAR3D_CFILES =
+
 GH_FILES = blockingGH.cpp Announce.cpp NetCDFUtilities.cpp interp_z500.cpp blockingUtilities.cpp TimeObj.cpp
 GH_CFILES =  
 ######################################
@@ -58,7 +61,7 @@ include Make.defs
 ##
 ## Build instructions
 ##
-all: StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs blockingDensity blockingGH
+all: StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs blockingDensity var4Dto3D blockingGH
 
 StitchNodes: $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(STITCHNODES_FILES:%.cpp=$(BUILDDIR)/%.o) $(STITCHNODES_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
@@ -79,8 +82,12 @@ blockingAvg: $(BLOCK_FILES:%.cpp=$(BUILDDIR)/%.o) $(BLOCK_CFILES:%.c=$(BUILDDIR)
 	$(CC) $(LDFLAGS) -o $@ $(BLOCK_FILES:%.cpp=$(BUILDDIR)/%.o) $(BLOCK_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 blockingDevs: $(DEV_FILES:%.cpp=$(BUILDDIR)/%.o) $(DEV_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(DEV_FILES:%.cpp=$(BUILDDIR)/%.o) $(DEV_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
+
 blockingDensity: $(DENS_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENS_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(DENS_FILES:%.cpp=$(BUILDDIR)/%.o) $(DENS_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
+
+var4Dto3D: $(VAR3D_FILES:%.cpp=$(BUILDDIR)/%.o) $(VAR3D_CFILES:%.c=$(BUILDDIR)/%.o)
+	$(CC) $(LDFLAGS) -o $@ $(VAR3D_FILES:%.cpp=$(BUILDDIR)/%.o) $(VAR3D_CFILES:%.c=$(BUILDDIR)/%.o) $(LDFILES)
 
 blockingGH: $(GH_FILES:%.cpp=$(BUILDDIR)/%.o) $(GH_CFILES:%.c=$(BUILDDIR)/%.o)
 	$(CC) $(LDFLAGS) -o $@ $(GH_FILES:%.cpp=$(BUILDDIR)/%.o) $(GH_CFILES:%/c=$(BUILDDIR)/%.o) $(LDFILES)
@@ -88,7 +95,7 @@ blockingGH: $(GH_FILES:%.cpp=$(BUILDDIR)/%.o) $(GH_CFILES:%.c=$(BUILDDIR)/%.o)
 ## Clean
 ##
 clean:
-	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs blockingDensity blockingGH
+	rm -f StitchNodes StitchBlobs DetectCyclones DensityNodes blockingPV blockingAvg blockingDevs blockingDensity var4Dto3D blockingGH
 	rm -rf $(DEPDIR)
 	rm -rf $(BUILDDIR)
 

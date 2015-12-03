@@ -106,6 +106,32 @@ void PV_calc(
         NcVar *PV,
         NcVar *intPV);
 
+void calcDevsPV(bool leap,
+              int startAvgIndex,
+              NcVar *inIPV,
+              NcVar *outDev,
+              NcVar *outADev,
+              NcVar *outPosIntDev,
+              NcVar *avgIPV,
+              NcVar *inTime,
+              NcVar *avgTime,
+              NcVar *lat,
+              NcVar *outTime,
+              double PVAnom);
+
+void calcDevsGH(bool leap,
+              int startAvgIndex,
+              NcVar *inGH,
+              NcVar *outDev,
+              NcVar *outADev,
+              NcVar *outIntDev,
+              NcVar *avgGH,
+              NcVar *inTime,
+              NcVar *avgTime,
+              NcVar *lat,
+              NcVar *outTime,
+              double GHAnom);
+
 //Function that calculates TM blocking index
 double GHcheck(double z_0,
           double z_N,

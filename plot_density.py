@@ -4,6 +4,11 @@ import numpy as np
 from mpl_toolkits.basemap import Basemap
 import sys
 
+#Set the plot parameters
+plt.rcParams['font.size']=10.
+plt.rcParams['axes.labelsize']=8.
+plt.rcParams['xtick.labelsize']=6.
+plt.rcParams['ytick.labelsize']=6.
 
 #import relevant variables
 nc_filename = sys.argv[1]
@@ -33,7 +38,7 @@ m.drawmeridians(lon_ticks,labels=[0,0,0,1])
 
 x,y = m(*np.meshgrid(lon,lat))
 #draw filled contours
-pv=m.contourf(x,y,dens,levels=np.arange(0,0.3,.025),extend='both')
+pv=m.contourf(x,y,dens,levels=np.arange(0,0.2,.025),extend='both')
 #add colorbar
 cb=plt.colorbar(pv)
 plt.title("%s density for %s %s"%(sys.argv[4],sys.argv[2],sys.argv[3]))

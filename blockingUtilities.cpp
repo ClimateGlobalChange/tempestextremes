@@ -674,6 +674,377 @@ void PV_calc(
 } 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
+void calcDevsPV(bool leap,
+              int startAvgIndex,
+              NcVar *inIPV,
+              NcVar *outDev,
+              NcVar *outADev,
+              NcVar *outPosIntDev,
+              NcVar *avgIPV,
+              NcVar *inTime,
+              NcVar *avgTime,
+              NcVar *lat,
+              NcVar *outTime,
+              double PVAnom){
+
+  int nTime,nLat,nLon,nSteps,avgDay,nOutTime;
+  double tRes;
+
+  nTime = inIPV->get_dim(0)->size();
+  nLat = inIPV->get_dim(1)->size();
+  nLon = inIPV->get_dim(2)->size();
+
+//keep sign consistent!
+  if (PVAnom<0){
+    PVAnom = -PVAnom;
+  }
+
+//input IPV
+  DataMatrix3D<double> IPVMat(nTime,nLat,nLon);
+  inIPV->set_cur(0,0,0);
+  inIPV->get(&(IPVMat[0][0][0]),nTime,nLat,nLon);
+
+  DataVector<double> timeVec(nTime);
+  inTime->set_cur((long) 0);
+  inTime->get(&(timeVec[0]),nTime);
+
+  std::string strTimeUnits = inTime->get_att("units")->as_string(0);
+  std::string strCalendar = inTime->get_att("calendar")->as_string(0);
+
+  if ((strTimeUnits.length() >= 11) && \
+    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
+    tRes = timeVec[1]-timeVec[0];
+  }
+  else{
+    tRes = (timeVec[1]-timeVec[0])/24.0;
+  }
+  nSteps = 1/tRes;
+
+//avg IPV
+  avgDay = avgIPV->get_dim(0)->size();
+  DataMatrix3D<double> avgMat(avgDay,nLat,nLon);
+  avgIPV->set_cur(0,0,0);
+  avgIPV->get(&(avgMat[0][0][0]),avgDay,nLat,nLon);
+
+  DataVector<int> avgDayVec(avgDay);
+  avgTime->set_cur((long) 0);
+  avgTime->get(&(avgDayVec[0]),avgDay);
+
+
+//Matrix for output data
+//Eliminate one day if contains Feb 29
+  if (leap){
+    nOutTime = nTime-nSteps;
+    std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
+  }
+  else{
+    nOutTime = nTime;
+  }
+
+  DataMatrix3D<double> devMat(nOutTime,nLat,nLon);
+  DataMatrix3D<double> aDevMat(nOutTime,nLat,nLon);
+
+//Number of days in IPV
+  int nDays = nTime*tRes;
+  std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
+
+
+//Deal with skipped days          
+  int d=0;
+  DataVector<double> newTime(nOutTime);
+
+  int leapYear=0;
+  int leapMonth=0;
+  int leapDay=0;
+  int leapHour=0;
+
+  for (int t=0; t<nTime; t++){
+    if (leap){
+      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
+        leapMonth, leapDay, leapHour);
+      if (leapMonth==2 && leapDay == 29){
+       /* while (leapMonth ==2 && leapDay == 29){
+          std::cout<<"Leap day! Skipping this step."<<std::endl;
+          t++;
+          ParseTimeDouble(strTimeUnits,strCalendar, timeVec[t],leapYear,\
+            leapMonth,leapDay,leapHour);
+        }*/
+        std::cout<<"Leap day! Skipping day."<<std::endl;
+        t+=nSteps;
+      }
+    }
+    if (t>=nTime){
+      std::cout<<"t equals or exceeds nTime. Leaving loop."<<std::endl;
+      break;
+    }
+    int nDayIncrease = d/nSteps;
+    std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
+    int currAvgIndex = startAvgIndex + nDayIncrease;
+    if (currAvgIndex>364){
+      currAvgIndex-=365;
+    }
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        devMat[t][a][b] = IPVMat[t][a][b]-avgMat[currAvgIndex][a][b];
+      }
+    }
+    newTime[d] = timeVec[t];
+    std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
+    d++;
+  }
+  outTime->set_cur((long) 0);
+  outTime->put(&(newTime[0]),nOutTime);
+
+  std::cout<<"About to implement smoothing."<<std::endl;
+  double div = (double) 2*nSteps;
+  double invDiv = 1.0/div;
+
+  //implement 2-day smoothing
+  for (int t=0; t<nOutTime; t++){
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        if (t<2*nSteps){
+          aDevMat[t][a][b] = devMat[t][a][b];
+        }
+        else{
+          for (int n=0; n<2*nSteps; n++){
+            aDevMat[t][a][b]+=devMat[t-n][a][b];
+          }
+          aDevMat[t][a][b] = aDevMat[t][a][b]*invDiv;
+        }
+      }
+    }
+  }
+
+  std::cout<<"Finished smoothing."<<std::endl;
+  outDev->set_cur(0,0,0);
+  outDev->put(&(devMat[0][0][0]),nOutTime,nLat,nLon);
+  std::cout<<"Wrote devs to file."<<std::endl;
+
+  outADev->set_cur(0,0,0);
+  outADev->put(&(aDevMat[0][0][0]),nOutTime,nLat,nLon);
+  std::cout<<"Wrote smoothed devs to file."<<std::endl;
+//Divide matrix by PV anomaly value 
+//We are looking for negative anomalies in NH and positive anomalies in SH
+  DataVector<double> latVec(nLat);
+  lat->set_cur((long) 0);
+  lat->get(&(latVec[0]),nLat);
+
+  DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
+  double invAnom = 1.0/PVAnom;
+  double divDev,pos,neg;
+  for (int t=0; t<nOutTime; t++){
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        divDev = aDevMat[t][a][b]*invAnom;
+        //SH: positive anomalies
+        if (latVec[a]<0){
+          pos = (divDev+std::fabs(divDev))*0.5;
+          posIntDevs[t][a][b] = int(pos);
+        }
+        //NH: negative anomalies
+        else if (latVec[a]>=0){
+          neg = (divDev-std::fabs(divDev))*0.5;
+          posIntDevs[t][a][b] = -int(neg);
+        }
+      }
+    }
+  }
+  outPosIntDev->set_cur(0,0,0);
+  outPosIntDev->put(&(posIntDevs[0][0][0]),nOutTime,nLat,nLon);
+  std::cout<<"Wrote integer values to file."<<std::endl;
+}
+
+
+void calcDevsGH(bool leap,
+              int startAvgIndex,
+              NcVar *inGH,
+              NcVar *outDev,
+              NcVar *outADev,
+              NcVar *outIntDev,
+              NcVar *avgGH,
+              NcVar *inTime,
+              NcVar *avgTime,
+              NcVar *lat,
+              NcVar *outTime,
+              double GHAnom){
+
+  int nTime,nLat,nLon,nSteps,avgDay,nOutTime;
+  double tRes;
+  double pi = std::atan(1)*4.;
+
+  nTime = inGH->get_dim(0)->size();
+  nLat = inGH->get_dim(1)->size();
+  nLon = inGH->get_dim(2)->size();
+
+//input GH
+  DataMatrix3D<double> GHMat(nTime,nLat,nLon);
+  inGH->set_cur(0,0,0);
+  inGH->get(&(GHMat[0][0][0]),nTime,nLat,nLon);
+
+  DataVector<double> timeVec(nTime);
+  inTime->set_cur((long) 0);
+  inTime->get(&(timeVec[0]),nTime);
+
+  std::string strTimeUnits = inTime->get_att("units")->as_string(0);
+  std::string strCalendar = inTime->get_att("calendar")->as_string(0);
+
+  if ((strTimeUnits.length() >= 11) && \
+    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
+    tRes = timeVec[1]-timeVec[0];
+  }
+  else{
+    tRes = (timeVec[1]-timeVec[0])/24.0;
+  }
+  nSteps = 1/tRes;
+
+//avg GH
+  avgDay = avgGH->get_dim(0)->size();
+  DataMatrix3D<double> avgMat(avgDay,nLat,nLon);
+  avgGH->set_cur(0,0,0);
+  avgGH->get(&(avgMat[0][0][0]),avgDay,nLat,nLon);
+
+  DataVector<int> avgDayVec(avgDay);
+  avgTime->set_cur((long) 0);
+  avgTime->get(&(avgDayVec[0]),avgDay);
+
+//Latitude values 
+
+  DataVector<double> latVec(nLat);
+  lat->set_cur((long) 0);
+  lat->get(&(latVec[0]),nLat);
+//Matrix for output data
+//Eliminate one day if contains Feb 29
+  if (leap){
+    nOutTime = nTime-nSteps;
+    std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
+  }
+  else{
+    nOutTime = nTime;
+  }
+
+  DataMatrix3D<double> devMat(nOutTime,nLat,nLon);
+  DataMatrix3D<double> aDevMat(nOutTime,nLat,nLon);
+
+//Number of days in IPV
+  int nDays = nTime*tRes;
+  std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
+
+
+//Deal with skipped days          
+  int d=0;
+  DataVector<double> newTime(nOutTime);
+
+  int leapYear=0;
+  int leapMonth=0;
+  int leapDay=0;
+  int leapHour=0;
+
+  for (int t=0; t<nTime; t++){
+    if (leap){
+      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
+        leapMonth, leapDay, leapHour);
+      if (leapMonth==2 && leapDay == 29){
+       /* while (leapMonth ==2 && leapDay == 29){
+          std::cout<<"Leap day! Skipping this step."<<std::endl;
+          t++;
+          ParseTimeDouble(strTimeUnits,strCalendar, timeVec[t],leapYear,\
+            leapMonth,leapDay,leapHour);
+        }*/
+        std::cout<<"Leap day! Skipping day."<<std::endl;
+        t+=nSteps;
+      }
+    }
+    if (t>=nTime){
+      std::cout<<"t equals or exceeds nTime. Leaving loop."<<std::endl;
+      break;
+    }
+    int nDayIncrease = d/nSteps;
+    std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
+    int currAvgIndex = startAvgIndex + nDayIncrease;
+    if (currAvgIndex>364){
+      currAvgIndex-=365;
+    }
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        devMat[t][a][b] = GHMat[t][a][b]-avgMat[currAvgIndex][a][b];
+      }
+    }
+    newTime[d] = timeVec[t];
+    std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
+    d++;
+  }
+  outTime->set_cur((long) 0);
+  outTime->put(&(newTime[0]),nOutTime);
+
+  std::cout<<"About to implement smoothing."<<std::endl;
+  double div = (double) 2*nSteps;
+  double invDiv = 1.0/div;
+
+  //implement 2-day smoothing
+  for (int t=0; t<nOutTime; t++){
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        if (t<2*nSteps){
+          aDevMat[t][a][b] = devMat[t][a][b];
+        }
+        else{
+          for (int n=0; n<2*nSteps; n++){
+            aDevMat[t][a][b]+=devMat[t-n][a][b];
+          }
+          aDevMat[t][a][b] = aDevMat[t][a][b]*invDiv;
+        }
+      }
+    }
+  }
+
+  std::cout<<"Finished smoothing."<<std::endl;
+
+  double num = std::sin(45*pi/180);
+  double denom,sineRatio;
+  //Multiply values by sine factor
+  for (int t=0; t<nOutTime; t++){
+    for (int a=0; a<nLat; a++){
+      denom = std::sin(latVec[a]*pi/180);
+      sineRatio = num/denom;
+      for (int b=0; b<nLon; b++){
+        devMat[t][a][b]*=sineRatio;
+        aDevMat[t][a][b]*=sineRatio;
+      }
+    }
+  }
+
+  outDev->set_cur(0,0,0);
+  outDev->put(&(devMat[0][0][0]),nOutTime,nLat,nLon);
+  std::cout<<"Wrote devs to file."<<std::endl;
+
+  outADev->set_cur(0,0,0);
+  outADev->put(&(aDevMat[0][0][0]),nOutTime,nLat,nLon);
+  std::cout<<"Wrote smoothed devs to file."<<std::endl;
+//Divide matrix by GH anomaly value 
+//We are looking for negative anomalies in NH and positive anomalies in SH
+
+
+  DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
+  double invAnom = 1.0/GHAnom;
+  for (int t=0; t<nOutTime; t++){
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        posIntDevs[t][a][b] = (int)(aDevMat[t][a][b]*invAnom);
+        }
+      }
+    }
+  
+  outIntDev->set_cur(0,0,0);
+  outIntDev->put(&(posIntDevs[0][0][0]),nOutTime,nLat,nLon);
+  std::cout<<"Wrote integer values to file."<<std::endl;
+}
+
+
+
+
+
+
 double GHcheck(double z_0,
           double z_N,
           double z_S,

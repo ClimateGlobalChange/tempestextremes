@@ -35,25 +35,14 @@ int main(int argc, char **argv){
   try{
   std::string fileList;
   std::string strfile_out;
-  std::string varName;
-  std::string avgName;
 
   BeginCommandLine()
     CommandLineString(fileList, "inlist", "");
     CommandLineString(strfile_out, "out", "");
-    CommandLineString(varName, "varname","");
-    CommandLineString(avgName, "avgname","");
     ParseCommandLine(argc, argv);
 
   EndCommandLine(argv)
   AnnounceBanner();
-
-  if (varName == ""){
-    _EXCEPTIONT("No variable name (--varname) specified");
-  }
-  if (avgName == ""){
-    _EXCEPTIONT("No average name (--avgname) specified");
-  }
 
   //Create list of input files
   std::vector<std::string> InputFiles;
@@ -67,7 +56,7 @@ int main(int argc, char **argv){
   int nLon = infile.get_dim("lon")->size();
 
   //IPV variable and data matrix
-  NcVar *inPV = infile.get_var(varName.c_str());
+  NcVar *inPV = infile.get_var("IPV");
 
   DataMatrix3D<double> IPVData(nTime, nLat, nLon);
   inPV->set_cur(0,0,0);
@@ -202,7 +191,7 @@ int main(int argc, char **argv){
       nLon = infile.get_dim("lon")->size();
 
       //IPV variable
-      NcVar *inPV = infile.get_var(varName.c_str());
+      NcVar *inPV = infile.get_var("IPV");
       IPVData.Initialize(nTime,nLat,nLon);
 
       inPV->set_cur(0,0,0);
@@ -297,7 +286,7 @@ int main(int argc, char **argv){
     nLon = infile.get_dim("lon")->size();
 
     //IPV variable
-    NcVar *inPV = infile.get_var(varName.c_str());
+    NcVar *inPV = infile.get_var("IPV");
     IPVData.Initialize(nTime,nLat,nLon);
 
     inPV->set_cur(0,0,0);
@@ -375,7 +364,7 @@ int main(int argc, char **argv){
         nLon = infile.get_dim("lon")->size();
 
       //IPV variable
-        NcVar *inPV = infile.get_var(varName.c_str());
+        NcVar *inPV = infile.get_var("IPV");
         IPVData.Initialize(nTime, nLat, nLon);
 
         inPV->set_cur(0,0,0);
@@ -530,7 +519,7 @@ int main(int argc, char **argv){
   copy_dim_var(inLatVar,outLatVar);
   copy_dim_var(inLonVar,outLonVar);
 
-  NcVar *outAvgIPV = outfile.add_var(avgName.c_str(), ncDouble, outTime, outLat, outLon);
+  NcVar *outAvgIPV = outfile.add_var("AIPV", ncDouble, outTime, outLat, outLon);
   outAvgIPV->set_cur(0,0,0);
   outAvgIPV->put(&(avgStoreVals[0][0][0]),yearLen,nLat,nLon);
 
