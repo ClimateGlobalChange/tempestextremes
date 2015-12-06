@@ -735,7 +735,7 @@ void calcDevsPV(bool leap,
 //Eliminate one day if contains Feb 29
   if (leap){
     nOutTime = nTime-nSteps;
-    std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
+   // std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
   }
   else{
     nOutTime = nTime;
@@ -774,11 +774,11 @@ void calcDevsPV(bool leap,
       }
     }
     if (t>=nTime){
-      std::cout<<"t equals or exceeds nTime. Leaving loop."<<std::endl;
+    //  std::cout<<"t equals or exceeds nTime. Leaving loop."<<std::endl;
       break;
     }
     int nDayIncrease = d/nSteps;
-    std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
+ //   std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
     int currAvgIndex = startAvgIndex + nDayIncrease;
     if (currAvgIndex>364){
       currAvgIndex-=365;
@@ -789,7 +789,7 @@ void calcDevsPV(bool leap,
       }
     }
     newTime[d] = timeVec[t];
-    std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
+  //  std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
     d++;
   }
   outTime->set_cur((long) 0);
@@ -872,6 +872,7 @@ void calcDevsGH(bool leap,
   int nTime,nLat,nLon,nSteps,avgDay,nOutTime;
   double tRes;
   double pi = std::atan(1)*4.;
+  std::cout<<"DEBUG: pi is "<<pi<<std::endl;
 
   nTime = inGH->get_dim(0)->size();
   nLat = inGH->get_dim(1)->size();
@@ -917,7 +918,7 @@ void calcDevsGH(bool leap,
 //Eliminate one day if contains Feb 29
   if (leap){
     nOutTime = nTime-nSteps;
-    std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
+  //  std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
   }
   else{
     nOutTime = nTime;
@@ -956,11 +957,11 @@ void calcDevsGH(bool leap,
       }
     }
     if (t>=nTime){
-      std::cout<<"t equals or exceeds nTime. Leaving loop."<<std::endl;
+     // std::cout<<"t equals or exceeds nTime. Leaving loop."<<std::endl;
       break;
     }
     int nDayIncrease = d/nSteps;
-    std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
+   // std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
     int currAvgIndex = startAvgIndex + nDayIncrease;
     if (currAvgIndex>364){
       currAvgIndex-=365;
@@ -971,7 +972,7 @@ void calcDevsGH(bool leap,
       }
     }
     newTime[d] = timeVec[t];
-    std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
+ //   std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
     d++;
   }
   outTime->set_cur((long) 0);
@@ -1001,12 +1002,19 @@ void calcDevsGH(bool leap,
   std::cout<<"Finished smoothing."<<std::endl;
 
   double num = std::sin(45*pi/180);
-  double denom,sineRatio;
+  double denom;
+  double sineRatio;
   //Multiply values by sine factor
   for (int t=0; t<nOutTime; t++){
     for (int a=0; a<nLat; a++){
-      denom = std::sin(latVec[a]*pi/180);
-      sineRatio = num/denom;
+      if ((latVec[a] < 30. && latVec[a] > -30.)\
+        || latVec[a] > 75. || latVec[a] < -75.){
+        SineRatio = 0.;
+      }
+      else{
+        denom = std::fabs(std::sin(latVec[a]*pi/180));
+        sineRatio = num/denom;
+      }
       for (int b=0; b<nLon; b++){
         devMat[t][a][b]*=sineRatio;
         aDevMat[t][a][b]*=sineRatio;
@@ -1027,10 +1035,12 @@ void calcDevsGH(bool leap,
 
   DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
   double invAnom = 1.0/GHAnom;
+  double pos;
   for (int t=0; t<nOutTime; t++){
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
-        posIntDevs[t][a][b] = (int)(aDevMat[t][a][b]*invAnom);
+        pos = aDevMat[t][a][b]*invAnom;
+        posIntDevs[t][a][b] =(int)((pos + std::fabs(pos))*0.5);
         }
       }
     }

@@ -182,9 +182,9 @@ int main(int argc, char **argv){
         avgTimeVals, inLat, tVarOut, anomVal);
       }
       else if (varName == "GH"){
-        NcVar *devOut = outfile.add_var("DGHA",ncDouble,tDimOut,latDimOut,lonDimOut);
-        NcVar *aDevOut = outfile.add_var("ADGHA",ncDouble,tDimOut,latDimOut,lonDimOut);
-        NcVar *devIntOut = outfile.add_var("INT_ADGHA",ncInt,tDimOut,latDimOut,lonDimOut);
+        NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
+        NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
+        NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);
 
         calcDevsGH(leap, startIndex, varData, devOut,aDevOut,devIntOut,AvarData,inTime,avgTimeVals,inLat,tVarOut,GHVal);
       }
