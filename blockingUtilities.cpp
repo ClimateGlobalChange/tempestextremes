@@ -11,6 +11,7 @@
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
 #include "DataVector.h"
+#include "DataMatrix.h"
 #include "DataMatrix3D.h"
 #include "DataMatrix4D.h"
 #include "TimeObj.h"
@@ -856,6 +857,33 @@ void calcDevsPV(bool leap,
 }
 
 
+void stdDev(DataMatrix3D<double>inDevs,
+              int nTime,
+              int nLat,
+              int nLon,
+              DataMatrix<double> & outStdDev){
+  //average the deviations along the time axis
+  double sigSum;
+  double dev;
+  double variance;
+  
+  for (int a=0; a<nLat; a++){
+    for (int b=0; b<nLon; b++){
+      sigSum = 0;
+      for (int t=0; t<nTime; t++){
+        dev = inDevs[t][a][b];
+        sigSum += (dev*dev);
+      }
+      variance = sigSum/nTime;
+      outStdDev[a][b] = std::sqrt(variance);
+      if (a==32 && b== 50){
+        std::cout<<"Standard deviation value: "<<std::sqrt(variance)<<std::endl;
+      }
+    }
+  }
+}
+
+
 void calcDevsGH(bool leap,
               int startAvgIndex,
               NcVar *inGH,
@@ -867,12 +895,11 @@ void calcDevsGH(bool leap,
               NcVar *avgTime,
               NcVar *lat,
               NcVar *outTime,
-              double GHAnom){
+              NcVar *stdDevVar){
 
   int nTime,nLat,nLon,nSteps,avgDay,nOutTime;
   double tRes;
   double pi = std::atan(1)*4.;
-  std::cout<<"DEBUG: pi is "<<pi<<std::endl;
 
   nTime = inGH->get_dim(0)->size();
   nLat = inGH->get_dim(1)->size();
@@ -1009,7 +1036,7 @@ void calcDevsGH(bool leap,
     for (int a=0; a<nLat; a++){
       if ((latVec[a] < 30. && latVec[a] > -30.)\
         || latVec[a] > 75. || latVec[a] < -75.){
-        SineRatio = 0.;
+        sineRatio = 0.;
       }
       else{
         denom = std::fabs(std::sin(latVec[a]*pi/180));
@@ -1034,17 +1061,34 @@ void calcDevsGH(bool leap,
 
 
   DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
-  double invAnom = 1.0/GHAnom;
+  DataMatrix<double> stdDevs(nLat,nLon);
+  stdDev(aDevMat,nOutTime,nLat,nLon,stdDevs);
+
+  double invAnom;
   double pos;
-  for (int t=0; t<nOutTime; t++){
-    for (int a=0; a<nLat; a++){
-      for (int b=0; b<nLon; b++){
+ 
+  for (int a=0; a<nLat; a++){
+    for (int b=0; b<nLon; b++){
+      if (std::fabs(latVec[a])<30. || std::fabs(latVec[a])>75.){
+        invAnom = 0.;
+      }
+      else{
+       // invAnom = 1./stdDevs[a][b];
+       invAnom = 1./180.;
+      }
+      if (a==32 && b==50){
+       // std::cout<<"Standard dev is "<<stdDevs[a][b]<<" and inv is "<<invAnom<<std::endl;
+      }
+      for (int t=0; t<nOutTime; t++){
         pos = aDevMat[t][a][b]*invAnom;
         posIntDevs[t][a][b] =(int)((pos + std::fabs(pos))*0.5);
         }
       }
     }
-  
+ 
+  stdDevVar->set_cur(0,0);
+  stdDevVar->put(&(stdDevs[0][0]),nLat,nLon);
+ 
   outIntDev->set_cur(0,0,0);
   outIntDev->put(&(posIntDevs[0][0][0]),nOutTime,nLat,nLon);
   std::cout<<"Wrote integer values to file."<<std::endl;

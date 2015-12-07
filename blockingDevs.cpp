@@ -50,7 +50,7 @@ int main(int argc, char **argv){
 
    int nFiles,avgTime,nTime,nLat,nLon;
    double anomVal = 1.3*std::pow(10,-6);
-   double GHVal = 100;
+   double GHVal = 200;
    //Create list of input files
     std::vector<std::string> InputFiles;
     GetInputFileList(fileList, InputFiles);
@@ -185,8 +185,8 @@ int main(int argc, char **argv){
         NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);
-
-        calcDevsGH(leap, startIndex, varData, devOut,aDevOut,devIntOut,AvarData,inTime,avgTimeVals,inLat,tVarOut,GHVal);
+        NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
+        calcDevsGH(leap, startIndex, varData, devOut,aDevOut,devIntOut,AvarData,inTime,avgTimeVals,inLat,tVarOut,stdDevOut);
       }
       else{
         _EXCEPTIONT("Invalid variable specified!");
