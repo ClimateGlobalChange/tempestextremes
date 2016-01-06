@@ -13,6 +13,7 @@
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
 #include "DataVector.h"
+#include "DataMatrix.h"
 #include "DataMatrix3D.h"
 #include "DataMatrix4D.h"
 #include "TimeObj.h"
@@ -119,6 +120,13 @@ void calcDevsPV(bool leap,
               NcVar *outTime,
               double PVAnom);
 
+void stdDev(DataMatrix3D<double>inDevs,
+              int nTime,
+              int nLat,
+              int nLon,
+              DataMatrix<double> & outStdDev);
+
+
 void calcDevsGH(bool leap,
               int startAvgIndex,
               NcVar *inGH,
@@ -130,7 +138,7 @@ void calcDevsGH(bool leap,
               NcVar *avgTime,
               NcVar *lat,
               NcVar *outTime,
-              double GHAnom);
+              NcVar *stdDevVar);
 
 //Function that calculates TM blocking index
 double GHcheck(double z_0,
