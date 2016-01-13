@@ -566,10 +566,13 @@ void Time::FromFormattedString(
 		    (strFormattedTime[i] == ' ')
 		) {
 			if (state != FormatState_Date) {
+				break;
+/*
 				_EXCEPTION1(
 					"Malformed Time string (%s): "
 						"Cannot return to Date format",
 						strFormattedTime.c_str());
+*/
 			}
 
 			if (szYear == NULL) {
