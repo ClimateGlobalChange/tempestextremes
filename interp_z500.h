@@ -1,11 +1,11 @@
 //////////////////////////////////
 ///
-///    \file interpolate.h
+///    \file interp_z500.h
 ///    \author Marielle Pinheiro
-///    \version March 24, 2015
+///    \version November 15, 2015
 
-#ifndef _INTERP_H_
-#define _INTERP_H_
+#ifndef _INTERP_Z_
+#define _INTERP_Z_
 
 /////////////////////////////////
 #include "blockingUtilities.h"
@@ -19,7 +19,15 @@
 #include <cmath>
 #include <cstring>
 
-void interp_util(NcFile & readin,
+void interp_1lev(NcVar *var,
+                     NcVar *hyam,
+                     NcVar *hybm,
+                     NcVar *ps,
+                     double plev,
+                     NcVar *NewVar
+);
+
+void interp_z500(NcFile & readin,
                  const std::string & strname_2d,
                  NcFile & ifile_out);
 
