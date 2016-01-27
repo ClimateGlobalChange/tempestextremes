@@ -104,6 +104,19 @@ clean:
 ##
 include $(FILES:%.cpp=$(DEPDIR)/%.d)
 include $(FILES:%.c=$(DEPDIR)/%.d)
+=======
+##
+## Build instructions
+##
+all:
+	cd src; make
+
+##
+## Clean
+##
+clean:
+	cd src; make clean
+	rm -f bin/*
+>>>>>>> master
 
 # DO NOT DELETE
-
