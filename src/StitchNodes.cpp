@@ -789,8 +789,20 @@ try {
 				double dLonC = vecNodes[t+g][iRes].lon;
 				double dLatC = vecNodes[t+g][iRes].lat;
 
-				double dR = 180.0 / M_PI * acos(sin(dLatC) * sin(dLat)
-						+ cos(dLatC) * cos(dLat) * cos(dLon - dLonC));
+				double dR =
+					sin(dLatC) * sin(dLat)
+					+ cos(dLatC) * cos(dLat) * cos(dLon - dLonC);
+
+				if (dR >= 1.0) {
+					dR = 0.0;
+				} else if (dR <= -1.0) {
+					dR = 180.0;
+				} else {
+					dR = 180.0 / M_PI * acos(dR);
+				}
+				if (dR != dR) {
+					_EXCEPTIONT("NaN value detected");
+				}
 
 				// Verify great circle distance satisfies range requirement
 				if (dR <= dRange) {
@@ -881,8 +893,20 @@ try {
 				double dLon1 = vecNodes[iTime1][iRes1].lon;
 				double dLat1 = vecNodes[iTime1][iRes1].lat;
 
-				double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLat1)
-						+ cos(dLat0) * cos(dLat1) * cos(dLon0 - dLon1));
+				double dR =
+					sin(dLat0) * sin(dLat1)
+					+ cos(dLat0) * cos(dLat1) * cos(dLon0 - dLon1);
+
+				if (dR >= 1.0) {
+					dR = 0.0;
+				} else if (dR <= -1.0) {
+					dR = 180.0;
+				} else {
+					dR = 180.0 / M_PI * acos(dR);
+				}
+				if (dR != dR) {
+					_EXCEPTIONT("NaN value detected");
+				}
 
 				if (dR < dMinEndpointDistance) {
 					nRejectedMinEndpointDistPaths++;
@@ -906,8 +930,20 @@ try {
 					double dLon1 = vecNodes[iTime1][iRes1].lon;
 					double dLat1 = vecNodes[iTime1][iRes1].lat;
 
-					double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLat1)
-						+ cos(dLat0) * cos(dLat1) * cos(dLon0 - dLon1));
+					double dR =
+						sin(dLat0) * sin(dLat1)
+						+ cos(dLat0) * cos(dLat1) * cos(dLon0 - dLon1);
+
+					if (dR >= 1.0) {
+						dR = 0.0;
+					} else if (dR <= -1.0) {
+						dR = 180.0;
+					} else {
+						dR = 180.0 / M_PI * acos(dR);
+					}
+					if (dR != dR) {
+						_EXCEPTIONT("NaN value detected");
+					}
 
 					dTotalPathDistance += dR;
 				}

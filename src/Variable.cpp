@@ -400,6 +400,28 @@ void Variable::LoadGridData(
 					+ dataRight[i] * dataRight[i]);
 		}
 
+	// Evaluate the average operator
+	} else if (m_strName == "_AVG") {
+		if (m_varArg.size() <= 1) {
+			_EXCEPTION1("_AVG expects at least two arguments: %i given",
+				m_varArg.size());
+		}
+
+		m_data.Zero();
+		for (int v = 0; v < m_varArg.size(); v++) {
+			Variable & varParam = varreg.Get(m_varArg[v]);
+			varParam.LoadGridData(varreg, vecFiles, grid, iTime);
+			const DataVector<float> & dataParam  = varParam.m_data;
+
+			for (int i = 0; i < m_data.GetRows(); i++) {
+				m_data[i] += dataParam[i];
+			}
+		}
+
+		for (int i = 0; i < m_data.GetRows(); i++) {
+			m_data[i] /= static_cast<double>(m_varArg.size());
+		}
+
 	// Evaluate the minus operator
 	} else if (m_strName == "_DIFF") {
 		if (m_varArg.size() != 2) {
