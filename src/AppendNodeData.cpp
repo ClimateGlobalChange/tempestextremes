@@ -171,8 +171,20 @@ void FindLocalAverage(
 		double dLonThis = dataLon[pr.second];
 
 		// Great circle distance to this element
-		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
-				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0));
+		double dR =
+			sin(dLat0) * sin(dLatThis)
+			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
+
+		if (dR >= 1.0) {
+			dR = 0.0;
+		} else if (dR <= -1.0) {
+			dR = 180.0;
+		} else {
+			dR = 180.0 / M_PI * acos(dR);
+		}
+		if (dR != dR) {
+			_EXCEPTIONT("NaN value detected");
+		}
 
 		if (dR > dMaxDist) {
 			continue;
