@@ -9,6 +9,12 @@ src/depend/*
 
 *.txt
 
+*.o
+
+*.d
+
+*.a
+
 bin/*
 
 test/*.nc
