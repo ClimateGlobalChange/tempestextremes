@@ -10,7 +10,7 @@ array that corresponds to the center date of the 31-day array.
 The value for each day is then divided by the number of years *31*
 nsteps to get the daily average for the (n)-year period. 
 */
-#include "blockingUtilities.h"
+#include "BlockingUtilities.h"
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
@@ -37,12 +37,14 @@ int main(int argc, char **argv){
   std::string strfile_out;
   std::string varName;
   std::string avgName;
+  bool missingFiles;
 
   BeginCommandLine()
     CommandLineString(fileList, "inlist", "");
     CommandLineString(strfile_out, "out", "");
     CommandLineString(varName, "varname","");
     CommandLineString(avgName, "avgname","");
+    CommandLineBool(missingFiles, "missing");
     ParseCommandLine(argc, argv);
 
   EndCommandLine(argv)

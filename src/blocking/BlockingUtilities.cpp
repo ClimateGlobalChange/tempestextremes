@@ -7,7 +7,7 @@
 ///          \version June 1, 2015
 ///
 
-#include "blockingUtilities.h"
+#include "BlockingUtilities.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
 #include "DataVector.h"

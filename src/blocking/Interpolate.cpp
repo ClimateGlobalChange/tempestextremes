@@ -4,8 +4,8 @@
 ///    \author Marielle Pinheiro
 ///    \version March 24, 2015
 
-#include "interpolate.h"
-#include "blockingUtilities.h"
+#include "Interpolate.h"
+#include "BlockingUtilities.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
 #include "DataVector.h"

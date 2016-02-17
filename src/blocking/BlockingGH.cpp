@@ -21,8 +21,8 @@ Temporal criterion for block: 5 days persistent blocking for single latitude
 #include "DataVector.h"
 #include "DataMatrix3D.h"
 #include "DataMatrix4D.h"
-#include "interp_z500.h"
-#include "blockingUtilities.h"
+#include "Interp_z500.h"
+#include "BlockingUtilities.h"
 
 #include <cstdlib>
 #include <cmath>

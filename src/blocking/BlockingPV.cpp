@@ -6,8 +6,8 @@
 ///
 
 
-#include "blockingUtilities.h"
-#include "interpolate.h"
+#include "BlockingUtilities.h"
+#include "Interpolate.h"
 #include "CommandLine.h"
 #include "Announce.h"
 #include "Exception.h"

@@ -12,7 +12,7 @@ and outputs integer values (INT_ADIPV) which can then be used by StitchBlobs
 
 */
 
-#include "blockingUtilities.h"
+#include "BlockingUtilities.h"
 #include "CommandLine.h"
 #include "Announce.h"
 #include "Exception.h"

@@ -4,8 +4,8 @@
 ///    \author Marielle Pinheiro
 ///    \version March 24, 2015
 
-#include "interp_z500.h"
-#include "blockingUtilities.h"
+#include "Interp_z500.h"
+#include "BlockingUtilities.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
 #include "DataVector.h"

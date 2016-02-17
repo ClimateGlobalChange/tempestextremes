@@ -25,6 +25,8 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
 OF SUCH DAMAGE.
 */
 /* single nearest neighbor search written by Tamas Nepusz <tamas@cs.rhul.ac.uk> */
+extern "C" {
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -108,7 +110,7 @@ struct kdtree *kd_create(int k)
 {
 	struct kdtree *tree;
 
-	if(!(tree = malloc(sizeof *tree))) {
+	if(!(tree = (struct kdtree *)malloc(sizeof *tree))) {
 		return 0;
 	}
 
@@ -165,10 +167,10 @@ static int insert_rec(struct kdnode **nptr, const double *pos, void *data, int d
 	struct kdnode *node;
 
 	if(!*nptr) {
-		if(!(node = malloc(sizeof *node))) {
+		if(!(node = (struct kdnode *)malloc(sizeof *node))) {
 			return -1;
 		}
-		if(!(node->pos = malloc(dim * sizeof *node->pos))) {
+		if(!(node->pos = (double *)malloc(dim * sizeof *node->pos))) {
 			free(node);
 			return -1;
 		}
@@ -212,10 +214,10 @@ int kd_insertf(struct kdtree *tree, const float *pos, void *data)
 	if(dim > 16) {
 #ifndef NO_ALLOCA
 		if(dim <= 256)
-			bptr = buf = alloca(dim * sizeof *bptr);
+			bptr = buf = (double *)alloca(dim * sizeof *bptr);
 		else
 #endif
-			if(!(bptr = buf = malloc(dim * sizeof *bptr))) {
+			if(!(bptr = buf = (double *)malloc(dim * sizeof *bptr))) {
 				return -1;
 			}
 	} else {
@@ -408,10 +410,10 @@ struct kdres *kd_nearest(struct kdtree *kd, const double *pos)
 	if (!kd->rect) return 0;
 
 	/* Allocate result set */
-	if(!(rset = malloc(sizeof *rset))) {
+	if(!(rset = (struct kdres *)malloc(sizeof *rset))) {
 		return 0;
 	}
-	if(!(rset->rlist = alloc_resnode())) {
+	if(!(rset->rlist = (struct res_node *)alloc_resnode())) {
 		free(rset);
 		return 0;
 	}
@@ -461,10 +463,10 @@ struct kdres *kd_nearestf(struct kdtree *tree, const float *pos)
 	if(dim > 16) {
 #ifndef NO_ALLOCA
 		if(dim <= 256)
-			bptr = buf = alloca(dim * sizeof *bptr);
+			bptr = buf = (double *)alloca(dim * sizeof *bptr);
 		else
 #endif
-			if(!(bptr = buf = malloc(dim * sizeof *bptr))) {
+			if(!(bptr = buf = (double *)malloc(dim * sizeof *bptr))) {
 				return 0;
 			}
 	} else {
@@ -534,10 +536,10 @@ struct kdres *kd_nearest_range(struct kdtree *kd, const double *pos, double rang
 	int ret;
 	struct kdres *rset;
 
-	if(!(rset = malloc(sizeof *rset))) {
+	if(!(rset = (struct kdres *)malloc(sizeof *rset))) {
 		return 0;
 	}
-	if(!(rset->rlist = alloc_resnode())) {
+	if(!(rset->rlist = (struct res_node *)alloc_resnode())) {
 		free(rset);
 		return 0;
 	}
@@ -563,10 +565,10 @@ struct kdres *kd_nearest_rangef(struct kdtree *kd, const float *pos, float range
 	if(dim > 16) {
 #ifndef NO_ALLOCA
 		if(dim <= 256)
-			bptr = buf = alloca(dim * sizeof *bptr);
+			bptr = buf = (double *)alloca(dim * sizeof *bptr);
 		else
 #endif
-			if(!(bptr = buf = malloc(dim * sizeof *bptr))) {
+			if(!(bptr = buf = (double *)malloc(dim * sizeof *bptr))) {
 				return 0;
 			}
 	} else {
@@ -689,16 +691,16 @@ static struct kdhyperrect* hyperrect_create(int dim, const double *min, const do
 	size_t size = dim * sizeof(double);
 	struct kdhyperrect* rect = 0;
 
-	if (!(rect = malloc(sizeof(struct kdhyperrect)))) {
+	if (!(rect = (struct kdhyperrect *)malloc(sizeof(struct kdhyperrect)))) {
 		return 0;
 	}
 
 	rect->dim = dim;
-	if (!(rect->min = malloc(size))) {
+	if (!(rect->min = (double *)malloc(size))) {
 		free(rect);
 		return 0;
 	}
-	if (!(rect->max = malloc(size))) {
+	if (!(rect->max = (double *)malloc(size))) {
 		free(rect->min);
 		free(rect);
 		return 0;
@@ -806,7 +808,7 @@ static int rlist_insert(struct res_node *list, struct kdnode *item, double dist_
 {
 	struct res_node *rnode;
 
-	if(!(rnode = alloc_resnode())) {
+	if(!(rnode = (struct res_node *)alloc_resnode())) {
 		return -1;
 	}
 	rnode->item = item;
@@ -833,4 +835,6 @@ static void clear_results(struct kdres *rset)
 	}
 
 	rset->rlist->next = 0;
+}
+
 }

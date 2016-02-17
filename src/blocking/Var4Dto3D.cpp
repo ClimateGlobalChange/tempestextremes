@@ -14,7 +14,7 @@ only along the lev axis)*/
 #include "DataVector.h"
 #include "DataMatrix3D.h"
 #include "DataMatrix4D.h"
-#include "blockingUtilities.h"
+#include "BlockingUtilities.h"
 
 #include <cstdlib>
 #include <cmath>
