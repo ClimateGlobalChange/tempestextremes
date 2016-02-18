@@ -158,6 +158,7 @@ int main(int argc, char **argv){
     int leapDay=0;
     int leapHour=0;
 
+<<<<<<< HEAD
 
     //Values in case of missing files
     double contCheck = 0.;
@@ -263,8 +264,83 @@ int main(int argc, char **argv){
         for (int a=0; a<nLat; a++){
           for (int b=0; b<nLon; b++){
             avgStoreVals[dateIndex][a][b] += currFillData[t][a][b];
+=======
+    double missingValue=-999999.9;
+
+    //First while loop: open files and fill until 31 days array full
+    while (currArrIndex<arrLen){
+      //First file
+      for (int t=tStart; t<tEnd; t++){
+        if (leap==true){
+        //Check if time is a leap year date
+          ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
+            leapMonth,leapDay,leapHour);
+          if (leapMonth==2 && leapDay == 29){
+            while (leapMonth ==2 && leapDay ==29){
+              std::cout<<"Leap day! Skipping this step."<<std::endl;
+              t++;
+              ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
+                leapMonth, leapDay, leapHour);
+            }
           }
         }
+        //Fill the 31 day array with PV data
+        for (int a=0; a<nLat; a++){
+          for (int b=0; b<nLon; b++){
+            currFillData[currArrIndex][a][b] = IPVData[t][a][b];
+          }
+        }
+        currArrIndex++;
+      }
+      //If the 31 days aren't yet filled, keep going
+      if (currArrIndex<arrLen){
+        infile.close();
+        //Open new file and increment file counter
+        x+=1;
+        NcFile infile(InputFiles[x].c_str());
+        nTime = infile.get_dim("time")->size();
+        nLat = infile.get_dim("lat")->size();
+        nLon = infile.get_dim("lon")->size();
+
+        //IPV variable
+        NcVar *inPV = infile.get_var(varName.c_str());
+        IPVData.Initialize(nTime,nLat,nLon);
+
+        inPV->set_cur(0,0,0);
+        inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
+
+        //Time variable
+        NcVar *timeVal = infile.get_var("time");
+        timeVec.Initialize(nTime);
+        timeVal->set_cur((long) 0);
+        timeVal->get(&(timeVec[0]),nTime);
+
+        double contCheck;
+        if ((strTimeUnits.length() >= 11) && \
+          (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
+          contCheck = std::fabs(timeVec[0]-endTime);
+        }
+        else{
+          contCheck = std::fabs(timeVec[0]-endTime)/24.0;
+        }
+        
+        //If missing hasn't been specified:
+
+        if (contCheck>tRes){
+          if (!missingFiles){
+          //check to make sure that there isn't a file missing in the list!
+          //otherwise will mess up averages
+            std::cout << "contCheck is "<< contCheck << std::endl;
+            _EXCEPTIONT("New file is not continuous with previous file."); 
+          } else{
+          //Fill in the days that are missing with the missingvalue 
+          
+
+>>>>>>> working on averaging code.
+          }
+          
+        }
+<<<<<<< HEAD
       }
    //increase count by 1
       for (int a=0; a<nLat; a++){
@@ -274,6 +350,41 @@ int main(int argc, char **argv){
       }
 
     }
+=======
+
+        //reset leap year check
+        leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear, \
+          dateMonth, dateDay, dateHour);
+
+        //reset ending time of current file for next continuity check
+        endTime = timeVec[nTime-1];
+
+        //check that tEnd doesn't exceed 31 days       
+        int tCheck = currArrIndex + nTime;
+
+        if (tCheck > arrLen){
+          tEnd = arrLen-currArrIndex;
+        }
+        else{
+          tEnd = nTime;
+        }
+      }     
+    }
+    //Fill yearly array with sum of 31 days
+    for (int t=0; t<arrLen; t++){
+      for (int a=0; a<nLat; a++){
+        for (int b=0; b<nLon; b++){
+          avgStoreVals[dateIndex][a][b] += currFillData[t][a][b];
+        }
+      }
+    }
+   //increase count by 1
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        avgCounts[dateIndex][a][b] +=1.0;
+      }
+    }
+>>>>>>> working on averaging code.
     
     dateIndex+=1;
     currArrIndex = 0;
@@ -304,9 +415,28 @@ int main(int argc, char **argv){
       timeVal->set_cur((long) 0);
       timeVal->get(&(timeVec[0]),nTime);
 
+<<<<<<< HEAD
       leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear, \
         dateMonth, dateDay, dateHour);
    
+=======
+      leap = false;
+   
+      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0], dateYear,\
+        dateMonth, dateDay, dateHour);
+
+      if (strCalendar!="noleap" && dateMonth<=2){
+        //Check whether file contains a Feb 29
+     //   std::cout<<"Checking leap year status."<<std::endl;
+        ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
+          leapMonth, leapDay, leapHour);
+        if ((leapMonth==2 && leapDay==29) || (dateMonth==2 && leapMonth==3)){
+        //Check when parsing the indices
+       //   std::cout<<"May contain leap day. Will check."<<std::endl;
+          leap = true;
+        }
+      }
+>>>>>>> working on averaging code.
       tStart = 0;
       tEnd = tStart + nSteps;
     }
@@ -342,7 +472,10 @@ int main(int argc, char **argv){
       }
       //2: if new file needs to be opened, open it
       if(newFile==true){
+<<<<<<< HEAD
         endTime = timeVec[nTime-1];
+=======
+>>>>>>> working on averaging code.
         std::cout<<"Reached end of file."<<std::endl;
         infile.close();
         std::cout<<"8: Closed "<<InputFiles[x]<<std::endl;
@@ -369,6 +502,7 @@ int main(int argc, char **argv){
           timeVal->set_cur((long) 0);
           timeVal->get(&(timeVec[0]),nTime);
 
+<<<<<<< HEAD
           std::cout <<"Current end time is "<<endTime << std::endl;
           
           ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0],dateYear,\
@@ -389,6 +523,25 @@ int main(int argc, char **argv){
           leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear,\
             dateMonth, dateDay, dateHour);
 
+=======
+          leap = false;
+
+          ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0], dateYear,\
+            dateMonth, dateDay, dateHour);
+
+          if (strCalendar!="noleap" && dateMonth<=2){
+          //Check whether file contains a Feb 29
+       //     std::cout<<"Checking leap year status."<<std::endl;
+            ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
+            leapMonth, leapDay, leapHour);
+
+            if ((leapMonth==2 && leapDay==29) || (dateMonth==2 && leapMonth==3)){
+          //Check when parsing the indices
+         //     std::cout<<"May contain leap day. Will check."<<std::endl;
+              leap = true;
+            }
+          }
+>>>>>>> working on averaging code.
           tStart = 0;
           tEnd = tStart + nSteps;
         }
@@ -404,9 +557,37 @@ int main(int argc, char **argv){
             for (int b=0; b<nLon; b++){
               currFillData[currArrIndex][a][b] = IPVData[t][a][b];
             }
+<<<<<<< HEAD
+=======
           }
           currArrIndex+=1;
         }
+        //check for periodic boundary condition for 31 day array
+        if (currArrIndex>=arrLen){
+          std::cout<<"currArrIndex is "<<currArrIndex<<" and periodic boundary: 31 day length met or exceeded."<<std::endl;
+          currArrIndex-=arrLen;
+          std::cout<<"currArrIndex is now "<<currArrIndex<<std::endl;
+        }
+     //Fill date with sum of new array values
+        for (int t=0; t<arrLen; t++){
+          for (int a=0; a<nLat; a++){
+            for (int b=0; b<nLon; b++){
+              avgStoreVals[dateIndex][a][b] += currFillData[t][a][b];
+            }
+          }
+        }
+        //increase count
+        for (int a=0; a<nLat; a++){
+          for (int b=0; b<nLon; b++){
+            avgCounts[dateIndex][a][b] += 1.0;
+            if (a==50 && b==50){
+         //     std::cout<<" date index is "<<dateIndex<<" and count is "<<avgCounts[dateIndex][a][b]<<std::endl;
+            }
+>>>>>>> working on averaging code.
+          }
+          currArrIndex+=1;
+        }
+<<<<<<< HEAD
         //check for periodic boundary condition for 31 day array
         if (currArrIndex>=arrLen){
           std::cout<<"currArrIndex is "<<currArrIndex<<" and periodic boundary: 31 day length met or exceeded."<<std::endl;
@@ -446,6 +627,22 @@ int main(int argc, char **argv){
         if (tEnd<nTime){
           tStart = tEnd;
           tEnd = tStart + nSteps;
+=======
+        dateIndex+=1;
+        //periodic boundary condition for year
+        if(dateIndex>=yearLen){
+          dateIndex-=yearLen;
+        //  std::cout<<"Periodic boundary: date index is "<<dateIndex<<" and end of year array reached. dateIndex is now "\
+            <<dateIndex<<std::endl;
+        }
+
+        //
+        if (tEnd<nTime){
+        //  std::cout<<"start/end/ntime:"<<tStart<<"/"<<tEnd<<"/"<<nTime<<". Still have data left on current file. Will continue on."<<std::endl;
+          tStart = tEnd;
+          tEnd = tStart + nSteps;
+        //  std::cout<<"start/end now "<<tStart <<" and "<< tEnd <<std::endl;
+>>>>>>> working on averaging code.
           //Check for leap year
           if (leap==true){
           //  std::cout<<"Checking date for leap day."<<std::endl;
@@ -459,6 +656,10 @@ int main(int argc, char **argv){
             }
             //re-check tEnd
             if (tEnd>=nTime){
+<<<<<<< HEAD
+=======
+            //  std::cout<<"After re-check of tEnd (leap day), reached EOF"<<std::endl;
+>>>>>>> working on averaging code.
               newFile = true;
             } 
           }
@@ -474,7 +675,16 @@ int main(int argc, char **argv){
     for (int t=0; t<yearLen; t++){
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
+<<<<<<< HEAD
           avgStoreVals[t][a][b] = avgStoreVals[t][a][b]/(avgCounts[t][a][b]*31.0*nSteps);
+=======
+     //     if (a==50 && b==50){
+         //   std::cout<<"DEBUG: for t="<<t<<", value is "<<avgStoreVals[t][a][b]\
+              <<", count is "<<avgCounts[t][a][b]<<" and dividing by "<<avgCounts[t][a][b]*31.0*nSteps<<std::endl;
+       //   }
+          avgStoreVals[t][a][b] = avgStoreVals[t][a][b]/(avgCounts[t][a][b]*31.0*nSteps);
+         // if (a==50 && b==50) std::cout <<"Value is "<<avgStoreVals[t][a][b]<<std::endl;
+>>>>>>> working on averaging code.
         }
       }
     }
