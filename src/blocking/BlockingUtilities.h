@@ -148,4 +148,21 @@ double GHcheck(double z_0,
           double lat_N,
           double lat_S,
           std::string hemi );
+
+bool missingValCheck(
+  DataMatrix3D<double> fillData,
+  int nTime,
+  double missingNum
+);
+
+bool checkFileLeap(
+  std::string StrTimeUnits,
+  std::string strCalendar,
+  int dateYear,
+  int dateMonth,
+  int dateDay,
+  int dateHour
+);
+
+
 #endif

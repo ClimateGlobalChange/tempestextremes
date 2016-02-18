@@ -1136,3 +1136,52 @@ double GHcheck(double z_0,
     " returned "<<gval<<" (NH: GHGS>0 & GHGN<-10)"<<std::endl;*/
   return(gval);
 }
+
+bool missingValCheck(
+  DataMatrix3D<double> fillData,
+  int nTime,
+  double missingNum
+){
+    bool isMissing = false;
+
+    for (int t=0; t<nTime; t++){
+      if (fillData[t][2][2] == missingNum){
+        std::cout << "Array contains missing values!"<<std::endl;
+        isMissing = true;
+        break;
+      }
+    }
+    if (isMissing == false) std::cout << "Did not find missing values."<<std::endl;
+    return isMissing;
+}
+
+bool checkFileLeap(
+  std::string StrTimeUnits,
+  std::string strCalendar,
+  int dateYear,
+  int dateMonth,
+  int dateDay,
+  int dateHour
+){
+
+  bool leap = false;
+
+  int leapYear=0;
+  int leapMonth=0;
+  int leapDay=0;
+  int leapHour=0;
+
+  if (strCalendar!="noleap" && dateMonth<=2){
+    //Check whether file contains a Feb 29
+
+    ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
+      leapMonth, leapDay, leapHour);
+
+    if ((leapMonth==2 && leapDay==29) || (dateMonth==2&&leapMonth==3)){
+      //Check when parsing the indices
+    //  std::cout<<"Might contain leap day. Will check."<<std::endl;
+      leap = true;
+    }
+  }
+  return leap;
+}
