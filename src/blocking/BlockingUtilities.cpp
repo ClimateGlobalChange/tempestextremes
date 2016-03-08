@@ -1137,6 +1137,23 @@ double GHcheck(double z_0,
   return(gval);
 }
 
+
+double tBetweenFiles(
+  std::string strTimeUnits,
+  double nextStartTime,
+  double prevEndTime
+){
+  double contCheck;
+  if ((strTimeUnits.length() >= 11) && \
+    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
+    contCheck = std::fabs(nextStartTime-prevEndTime);
+  }
+  else{
+    contCheck = std::fabs(nextStartTime-prevEndTime)/24.0;
+  }
+  return(contCheck);
+}
+
 bool missingValCheck(
   DataMatrix3D<double> fillData,
   int nTime,
@@ -1153,6 +1170,32 @@ bool missingValCheck(
     }
     if (isMissing == false) std::cout << "Did not find missing values."<<std::endl;
     return isMissing;
+}
+
+void MissingFill(
+  double missingValue,
+  double tRes,
+  double contCheck,
+  int nLat,
+  int nLon,
+  int & currArrIndex,
+  DataMatrix3D<double> & currFillData
+){
+
+  int nFill = contCheck/tRes;
+  std::cout<<"ContCheck is " << contCheck << " and tRes is "<<\
+   tRes <<" and nFill is "<<nFill << std::endl;
+  std::cout<<"Before filling in missing values: CurrArrIndex is "<<currArrIndex<<std::endl;
+  for (int n=0; n<nFill; n++){
+    std::cout<<" Filling index "<<currArrIndex + n <<std::endl;
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        currFillData[currArrIndex + n][a][b] = missingValue;
+      } 
+    }
+  }
+  currArrIndex += nFill;
+  std::cout<<"CurrArrIndex is now "<<currArrIndex<<std::endl;
 }
 
 bool checkFileLeap(

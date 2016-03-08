@@ -158,7 +158,11 @@ int main(int argc, char **argv){
     int leapDay=0;
     int leapHour=0;
 
+
+    //Values in case of missing files
+    double contCheck = 0.;
     double missingValue=-999999.9;
+    bool hasMissingValues = false;
 
     //First while loop: open files and fill until 31 days array full
     while (currArrIndex<arrLen){
@@ -208,14 +212,7 @@ int main(int argc, char **argv){
         timeVal->set_cur((long) 0);
         timeVal->get(&(timeVec[0]),nTime);
 
-        double contCheck;
-        if ((strTimeUnits.length() >= 11) && \
-          (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
-          contCheck = std::fabs(timeVec[0]-endTime);
-        }
-        else{
-          contCheck = std::fabs(timeVec[0]-endTime)/24.0;
-        }
+        contCheck = tBetweenFiles(strTimeUnits, timeVec[0], endTime);
         
         //If missing hasn't been specified:
 
@@ -227,8 +224,9 @@ int main(int argc, char **argv){
             _EXCEPTIONT("New file is not continuous with previous file."); 
           } else{
           //Fill in the days that are missing with the missingvalue 
-          
-
+          //contCheck units are in days, tRes is a fraction of a day
+          //So the number of indices to be filled in is contCheck/tRes     
+            MissingFill(missingValue,tRes,contCheck,nLat,nLon,currArrIndex,currFillData); 
           }
           
         }
@@ -252,18 +250,29 @@ int main(int argc, char **argv){
       }     
     }
     //Fill yearly array with sum of 31 days
-    for (int t=0; t<arrLen; t++){
-      for (int a=0; a<nLat; a++){
-        for (int b=0; b<nLon; b++){
-          avgStoreVals[dateIndex][a][b] += currFillData[t][a][b];
+    //Check if the array contains missing values
+    if (missingFiles){
+      hasMissingValues = missingValCheck(currFillData,arrLen,missingValue);
+    }    
+
+    if (hasMissingValues){
+      std::cout<< "This array has missing values, will not be added to sum."<<std::endl;
+    }
+    else{
+      for (int t=0; t<arrLen; t++){
+        for (int a=0; a<nLat; a++){
+          for (int b=0; b<nLon; b++){
+            avgStoreVals[dateIndex][a][b] += currFillData[t][a][b];
+          }
         }
       }
-    }
    //increase count by 1
-    for (int a=0; a<nLat; a++){
-      for (int b=0; b<nLon; b++){
-        avgCounts[dateIndex][a][b] +=1.0;
+      for (int a=0; a<nLat; a++){
+        for (int b=0; b<nLon; b++){
+          avgCounts[dateIndex][a][b] +=1.0;
+        }
       }
+
     }
     
     dateIndex+=1;
@@ -295,22 +304,9 @@ int main(int argc, char **argv){
       timeVal->set_cur((long) 0);
       timeVal->get(&(timeVec[0]),nTime);
 
-      leap = false;
-   
-      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0], dateYear,\
+      leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear, \
         dateMonth, dateDay, dateHour);
-
-      if (strCalendar!="noleap" && dateMonth<=2){
-        //Check whether file contains a Feb 29
-     //   std::cout<<"Checking leap year status."<<std::endl;
-        ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
-          leapMonth, leapDay, leapHour);
-        if ((leapMonth==2 && leapDay==29) || (dateMonth==2 && leapMonth==3)){
-        //Check when parsing the indices
-       //   std::cout<<"May contain leap day. Will check."<<std::endl;
-          leap = true;
-        }
-      }
+   
       tStart = 0;
       tEnd = tStart + nSteps;
     }
@@ -346,6 +342,7 @@ int main(int argc, char **argv){
       }
       //2: if new file needs to be opened, open it
       if(newFile==true){
+        endTime = timeVec[nTime-1];
         std::cout<<"Reached end of file."<<std::endl;
         infile.close();
         std::cout<<"8: Closed "<<InputFiles[x]<<std::endl;
@@ -372,23 +369,27 @@ int main(int argc, char **argv){
           timeVal->set_cur((long) 0);
           timeVal->get(&(timeVec[0]),nTime);
 
-          leap = false;
+          std::cout <<"Current end time is "<<endTime << std::endl;
+          
+          ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0],dateYear,\
+            dateMonth,dateDay,dateHour);
 
-          ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0], dateYear,\
+         //Check file continuity
+          contCheck = tBetweenFiles(strTimeUnits, timeVec[0],endTime);
+
+          if (contCheck > tRes){
+            if (!missingFiles){
+              std::cout<<"contCheck is "<<contCheck<<std::endl;
+              _EXCEPTIONT("New file %s is not continuous with previous file",InputFiles[x].c_str());
+            }else{
+              MissingFill(missingValue, tRes, contCheck, nLat, nLon, currArrIndex, currFillData);
+            }
+          }           
+//START HEEEEEEEEEEEEEEEEEEEEEEEEEEEERE
+
+          leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear,\
             dateMonth, dateDay, dateHour);
 
-          if (strCalendar!="noleap" && dateMonth<=2){
-          //Check whether file contains a Feb 29
-       //     std::cout<<"Checking leap year status."<<std::endl;
-            ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
-            leapMonth, leapDay, leapHour);
-
-            if ((leapMonth==2 && leapDay==29) || (dateMonth==2 && leapMonth==3)){
-          //Check when parsing the indices
-         //     std::cout<<"May contain leap day. Will check."<<std::endl;
-              leap = true;
-            }
-          }
           tStart = 0;
           tEnd = tStart + nSteps;
         }

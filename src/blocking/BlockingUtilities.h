@@ -149,10 +149,29 @@ double GHcheck(double z_0,
           double lat_S,
           std::string hemi );
 
+
+double tBetweenFiles(
+  std::string strTimeUnits,
+  double nextStartTime,
+  double prevEndTime
+);
+
+
 bool missingValCheck(
   DataMatrix3D<double> fillData,
   int nTime,
   double missingNum
+);
+
+
+void MissingFill(
+  double missingValue,
+  double tRes,
+  double contCheck,
+  int nLat,
+  int nLon,
+  int & currArrIndex,
+  DataMatrix3D<double> & currFillData
 );
 
 bool checkFileLeap(
