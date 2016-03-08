@@ -151,11 +151,11 @@ void ParseTimeDouble(
 		int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
 		time.AddSeconds(nSeconds);
 
-		Announce("Time (YMDS): %i %i %i %i",
+	/*	Announce("Time (YMDS): %i %i %i %i",
 				time.GetYear(),
 				time.GetMonth(),
 				time.GetDay(),
-				time.GetSecond());
+				time.GetSecond());*/
 
 
 		nDateYear = time.GetYear();
@@ -173,14 +173,14 @@ void ParseTimeDouble(
 		std::string strSubStr = strTimeUnits.substr(12);
 		Time time(cal);
 		time.FromFormattedString(strSubStr);
-                printf("Debug: dTime is %10f \n",dTime);
+              //  printf("Debug: dTime is %10f \n",dTime);
 		time.AddHours(static_cast<int>(dTime));
 
-		Announce("Time (YMDS): %i %i %i %i",
+	/*	Announce("Time (YMDS): %i %i %i %i",
 				time.GetYear(),
 				time.GetMonth(),
 				time.GetDay(),
-				time.GetSecond());
+				time.GetSecond());*/
 
 		nDateYear = time.GetYear();
 		nDateMonth = time.GetMonth();
