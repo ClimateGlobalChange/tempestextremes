@@ -1137,7 +1137,6 @@ double GHcheck(double z_0,
   return(gval);
 }
 
-<<<<<<< HEAD
 
 double tBetweenFiles(
   std::string strTimeUnits,
@@ -1155,8 +1154,6 @@ double tBetweenFiles(
   return(contCheck);
 }
 
-=======
->>>>>>> working on averaging code.
 bool missingValCheck(
   DataMatrix3D<double> fillData,
   int nTime,
@@ -1175,7 +1172,6 @@ bool missingValCheck(
     return isMissing;
 }
 
-<<<<<<< HEAD
 void MissingFill(
   double missingValue,
   double tRes,
@@ -1202,8 +1198,6 @@ void MissingFill(
   std::cout<<"CurrArrIndex is now "<<currArrIndex<<std::endl;
 }
 
-=======
->>>>>>> working on averaging code.
 bool checkFileLeap(
   std::string StrTimeUnits,
   std::string strCalendar,

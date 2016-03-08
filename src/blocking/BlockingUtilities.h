@@ -149,8 +149,6 @@ double GHcheck(double z_0,
           double lat_S,
           std::string hemi );
 
-<<<<<<< HEAD
-
 double tBetweenFiles(
   std::string strTimeUnits,
   double nextStartTime,
@@ -158,15 +156,12 @@ double tBetweenFiles(
 );
 
 
-=======
->>>>>>> working on averaging code.
 bool missingValCheck(
   DataMatrix3D<double> fillData,
   int nTime,
   double missingNum
 );
 
-<<<<<<< HEAD
 
 void MissingFill(
   double missingValue,
@@ -178,8 +173,6 @@ void MissingFill(
   DataMatrix3D<double> & currFillData
 );
 
-=======
->>>>>>> working on averaging code.
 bool checkFileLeap(
   std::string StrTimeUnits,
   std::string strCalendar,
