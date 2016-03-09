@@ -385,7 +385,6 @@ int main(int argc, char **argv){
               MissingFill(missingValue, tRes, contCheck, nLat, nLon, currArrIndex, currFillData);
             }
           }           
-//START HEEEEEEEEEEEEEEEEEEEEEEEEEEEERE
 
           leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear,\
             dateMonth, dateDay, dateHour);
@@ -414,37 +413,39 @@ int main(int argc, char **argv){
           currArrIndex-=arrLen;
           std::cout<<"currArrIndex is now "<<currArrIndex<<std::endl;
         }
-     //Fill date with sum of new array values
-        for (int t=0; t<arrLen; t++){
+     //Check to see if array contains missing values
+     if (missingFiles){
+       hasMissingValues = missingValCheck(currFillData,arrLen,missingValue);
+     }
+     //Do not add sum of array to average if array contains missing values!
+     if (hasMissingValues){
+       std::cout<<"This array has missing values, will not be added to sum."<<std::endl;
+     }else{
+       //Fill date with sum of new array values
+          for (int t=0; t<arrLen; t++){
+            for (int a=0; a<nLat; a++){
+              for (int b=0; b<nLon; b++){
+                avgStoreVals[dateIndex][a][b] += currFillData[t][a][b];
+              }
+            }
+          }
+        //increase count
           for (int a=0; a<nLat; a++){
             for (int b=0; b<nLon; b++){
-              avgStoreVals[dateIndex][a][b] += currFillData[t][a][b];
+              avgCounts[dateIndex][a][b] += 1.0;
             }
           }
         }
-        //increase count
-        for (int a=0; a<nLat; a++){
-          for (int b=0; b<nLon; b++){
-            avgCounts[dateIndex][a][b] += 1.0;
-            if (a==50 && b==50){
-         //     std::cout<<" date index is "<<dateIndex<<" and count is "<<avgCounts[dateIndex][a][b]<<std::endl;
-            }
-          }
-        }
+
+        //regardless of missing data or not, proceed to next date
         dateIndex+=1;
         //periodic boundary condition for year
         if(dateIndex>=yearLen){
           dateIndex-=yearLen;
-        //  std::cout<<"Periodic boundary: date index is "<<dateIndex<<" and end of year array reached. dateIndex is now "\
-            <<dateIndex<<std::endl;
         }
-
-        //
         if (tEnd<nTime){
-        //  std::cout<<"start/end/ntime:"<<tStart<<"/"<<tEnd<<"/"<<nTime<<". Still have data left on current file. Will continue on."<<std::endl;
           tStart = tEnd;
           tEnd = tStart + nSteps;
-        //  std::cout<<"start/end now "<<tStart <<" and "<< tEnd <<std::endl;
           //Check for leap year
           if (leap==true){
           //  std::cout<<"Checking date for leap day."<<std::endl;
@@ -458,7 +459,6 @@ int main(int argc, char **argv){
             }
             //re-check tEnd
             if (tEnd>=nTime){
-            //  std::cout<<"After re-check of tEnd (leap day), reached EOF"<<std::endl;
               newFile = true;
             } 
           }
@@ -474,12 +474,7 @@ int main(int argc, char **argv){
     for (int t=0; t<yearLen; t++){
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
-     //     if (a==50 && b==50){
-         //   std::cout<<"DEBUG: for t="<<t<<", value is "<<avgStoreVals[t][a][b]\
-              <<", count is "<<avgCounts[t][a][b]<<" and dividing by "<<avgCounts[t][a][b]*31.0*nSteps<<std::endl;
-       //   }
           avgStoreVals[t][a][b] = avgStoreVals[t][a][b]/(avgCounts[t][a][b]*31.0*nSteps);
-         // if (a==50 && b==50) std::cout <<"Value is "<<avgStoreVals[t][a][b]<<std::endl;
         }
       }
     }
