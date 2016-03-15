@@ -15,6 +15,9 @@ else ifeq ($(UNAME),Linux)
   ifeq ($(NERSC_HOST),babbage)
     SYSTEM= BABBAGE
     SYSTEM_MAKEFILE= babbage.make
+  else ifeq ($(NERSC_HOST),cori)
+    SYSTEM= CORI
+    SYSTEM_MAKEFILE= cori.make
   else # FIXME: Add a test condition
     SYSTEM= AGRI
     SYSTEM_MAKEFILE= agri.make
