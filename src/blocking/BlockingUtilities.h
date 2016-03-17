@@ -179,7 +179,8 @@ bool checkFileLeap(
   int dateYear,
   int dateMonth,
   int dateDay,
-  int dateHour
+  int dateHour,
+  double timeVal
 );
 
 

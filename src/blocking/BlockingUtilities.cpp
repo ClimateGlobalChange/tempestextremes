@@ -1199,12 +1199,13 @@ void MissingFill(
 }
 
 bool checkFileLeap(
-  std::string StrTimeUnits,
+  std::string strTimeUnits,
   std::string strCalendar,
   int dateYear,
   int dateMonth,
   int dateDay,
-  int dateHour
+  int dateHour,
+  double timeVal
 ){
 
   bool leap = false;
@@ -1217,7 +1218,7 @@ bool checkFileLeap(
   if (strCalendar!="noleap" && dateMonth<=2){
     //Check whether file contains a Feb 29
 
-    ParseTimeDouble(strTimeUnits, strCalendar, timeVec[nTime-1], leapYear,\
+    ParseTimeDouble(strTimeUnits, strCalendar, timeVal, leapYear,\
       leapMonth, leapDay, leapHour);
 
     if ((leapMonth==2 && leapDay==29) || (dateMonth==2&&leapMonth==3)){

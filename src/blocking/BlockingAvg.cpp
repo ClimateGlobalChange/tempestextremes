@@ -129,9 +129,6 @@ int main(int argc, char **argv){
     int day = DayInYear(dateMonth,dateDay);
     int dateIndex = day + 15;
 
-    bool leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear, \
-      dateMonth, dateDay, dateHour);
-
     //Number of time steps per day
     int nSteps = 1/tRes;
     std::cout<<"tRes is "<<tRes<<" and nSteps is "<<nSteps<<std::endl;
@@ -153,11 +150,8 @@ int main(int argc, char **argv){
       tEnd = nTime;
     }
 
-    int leapYear=0;
-    int leapMonth=0;
-    int leapDay=0;
-    int leapHour=0;
-
+    //leap year file check
+    bool leap = false;
 
     //Values in case of missing files
     double contCheck = 0.;
@@ -168,19 +162,9 @@ int main(int argc, char **argv){
     while (currArrIndex<arrLen){
       //First file
       for (int t=tStart; t<tEnd; t++){
-        if (leap==true){
         //Check if time is a leap year date
-          ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
-            leapMonth,leapDay,leapHour);
-          if (leapMonth==2 && leapDay == 29){
-            while (leapMonth ==2 && leapDay ==29){
-              std::cout<<"Leap day! Skipping this step."<<std::endl;
-              t++;
-              ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
-                leapMonth, leapDay, leapHour);
-            }
-          }
-        }
+       leap = checkFileLeap(strTimeUnits, strCalendar, dateYear,\
+          dateMonth, dateDay, dateHour, timeVec[nTime-1]);
         //Fill the 31 day array with PV data
         for (int a=0; a<nLat; a++){
           for (int b=0; b<nLon; b++){
