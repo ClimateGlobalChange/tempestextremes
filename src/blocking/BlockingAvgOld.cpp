@@ -37,14 +37,12 @@ int main(int argc, char **argv){
   std::string strfile_out;
   std::string varName;
   std::string avgName;
-  bool missingFiles;
 
   BeginCommandLine()
     CommandLineString(fileList, "inlist", "");
     CommandLineString(strfile_out, "out", "");
     CommandLineString(varName, "varname","");
     CommandLineString(avgName, "avgname","");
-    CommandLineBool(missingFiles, "missing");
     ParseCommandLine(argc, argv);
 
   EndCommandLine(argv)
