@@ -130,7 +130,7 @@ int main(int argc, char **argv){
     int dateIndex = day + 15;
 
     bool leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear, \
-      dateMonth, dateDay, dateHour);
+      dateMonth, dateDay, dateHour, timeVec[nTime-1]);
 
     //Number of time steps per day
     int nSteps = 1/tRes;
@@ -233,7 +233,7 @@ int main(int argc, char **argv){
 
         //reset leap year check
         leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear, \
-          dateMonth, dateDay, dateHour);
+          dateMonth, dateDay, dateHour,timeVec[nTime-1]);
 
         //reset ending time of current file for next continuity check
         endTime = timeVec[nTime-1];
@@ -305,7 +305,7 @@ int main(int argc, char **argv){
       timeVal->get(&(timeVec[0]),nTime);
 
       leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear, \
-        dateMonth, dateDay, dateHour);
+        dateMonth, dateDay, dateHour, timeVec[nTime-1]);
    
       tStart = 0;
       tEnd = tStart + nSteps;
@@ -387,7 +387,7 @@ int main(int argc, char **argv){
           }           
 
           leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear,\
-            dateMonth, dateDay, dateHour);
+            dateMonth, dateDay, dateHour, timeVec[nTime-1]);
 
           tStart = 0;
           tEnd = tStart + nSteps;

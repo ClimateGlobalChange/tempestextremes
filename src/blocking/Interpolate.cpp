@@ -51,8 +51,8 @@ void interp_util(NcFile & readin,
   
   //2D variables
   NcVar *ps = readin_2d.get_var("PS");
-  NcVar *hyam = readin.get_var("hyam");
-  NcVar *hybm = readin.get_var("hybm");
+  NcVar *hyam = readin_2d.get_var("hyam");
+  NcVar *hybm = readin_2d.get_var("hybm");
 
   //Create pressure level vector
   int plev_len = (100000.0-5000.0)/(5000.0);

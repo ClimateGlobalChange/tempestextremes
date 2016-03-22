@@ -56,7 +56,9 @@ int main(int argc, char **argv){
   if (avgName == ""){
     _EXCEPTIONT("No average name (--avgname) specified");
   }
-
+  if (strfile_out == ""){
+    _EXCEPTIONT("No output file name (--out) specified");
+  }
   //Create list of input files
   std::vector<std::string> InputFiles;
   GetInputFileList(fileList, InputFiles);
