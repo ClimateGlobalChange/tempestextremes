@@ -19,6 +19,7 @@ UTIL_FILES= BlockingUtilities.cpp \
             Interpolate.cpp
 
 EXEC_FILES= BlockingAvgOld.cpp\
+            BlockingAvg.cpp\
             BlockingDevs.cpp \
             BlockingGH.cpp \
             BlockingPV.cpp \

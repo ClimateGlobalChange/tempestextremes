@@ -112,9 +112,6 @@ int main(int argc, char **argv){
     //Length of 31 days axis
     int arrLen = int(31.0/tRes);
 
-    //3D matrix to store averaged values
-    DataMatrix3D<double> avgStoreVals(yearLen,nLat,nLon);
-    DataMatrix3D<double> avgCounts(yearLen,nLat,nLon);
 
     //Start date of first file
     //Parse time units of first file to determine start date 
@@ -129,8 +126,12 @@ int main(int argc, char **argv){
     int day = DayInYear(dateMonth,dateDay);
     int dateIndex = day + 15;
 
-    bool leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear, \
+    bool leap = checkFileLeap(strTimeUnits, strCalendar, dateYear, \
       dateMonth, dateDay, dateHour, timeVec[nTime-1]);
+
+    //3D matrix to store averaged values
+    DataMatrix3D<double> avgStoreVals(yearLen,nLat,nLon);
+    DataMatrix3D<double> avgCounts(yearLen,nLat,nLon);
 
     //Number of time steps per day
     int nSteps = 1/tRes;
@@ -163,6 +164,7 @@ int main(int argc, char **argv){
     double contCheck = 0.;
     double missingValue=-999999.9;
     bool hasMissingValues = false;
+    
 
     //First while loop: open files and fill until 31 days array full
     while (currArrIndex<arrLen){
@@ -188,6 +190,7 @@ int main(int argc, char **argv){
           }
         }
         currArrIndex++;
+       // std::cout<<"current array index is "<<currArrIndex<<std::endl;
       }
       //If the 31 days aren't yet filled, keep going
       if (currArrIndex<arrLen){
@@ -220,19 +223,20 @@ int main(int argc, char **argv){
           if (!missingFiles){
           //check to make sure that there isn't a file missing in the list!
           //otherwise will mess up averages
-            std::cout << "contCheck is "<< contCheck << std::endl;
+           // std::cout << "contCheck is "<< contCheck << std::endl;
             _EXCEPTIONT("New file is not continuous with previous file."); 
           } else{
           //Fill in the days that are missing with the missingvalue 
           //contCheck units are in days, tRes is a fraction of a day
           //So the number of indices to be filled in is contCheck/tRes     
-            MissingFill(missingValue,tRes,contCheck,nLat,nLon,currArrIndex,currFillData); 
+            MissingFill(missingValue,tRes,contCheck,nLat,nLon,arrLen,\
+              currArrIndex,dateIndex,currFillData); 
           }
           
         }
 
         //reset leap year check
-        leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear, \
+        leap = checkFileLeap(strTimeUnits, strCalendar, dateYear, \
           dateMonth, dateDay, dateHour,timeVec[nTime-1]);
 
         //reset ending time of current file for next continuity check
@@ -259,6 +263,7 @@ int main(int argc, char **argv){
       std::cout<< "This array has missing values, will not be added to sum."<<std::endl;
     }
     else{
+      std::cout<<"No missing values found. Adding array to sum."<<std::endl;
       for (int t=0; t<arrLen; t++){
         for (int a=0; a<nLat; a++){
           for (int b=0; b<nLon; b++){
@@ -274,16 +279,15 @@ int main(int argc, char **argv){
       }
 
     }
-    
+   
+    std::cout<<"Filled date index number "<<dateIndex<<std::endl; 
     dateIndex+=1;
     currArrIndex = 0;
-
   //Check if new file needs to be opened before entering while loop
 
     if(tEnd>=nTime){
-   //   std::cout<<"tEnd is "<<tEnd<<". Reached end of previous file."<<std::endl;
       infile.close();
-      std::cout<<"Closed "<<InputFiles[x]<<std::endl;
+      std::cout<<"First while loop. Closed "<<InputFiles[x]<<std::endl;
       x+=1;
       NcFile infile(InputFiles[x].c_str());
       nTime = infile.get_dim("time")->size();
@@ -304,7 +308,7 @@ int main(int argc, char **argv){
       timeVal->set_cur((long) 0);
       timeVal->get(&(timeVec[0]),nTime);
 
-      leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear, \
+      leap = checkFileLeap(strTimeUnits, strCalendar, dateYear, \
         dateMonth, dateDay, dateHour, timeVec[nTime-1]);
    
       tStart = 0;
@@ -312,18 +316,19 @@ int main(int argc, char **argv){
     }
 
     else if (tEnd<nTime){
-      std::cout<<"Still have data left on current file. Will continue on."<<std::endl;
+      std::cout<<"First while loop. Still have data left on current file. Will continue on."<<std::endl;
       tStart = tEnd;
       tEnd = tStart + nSteps;
     }
 
     //entering while loop.
-  //  std::cout<<"Before entering: start, end is "<<tStart<<", "<<tEnd<<std::endl;
+
     bool newFile = false;
 
     while (x<nFiles){
-    //  std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
+      std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
         <<nTime<<"; tStart/end is "<<tStart<<" and "<<tEnd<<std::endl;
+      std::cout<<"Current date index is "<<dateIndex<<std::endl;
        //1: check if current day is a leap day
       if (leap==true){
       //  std::cout<<"Checking date for leap day."<<std::endl;
@@ -332,23 +337,22 @@ int main(int argc, char **argv){
         if (leapMonth==2 && leapDay ==29){
           tStart = tEnd;
           tEnd = tStart + nSteps;
-          std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
+          std::cout<<"#1: This day is a leap day. Resetting tStart/tEnd to "\
             <<tStart<<" and "<<tEnd<<std::endl;
         } 
         if (tEnd>nTime){
           newFile = true;
-       //   std::cout<<"For leap day file, reached EOF."<<std::endl;
+          std::cout<<"For leap day file, reached EOF."<<std::endl;
         }
       }
       //2: if new file needs to be opened, open it
       if(newFile==true){
         endTime = timeVec[nTime-1];
-        std::cout<<"Reached end of file."<<std::endl;
+        std::cout<<"#2: Reached end of file."<<std::endl;
         infile.close();
-        std::cout<<"8: Closed "<<InputFiles[x]<<std::endl;
+        std::cout<<"Closed "<<InputFiles[x]<<std::endl;
         x+=1;
-        if (x<(nFiles-1)){
-
+        if (x<nFiles){
           NcFile infile(InputFiles[x].c_str());
           newFile = false;
           std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
@@ -369,8 +373,6 @@ int main(int argc, char **argv){
           timeVal->set_cur((long) 0);
           timeVal->get(&(timeVec[0]),nTime);
 
-          std::cout <<"Current end time is "<<endTime << std::endl;
-          
           ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0],dateYear,\
             dateMonth,dateDay,dateHour);
 
@@ -380,13 +382,14 @@ int main(int argc, char **argv){
           if (contCheck > tRes){
             if (!missingFiles){
               std::cout<<"contCheck is "<<contCheck<<std::endl;
-              _EXCEPTIONT("New file %s is not continuous with previous file",InputFiles[x].c_str());
+              _EXCEPTIONT("New file is not continuous with previous file");
             }else{
-              MissingFill(missingValue, tRes, contCheck, nLat, nLon, currArrIndex, currFillData);
+              MissingFill(missingValue, tRes, contCheck, nLat, nLon, arrLen, \
+                currArrIndex,dateIndex, currFillData);
             }
           }           
 
-          leap = checkFileLeap(StrTimeUnits, strCalendar, dateYear,\
+          leap = checkFileLeap(strTimeUnits, strCalendar, dateYear,\
             dateMonth, dateDay, dateHour, timeVec[nTime-1]);
 
           tStart = 0;
@@ -395,10 +398,7 @@ int main(int argc, char **argv){
       }    
       //3: fill array for next value
       if (newFile==false){
-    //    std::cout<<"DEBUG for fill: tStart, tEnd are "<<tStart<<", "<<tEnd\
-          <<"and nTime is "<<nTime<<". Now parsing dates for those times."<<std::endl;
-
-
+        std::cout<<"At time "<<tStart<<" to "<<tEnd<< "Filled in values at array index "<<currArrIndex<<" that will fill date "<<dateIndex<<std::endl;
         for (int t=tStart; t<tEnd; t++){
           for (int a=0; a<nLat; a++){
             for (int b=0; b<nLon; b++){
@@ -411,7 +411,6 @@ int main(int argc, char **argv){
         if (currArrIndex>=arrLen){
           std::cout<<"currArrIndex is "<<currArrIndex<<" and periodic boundary: 31 day length met or exceeded."<<std::endl;
           currArrIndex-=arrLen;
-          std::cout<<"currArrIndex is now "<<currArrIndex<<std::endl;
         }
      //Check to see if array contains missing values
      if (missingFiles){
@@ -421,6 +420,7 @@ int main(int argc, char **argv){
      if (hasMissingValues){
        std::cout<<"This array has missing values, will not be added to sum."<<std::endl;
      }else{
+       std::cout<<"Filled in values at date index "<<dateIndex<<std::endl;
        //Fill date with sum of new array values
           for (int t=0; t<arrLen; t++){
             for (int a=0; a<nLat; a++){
@@ -436,16 +436,22 @@ int main(int argc, char **argv){
             }
           }
         }
-
         //regardless of missing data or not, proceed to next date
         dateIndex+=1;
         //periodic boundary condition for year
         if(dateIndex>=yearLen){
           dateIndex-=yearLen;
         }
-        if (tEnd<nTime){
+        if (tEnd >= nTime){
+          std::cout<<"Current tEnd is "<<tEnd << " and nTime is "<<nTime<<std::endl;
+          newFile = true;
+          std::cout<<"Else: Reached EOF. Will open new file in next iteration."<<std::endl;
+
+        }
+        else{
           tStart = tEnd;
           tEnd = tStart + nSteps;
+          std::cout<<"Filled array. Resetting tstart/tend to "<<tStart<< " and "<<tEnd<<std::endl;
           //Check for leap year
           if (leap==true){
           //  std::cout<<"Checking date for leap day."<<std::endl;
@@ -454,7 +460,7 @@ int main(int argc, char **argv){
             if (leapMonth==2 && leapDay ==29){
               tStart = tEnd;
               tEnd = tStart + nSteps;
-            //  std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
+              std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
                 <<tStart<<" and "<<tEnd<<std::endl;
             }
             //re-check tEnd
@@ -463,10 +469,11 @@ int main(int argc, char **argv){
             } 
           }
         }
-        else{
-          newFile = true;
-          std::cout<<"Else: Reached EOF. Will open new file in next iteration."<<std::endl;
-        }
+    //    else{
+    //      newFile = true;
+    //      std::cout<<"tEnd is "<<tEnd<<", nTime is "<<nTime<<", tStart is "<<tStart<<std::endl;
+   //       std::cout<<"Else: Reached EOF. Will open new file in next iteration."<<std::endl;
+     //   }
       }
     }
     
@@ -478,7 +485,7 @@ int main(int argc, char **argv){
         }
       }
     }
-
+    std::cout<<"Averaged values"<<std::endl;
 
     //Get existing file info to copy to output file
 

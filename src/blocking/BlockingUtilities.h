@@ -169,7 +169,9 @@ void MissingFill(
   double contCheck,
   int nLat,
   int nLon,
+  int ArrLen,
   int & currArrIndex,
+  int & dateIndex,
   DataMatrix3D<double> & currFillData
 );
 

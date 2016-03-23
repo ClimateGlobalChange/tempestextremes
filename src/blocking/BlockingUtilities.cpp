@@ -66,27 +66,20 @@ void GetInputFileList(
 
 int DayInYear(int nMonth, int nDay){
   int day=0;
-//  std::cout<<"nMonth is "<<nMonth<<std::endl;
   if (nMonth>1){
     for (int x=1; x<nMonth; x++){
-  //    std::cout<<"Month is currently "<<x;
       if (x==2){
         day += 28;
-    //    std::cout<<". Adding 28 days.";
       }
       else if (x==4 || x==6 || x==9 || x==11){
         day +=30;
-      //  std::cout<<". Adding 30 days.";
       }
       else{
         day +=31;
-       // std::cout<<". Adding 31 days.";
       }
- //     std::cout<<" Total number of days currently "<<day<<std::endl;
     }
   }
   day+=nDay;
-//  std::cout<<"Final day value is "<<day<<std::endl;
   return(day);
 }
 
@@ -272,7 +265,6 @@ void interpolate_lev(NcVar *var,
       }
     }
   }
-  std::cout<<"Finished interpolating variable.\n";
   NewVar->set_cur(0, 0, 0, 0);
   NewVar->put(&(matVarOut[0][0][0][0]), nTime, npLev, nLat, nLon);
   CopyNcVarAttributes(var, NewVar);
@@ -736,7 +728,6 @@ void calcDevsPV(bool leap,
 //Eliminate one day if contains Feb 29
   if (leap){
     nOutTime = nTime-nSteps;
-   // std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
   }
   else{
     nOutTime = nTime;
@@ -764,22 +755,14 @@ void calcDevsPV(bool leap,
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
         leapMonth, leapDay, leapHour);
       if (leapMonth==2 && leapDay == 29){
-       /* while (leapMonth ==2 && leapDay == 29){
-          std::cout<<"Leap day! Skipping this step."<<std::endl;
-          t++;
-          ParseTimeDouble(strTimeUnits,strCalendar, timeVec[t],leapYear,\
-            leapMonth,leapDay,leapHour);
-        }*/
         std::cout<<"Leap day! Skipping day."<<std::endl;
         t+=nSteps;
       }
     }
     if (t>=nTime){
-    //  std::cout<<"t equals or exceeds nTime. Leaving loop."<<std::endl;
       break;
     }
     int nDayIncrease = d/nSteps;
- //   std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
     int currAvgIndex = startAvgIndex + nDayIncrease;
     if (currAvgIndex>364){
       currAvgIndex-=365;
@@ -790,7 +773,6 @@ void calcDevsPV(bool leap,
       }
     }
     newTime[d] = timeVec[t];
-  //  std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
     d++;
   }
   outTime->set_cur((long) 0);
@@ -945,7 +927,6 @@ void calcDevsGH(bool leap,
 //Eliminate one day if contains Feb 29
   if (leap){
     nOutTime = nTime-nSteps;
-  //  std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
   }
   else{
     nOutTime = nTime;
@@ -973,22 +954,14 @@ void calcDevsGH(bool leap,
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
         leapMonth, leapDay, leapHour);
       if (leapMonth==2 && leapDay == 29){
-       /* while (leapMonth ==2 && leapDay == 29){
-          std::cout<<"Leap day! Skipping this step."<<std::endl;
-          t++;
-          ParseTimeDouble(strTimeUnits,strCalendar, timeVec[t],leapYear,\
-            leapMonth,leapDay,leapHour);
-        }*/
         std::cout<<"Leap day! Skipping day."<<std::endl;
         t+=nSteps;
       }
     }
     if (t>=nTime){
-     // std::cout<<"t equals or exceeds nTime. Leaving loop."<<std::endl;
       break;
     }
     int nDayIncrease = d/nSteps;
-   // std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
     int currAvgIndex = startAvgIndex + nDayIncrease;
     if (currAvgIndex>364){
       currAvgIndex-=365;
@@ -999,7 +972,6 @@ void calcDevsGH(bool leap,
       }
     }
     newTime[d] = timeVec[t];
- //   std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
     d++;
   }
   outTime->set_cur((long) 0);
@@ -1073,11 +1045,7 @@ void calcDevsGH(bool leap,
         invAnom = 0.;
       }
       else{
-       // invAnom = 1./stdDevs[a][b];
        invAnom = 1./180.;
-      }
-      if (a==32 && b==50){
-       // std::cout<<"Standard dev is "<<stdDevs[a][b]<<" and inv is "<<invAnom<<std::endl;
       }
       for (int t=0; t<nOutTime; t++){
         pos = aDevMat[t][a][b]*invAnom;
@@ -1130,10 +1098,6 @@ double GHcheck(double z_0,
     else gval=0.;
   }
   else std::cout << "Error: invalid hemisphere specified."<<std::endl;
-/*  std::cout<<"Inputs: lat_0: "<<lat_0<<" lat_N: "<<lat_N<<" lat_S: "<<lat_S<<std::endl;
-  std::cout<<"Z values: Z_0: "<<z_0<<" Z_N: "<<z_N<<" Z_S: "<<z_S<<std::endl;
-  std::cout<<"For "<< hemi<<", GHGS and GHGN:"<<GHGS<<", "<<GHGN<<\
-    " returned "<<gval<<" (NH: GHGS>0 & GHGN<-10)"<<std::endl;*/
   return(gval);
 }
 
@@ -1160,10 +1124,8 @@ bool missingValCheck(
   double missingNum
 ){
     bool isMissing = false;
-
     for (int t=0; t<nTime; t++){
       if (fillData[t][2][2] == missingNum){
-        std::cout << "Array contains missing values!"<<std::endl;
         isMissing = true;
         break;
       }
@@ -1178,24 +1140,32 @@ void MissingFill(
   double contCheck,
   int nLat,
   int nLon,
+  int arrLen,
   int & currArrIndex,
+  int & dateIndex,
   DataMatrix3D<double> & currFillData
 ){
 
-  int nFill = contCheck/tRes;
+  int nFill = contCheck/tRes-1;
+  int nDaysSkip = int(contCheck-tRes);
   std::cout<<"ContCheck is " << contCheck << " and tRes is "<<\
    tRes <<" and nFill is "<<nFill << std::endl;
-  std::cout<<"Before filling in missing values: CurrArrIndex is "<<currArrIndex<<std::endl;
   for (int n=0; n<nFill; n++){
-    std::cout<<" Filling index "<<currArrIndex + n <<std::endl;
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
-        currFillData[currArrIndex + n][a][b] = missingValue;
+        currFillData[currArrIndex][a][b] = missingValue;
       } 
     }
+    currArrIndex +=1;
+    if (currArrIndex >= arrLen){
+      currArrIndex -= arrLen;
+    }
   }
-  currArrIndex += nFill;
-  std::cout<<"CurrArrIndex is now "<<currArrIndex<<std::endl;
+  dateIndex += nDaysSkip;
+  if (dateIndex >= 365){
+    dateIndex-=365;
+  }
+  std::cout<<"The new date index is "<<dateIndex<<" at the end of the missing fill."<<std::endl;
 }
 
 bool checkFileLeap(
@@ -1223,7 +1193,6 @@ bool checkFileLeap(
 
     if ((leapMonth==2 && leapDay==29) || (dateMonth==2&&leapMonth==3)){
       //Check when parsing the indices
-    //  std::cout<<"Might contain leap day. Will check."<<std::endl;
       leap = true;
     }
   }
