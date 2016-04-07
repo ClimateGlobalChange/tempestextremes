@@ -240,7 +240,8 @@ void interpolate_lev(NcVar *var,
   DataVector<double> vecpLev(npLev);
   pLev->set_cur((long) 0);
   pLev->get(&(vecpLev[0]), npLev);
-  
+ 
+  std::cout<<"within interpolate_lev: about to interpolate"<<std::endl; 
   //Loop over input data and interpolate to output var
   for (int t=0; t<nTime; t++){
     for (int l=0; l<(nLev-1); l++){
@@ -277,15 +278,17 @@ void copy_dim_var(
 	NcVar *inVar, 
 	NcVar *outVar
 	){
+  std::cout<<"Within copy_dim_var: starting copy"<<std::endl;
 //Get necessary information from infile
   int varLen = inVar->get_dim(0)->size();
+  std::cout<<"Variable dimension length is "<<varLen<<std::endl;
   DataVector<double> inVec(varLen);
   inVar->set_cur((long) 0);
   inVar->get(&(inVec[0]), varLen);
 //Copy data to new outgoing variable
   outVar->set_cur((long) 0);
   outVar->put(&(inVec[0]), varLen);
-
+  std::cout<<"Copying attributes."<<std::endl;
 //Copy other attributes
   CopyNcVarAttributes(inVar, outVar);
 }

@@ -108,6 +108,7 @@ for i in "$@"; do
   esac
 done
 
+
 if [ "$DATA_DIR" == "" ] || [ "$BINDIR" == "" ]; then
   echo "Need to specify data (--ddir) and binary (--bdir) directories"
   exit
@@ -121,6 +122,10 @@ if [ "$PV_BOOL" == "FALSE" ] && [ "$AVG_BOOL" == "FALSE" ] && [ "$DEV_BOOL" == "
   echo "Need to specify at least one job flag (--pv, --avg, or --dev)"
   exit
 fi
+
+PV_BATCH_NAME=$DATA_DIR/$PV_BATCH_NAME
+AVG_BATCH_NAME=$DATA_DIR/$AVG_BATCH_NAME
+DEV_BATCH_NAME=$DATA_DIR/$DEV_BATCH_NAME
 # This part of the code starts with h2/h4 cam files and generates interpolated variables,
 #  then calculates PV that is averaged over 100-500 mb 
 if [ "$PV_BOOL" == "TRUE" ]; then 
@@ -149,8 +154,8 @@ if [ "$PV_BOOL" == "TRUE" ]; then
   NUM_H2=$(cat $LIST_2D | wc -l)    
   NUM_H4=$(cat $LIST_4D | wc -l)
    
-  if [ $NUM_H2 -ne $NUM_H4 ]; then
-    echo "Number of h2 and h4 files doesn't match!"
+#  if [ $NUM_H2 -ne $NUM_H4 ]; then
+#    echo "Number of h2 and h4 files doesn't match!"
     echo "H4 files: $NUM_H4 H2 files: $NUM_H2"
     echo "Altering list files to only matches."
     MISSING_FILES="TRUE"
@@ -169,7 +174,7 @@ if [ "$PV_BOOL" == "TRUE" ]; then
     LIST_4D=newh4.txt
     LIST_2D=newh2.txt
     LIST_PV=newinteg.txt
-  fi
+#  fi
 
   cd $DATA_DIR
   #Create a text file with all 3 lists
@@ -179,14 +184,14 @@ if [ "$PV_BOOL" == "TRUE" ]; then
   echo "#!/bin/bash -l" > $PV_BATCH_NAME
   echo "" >> $PV_BATCH_NAME
   echo "#SBATCH -p shared" >> $PV_BATCH_NAME
-  echo "#SBATCH -t 5:00:00" >> $PV_BATCH_NAME
-  echo "#SBATCH --mem=10GB" >> $PV_BATCH_NAME
+  echo "#SBATCH -t 20:00:00" >> $PV_BATCH_NAME
+  echo "#SBATCH --mem=20GB" >> $PV_BATCH_NAME
   echo "" >> $PV_BATCH_NAME
   echo "cd $DATA_DIR" >> $PV_BATCH_NAME
   echo "cat combined_list.txt | awk '{print \"$BINDIR/BlockingPV --ipl --in \"\$1 \" --in2d \"\$2\" --out \"\$3}'| sh" >> $PV_BATCH_NAME
 
-  if [ "$AVG_BOOL" == "TRUE" ]; then
-    echo "sbatch $AVG_BATCH_NAME" >> $PV_BATCH_NAME
+  if [ "$AVG_BOOL" == "TRUE" ] && [ "$PV_BOOL" == "TRUE" ]; then
+    echo "sbatch --dependency=afterok:\${SLURM_JOB_ID} $AVG_BATCH_NAME" >> $PV_BATCH_NAME
   fi
   echo "Submitting PV batch file."
   sbatch $PV_BATCH_NAME
@@ -218,16 +223,20 @@ if [ "$AVG_BOOL" == "TRUE" ]; then
   echo "#!/bin/bash -l" > $AVG_BATCH_NAME
   echo "" >> $AVG_BATCH_NAME
   echo "#SBATCH -p shared" >> $AVG_BATCH_NAME
-  echo "#SBATCH -t 1:00:00" >> $AVG_BATCH_NAME
+  echo "#SBATCH -t 0:20:00" >> $AVG_BATCH_NAME
   echo "" >> $AVG_BATCH_NAME
   echo "cd $DATA_DIR" >> $AVG_BATCH_NAME
-  echo "$BINDIR/BlockingAvgOld --inlist $LIST_PV --out $AVG_NAME --varname $VARNAME --avgname $AVGNAME" >> $AVG_BATCH_NAME
+  if [ "$MISSING_FILES" == "TRUE" ]; then
+    echo "$BINDIR/BlockingAvg --missing --inlist $LIST_PV --out $AVG_NAME --varname $VARNAME --avgname $AVGNAME" >> $AVG_BATCH_NAME
+  else
+    echo "$BINDIR/BlockingAvg --missing --inlist $LIST_PV --out $AVGFILE --varname $VARNAME --avgname $AVGNAME" >> $AVG_BATCH_NAME
+  fi
   if [ "$DEV_BOOL" == "TRUE" ]; then
-    echo "sbatch $DEV_BATCH_NAME" >> $AVG_BATCH_NAME
+    echo "sbatch --dependency=afterok:\${SLURM_JOB_ID} $DEV_BATCH_NAME" >> $AVG_BATCH_NAME
   fi
   if [ "$PV_BOOL" == "FALSE" ]; then
     echo "Submitting averaging batch file."
-    sbatch $PV_BATCH_NAME
+    sbatch $AVG_BATCH_NAME
   fi
 fi
 
