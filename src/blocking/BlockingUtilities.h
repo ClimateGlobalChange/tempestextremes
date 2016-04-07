@@ -148,4 +148,42 @@ double GHcheck(double z_0,
           double lat_N,
           double lat_S,
           std::string hemi );
+
+double tBetweenFiles(
+  std::string strTimeUnits,
+  double nextStartTime,
+  double prevEndTime
+);
+
+
+bool missingValCheck(
+  DataMatrix3D<double> fillData,
+  int nTime,
+  double missingNum
+);
+
+
+void MissingFill(
+  double missingValue,
+  double tRes,
+  double contCheck,
+  int nLat,
+  int nLon,
+  int ArrLen,
+  int & currArrIndex,
+  int & dateIndex,
+  DataMatrix3D<double> & currFillData
+);
+
+bool checkFileLeap(
+  std::string StrTimeUnits,
+  std::string strCalendar,
+  int dateYear,
+  int dateMonth,
+  int dateDay,
+  int dateHour,
+  double timeVal
+);
+
+
 #endif

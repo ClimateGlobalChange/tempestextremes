@@ -37,14 +37,12 @@ int main(int argc, char **argv){
   std::string strfile_out;
   std::string varName;
   std::string avgName;
-  bool missingFiles;
 
   BeginCommandLine()
     CommandLineString(fileList, "inlist", "");
     CommandLineString(strfile_out, "out", "");
     CommandLineString(varName, "varname","");
     CommandLineString(avgName, "avgname","");
-    CommandLineBool(missingFiles, "missing");
     ParseCommandLine(argc, argv);
 
   EndCommandLine(argv)
@@ -56,7 +54,9 @@ int main(int argc, char **argv){
   if (avgName == ""){
     _EXCEPTIONT("No average name (--avgname) specified");
   }
-
+  if (strfile_out == ""){
+    _EXCEPTIONT("No output file name (--out) specified");
+  }
   //Create list of input files
   std::vector<std::string> InputFiles;
   GetInputFileList(fileList, InputFiles);
@@ -122,6 +122,8 @@ int main(int argc, char **argv){
   DataMatrix3D<double> avgStoreVals(yearLen,nLat,nLon);
   DataMatrix3D<double> avgCounts(yearLen,nLat,nLon);
 
+
+
   //Start date of first file
   ParseTimeDouble(strTimeUnits, strCalendar, timeVec[0], dateYear,\
     dateMonth, dateDay, dateHour);
@@ -169,6 +171,8 @@ int main(int argc, char **argv){
     tEnd = nTime;
   }
 
+
+//THIS IS WHERE NEW AVERAGING CODE BEGINS!!!!!!!!!!!!!!!!!!!!!
   //First while loop: open files and fill until 31 days array full
   while (currArrIndex<arrLen){
     for (int t=tStart; t<tEnd; t++){

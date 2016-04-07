@@ -51,8 +51,8 @@ void interp_util(NcFile & readin,
   
   //2D variables
   NcVar *ps = readin_2d.get_var("PS");
-  NcVar *hyam = readin.get_var("hyam");
-  NcVar *hybm = readin.get_var("hybm");
+  NcVar *hyam = readin_2d.get_var("hyam");
+  NcVar *hybm = readin_2d.get_var("hybm");
 
   //Create pressure level vector
   int plev_len = (100000.0-5000.0)/(5000.0);
@@ -63,7 +63,7 @@ void interp_util(NcFile & readin,
     double pNum = 5000.0 * (i+1);
     pVals[i] = pNum;
   }
-    
+  
   //Write information to outfile
   NcDim *itime = ifile_out.add_dim("time", time_len);
   NcDim *ilev = ifile_out.add_dim("lev", plev_len);
@@ -75,14 +75,19 @@ void interp_util(NcFile & readin,
   NcVar *ilon_vals = ifile_out.add_var("lon", ncDouble, ilon);
   NcVar *ilev_vals = ifile_out.add_var("lev", ncDouble, ilev);
 
+  std::cout<<"Copying variable values."<<std::endl;
   copy_dim_var(timevar, itime_vals);
+  std::cout<<"Copied time."<<std::endl;
   copy_dim_var(latvar, ilat_vals);
   copy_dim_var(lonvar, ilon_vals);
 
+  std::cout<<"writing new pressure level."<<std::endl;
   //Give pressure dimension values
   ilev_vals ->set_cur((long) 0);
   ilev_vals->put(&(pVals[0]), plev_len);
 
+
+  std::cout<<"Within interpolation file: about to call interpolate_lev"<<std::endl;
   //Add interpolated variables to interpolated outfile
   NcVar *itemp = ifile_out.add_var("T", ncDouble, itime, ilev, ilat, ilon);
   interpolate_lev(temp, hyam, hybm, ps, ilev_vals, itemp);

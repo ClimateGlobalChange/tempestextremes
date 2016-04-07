@@ -70,6 +70,13 @@ int main(int argc, char **argv){
       _EXCEPTION1("Unable to open file \"%s\" for reading",
         strfile_in.c_str());
     }
+    //Check that time dimension is non-zero
+    NcDim *time_int = readin_int.get_dim("time");
+    int time_len_int = time_int->size();
+    if (time_len_int < 1){
+      _EXCEPTIONT("This file has a time dimension length of 0.");
+    }
+
     //Interpolated file name
     std::string interp_file = strfile_in.replace(strfile_in.end()-3,strfile_in.end(),"_ipl.nc");
     std::cout<< "Interpolated file name is "<<interp_file<<std::endl;
@@ -82,6 +89,7 @@ int main(int argc, char **argv){
     }
 
     //Interpolate variable and write to new file
+    std::cout << "About to interpolate files. Entering interp util."<<std::endl;
     interp_util(readin_int, strfile_2d, readin_out);
     readin_out.close();
     strfile_in = interp_file;

@@ -66,27 +66,20 @@ void GetInputFileList(
 
 int DayInYear(int nMonth, int nDay){
   int day=0;
-//  std::cout<<"nMonth is "<<nMonth<<std::endl;
   if (nMonth>1){
     for (int x=1; x<nMonth; x++){
-  //    std::cout<<"Month is currently "<<x;
       if (x==2){
         day += 28;
-    //    std::cout<<". Adding 28 days.";
       }
       else if (x==4 || x==6 || x==9 || x==11){
         day +=30;
-      //  std::cout<<". Adding 30 days.";
       }
       else{
         day +=31;
-       // std::cout<<". Adding 31 days.";
       }
- //     std::cout<<" Total number of days currently "<<day<<std::endl;
     }
   }
   day+=nDay;
-//  std::cout<<"Final day value is "<<day<<std::endl;
   return(day);
 }
 
@@ -151,11 +144,11 @@ void ParseTimeDouble(
 		int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
 		time.AddSeconds(nSeconds);
 
-		Announce("Time (YMDS): %i %i %i %i",
+	/*	Announce("Time (YMDS): %i %i %i %i",
 				time.GetYear(),
 				time.GetMonth(),
 				time.GetDay(),
-				time.GetSecond());
+				time.GetSecond());*/
 
 
 		nDateYear = time.GetYear();
@@ -173,14 +166,14 @@ void ParseTimeDouble(
 		std::string strSubStr = strTimeUnits.substr(12);
 		Time time(cal);
 		time.FromFormattedString(strSubStr);
-                printf("Debug: dTime is %10f \n",dTime);
+              //  printf("Debug: dTime is %10f \n",dTime);
 		time.AddHours(static_cast<int>(dTime));
 
-		Announce("Time (YMDS): %i %i %i %i",
+	/*	Announce("Time (YMDS): %i %i %i %i",
 				time.GetYear(),
 				time.GetMonth(),
 				time.GetDay(),
-				time.GetSecond());
+				time.GetSecond());*/
 
 		nDateYear = time.GetYear();
 		nDateMonth = time.GetMonth();
@@ -247,7 +240,8 @@ void interpolate_lev(NcVar *var,
   DataVector<double> vecpLev(npLev);
   pLev->set_cur((long) 0);
   pLev->get(&(vecpLev[0]), npLev);
-  
+ 
+  std::cout<<"within interpolate_lev: about to interpolate"<<std::endl; 
   //Loop over input data and interpolate to output var
   for (int t=0; t<nTime; t++){
     for (int l=0; l<(nLev-1); l++){
@@ -272,7 +266,6 @@ void interpolate_lev(NcVar *var,
       }
     }
   }
-  std::cout<<"Finished interpolating variable.\n";
   NewVar->set_cur(0, 0, 0, 0);
   NewVar->put(&(matVarOut[0][0][0][0]), nTime, npLev, nLat, nLon);
   CopyNcVarAttributes(var, NewVar);
@@ -285,15 +278,17 @@ void copy_dim_var(
 	NcVar *inVar, 
 	NcVar *outVar
 	){
+  std::cout<<"Within copy_dim_var: starting copy"<<std::endl;
 //Get necessary information from infile
   int varLen = inVar->get_dim(0)->size();
+  std::cout<<"Variable dimension length is "<<varLen<<std::endl;
   DataVector<double> inVec(varLen);
   inVar->set_cur((long) 0);
   inVar->get(&(inVec[0]), varLen);
 //Copy data to new outgoing variable
   outVar->set_cur((long) 0);
   outVar->put(&(inVec[0]), varLen);
-
+  std::cout<<"Copying attributes."<<std::endl;
 //Copy other attributes
   CopyNcVarAttributes(inVar, outVar);
 }
@@ -736,7 +731,6 @@ void calcDevsPV(bool leap,
 //Eliminate one day if contains Feb 29
   if (leap){
     nOutTime = nTime-nSteps;
-   // std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
   }
   else{
     nOutTime = nTime;
@@ -764,22 +758,14 @@ void calcDevsPV(bool leap,
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
         leapMonth, leapDay, leapHour);
       if (leapMonth==2 && leapDay == 29){
-       /* while (leapMonth ==2 && leapDay == 29){
-          std::cout<<"Leap day! Skipping this step."<<std::endl;
-          t++;
-          ParseTimeDouble(strTimeUnits,strCalendar, timeVec[t],leapYear,\
-            leapMonth,leapDay,leapHour);
-        }*/
         std::cout<<"Leap day! Skipping day."<<std::endl;
         t+=nSteps;
       }
     }
     if (t>=nTime){
-    //  std::cout<<"t equals or exceeds nTime. Leaving loop."<<std::endl;
       break;
     }
     int nDayIncrease = d/nSteps;
- //   std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
     int currAvgIndex = startAvgIndex + nDayIncrease;
     if (currAvgIndex>364){
       currAvgIndex-=365;
@@ -790,7 +776,6 @@ void calcDevsPV(bool leap,
       }
     }
     newTime[d] = timeVec[t];
-  //  std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
     d++;
   }
   outTime->set_cur((long) 0);
@@ -945,7 +930,6 @@ void calcDevsGH(bool leap,
 //Eliminate one day if contains Feb 29
   if (leap){
     nOutTime = nTime-nSteps;
-  //  std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
   }
   else{
     nOutTime = nTime;
@@ -973,22 +957,14 @@ void calcDevsGH(bool leap,
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
         leapMonth, leapDay, leapHour);
       if (leapMonth==2 && leapDay == 29){
-       /* while (leapMonth ==2 && leapDay == 29){
-          std::cout<<"Leap day! Skipping this step."<<std::endl;
-          t++;
-          ParseTimeDouble(strTimeUnits,strCalendar, timeVec[t],leapYear,\
-            leapMonth,leapDay,leapHour);
-        }*/
         std::cout<<"Leap day! Skipping day."<<std::endl;
         t+=nSteps;
       }
     }
     if (t>=nTime){
-     // std::cout<<"t equals or exceeds nTime. Leaving loop."<<std::endl;
       break;
     }
     int nDayIncrease = d/nSteps;
-   // std::cout<<"t is "<<t<<" and current number of days past start is "<<nDayIncrease<<std::endl;
     int currAvgIndex = startAvgIndex + nDayIncrease;
     if (currAvgIndex>364){
       currAvgIndex-=365;
@@ -999,7 +975,6 @@ void calcDevsGH(bool leap,
       }
     }
     newTime[d] = timeVec[t];
- //   std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
     d++;
   }
   outTime->set_cur((long) 0);
@@ -1073,11 +1048,7 @@ void calcDevsGH(bool leap,
         invAnom = 0.;
       }
       else{
-       // invAnom = 1./stdDevs[a][b];
        invAnom = 1./180.;
-      }
-      if (a==32 && b==50){
-       // std::cout<<"Standard dev is "<<stdDevs[a][b]<<" and inv is "<<invAnom<<std::endl;
       }
       for (int t=0; t<nOutTime; t++){
         pos = aDevMat[t][a][b]*invAnom;
@@ -1130,9 +1101,103 @@ double GHcheck(double z_0,
     else gval=0.;
   }
   else std::cout << "Error: invalid hemisphere specified."<<std::endl;
-/*  std::cout<<"Inputs: lat_0: "<<lat_0<<" lat_N: "<<lat_N<<" lat_S: "<<lat_S<<std::endl;
-  std::cout<<"Z values: Z_0: "<<z_0<<" Z_N: "<<z_N<<" Z_S: "<<z_S<<std::endl;
-  std::cout<<"For "<< hemi<<", GHGS and GHGN:"<<GHGS<<", "<<GHGN<<\
-    " returned "<<gval<<" (NH: GHGS>0 & GHGN<-10)"<<std::endl;*/
   return(gval);
+}
+
+
+double tBetweenFiles(
+  std::string strTimeUnits,
+  double nextStartTime,
+  double prevEndTime
+){
+  double contCheck;
+  if ((strTimeUnits.length() >= 11) && \
+    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
+    contCheck = std::fabs(nextStartTime-prevEndTime);
+  }
+  else{
+    contCheck = std::fabs(nextStartTime-prevEndTime)/24.0;
+  }
+  return(contCheck);
+}
+
+bool missingValCheck(
+  DataMatrix3D<double> fillData,
+  int nTime,
+  double missingNum
+){
+    bool isMissing = false;
+    for (int t=0; t<nTime; t++){
+      if (fillData[t][2][2] == missingNum){
+        isMissing = true;
+        break;
+      }
+    }
+    if (isMissing == false) std::cout << "Did not find missing values."<<std::endl;
+    return isMissing;
+}
+
+void MissingFill(
+  double missingValue,
+  double tRes,
+  double contCheck,
+  int nLat,
+  int nLon,
+  int arrLen,
+  int & currArrIndex,
+  int & dateIndex,
+  DataMatrix3D<double> & currFillData
+){
+
+  int nFill = contCheck/tRes-1;
+  int nDaysSkip = int(contCheck-tRes);
+  std::cout<<"ContCheck is " << contCheck << " and tRes is "<<\
+   tRes <<" and nFill is "<<nFill << std::endl;
+  for (int n=0; n<nFill; n++){
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        currFillData[currArrIndex][a][b] = missingValue;
+      } 
+    }
+    currArrIndex +=1;
+    if (currArrIndex >= arrLen){
+      currArrIndex -= arrLen;
+    }
+  }
+  dateIndex += nDaysSkip;
+  if (dateIndex >= 365){
+    dateIndex-=365;
+  }
+  std::cout<<"The new date index is "<<dateIndex<<" at the end of the missing fill."<<std::endl;
+}
+
+bool checkFileLeap(
+  std::string strTimeUnits,
+  std::string strCalendar,
+  int dateYear,
+  int dateMonth,
+  int dateDay,
+  int dateHour,
+  double timeVal
+){
+
+  bool leap = false;
+
+  int leapYear=0;
+  int leapMonth=0;
+  int leapDay=0;
+  int leapHour=0;
+
+  if (strCalendar!="noleap" && dateMonth<=2){
+    //Check whether file contains a Feb 29
+
+    ParseTimeDouble(strTimeUnits, strCalendar, timeVal, leapYear,\
+      leapMonth, leapDay, leapHour);
+
+    if ((leapMonth==2 && leapDay==29) || (dateMonth==2&&leapMonth==3)){
+      //Check when parsing the indices
+      leap = true;
+    }
+  }
+  return leap;
 }

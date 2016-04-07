@@ -14,6 +14,7 @@ MPIF90=            ftn
 # NetCDF
 NETCDF_ROOT=       $(NETCDF_DIR)
 NETCDF_CXX_ROOT=   /global/homes/p/paullric/netcdf-cxx-cori
+#NETCDF_CXX_ROOT=   /global/homes/m/marielp/netcdf-cxx-4.2
 NETCDF_CXXFLAGS=   -I$(NETCDF_ROOT)/include -I$(NETCDF_CXX_ROOT)/include
 NETCDF_LIBRARIES=  -lnetcdf -lnetcdf_c++
 NETCDF_LDFLAGS=    -L$(NETCDF_ROOT)/lib -L$(NETCDF_CXX_ROOT)/lib -Wl,-rpath=$(NETCDF_CXX_ROOT)/lib
@@ -21,7 +22,7 @@ NETCDF_LDFLAGS=    -L$(NETCDF_ROOT)/lib -L$(NETCDF_CXX_ROOT)/lib -Wl,-rpath=$(NE
 # LAPACK (Intel MKL)
 LAPACK_INTERFACE=  FORTRAN
 LAPACK_CXXFLAGS=
-LAPACK_LIBRARIES=  
+LAPACK_LIBRARIES=
 LAPACK_LDFLAGS=    -mkl=sequential
 
 # DO NOT DELETE

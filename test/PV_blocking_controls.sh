@@ -2,7 +2,7 @@
 
 #This script will automate the PV blocking calculations for the input data list
 
-export DATA_DIR=$GSCRATCH/CO2_2
+export DATA_DIR=$SCRATCH/2xCO2
 export WKDIR=$HOME/tempestextremes
 export NUM_NODES=8
 if [ ! -d $DATA_DIR ]; then
