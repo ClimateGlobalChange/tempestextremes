@@ -1,4 +1,4 @@
-//////////////////////////////////////
+/////////////////////////////////////
 ///     \file blockingAvg.cpp
 ///     \author Marielle Pinheiro
 ///     \version March 26, 2015
@@ -9,9 +9,6 @@ data and adds the sum of this array to the index of a 365-day
 array that corresponds to the center date of the 31-day array.
 The value for each day is then divided by the number of years *31*
 nsteps to get the daily average for the (n)-year period. 
-
-CURRENT ISSUE: instances where file has a weird number of time steps 
-(i.e. 57) that causes a segfault due to nonexistent end index. 
 */
 #include "BlockingUtilities.h"
 #include "CommandLine.h"
@@ -62,16 +59,13 @@ int main(int argc, char **argv){
     if (fileList == ""){
       _EXCEPTIONT("No file list (--inlist) specified");
     }
-    if (strfile_out == "" ){
-      _EXCEPTIONT("Need to provide average file output name.");
-    }
+
     //Create list of input files
     std::vector<std::string> InputFiles;
     GetInputFileList(fileList, InputFiles);
     int nFiles = InputFiles.size();
 
     //Open first file 
-    std::cout<< "First file: "<<InputFiles[0].c_str()<<std::endl;
     NcFile infile(InputFiles[0].c_str());
     int nTime = infile.get_dim("time")->size();
     int nLat = infile.get_dim("lat")->size();
@@ -203,7 +197,6 @@ int main(int argc, char **argv){
         infile.close();
         //Open new file and increment file counter
         x+=1;
-        std::cout << "opening file "<< InputFiles[x].c_str()<<std::endl;
         NcFile infile(InputFiles[x].c_str());
         nTime = infile.get_dim("time")->size();
         nLat = infile.get_dim("lat")->size();
@@ -270,7 +263,7 @@ int main(int argc, char **argv){
       std::cout<< "This array has missing values, will not be added to sum."<<std::endl;
     }
     else{
-   //   std::cout<<"No missing values found. Adding array to sum."<<std::endl;
+      std::cout<<"No missing values found. Adding array to sum."<<std::endl;
       for (int t=0; t<arrLen; t++){
         for (int a=0; a<nLat; a++){
           for (int b=0; b<nLon; b++){
@@ -330,13 +323,11 @@ int main(int argc, char **argv){
 
     //entering while loop.
 
-
-    std::cout << "Entering while loop. Setting newFile to false."<<std::endl;
     bool newFile = false;
 
     while (x<nFiles){
-      std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and length of time axis is "\
-        <<nTime<<"; tStart/end indices are "<<tStart<<" and "<<tEnd<<std::endl;
+      std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
+        <<nTime<<"; tStart/end is "<<tStart<<" and "<<tEnd<<std::endl;
       std::cout<<"Current date index is "<<dateIndex<<std::endl;
        //1: check if current day is a leap day
       if (leap==true){
@@ -357,6 +348,13 @@ int main(int argc, char **argv){
       //2: if new file needs to be opened, open it
       if(newFile==true){
         endTime = timeVec[nTime-1];
+        //cases with incomplete days
+        if (nTime-tStart < nSteps) {
+          double extraSteps = nSteps - (nTime-tStart);
+          std::cout<<"Need to add "<<extraSteps<<" extra steps."<<std::endl;
+          endTime += (extraSteps * tRes);
+          std::cout<<"New end time is "<<endTime<<std::endl;
+        }
         std::cout<<"#2: Reached end of file."<<std::endl;
         infile.close();
         std::cout<<"Closed "<<InputFiles[x]<<std::endl;
@@ -407,36 +405,30 @@ int main(int argc, char **argv){
       }    
       //3: fill array for next value
       if (newFile==false){
-       std::cout<<"newFile is false. Filling values."<<std::endl;
-       //Deal with the case where there isn't a complete day!
-       if ((tEnd > nTime) && (nTime-tStart < nSteps)){
-         std::cout<<"Incomplete day. Skipping."<<std::endl;
-         for (int t=tStart; t<tEnd; t++){
-           for (int a=0; a<nLat; a++){
-             for (int b=0; b<nLon; b++){
-               currFillData[currArrIndex][a][b] = missingValue;
-             }
-           }
-           currArrIndex+=1;
-         }
-         //check for periodic boundary condition for 31 day array
-         if (currArrIndex>=arrLen){
-          currArrIndex-=arrLen;
-         }
-       } 
-       else{
-          for (int t=tStart; t<tEnd; t++){
-            for (int a=0; a<nLat; a++){
-              for (int b=0; b<nLon; b++){
+        std::cout<<"At time "<<tStart<<" to "<<tEnd<< "Filled in values at array index "<<currArrIndex<<" that will fill date "<<dateIndex<<std::endl;
+       
+        if (nTime-tStart < nSteps) {
+          std::cout<< "Incomplete day. Skipping."<<std::endl;
+        }
+ 
+        for (int t=tStart; t<tEnd; t++){
+          for (int a=0; a<nLat; a++){
+            for (int b=0; b<nLon; b++){
+              if (nTime-tStart < nSteps){
+                currFillData[currArrIndex][a][b] = missingValue;
+              }
+              else{
                 currFillData[currArrIndex][a][b] = IPVData[t][a][b];
               }
             }
-            currArrIndex+=1;
           }
-          //check for periodic boundary condition for 31 day array
-          if (currArrIndex>=arrLen){
-            currArrIndex-=arrLen;
-          }
+          currArrIndex+=1;
+          std::cout<< "Array index is now "<<currArrIndex<<" (arrlen is "<<arrLen<<")"<<std::endl;
+        }
+        //check for periodic boundary condition for 31 day array
+        if (currArrIndex>=arrLen){
+          std::cout<<"currArrIndex is "<<currArrIndex<<" and periodic boundary: 31 day length met or exceeded."<<std::endl;
+          currArrIndex-=arrLen;
         }
      //Check to see if array contains missing values
      if (missingFiles){
@@ -445,8 +437,7 @@ int main(int argc, char **argv){
      //Do not add sum of array to average if array contains missing values!
      if (hasMissingValues){
        std::cout<<"This array has missing values, will not be added to sum."<<std::endl;
-     }
-     else{
+     }else{
        std::cout<<"Filled in values at date index "<<dateIndex<<std::endl;
        //Fill date with sum of new array values
           for (int t=0; t<arrLen; t++){
@@ -496,6 +487,11 @@ int main(int argc, char **argv){
             } 
           }
         }
+    //    else{
+    //      newFile = true;
+    //      std::cout<<"tEnd is "<<tEnd<<", nTime is "<<nTime<<", tStart is "<<tStart<<std::endl;
+   //       std::cout<<"Else: Reached EOF. Will open new file in next iteration."<<std::endl;
+     //   }
       }
     }
     
