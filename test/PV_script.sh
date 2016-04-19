@@ -31,6 +31,7 @@
 # --listpv=[LIST OF INPUT FILES] ##MANDATORY IF NOT RUNNING PV
 # --varname=[NAME OF VARIABLE BEING AVERAGED] ##MANDATORY
 # --avgname=[NAME OF AVERAGE VARIABLE] ##MANDATORY
+# --avgfile=[NAME OF AVERAGING FILE] ##MANDATORY
 # FOR DEVIATION CALCULATIONS:
 # --listpv=[LIST OF INPUT FILES] ##MANDATORY IF NOT RUNNING PV
 # --avgfile=[NAME OF AVERAGED FILE] ##MANDATORY IF NOT RUNNING AVG
@@ -142,6 +143,11 @@ if [ "$PV_BOOL" == "TRUE" ]; then
     LIST_2D=h2list.txt
     LIST_PV=integ_list.txt
 
+    if [ "$AVG_BOOL" == "TRUE" ] && [ "$AVGNAME" == "" ]; then
+      echo "Need to provide average file name (--avgname)."
+      exit
+    fi
+
     cd $DATA_DIR
     ls $H2DIR/*_sub.nc > $DATA_DIR/$LIST_2D
     ls $H4DIR/*_sub.nc > $DATA_DIR/$LIST_4D
@@ -176,7 +182,6 @@ if [ "$PV_BOOL" == "TRUE" ]; then
     LIST_PV=newinteg.txt
 #  fi
 
-  cd $DATA_DIR
   #Create a text file with all 3 lists
   paste $LIST_4D $LIST_2D $LIST_PV > combined_list.txt
 
@@ -184,6 +189,7 @@ if [ "$PV_BOOL" == "TRUE" ]; then
   echo "#!/bin/bash -l" > $PV_BATCH_NAME
   echo "" >> $PV_BATCH_NAME
   echo "#SBATCH -p shared" >> $PV_BATCH_NAME
+  echo "#SBATCH -o pv_batch.output" >> $PV_BATCH_NAME
   echo "#SBATCH -t 20:00:00" >> $PV_BATCH_NAME
   echo "#SBATCH --mem=20GB" >> $PV_BATCH_NAME
   echo "" >> $PV_BATCH_NAME
@@ -219,15 +225,17 @@ if [ "$AVG_BOOL" == "TRUE" ]; then
     echo "Averaged file name is $AVGFILE"
   fi
 
+  cd $DATA_DIR
   #Create the averaging batch file
   echo "#!/bin/bash -l" > $AVG_BATCH_NAME
   echo "" >> $AVG_BATCH_NAME
   echo "#SBATCH -p shared" >> $AVG_BATCH_NAME
-  echo "#SBATCH -t 0:20:00" >> $AVG_BATCH_NAME
+  echo "#SBATCH -o avg_batch.output">> $AVG_BATCH_NAME
+  echo "#SBATCH -t 0:30:00" >> $AVG_BATCH_NAME
   echo "" >> $AVG_BATCH_NAME
   echo "cd $DATA_DIR" >> $AVG_BATCH_NAME
   if [ "$MISSING_FILES" == "TRUE" ]; then
-    echo "$BINDIR/BlockingAvg --missing --inlist $LIST_PV --out $AVG_NAME --varname $VARNAME --avgname $AVGNAME" >> $AVG_BATCH_NAME
+    echo "$BINDIR/BlockingAvg --missing --inlist $LIST_PV --out $AVGFILE --varname $VARNAME --avgname $AVGNAME" >> $AVG_BATCH_NAME
   else
     echo "$BINDIR/BlockingAvg --missing --inlist $LIST_PV --out $AVGFILE --varname $VARNAME --avgname $AVGNAME" >> $AVG_BATCH_NAME
   fi
@@ -258,10 +266,13 @@ if [ "$DEV_BOOL" == "TRUE" ]; then
     echo "Need to specify average variable name (--avgname=)."
     exit
   fi
+
+  cd $DATA_DIR
   #Create the deviations batch file
   echo "#!/bin/bash -l" > $DEV_BATCH_NAME
   echo "" >> $DEV_BATCH_NAME
   echo "#SBATCH -p shared" >> $DEV_BATCH_NAME
+  echo "#SBATCH -o dev_batch.output">>$DEV_BATCH_NAME
   echo "#SBATCH -t 2:00:00" >> $DEV_BATCH_NAME
   echo "" >> $DEV_BATCH_NAME
   echo "cd $DATA_DIR" >> $DEV_BATCH_NAME
