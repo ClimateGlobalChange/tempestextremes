@@ -79,7 +79,13 @@ struct LatLonPair {
 ///	<summary>
 ///		A structure for storing a bounding box in latitude / longitude space.
 ///	</summary>
-struct LatLonBox {
+class LatLonBox {
+
+public:
+	///	<summary>
+	///		Flag indicating this is a null box.
+	///	</summary>
+	bool is_null;
 
 	///	<summary>
 	///		Bounding latitudes (endpoints are included).
@@ -91,6 +97,34 @@ struct LatLonBox {
 	///	</summary>
 	int lon[2];
 
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	LatLonBox() :
+		is_null(true)
+	{ }
+
+	///	<summary>
+	///		Width of this LatLonBox.
+	///	</summary>
+	int Width(
+		int nLonCount
+	) {
+		if (is_null) {
+			return 0;
+		}
+
+		if (lon[0] == lon[1]) {
+			return (1);
+
+		} else if (lon[0] <= lon[1]) {
+			return (lon[1] - lon[0] + 1);
+		} else {
+			return (lon[1] - lon[0] + nLonCount + 1);
+		}
+	}
+
 	///	<summary>
 	///		Insert a point into this LatLonBox.
 	///	</summary>
@@ -100,12 +134,55 @@ struct LatLonBox {
 		int nLatCount,
 		int nLonCount
 	) {
+		if (is_null) {
+			is_null = false;
+			lat[0] = iLat;
+			lat[1] = iLat;
+			lon[0] = iLon;
+			lon[1] = iLon;
+			return;
+		}
+
+		// Expand latitudes
 		if (iLat > lat[1]) {
 			lat[1] = iLat;
 		}
 		if (iLat < lat[0]) {
 			lat[0] = iLat;
 		}
+
+		// New longitude lies within existing range
+		if (lon[0] <= lon[1]) {
+			if ((iLon >= lon[0]) && (iLon <= lon[1])) {
+				return;
+			}
+		} else {
+			if ((iLon >= lon[0]) || (iLon <= lon[1])) {
+				return;
+			}
+		}
+
+		// New longitude lies outside of existing range
+		LatLonBox boxA(*this);
+		boxA.lon[0] = iLon;
+
+		LatLonBox boxB(*this);
+		boxB.lon[1] = iLon;
+
+		int iWidthNow = Width(nLonCount);
+		int iWidthA = boxA.Width(nLonCount);
+		int iWidthB = boxB.Width(nLonCount);
+
+		if ((iWidthA < iWidthNow) || (iWidthB < iWidthNow)) {
+			_EXCEPTIONT("Logic error");
+		}
+
+		if (iWidthA < iWidthB) {
+			(*this) = boxA;
+		} else {
+			(*this) = boxB;
+		}
+/*
 		if (iLon == nLonCount-1) {
 			if (lon[0] <= lon[1]) {
 				if (nLonCount - 1 - lon[1] < lon[0] + 1) {
@@ -146,6 +223,7 @@ struct LatLonBox {
 				}
 			}
 		}
+*/
 	}
 
 	///	<summary>

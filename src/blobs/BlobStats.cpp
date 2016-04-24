@@ -73,9 +73,14 @@ struct BlobQuantities {
 };
 
 ///	<summary>
-///		A map between blob index and quantities associated with the blob.
+///		A map between time and quantities associated with the blob.
 ///	</summary>
-typedef std::map<int, BlobQuantities> BlobQuantitiesMap;
+typedef std::map<int, BlobQuantities> TimedBlobQuantitiesMap;
+
+///	<summary>
+///		A map between blob index and TimedBlobQuantitiesMap;
+///	</summary>
+typedef std::map<int, TimedBlobQuantitiesMap> AllTimedBlobQuantitiesMap;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -162,6 +167,8 @@ try {
 	DataVector<double> dataLonDeg;
 	DataVector<double> dataLon;
 
+	bool fFlippedLat = false;
+
 	double dAreaElement;
 
 	{
@@ -217,6 +224,13 @@ try {
 			M_PI / static_cast<double>(nLat)
 			* 2.0 * M_PI / static_cast<double>(nLon);
 
+		// Check for flipped latitude
+		if (dataLatDeg.GetRows() >= 2) {
+			if (dataLatDeg[1] < dataLatDeg[0]) {
+				fFlippedLat = true;
+			}
+		}
+
 		// Close first netcdf file
 		ncInput.close();
 	}
@@ -268,6 +282,9 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
+	// Computed quantities associated with each blob
+	AllTimedBlobQuantitiesMap mapAllQuantities;
+
 	// Time index across all files
 	int iTime = 0;
 
@@ -311,106 +328,181 @@ try {
 		// Loop through all times
 		for (int t = 0; t < nLocalTimes; t++, iTime++) {
 
-			BlobQuantitiesMap mapOutputQuantities;
-
 			// Load in the data at this time
 			varIndicator->set_cur(t, 0, 0);
 			varIndicator->get(&(dataIndex[0][0]), 1, nLat, nLon);
 
+			// Last data index
+			int iLastDataIndex = 0;
+
+			// Iterator to BlobQuantities with iLastDataIndex and iTime
+			TimedBlobQuantitiesMap::iterator iterBlobQuantities;
+
 			// Loop over all locations
 			for (int j = 0; j < nLat; j++) {
 			for (int i = 0; i < nLon; i++) {
-				if (dataIndex[j][i] != 0) {
-					BlobQuantitiesMap::iterator iterOutput =
-						mapOutputQuantities.find(
+
+				// Ignore non-blob data
+				if (dataIndex[j][i] == 0) {
+					continue;
+				}
+
+				// Check if iterator already points to correct data
+				if (dataIndex[j][i] != iLastDataIndex) {
+
+					// Iterator to TimedBlobQuantities with iLastDataIndex
+					AllTimedBlobQuantitiesMap::iterator
+						iterTimedBlobQuantities;
+
+					// Get new iterator for this dataIndex
+					iterTimedBlobQuantities =
+						mapAllQuantities.find(
 							dataIndex[j][i]);
 
-					if (iterOutput == mapOutputQuantities.end()) {
-						std::pair<BlobQuantitiesMap::iterator,bool> pr =
-							mapOutputQuantities.insert(
-								BlobQuantitiesMap::value_type(
+					if (iterTimedBlobQuantities == mapAllQuantities.end()) {
+
+						std::pair<AllTimedBlobQuantitiesMap::iterator,bool> pr =
+							mapAllQuantities.insert(
+								AllTimedBlobQuantitiesMap::value_type(
 									dataIndex[j][i],
+									TimedBlobQuantitiesMap()));
+
+						if (pr.second == false) {
+							_EXCEPTIONT("Map insertion failed");
+						}
+						iterTimedBlobQuantities = pr.first;
+					}
+
+					// Get the BlobQuantities at the current time
+					TimedBlobQuantitiesMap & mapTimedBlobQuantities =
+						iterTimedBlobQuantities->second;
+
+					iterBlobQuantities =
+						mapTimedBlobQuantities.find(iTime);
+
+					if (iterBlobQuantities == mapTimedBlobQuantities.end()) {
+						std::pair<TimedBlobQuantitiesMap::iterator,bool> pr =
+							mapTimedBlobQuantities.insert(
+								TimedBlobQuantitiesMap::value_type(
+									iTime,
 									BlobQuantities()));
 
 						if (pr.second == false) {
 							_EXCEPTIONT("Map insertion failed");
 						}
-						iterOutput = pr.first;
-
+						iterBlobQuantities = pr.first;
 					}
 
-					// Insert point into array
-					iterOutput->second.box.InsertPoint(j, i, nLat, nLon);
-
-					// Add blob area
-					iterOutput->second.dArea +=
-						cos(dataLat[j]) * dAreaElement;
+					// Update last data index
+					iLastDataIndex = dataIndex[j][i];
 				}
+
+				//std::cout << iterBlobQuantities->first << std::endl;
+/*
+				if ((dataIndex[j][i] == 1) && (iTime == 1)) {
+					printf("%i %i : %i %i\n",
+						j, i,
+						iterBlobQuantities->second.box.lon[0],
+						iterBlobQuantities->second.box.lon[1]);
+				}
+*/
+				// Insert point into array
+				iterBlobQuantities->second.box.InsertPoint(j, i, nLat, nLon);
+
+				// Add blob area
+				iterBlobQuantities->second.dArea +=
+					cos(dataLat[j]) * dAreaElement;
+
 			}
 			}
+		}
 
-			// Calculate vecOutputVars
-			BlobQuantitiesMap::iterator iter = mapOutputQuantities.begin();
-			for (; iter != mapOutputQuantities.end(); iter++) {
-				for (int i = 0; i < vecOutputVars.size(); i++) {
+		// Output all BlobQuantities
+		{
+			AllTimedBlobQuantitiesMap::iterator iterBlobs =
+				mapAllQuantities.begin();
 
-					// Bounding box coordinates
-					double dLat0 = dataLatDeg[iter->second.box.lat[0]];
-					double dLat1 = dataLatDeg[iter->second.box.lat[1]];
-					double dLon0 = dataLonDeg[iter->second.box.lon[0]];
-					double dLon1 = dataLonDeg[iter->second.box.lon[1]];
+			for (; iterBlobs != mapAllQuantities.end(); iterBlobs++) {
 
-					// Blob index
-					fprintf(fpout, "%i", iter->first);
+				fprintf(fpout, "Blob %i (%lu)\n",
+					iterBlobs->first,
+					iterBlobs->second.size());
 
-					// Minimum latitude
-					if (vecOutputVars[i] == BlobQuantities::MinLat) {
-						fprintf(fpout, "\t%1.5f", dLat0);
-					}
+				TimedBlobQuantitiesMap::iterator iterTimes =
+					iterBlobs->second.begin();
 
-					// Maximum latitude
-					if (vecOutputVars[i] == BlobQuantities::MaxLat) {
-						fprintf(fpout, "\t%1.5f", dLat1);
-					}
+				for (; iterTimes != iterBlobs->second.end(); iterTimes++) {
 
-					// Minimum longitude
-					if (vecOutputVars[i] == BlobQuantities::MinLon) {
-						fprintf(fpout, "\t%1.5f", dLon0);
-					}
+					fprintf(fpout, "%i", iterTimes->first);
 
-					// Maximum longitude
-					if (vecOutputVars[i] == BlobQuantities::MaxLon) {
-						fprintf(fpout, "\t%1.5f", dLon1);
-					}
+					BlobQuantities & quants = iterTimes->second;
+					for (int i = 0; i < vecOutputVars.size(); i++) {
 
-					// Centroid latitude
-					if (vecOutputVars[i] == BlobQuantities::CentroidLat) {
-						double dMidLat = 0.5 * (dLat0 + dLat1);
+						// Bounding box coordinates
+						double dLat0 = dataLatDeg[quants.box.lat[0]];
+						double dLat1 = dataLatDeg[quants.box.lat[1]];
+						double dLon0 = dataLonDeg[quants.box.lon[0]];
+						double dLon1 = dataLonDeg[quants.box.lon[1]];
 
-						fprintf(fpout, "\t%1.5f", dMidLat);
-					}
-
-					// Centroid longitude
-					if (vecOutputVars[i] == BlobQuantities::CentroidLon) {
-						double dMidLon;
-						if (dLon0 <= dLon1) {
-							dMidLon = 0.5 * (dLon0 + dLon1);
-						} else {
-							dMidLon = 0.5 * (dLon0 + dLon1 + 2.0 * M_PI);
-							if (dMidLon > 2.0 * M_PI) {
-								dMidLon -= 2.0 * M_PI;
+						// Minimum latitude
+						if (vecOutputVars[i] == BlobQuantities::MinLat) {
+							if (fFlippedLat) {
+								fprintf(fpout, "\t%1.5f", dLat1);
+							} else {
+								fprintf(fpout, "\t%1.5f", dLat0);
 							}
 						}
 
-						fprintf(fpout, "\t%1.5f", dMidLon);
+						// Maximum latitude
+						if (vecOutputVars[i] == BlobQuantities::MaxLat) {
+							if (fFlippedLat) {
+								fprintf(fpout, "\t%1.5f", dLat0);
+							} else {
+								fprintf(fpout, "\t%1.5f", dLat1);
+							}
+						}
+
+						// Minimum longitude
+						if (vecOutputVars[i] == BlobQuantities::MinLon) {
+							fprintf(fpout, "\t%1.5f", dLon0);
+						}
+
+						// Maximum longitude
+						if (vecOutputVars[i] == BlobQuantities::MaxLon) {
+							fprintf(fpout, "\t%1.5f", dLon1);
+						}
+
+						// Centroid latitude
+						if (vecOutputVars[i] == BlobQuantities::CentroidLat) {
+							double dMidLat = 0.5 * (dLat0 + dLat1);
+
+							fprintf(fpout, "\t%1.5f", dMidLat);
+						}
+
+						// Centroid longitude
+						if (vecOutputVars[i] == BlobQuantities::CentroidLon) {
+							double dMidLon;
+							if (dLon0 <= dLon1) {
+								dMidLon = 0.5 * (dLon0 + dLon1);
+							} else {
+								dMidLon = 0.5 * (dLon0 + dLon1 + 360.0);
+								if (dMidLon > 360.0) {
+									dMidLon -= 360.0;
+								}
+							}
+
+							fprintf(fpout, "\t%1.5f", dMidLon);
+						}
+
+						// Area
+						if (vecOutputVars[i] == BlobQuantities::Area) {
+							fprintf(fpout, "\t%1.5f", quants.dArea);
+						}
 					}
 
-					// Area
-					if (vecOutputVars[i] == BlobQuantities::Area) {
-						fprintf(fpout, "\t%1.5f", iter->second.dArea);
-					}
+					// Endline
+					fprintf(fpout, "\n");
 				}
-				fprintf(fpout, "\n");
 			}
 		}
 	}
