@@ -241,7 +241,7 @@ void interpolate_lev(NcVar *var,
   pLev->set_cur((long) 0);
   pLev->get(&(vecpLev[0]), npLev);
  
-  std::cout<<"within interpolate_lev: about to interpolate"<<std::endl; 
+  //std::cout<<"within interpolate_lev: about to interpolate"<<std::endl; 
   //Loop over input data and interpolate to output var
   for (int t=0; t<nTime; t++){
     for (int l=0; l<(nLev-1); l++){
@@ -278,17 +278,17 @@ void copy_dim_var(
 	NcVar *inVar, 
 	NcVar *outVar
 	){
-  std::cout<<"Within copy_dim_var: starting copy"<<std::endl;
+ // std::cout<<"Within copy_dim_var: starting copy"<<std::endl;
 //Get necessary information from infile
   int varLen = inVar->get_dim(0)->size();
-  std::cout<<"Variable dimension length is "<<varLen<<std::endl;
+ // std::cout<<"Variable dimension length is "<<varLen<<std::endl;
   DataVector<double> inVec(varLen);
   inVar->set_cur((long) 0);
   inVar->get(&(inVec[0]), varLen);
 //Copy data to new outgoing variable
   outVar->set_cur((long) 0);
   outVar->put(&(inVec[0]), varLen);
-  std::cout<<"Copying attributes."<<std::endl;
+ // std::cout<<"Copying attributes."<<std::endl;
 //Copy other attributes
   CopyNcVarAttributes(inVar, outVar);
 }
@@ -741,7 +741,7 @@ void calcDevsPV(bool leap,
 
 //Number of days in IPV
   int nDays = nTime*tRes;
-  std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
+ // std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
 
 
 //Deal with skipped days          
@@ -758,7 +758,7 @@ void calcDevsPV(bool leap,
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
         leapMonth, leapDay, leapHour);
       if (leapMonth==2 && leapDay == 29){
-        std::cout<<"Leap day! Skipping day."<<std::endl;
+      //  std::cout<<"Leap day! Skipping day."<<std::endl;
         t+=nSteps;
       }
     }
@@ -781,7 +781,7 @@ void calcDevsPV(bool leap,
   outTime->set_cur((long) 0);
   outTime->put(&(newTime[0]),nOutTime);
 
-  std::cout<<"About to implement smoothing."<<std::endl;
+ // std::cout<<"About to implement smoothing."<<std::endl;
   double div = (double) 2*nSteps;
   double invDiv = 1.0/div;
 
@@ -802,7 +802,7 @@ void calcDevsPV(bool leap,
     }
   }
 
-  std::cout<<"Finished smoothing."<<std::endl;
+ // std::cout<<"Finished smoothing."<<std::endl;
   outDev->set_cur(0,0,0);
   outDev->put(&(devMat[0][0][0]),nOutTime,nLat,nLon);
   std::cout<<"Wrote devs to file."<<std::endl;
@@ -861,9 +861,9 @@ void stdDev(DataMatrix3D<double>inDevs,
       }
       variance = sigSum/nTime;
       outStdDev[a][b] = std::sqrt(variance);
-      if (a==32 && b== 50){
-        std::cout<<"Standard deviation value: "<<std::sqrt(variance)<<std::endl;
-      }
+    //  if (a==32 && b== 50){
+    //    std::cout<<"Standard deviation value: "<<std::sqrt(variance)<<std::endl;
+   //   }
     }
   }
 }
