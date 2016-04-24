@@ -176,7 +176,7 @@ int main(int argc, char **argv){
             leapMonth,leapDay,leapHour);
           if (leapMonth==2 && leapDay == 29){
             while (leapMonth ==2 && leapDay ==29){
-              std::cout<<"Leap day! Skipping this step."<<std::endl;
+            //  std::cout<<"Leap day! Skipping this step."<<std::endl;
               t++;
               ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
                 leapMonth, leapDay, leapHour);
@@ -351,11 +351,11 @@ int main(int argc, char **argv){
         //cases with incomplete days
         if (nTime-tStart < nSteps) {
           double extraSteps = nSteps - (nTime-tStart);
-          std::cout<<"Need to add "<<extraSteps<<" extra steps."<<std::endl;
+        //  std::cout<<"Need to add "<<extraSteps<<" extra steps."<<std::endl;
           endTime += (extraSteps * tRes);
-          std::cout<<"New end time is "<<endTime<<std::endl;
+        //  std::cout<<"New end time is "<<endTime<<std::endl;
         }
-        std::cout<<"#2: Reached end of file."<<std::endl;
+      //  std::cout<<"#2: Reached end of file."<<std::endl;
         infile.close();
         std::cout<<"Closed "<<InputFiles[x]<<std::endl;
         x+=1;
@@ -388,7 +388,7 @@ int main(int argc, char **argv){
 
           if (contCheck > tRes){
             if (!missingFiles){
-              std::cout<<"contCheck is "<<contCheck<<std::endl;
+            //  std::cout<<"contCheck is "<<contCheck<<std::endl;
               _EXCEPTIONT("New file is not continuous with previous file");
             }else{
               MissingFill(missingValue, tRes, contCheck, nLat, nLon, arrLen, \
@@ -405,11 +405,11 @@ int main(int argc, char **argv){
       }    
       //3: fill array for next value
       if (newFile==false){
-        std::cout<<"At time "<<tStart<<" to "<<tEnd<< "Filled in values at array index "<<currArrIndex<<" that will fill date "<<dateIndex<<std::endl;
+      //  std::cout<<"At time "<<tStart<<" to "<<tEnd<< "Filled in values at array index "<<currArrIndex<<" that will fill date "<<dateIndex<<std::endl;
        
-        if (nTime-tStart < nSteps) {
-          std::cout<< "Incomplete day. Skipping."<<std::endl;
-        }
+      //  if (nTime-tStart < nSteps) {
+        //  std::cout<< "Incomplete day. Skipping."<<std::endl;
+      //  }
  
         for (int t=tStart; t<tEnd; t++){
           for (int a=0; a<nLat; a++){
@@ -423,11 +423,11 @@ int main(int argc, char **argv){
             }
           }
           currArrIndex+=1;
-          std::cout<< "Array index is now "<<currArrIndex<<" (arrlen is "<<arrLen<<")"<<std::endl;
+        //  std::cout<< "Array index is now "<<currArrIndex<<" (arrlen is "<<arrLen<<")"<<std::endl;
         }
         //check for periodic boundary condition for 31 day array
         if (currArrIndex>=arrLen){
-          std::cout<<"currArrIndex is "<<currArrIndex<<" and periodic boundary: 31 day length met or exceeded."<<std::endl;
+       //   std::cout<<"currArrIndex is "<<currArrIndex<<" and periodic boundary: 31 day length met or exceeded."<<std::endl;
           currArrIndex-=arrLen;
         }
      //Check to see if array contains missing values
@@ -461,15 +461,15 @@ int main(int argc, char **argv){
           dateIndex-=yearLen;
         }
         if (tEnd >= nTime){
-          std::cout<<"Current tEnd is "<<tEnd << " and nTime is "<<nTime<<std::endl;
+       //   std::cout<<"Current tEnd is "<<tEnd << " and nTime is "<<nTime<<std::endl;
           newFile = true;
-          std::cout<<"Else: Reached EOF. Will open new file in next iteration."<<std::endl;
+       //   std::cout<<"Else: Reached EOF. Will open new file in next iteration."<<std::endl;
 
         }
         else{
           tStart = tEnd;
           tEnd = tStart + nSteps;
-          std::cout<<"Filled array. Resetting tstart/tend to "<<tStart<< " and "<<tEnd<<std::endl;
+        //  std::cout<<"Filled array. Resetting tstart/tend to "<<tStart<< " and "<<tEnd<<std::endl;
           //Check for leap year
           if (leap==true){
           //  std::cout<<"Checking date for leap day."<<std::endl;

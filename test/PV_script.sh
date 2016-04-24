@@ -48,15 +48,20 @@ H4DIR=""
 LIST_4D=""
 LIST_2D=""
 LIST_PV=""
+LIST_BLOBS=""
 PV_BATCH_NAME="pvbatch"
 AVG_BATCH_NAME="avgbatch"
 DEV_BATCH_NAME="devbatch"
+BLOBS_BATCH_NAME="blobsbatch"
 PV_BOOL="FALSE"
 AVG_BOOL="FALSE"
 DEV_BOOL="FALSE"
+BLOBS_BOOL="FALSE"
 VARNAME=""
 AVGNAME=""
+DEVNAME=""
 AVGFILE=""
+BLOBSFILE=""
 MISSING_FILES="FALSE"
 
 for i in "$@"; do 
@@ -82,6 +87,9 @@ for i in "$@"; do
     --listpv=*)
     LIST_PV="${i#*=}"
     ;;
+    --listblobs=*)
+    LIST_BLOBS="${i#*=}"
+    ;;
     --pv)
     PV_BOOL="TRUE"
     ;;
@@ -91,14 +99,23 @@ for i in "$@"; do
     --dev)
     DEV_BOOL="TRUE"
     ;;
+    --blobs)
+    BLOBS_BOOL="TRUE"
+    ;;
     --varname=*)
     VARNAME="${i#*=}"
     ;;
     --avgname=*)
     AVGNAME="${i#*=}"
     ;;
+    --devname=*)
+    DEVNAME="${i#*=}"
+    ;;
     --avgfile=*)
     AVGFILE="${i#*=}"
+    ;;
+    --blobsfile=*)
+    BLOBSFILE="${i#*=}"
     ;;
     --missing)
     MISSING_FILES="TRUE"
@@ -282,5 +299,18 @@ if [ "$DEV_BOOL" == "TRUE" ]; then
     echo "Submitting deviations batch file."
     sbatch $DEV_BATCH_NAME
   fi
+
+fi
+
+if [ "$BLOBS_BOOL" == "TRUE" ]; then
+  cd $DATA_DIR
+  echo "#!/bin/bash -l" >> $BLOBS_BATCH_NAME
+  echo "" >> $BLOBS_BATCH_NAME
+  echo "#SBATCH -p shared" >> $BLOBS_BATCH_NAME
+  echo "#SBATCH -o blobs_batch.output" >> $BLOBS_BATCH_NAME
+  echo "#SBATCH -t 1:00:00" >> $BLOBS_BATCH_NAME
+  echo "" >> $BLOBS_BATCH_NAME
+  echo "cd $DATA_DIR" >> $BLOBS_BATCH_NAME
+  echo "$BINDIR/StitchBlobs --inlist $LIST_BLOBS --out $BLOBSFILE --var $DEVNAME --minsize 4 --mintime 40 
 
 fi

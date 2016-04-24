@@ -100,7 +100,7 @@ int main(int argc, char **argv){
       }
       std::string strCalendar = attCal->as_string(0);
 
-      std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
+   //   std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
 
 
 

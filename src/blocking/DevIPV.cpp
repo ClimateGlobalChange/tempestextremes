@@ -57,7 +57,7 @@ void calcDevs(bool leap,
   double tRes = timeVec[1]-timeVec[0];
   int nSteps = 1/tRes;
 
-  std::cout<<"Time resolution is "<<tRes<< " and steps per day is "<<nSteps<<std::endl;
+//  std::cout<<"Time resolution is "<<tRes<< " and steps per day is "<<nSteps<<std::endl;
  
 //avg IPV
   int avgDay = avgIPV->get_dim(0)->size();
@@ -75,7 +75,7 @@ void calcDevs(bool leap,
   int nOutTime;
   if (leap){
     nOutTime = nTime-nSteps;
-    std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
+  //  std::cout<<"# steps previously "<<nTime<<" but now "<<nOutTime<<std::endl;
   }
   else{
     nOutTime = nTime;
@@ -87,7 +87,7 @@ void calcDevs(bool leap,
 //Number of days in IPV
   int nDays = nTime*tRes;
 
-  std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
+//  std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
 
 //  int startAvgIndex = (int(timeVec[0])%365)-1;
 //  std::cout<<"first time value is "<<timeVec[0]<<", modulo is "<<int(timeVec[0])%365<<std::endl;
@@ -108,7 +108,7 @@ void calcDevs(bool leap,
         leapMonth, leapDay, leapHour);
       if (leapMonth==2 && leapDay == 29){
         while (leapMonth ==2 && leapDay == 29){
-          std::cout<<"Leap day! Skipping this step."<<std::endl;
+  //        std::cout<<"Leap day! Skipping this step."<<std::endl;
           t++;
           ParseTimeDouble(strTimeUnits,strCalendar, timeVec[t],leapYear,\
             leapMonth,leapDay,leapHour);
@@ -127,13 +127,13 @@ void calcDevs(bool leap,
       }
     }
     newTime[d] = timeVec[t];
-    std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
+//    std::cout<<"Day is "<<currAvgIndex<<", d is "<<d<<" and t is "<<t<<std::endl;
     d++;
   }
   outTime->set_cur((long) 0);
   outTime->put(&(newTime[0]),nOutTime);
 
-  std::cout<<"About to implement smoothing."<<std::endl;
+//  std::cout<<"About to implement smoothing."<<std::endl;
 
   //implement 2-day smoothing
   for (int t=0; t<nTime; t++){
@@ -152,7 +152,7 @@ void calcDevs(bool leap,
     }
   }
 
-  std::cout<<"Finished smoothing."<<std::endl;
+//  std::cout<<"Finished smoothing."<<std::endl;
   outDev->set_cur(0,0,0);
   outDev->put(&(devMat[0][0][0]),nOutTime,nLat,nLon);
   std::cout<<"Wrote devs to file."<<std::endl;
@@ -260,7 +260,7 @@ int main(int argc, char **argv){
       }
       std::string strCalendar = attCal->as_string(0);
 
-      std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
+//      std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
 
 
 
