@@ -60,6 +60,7 @@ BLOBS_BOOL="FALSE"
 VARNAME=""
 AVGNAME=""
 DEVNAME=""
+BLOBSNAME=""
 AVGFILE=""
 BLOBSFILE=""
 MISSING_FILES="FALSE"
@@ -110,6 +111,9 @@ for i in "$@"; do
     ;;
     --devname=*)
     DEVNAME="${i#*=}"
+    ;;
+    --blobsname=*)
+    BLOBSNAME="${i#*=}"
     ;;
     --avgfile=*)
     AVGFILE="${i#*=}"
@@ -311,6 +315,6 @@ if [ "$BLOBS_BOOL" == "TRUE" ]; then
   echo "#SBATCH -t 1:00:00" >> $BLOBS_BATCH_NAME
   echo "" >> $BLOBS_BATCH_NAME
   echo "cd $DATA_DIR" >> $BLOBS_BATCH_NAME
-  echo "$BINDIR/StitchBlobs --inlist $LIST_BLOBS --out $BLOBSFILE --var $DEVNAME --minsize 4 --mintime 40 
-
+  echo "$BINDIR/StitchBlobs --inlist $LIST_BLOBS --out $BLOBSFILE --var $DEVNAME --outvar $BLOBSNAME --minsize 5 --mintime 40" 
+  echo "$BINDIR/BlobStats --in $BLOBSFILE --outfile test --invar $BLOBSNAME --out minlat,maxlat,minlon,maxlon,centlat,centlon,area" >> $BLOBS_BATCH_NAME
 fi
