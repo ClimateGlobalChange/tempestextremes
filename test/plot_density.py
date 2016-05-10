@@ -40,7 +40,7 @@ m.drawmeridians(lon_ticks,labels=[0,0,0,1])
 
 x,y = m(*np.meshgrid(lon,lat))
 #draw filled contours
-pv=m.contourf(x,y,dens,levels=np.arange(0.025,0.25,.025),extend='max')
+pv=m.contourf(x,y,dens,levels=np.arange(0.025,0.2,.025),extend='max')
 #add colorbar
 cb=plt.colorbar(pv,shrink=0.75)
 cb.ax.tick_params(labelsize=16.)
