@@ -2,9 +2,8 @@ from pandas import DataFrame
 import pandas
 import numpy
 import pylab
-import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.colors as colors
+import matplotlib.cm as cm
 from matplotlib.collections import LineCollection
 from mpl_toolkits.basemap import Basemap, addcyclic
 import math
@@ -51,6 +50,7 @@ def sector(hemi,lon0):
     #print("for lon0 %f, sector is %s"%(lon0,sec))
   return(sec)
     
+
 
 #Function that will generate color values for each point (on a scale of 0-1)
 def color_split(var, vartype, n=10):
@@ -163,21 +163,21 @@ class BlobObject:
         plt.plot(x,y)
         plt.ylabel(latname)
         plt.xlabel(lonname)
-  def plot_area(self):
+  def plot_mvmt(self):
     aarr = self.data[['centlon','sector','area']]  
-    points = numpy.array([aarr.centlon.values.astype('float64'),\
-                aarr.area.values.astype('float64')]).T.reshape(-1, 1, 2)
+    points = numpy.array([aarr.index.values.astype('float64'),\
+                aarr.centlon.values.astype('float64')]).T.reshape(-1, 1, 2)
     segments = numpy.concatenate([points[:-1], points[1:]], axis=1) 
-    cols = color_split(aarr.sector.values,'STR')
+    cols = color_split(aarr.area.values,'NUM')
     dummy_cols = numpy.asarray(cols)
-    cmin=aarr.area.values.min()
-    cmax=aarr.area.values.max()
-    xmin=aarr.centlon.values.min()
-    xmax=aarr.centlon.values.max()
+    cmin=aarr.centlon.values.min()
+    cmax=aarr.centlon.values.max()
+    xmin=aarr.index.values.min()
+    xmax=aarr.index.values.max()
     print(cmin, cmax)
     print(xmin,xmax)
     #cnorm=mpl.colors.Normalize(cmin,cmax)
-    lc = LineCollection(segments, cmap=mpl.cm.get_cmap('Dark2_r'))#,\
+    lc = LineCollection(segments, cmap=cm.get_cmap('Dark2_r'))#,\
     #        norm=cnorm )
     lc.set_array(dummy_cols)
     lc.set_linewidth(3)
@@ -186,7 +186,20 @@ class BlobObject:
     plt.xlim(xmin,xmax)
     plt.ylim(cmin-0.01, cmax+0.01)
 
-    plt.ylabel('Blob area')
-    plt.xlabel('Longitude')
-    plt.legend()
+    plt.ylabel('Longitude')
+    plt.xlabel('Time index')
+    plt.colorbar(dummy_cols)
+
+
+def plot_func(vartype,var1,var2=None,cvar=None,cm='viridis',bmap=None):    
+    plt.figure(figsize=(24,12))
+    if (vartype=='HIST'):
+      plt.hist(var1)
+    elif(vartype=='SCTR'):
+      if (cvar == None):
+        plt.scatter(var1,var2)
+      else:
+        plt.scatter(var1,var2,c=cvar,cmap=cm)
+        plt.colorbar()
+      
 
