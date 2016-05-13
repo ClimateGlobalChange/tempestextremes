@@ -18,13 +18,13 @@ UTIL_FILES= BlockingUtilities.cpp \
             Interp_z500.cpp \
             Interpolate.cpp
 
-EXEC_FILES= BlockingAvgOld.cpp\
-            BlockingAvg.cpp\
+EXEC_FILES= BlockingAvg.cpp\
             BlockingDevs.cpp \
             BlockingGH.cpp \
             BlockingPV.cpp \
 	    DensityCalculations.cpp \
-            Var4Dto3D.cpp
+            Var4Dto3D.cpp\
+            split_file.cpp 
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 
