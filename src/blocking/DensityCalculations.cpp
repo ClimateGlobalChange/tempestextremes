@@ -21,7 +21,7 @@
 #include <cstring>
 
 void densCalc(NcVar * inVar,
-              NcVar * outVar){
+              DataMatrix<double> & outMat){
 
   int tLen,latLen,lonLen;
   double invtLen;
@@ -36,7 +36,7 @@ void densCalc(NcVar * inVar,
   inVar->set_cur(0,0,0);
   inVar->get((&inMat[0][0][0]), tLen,latLen,lonLen);
 
-  DataMatrix<double> outMat(latLen,lonLen);
+  //DataMatrix<double> outMat(latLen,lonLen);
   for (int i=0; i<latLen; i++){
     for (int j=0; j<lonLen; j++){
       outMat[i][j] = 0.0;
@@ -59,8 +59,8 @@ void densCalc(NcVar * inVar,
       outMat[i][j]*=invtLen;
     }
   }
-  outVar->set_cur(0,0);
-  outVar->put((&outMat[0][0]),latLen,lonLen);
+ // outVar->set_cur(0,0);
+  //outVar->put((&outMat[0][0]),latLen,lonLen);
 }
 
 int main(int argc, char ** argv){
@@ -70,21 +70,37 @@ int main(int argc, char ** argv){
     std::string inFile;
     std::string outFile;
     std::string varName;
+    std::string inList;
 
     BeginCommandLine()
       CommandLineString(inFile, "in", "");
+      CommandLineString(inList, "inlist","");
       CommandLineString(varName, "var", "");
       CommandLineString(outFile, "out", "");
       ParseCommandLine(argc, argv);
     EndCommandLine(argv)
     AnnounceBanner();
   
-    NcFile readin(inFile.c_str());
-    if (!readin.is_valid()){
-      _EXCEPTION1("Unable to open file %s for reading",\
-     inFile.c_str());
+
+    if ((inFile != "") && (inList != "")){
+      _EXCEPTIONT("Can only open one file (--in) or list (--inlist).");
     }
 
+    //file list vector
+    std::vector<std::string> vecFiles;
+    if (inFile != ""){
+      vecFiles.push_back(inFile);
+    }
+    if (inList != ""){
+      GetInputFileList(inList,vecFiles);
+    }
+
+    //open up first file
+    NcFile readin(vecFiles[0].c_str());
+    if (!readin.is_valid()){
+      _EXCEPTION1("Unable to open file %s for reading",\
+        vecFiles[0].c_str());
+    }
     int tLen,latLen,lonLen;
 
     NcDim * time = readin.get_dim("time");
@@ -99,17 +115,55 @@ int main(int argc, char ** argv){
     lonLen = lon->size();
     NcVar * lonVar = readin.get_var("lon");
 
+    //read input variable
     NcVar * inVar = readin.get_var(varName.c_str());
+    //Create output matrix
+    DataMatrix<double> outMat(latLen,lonLen);
+    densCalc(inVar,outMat);
+    //If multiple files, add these values to the output
+    if (vecFiles.size()>1){
+      DataMatrix<double> addMat(latLen,lonLen);
+      std::cout<<"There are "<<vecFiles.size()<<" files."<<std::endl;
+      for (int v=1; v<vecFiles.size(); v++){
+        readin.close();
+        NcFile readin(vecFiles[v].c_str());
+        NcVar * inVar = readin.get_var(varName.c_str());
+
+        densCalc(inVar,addMat);
+        for (int a=0; a<latLen; a++){
+          for (int b=0; b<lonLen; b++){
+            outMat[a][b]+=addMat[a][b];
+          }
+        } 
+      }
+      //Divide output by number of files
+      double div = 1./((double) vecFiles.size());
+      for (int a=0; a<latLen; a++){
+        for (int b=0; b<lonLen; b++){
+          outMat[a][b]*=div;
+        }
+      }
+    }
+    NcFile refFile(vecFiles[0].c_str());
+    latVar = refFile.get_var("lat");
+    lonVar = refFile.get_var("lon");   
+ 
     NcFile readout(outFile.c_str(),NcFile::Replace, NULL,0,NcFile::Offset64Bits);
     NcDim * outLat = readout.add_dim("lat", latLen);
     NcDim * outLon = readout.add_dim("lon", lonLen);
     NcVar * outLatVar = readout.add_var("lat",ncDouble,outLat);
     NcVar * outLonVar = readout.add_var("lon",ncDouble,outLon);
+    std::cout<<"Copying dimension attributes."<<std::endl;
     copy_dim_var(latVar,outLatVar);
     copy_dim_var(lonVar,outLonVar);
 
+    std::cout<<"Creating density variable."<<std::endl;
+
     NcVar * densVar = readout.add_var("dens",ncDouble,outLat,outLon);
-    densCalc(inVar,densVar);
+    densVar->set_cur(0,0);
+    densVar->put((&outMat[0][0]),latLen,lonLen);
+
+   // densCalc(inVar,densVar);
 
     readout.close();
     readin.close();
