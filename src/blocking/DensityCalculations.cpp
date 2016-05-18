@@ -71,12 +71,14 @@ int main(int argc, char ** argv){
     std::string outFile;
     std::string varName;
     std::string inList;
+    bool calcStdDev;
 
     BeginCommandLine()
       CommandLineString(inFile, "in", "");
       CommandLineString(inList, "inlist","");
       CommandLineString(varName, "var", "");
       CommandLineString(outFile, "out", "");
+      CommandLineBool(calcStdDev, "std");
       ParseCommandLine(argc, argv);
     EndCommandLine(argv)
     AnnounceBanner();
@@ -120,21 +122,38 @@ int main(int argc, char ** argv){
     //Create output matrix
     DataMatrix<double> outMat(latLen,lonLen);
     densCalc(inVar,outMat);
+
+    //Option for calculating the yearly standard deviation 
+    if (calcStdDev){
+      DataMatrix3D<double> storeMat(vecFiles.size(),latLen,lonLen);
+      for (int a=0; a<latLen; a++){
+        for (int b=0; b<lonLen; b++){
+          storeMat[0][a][b] = outMat[a][b];
+        }
+      }
+    }
+
     //If multiple files, add these values to the output
     if (vecFiles.size()>1){
       DataMatrix<double> addMat(latLen,lonLen);
       std::cout<<"There are "<<vecFiles.size()<<" files."<<std::endl;
       for (int v=1; v<vecFiles.size(); v++){
-        readin.close();
-        NcFile readin(vecFiles[v].c_str());
-        NcVar * inVar = readin.get_var(varName.c_str());
-
+        NcFile addread(vecFiles[v].c_str());
+        NcVar * inVar = addread.get_var(varName.c_str());
         densCalc(inVar,addMat);
         for (int a=0; a<latLen; a++){
           for (int b=0; b<lonLen; b++){
             outMat[a][b]+=addMat[a][b];
           }
-        } 
+        }
+        if (calcStdDev){
+          for (int a=0; a<latLen; a++){
+            for (int b=0; b<lonLen; b++){
+              storeMat[v][a][b] = addMat[a][b];
+            }
+          }
+        }
+        addread.close(); 
       }
       //Divide output by number of files
       double div = 1./((double) vecFiles.size());
@@ -144,9 +163,6 @@ int main(int argc, char ** argv){
         }
       }
     }
-    NcFile refFile(vecFiles[0].c_str());
-    latVar = refFile.get_var("lat");
-    lonVar = refFile.get_var("lon");   
  
     NcFile readout(outFile.c_str(),NcFile::Replace, NULL,0,NcFile::Offset64Bits);
     NcDim * outLat = readout.add_dim("lat", latLen);
@@ -163,7 +179,14 @@ int main(int argc, char ** argv){
     densVar->set_cur(0,0);
     densVar->put((&outMat[0][0]),latLen,lonLen);
 
-   // densCalc(inVar,densVar);
+    if (calcStdDev){
+      NcVar * stdDevVar = readout.add_var("stddev", ncDouble,outLat,outLon);
+      DataMatrix<double> stdDevMat(latLen,lonLen);
+      stdDev(storeMat,vecFiles.size(),latLen,lonLen,stdDevMat);
+      stdDevVar->set_cur(0,0);
+      stdDevVar->put(&(stdDevMat[0][0]),latLen,lonLen);
+
+    }
 
     readout.close();
     readin.close();
