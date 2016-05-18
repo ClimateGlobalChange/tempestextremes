@@ -37,8 +37,10 @@ def sector(hemi,lon0):
       sec = "ATL"
     elif ((lon0 > 140.) and (lon0 < 260.)):
       sec = "PAC"
+    elif ((lon0>=260.) and (lon0<=280.))::
+      sec = "CONT1"
     else:
-      sec = "CONT"
+      sec = "CONT2"
       
   elif hemi == "SH":
     if ((lon0 < 30.) or (lon0 > 300.)):
