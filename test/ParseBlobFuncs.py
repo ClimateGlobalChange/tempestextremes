@@ -53,38 +53,112 @@ def sector(hemi,lon0):
 
 
 #Function that will generate color values for each point (on a scale of 0-1)
-def color_split(var, vartype, n=10):
+def color_split_num(var, minvar, maxvar, n=10):
   ncols = []
-  if vartype == 'STR':
-    uniq_var = set(var)
-    n_uniq = len(uniq_var)
-    list_var = list(uniq_var)
-    col_idx = numpy.linspace(0,1,n_uniq)
 
-    for i in range(0,len(list_var)):
-      for j in range(0,len(var)):
-        if list_var[i] == var[j]:
-          ncols+= [col_idx[i]]
-  elif vartype == 'NUM':
-    minvar = min(var)
-    maxvar = max(var)
-    bins=numpy.linspace(minvar,maxvar,n)
-    #print(bins)
-    col_idx = numpy.linspace(0,1,n)
-    #print(col_idx)
-    vals = var.astype('float64')
-    #print(vals)
-    #This will return the index of the bin value for each item
-    d = numpy.digitize(vals, bins)
-    #print(d)
-    for i in range (0,len(var)):
-      ncols += [col_idx[d[i]-1]]
-    
-  #str_ncols = [str(x) for x in ncols]
-  #str_ncols = str_ncols[:-1]
-  #return(str_ncols)
-#  return(col_idx)
+  bins=numpy.linspace(minvar,maxvar,n)
+  col_idx = numpy.linspace(0,1,n)
+  vals = var.astype('float64')
+
+  #This will return the index of the bin value for each item
+  d = numpy.digitize(vals, bins)
+  for i in range (0,len(var)):
+    ncols += [col_idx[d[i]-1]]
+
   return(ncols)
+  
+#Function that will generate color values for each unique string (on a scale of 0-1)
+#uniq_var=set(var)
+def color_split_str(var, uniq_var):
+  ncols = []
+
+  n_uniq = len(uniq_var)
+  list_var = list(uniq_var)
+  col_idx = numpy.linspace(0,1,n_uniq)
+
+  for i in range(0,len(list_var)):
+    for j in range(0,len(var)):
+      if list_var[i] == var[j]:
+        ncols+= [col_idx[i]]
+    
+  return(ncols)
+
+def plot_mcline(var1,var2,cvar,vartype,xmin,xmax,ymin,ymax,cmin=0,cmax=1,n=10,c='viridis'):
+                
+  points = numpy.array([var1.astype('float64'),\
+             var2.astype('float64')]).T.reshape(-1, 1, 2)
+  segments = numpy.concatenate([points[:-1], points[1:]], axis=1) 
+  if (vartype == 'STR'):
+    uniq_var=set(cvar)
+    cols = color_split_str(cvar,uniq_var)
+  elif (vartype == 'NUM'):
+    cols = color_split_num(cvar,cmin,cmax,n)
+   
+  dummy_cols = numpy.asarray(cols)
+  
+  lc = LineCollection(segments, cmap=cm.get_cmap(c))
+  lc.set_array(dummy_cols)
+  lc.set_linewidth(1.5)
+  plt.gca().add_collection(lc)
+  plt.xlim(xmin,xmax)
+  plt.ylim(ymin, ymax)
+
+def map_t_latlon(d,tmax,m):
+  #vals=color_split_num(d['t_since_init'].values,cmin,cmax)
+  dat=d[['centlon','centlat','t_since_init']]
+  #dat['col']=vals
+  #print(dat)
+  
+  #Pick out areas where there's a periodic boundary condition
+  #note that these are not index values!!! 
+  per_values = dat[abs(dat.centlon.diff()) > 100. ].index.tolist()
+  print per_values
+  #x,y=m(dat.centlon.values.astype('float64'),dat.centlat.values.astype('float64'))
+  if (len(per_values) == 0):
+    print "No periodic condition"
+    print dat.centlon.values
+    x,y=m(dat.centlon.values.astype('float64'),dat.centlat.values.astype('float64'))
+
+    plot_mcline(x,y,dat['t_since_init'].values,'NUM',\
+    0.,360.,-90.,90.,0,int(tmax),n=int(tmax))
+
+  else:
+    startloc=dat.index[0]
+    for n in range(0,len(per_values)):  
+      endloc=per_values[n]-1
+      dat_sub = dat.loc[startloc:endloc]
+      print dat_sub.centlon.values
+      startloc=per_values[n]
+
+    dat_sub=dat.loc[startloc:]
+    print dat_sub.centlon.values
+      #x,y=m(dat_sub.centlon.values, dat_sub.centlat.values)
+      #plot_mcline(x,y,dat_sub['t_since_init'].values,'NUM',\
+       #0.,360.,-90.,90.,0,int(tmax),n=int(tmax))
+      
+
+#Plotting functions
+def plot_latlon(dat,latname,lonname):
+  clat=dat[latname]
+  clon=dat[lonname]
+  #Pick out areas where there's a periodic boundary condition
+  #note that these are not index values!!! 
+  per_values = dat[abs(clon.diff()) > 300 ].index.tolist()
+  if (len(per_values) == 0):
+    plt.plot(clon.values,clat.values)
+  else:
+    for n in range(0,len(per_values)):
+      if (n < len(per_values)-1):
+        clat_sub = clat.loc[per_values[n]:per_values[n+1]-1]
+        clon_sub = clon.loc[per_values[n]:per_values[n+1]-1]
+      else:
+        clat_sub = clat.loc[per_values[n]:]
+        clon_sub = clon.loc[per_values[n]:]
+      
+      plt.plot(clon_sub.values,clat_sub.values)
+      plt.ylabel(latname)
+      plt.xlabel(lonname)  
+  
   
 class BlobObject:
   #initialize object:
@@ -107,6 +181,10 @@ class BlobObject:
 
     self.averages = self.data.mean()
     self.std_dev = self.data.std()
+    
+    #Calculate number of days from init
+    itime=self.data.index.values[0]
+    self.data['t_since_init']=(self.data.index.values-itime)*0.125
     #Calculate distance of center from start to finish    
     clat0=self.data['centlat'].iloc[0]
     clon0=self.data['centlon'].iloc[0]
@@ -121,48 +199,6 @@ class BlobObject:
     self.data['sector'] = [sector(self.hemi, l) for l in self.data.centlon]
     self.ndays = float(len(self.data.index))/8.
     
-  #Plotting functions
-  def plot_latlon(self,lonname,latname):
-    clat=self.data[latname]
-    clon=self.data[lonname]
-    #Pick out areas where there's a periodic boundary condition
-    #note that these are not index values!!! 
-    per_values = self.data[abs(clon.diff()) > 300 ].index.tolist()
-    plt.axis
-    if (len(per_values) == 0):
-      plt.plot(clon.values,clat.values)
-    else:
-      for n in range(0,len(per_values)):
-        if (n < len(per_values)-1):
-          clat_sub = clat.loc[per_values[n]:per_values[n+1]-1]
-          clon_sub = clon.loc[per_values[n]:per_values[n+1]-1]
-        else:
-          clat_sub = clat.loc[per_values[n]:]
-          clon_sub = clon.loc[per_values[n]:]
-        
-        plt.plot(clon_sub.values,clat_sub.values)
-        plt.ylabel(latname)
-        plt.xlabel(lonname)
-
-  def map_latlon(self,lonname,latname,m):
-    dat=self.data[[lonname,latname,'area']]
-    vals = color_split(dat.area.values, 'NUM')
-    
-    #Pick out areas where there's a periodic boundary condition
-    #note that these are not index values!!! 
-    per_values = dat[abs(dat[lonname].diff()) > 300 ].index.tolist()
-    if (len(per_values) == 0):
-      plt.plot(dat[lonname].values,dat[latname].values)
-    else:
-      for n in range(0,len(per_values)):
-        if (n < len(per_values)-1):
-          dat_sub = dat.loc[per_values[n]:per_values[n+1]-1]
-        else:
-          dat_sub = dat.loc[per_values[n]:]
-        x,y=m(dat_sub[lonname].values, dat_sub[latname].values)
-        plt.plot(x,y)
-        plt.ylabel(latname)
-        plt.xlabel(lonname)
   def plot_mvmt(self):
     aarr = self.data[['centlon','sector','area']]  
     points = numpy.array([aarr.index.values.astype('float64'),\
@@ -188,18 +224,7 @@ class BlobObject:
 
     plt.ylabel('Longitude')
     plt.xlabel('Time index')
-    plt.colorbar(dummy_cols)
 
 
-def plot_func(vartype,var1,var2=None,cvar=None,cm='viridis',bmap=None):    
-    plt.figure(figsize=(24,12))
-    if (vartype=='HIST'):
-      plt.hist(var1)
-    elif(vartype=='SCTR'):
-      if (cvar == None):
-        plt.scatter(var1,var2)
-      else:
-        plt.scatter(var1,var2,c=cvar,cmap=cm)
-        plt.colorbar()
       
 
