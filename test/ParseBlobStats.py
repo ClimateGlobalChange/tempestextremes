@@ -36,15 +36,6 @@ print("Saved indices")
 
 colnames = ['minlat','maxlat','minlon','maxlon','centlat','centlon','area']
 
-plt.figure(figsize=(24,12))
-plt.figure(1)
-#setup Basemap
-mp=Basemap(projection='cyl',llcrnrlat=-90.,urcrnrlat=90.,
-            llcrnrlon=0,urcrnrlon=360.,resolution='c')
-mp.drawcoastlines()
-mp.drawparallels(numpy.arange(-90.,91.,30.),labels=[0,0,0,1])
-mp.drawmeridians(numpy.arange(0.,360.,60.),labels=[0,0,0,1])
-
 #plt.figure(2)
 #plt.figure(3)
 print("entering loop")
@@ -53,9 +44,10 @@ SHVec = []
 
 minarea = 10e20
 maxarea = 0.
+maxt=0.
 #Now, for each blob,create a BlobObject
 for n in range(0,len(BlobIndices)):
-#for n in range(12,30):
+#for n in range(1,5):
   if (n < len(BlobIndices)-1):
     subarr = lines[BlobIndices[n]:BlobIndices[n+1]]
   else:
@@ -71,32 +63,58 @@ for n in range(0,len(BlobIndices)):
   Blob=BlobObject(title,colnames,i,nl,subarr[1:])
   if (Blob.data.area.min()<minarea):
     minarea=Blob.data.area.min()
+    
   if (Blob.data.area.max()>maxarea):
     maxarea=Blob.data.area.max()
+    
+  if (Blob.data.t_since_init.max()>maxt):
+    maxt=Blob.data.t_since_init.max()
+    
   if Blob.hemi == 'NH':
     NHVec += [Blob]
   else:
     SHVec += [Blob]
-  plt.figure(1)
-  Blob.map_latlon('centlon','centlat',mp)
+  #plt.figure(1)
+  #Blob.map_latlon('centlon','centlat',mp)
   #plt.figure(2)
   #Blob.plot_mvmt()
   #plt.figure(3)
   #Blob.plot_area()
 
 
+#plt.figure(figsize=(24,12))
+plt.figure(1)
+#setup Basemap
+mp=Basemap(projection='cyl',llcrnrlat=-90.,urcrnrlat=90.,
+            llcrnrlon=0,urcrnrlon=360.,resolution='c')
+mp.drawcoastlines()
+mp.drawparallels(numpy.arange(-90.,91.,30.),labels=[0,0,0,1])
+mp.drawmeridians(numpy.arange(0.,360.,60.),labels=[0,0,0,1])
+
+#plt.figure(2)
+#n=44 (Blob 85) and n=51 (Blob 99) have huge jumps in longitude!
+n=0
+for b in NHVec:
+  print "n is %d"%n
+  print b.name
+  plt.figure(1)
+  map_t_latlon(b.data,maxt,mp)
+  n+=1
+  #plt.plot(b.data.index.values,b.data.centlon.values)
+
+
 #Some histograms
 #plt.figure(4)
-plt.figure(3)
-plt.subplot(211)
-max_area = [b.data.area.values.max() for b in NHVec]
-dist = [b.dist for b in NHVec]
-plt.scatter(dist,max_area)
+#plt.figure(3)
+#plt.subplot(211)
+#max_area = [b.data.area.values.max() for b in NHVec]
+#dist = [b.dist for b in NHVec]
+#plt.scatter(dist,max_area)
 #plt.hist(init_lon)
-plt.subplot(212)
-max_area = [b.data.area.values.max() for b in SHVec]
-dist = [b.dist for b in SHVec]
-plt.scatter(dist,max_area)
+#plt.subplot(212)
+#max_area = [b.data.area.values.max() for b in SHVec]
+#dist = [b.dist for b in SHVec]
+#plt.scatter(dist,max_area)
 
 #plt.figure(5)
 #plt.subplot(211)
