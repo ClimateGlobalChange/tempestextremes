@@ -63,6 +63,36 @@ void densCalc(NcVar * inVar,
   //outVar->put((&outMat[0][0]),latLen,lonLen);
 }
 
+void yearlyStdDev(DataMatrix3D<double> inMat,
+                 int nTime,
+                 int nLat,
+                 int nLon,
+                 DataMatrix<double> & outMat){
+  DataMatrix<double> meanval(nLat,nLon);
+  double invt = 1./((double)nTime);
+
+  for (int t=0; t<nTime; t++){
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        meanval[a][b]+=(inMat[t][a][b]*invt);
+      }
+    }
+  }
+  double dev;
+  double variance;
+  for (int a=0; a<nLat; a++){
+    for (int b=0; b<nLon; b++){
+      dev=0;
+      variance=0;
+      for (int t=0; t<nTime; t++){
+        dev=inMat[t][a][b]-meanval[a][b];
+        variance+=(dev*dev*invt);
+      }
+      outMat[a][b]=std::sqrt(variance);
+    }
+  }
+}
+
 int main(int argc, char ** argv){
   NcError error(NcError::verbose_nonfatal);
 
@@ -123,9 +153,9 @@ int main(int argc, char ** argv){
     DataMatrix<double> outMat(latLen,lonLen);
     densCalc(inVar,outMat);
 
+    DataMatrix3D<double> storeMat(vecFiles.size(),latLen,lonLen);
     //Option for calculating the yearly standard deviation 
     if (calcStdDev){
-      DataMatrix3D<double> storeMat(vecFiles.size(),latLen,lonLen);
       for (int a=0; a<latLen; a++){
         for (int b=0; b<lonLen; b++){
           storeMat[0][a][b] = outMat[a][b];
@@ -182,9 +212,10 @@ int main(int argc, char ** argv){
     if (calcStdDev){
       NcVar * stdDevVar = readout.add_var("stddev", ncDouble,outLat,outLon);
       DataMatrix<double> stdDevMat(latLen,lonLen);
-      stdDev(storeMat,vecFiles.size(),latLen,lonLen,stdDevMat);
+      yearlyStdDev(storeMat,vecFiles.size(),latLen,lonLen,stdDevMat);
       stdDevVar->set_cur(0,0);
       stdDevVar->put(&(stdDevMat[0][0]),latLen,lonLen);
+      std::cout<<" created sd variable"<<std::endl;
 
     }
 
