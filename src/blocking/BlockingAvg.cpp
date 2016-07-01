@@ -418,6 +418,9 @@ int main(int argc, char **argv){
                 currFillData[currArrIndex][a][b] = missingValue;
               }
               else{
+                if (std::fabs(IPVData[t][a][b]) > 10e10){
+                  std::cout<<"WARNING: File "<<InputFiles[x]<<" has suspicious value! "<<IPVData[t][a][b]<<std::endl;
+                }
                 currFillData[currArrIndex][a][b] = IPVData[t][a][b];
               }
             }
