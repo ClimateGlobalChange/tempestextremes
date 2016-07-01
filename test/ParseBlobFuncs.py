@@ -117,8 +117,8 @@ def map_t_latlon(d,tmax,m):
   print per_values
   #x,y=m(dat.centlon.values.astype('float64'),dat.centlat.values.astype('float64'))
   if (len(per_values) == 0):
-    print "No periodic condition"
-    print dat.centlon.values
+    #print "No periodic condition"
+    #print dat.centlon.values
     x,y=m(dat.centlon.values.astype('float64'),dat.centlat.values.astype('float64'))
 
     plot_mcline(x,y,dat['t_since_init'].values,'NUM',\
@@ -133,7 +133,7 @@ def map_t_latlon(d,tmax,m):
       startloc=per_values[n]
 
     dat_sub=dat.loc[startloc:]
-    print dat_sub.centlon.values
+    #print dat_sub.centlon.values
       #x,y=m(dat_sub.centlon.values, dat_sub.centlat.values)
       #plot_mcline(x,y,dat_sub['t_since_init'].values,'NUM',\
        #0.,360.,-90.,90.,0,int(tmax),n=int(tmax))
@@ -212,8 +212,8 @@ class BlobObject:
     cmax=aarr.centlon.values.max()
     xmin=aarr.index.values.min()
     xmax=aarr.index.values.max()
-    print(cmin, cmax)
-    print(xmin,xmax)
+    #print(cmin, cmax)
+    #print(xmin,xmax)
     #cnorm=mpl.colors.Normalize(cmin,cmax)
     lc = LineCollection(segments, cmap=cm.get_cmap('Dark2_r'))#,\
     #        norm=cnorm )

@@ -867,6 +867,7 @@ void stdDev(DataMatrix3D<double>inDevs,
 
 
 void calcDevsGH(bool leap,
+              double GHAnom,
               int startAvgIndex,
               NcVar *inGH,
               NcVar *outDev,
@@ -949,6 +950,8 @@ void calcDevsGH(bool leap,
   int leapDay=0;
   int leapHour=0;
 
+  std::cout<<"Starting avg index is "<<startAvgIndex<<std::endl;
+
   for (int t=0; t<nTime; t++){
     if (leap){
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
@@ -962,6 +965,7 @@ void calcDevsGH(bool leap,
       break;
     }
     int nDayIncrease = d/nSteps;
+    std::cout<<"Number of days increased since start is "<<nDayIncrease<<std::endl;
     int currAvgIndex = startAvgIndex + nDayIncrease;
     if (currAvgIndex>364){
       currAvgIndex-=365;
@@ -1011,7 +1015,7 @@ void calcDevsGH(bool leap,
         sineRatio = 0.;
       }
       else{
-        denom = std::fabs(std::sin(latVec[a]*pi/180));
+        denom = std::fabs(std::sin(latVec[a]*pi/180.));
         sineRatio = num/denom;
       }
       for (int b=0; b<nLon; b++){
@@ -1045,7 +1049,7 @@ void calcDevsGH(bool leap,
         invAnom = 0.;
       }
       else{
-       invAnom = 1./180.;
+       invAnom = 1./GHAnom;;
       }
       for (int t=0; t<nOutTime; t++){
         pos = aDevMat[t][a][b]*invAnom;
