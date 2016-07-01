@@ -1,7 +1,5 @@
-from pandas import DataFrame
 import pandas
 import numpy
-import pylab
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
@@ -23,7 +21,7 @@ pandas.options.mode.chained_assignment = None
         
 ###############################################
 #f = open("/global/cscratch1/sd/marielp/2xCO2/data/y_16_stats","r")
-f = open("y_03_stats_2xCO2","r")
+f = open("/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1980_DJF_stats.txt","r")
 lines=f.readlines()
 print("Read file.")
 #Search for all instances of "Blob"
@@ -82,7 +80,7 @@ for n in range(0,len(BlobIndices)):
   #Blob.plot_area()
 
 
-#plt.figure(figsize=(24,12))
+plt.figure(figsize=(24,12))
 plt.figure(1)
 #setup Basemap
 mp=Basemap(projection='cyl',llcrnrlat=-90.,urcrnrlat=90.,
@@ -93,28 +91,29 @@ mp.drawmeridians(numpy.arange(0.,360.,60.),labels=[0,0,0,1])
 
 #plt.figure(2)
 #n=44 (Blob 85) and n=51 (Blob 99) have huge jumps in longitude!
-n=0
-for b in NHVec:
-  print "n is %d"%n
-  print b.name
-  plt.figure(1)
-  map_t_latlon(b.data,maxt,mp)
-  n+=1
+#n=0
+#for b in NHVec:
+  #print "n is %d"%n
+  #print b.name
+#  plt.figure(1)
+#  map_t_latlon(b.data,maxt,mp)
+#  n+=1
   #plt.plot(b.data.index.values,b.data.centlon.values)
 
 
 #Some histograms
-#plt.figure(4)
-#plt.figure(3)
-#plt.subplot(211)
-#max_area = [b.data.area.values.max() for b in NHVec]
-#dist = [b.dist for b in NHVec]
-#plt.scatter(dist,max_area)
+plt.figure(figsize=(24,12))
+plt.figure(4)
+plt.figure(3)
+plt.subplot(211)
+max_area = [b.data.area.values.max() for b in NHVec]
+dist = [b.dist for b in NHVec]
+plt.scatter(dist,max_area)
 #plt.hist(init_lon)
-#plt.subplot(212)
-#max_area = [b.data.area.values.max() for b in SHVec]
-#dist = [b.dist for b in SHVec]
-#plt.scatter(dist,max_area)
+plt.subplot(212)
+max_area = [b.data.area.values.max() for b in SHVec]
+dist = [b.dist for b in SHVec]
+plt.scatter(dist,max_area)
 
 #plt.figure(5)
 #plt.subplot(211)

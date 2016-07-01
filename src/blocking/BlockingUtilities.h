@@ -128,6 +128,7 @@ void stdDev(DataMatrix3D<double>inDevs,
 
 
 void calcDevsGH(bool leap,
+              double GHAnom,
               int startAvgIndex,
               NcVar *inGH,
               NcVar *outDev,

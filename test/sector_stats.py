@@ -56,24 +56,77 @@ def get_arr(var,sec,hemi):
 #nc1name=sys.argv[1]
 #nc2name=sys.argv[2]
 
-nc1name="/global/cscratch1/sd/marielp/climo/blobs/JJA_avg_dens_climo.nc"
-nc2name="/global/cscratch1/sd/marielp/2xCO2/blobs/JJA_avg_dens_2xCO2.nc"
+f=open("/Users/mariellep/data_netcdf/test_climo.txt","r")
+listfiles=f.readlines()
+nfiles=len(listfiles)
 
-nc1=Dataset(nc1name,"r")
-nc2=Dataset(nc2name,"r")
+latval=52.3
+lonval=198.75
 
-nc1dens=nc1.variables['dens'][:]
-nc2dens=nc2.variables['dens'][:]
+#get lat and lon from first file
+ref=Dataset(listfiles[0].strip(),"r")
+latarr=ref.variables['lat'][:]
+lonarr=ref.variables['lon'][:]
+ref.close()
 
-lon=nc1.variables['lon'][:]
-lat=nc1.variables['lat'][:]
+a=get_index(latarr,latval,0.5)
+b=get_index(lonarr,lonval,0.5)
+
+datlist=[]
+tlist=[]
+for l in listfiles:
+  fname=l.strip()
+  nc=Dataset(fname,"r")
+  dat=nc.variables['ADIPV'][:]
+  
+  tarr=nc.variables['time'][:].tolist()
+  tlist.extend(tarr)
+  
+  subdat=dat[:,a,b][:].tolist()
+  nc.close()
+  datlist.extend(subdat)  
+
+#datarr=np.array(datlist)
+#timearr=np.array(tlist)
+nPerYear=365*8
+#Break lists up into arrays that can be plotted
+nYear=len(datlist)/nPerYear
+nRem=len(datlist)%nPerYear
+#if (nRem>0):
+#  ylen=nYear+1
+#else:
+#  ylen=nYear
+  
+datarr=np.zeros((nYear,nPerYear))
+plt.figure(1)
+tarr=np.array(tlist[0:nPerYear])
+for n in range(0,nYear):
+  datarr[n,:]=datlist[nPerYear*n:nPerYear*(n+1)]
+  plt.figure(1)
+  plt.plot(tarr,datarr[n,:])
+
+plt.ylim(datarr.min(),datarr.max())
+plt.show()
+
+
+#nc1name="/global/cscratch1/sd/marielp/climo/blobs/JJA_avg_dens_climo.nc"
+#nc2name="/global/cscratch1/sd/marielp/2xCO2/blobs/JJA_avg_dens_2xCO2.nc"
+
+#nc1=Dataset(nc1name,"r")
+#nc2=Dataset(nc2name,"r")
+
+#nc1dens=nc1.variables['dens'][:]
+#nc2dens=nc2.variables['dens'][:]
+
+#lon=nc1.variables['lon'][:]
+#lat=nc1.variables['lat'][:]
 
 #ATL: -80. (280.) to 40. (NH), -60. (300.) to 30. (SH)
 #PAC: 140. to -100. (260.) (NH), 130. to -60. (300.)(SH)
 #Continental: -100. to -80. and 40. to 140. (NH)
 # Indian Ocean: 30. to 130.
 
-NH_ATL1=get_arr(nc1dens,"ATL","NH")
-NH_ATL2=get_arr(nc2dens,"ATL","NH")
+#NH_ATL1=get_arr(nc1dens,"ATL","NH")
+#NH_ATL2=get_arr(nc2dens,"ATL","NH")
 
 
