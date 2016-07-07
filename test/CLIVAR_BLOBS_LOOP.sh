@@ -5,7 +5,7 @@
 SEASONS=("MAM" "JJA" "SON" "DJF")
 DATA=("climo" "2xCO2" "SSTplus2" "SSTplus2_2xCO2")
 mstart=(3 6 9 12)
-BLOBS="FALSE"
+BLOBS="TRUE"
 
 if [ "$BLOBS" == "TRUE" ]; then
 for d in ${DATA[@]}; do
@@ -34,7 +34,7 @@ for d in ${DATA[@]}; do
       blobsname="$bdir/$s""_""$yf""_blobs_""$d.nc"
       statsname="$bdir/$s""_""$yf""_stats_""$d.txt"
       densname="$bdir/$s""_""$yf""_dens_""$d.nc"
-      ~/tempestextremes/bin/StitchBlobs --inlist bloblist --out $blobsname --var INT_ADIPV --outvar PV_BLOB --minsize 5 --mintime 40
+      ~/tempestextremes/bin/StitchBlobs --inlist bloblist --out $blobsname --var INT_ADIPV --outvar PV_BLOB --mintime 40
       ~/tempestextremes/bin/BlobStats --infile $blobsname --outfile $statsname --invar PV_BLOB --out minlat,maxlat,minlon,maxlon,centlat,centlon,area
       ~/tempestextremes/bin/DensityCalculations --in $blobsname --var PV_BLOB --out $densname
 
@@ -71,7 +71,7 @@ for d in ${DATA[@]}; do
     outname=$s"_avg_dens_"$d".nc"
     ls $s*blobs*.nc > $lsname
     numfiles=$(cat $lsname | wc -l)
-    #~/tempestextremes/bin/DensityCalculations --std --inlist $lsname --var PV_BLOB --out $outname
+    ~/tempestextremes/bin/DensityCalculations --std --inlist $lsname --var PV_BLOB --out $outname
     python ~/tempestextremes/test/plot_density.py $outname "$d $numfiles yr $s" "avg" "PV blocking"
   done
 done
