@@ -572,8 +572,20 @@ void FindLocalMinMax(
 		double dLonThis = grid.m_dLon[ix];
 
 		// Great circle distance to this element
-		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
-				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0));
+		double dR =
+			sin(dLat0) * sin(dLatThis)
+			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
+
+		if (dR >= 1.0) {
+			dR = 0.0;
+		} else if (dR <= -1.0) {
+			dR = 180.0;
+		} else {
+			dR = 180.0 / M_PI * acos(dR);
+		}
+		if (dR != dR) {
+			_EXCEPTIONT("NaN value detected");
+		}
 
 		if (dR > dMaxDist) {
 			continue;
@@ -801,8 +813,20 @@ bool HasClosedContour(
 		double dLatThis = grid.m_dLat[ix];
 		double dLonThis = grid.m_dLon[ix];
 
-		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
-				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0));
+		double dR =
+			sin(dLat0) * sin(dLatThis)
+			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
+
+		if (dR >= 1.0) {
+			dR = 0.0;
+		} else if (dR <= -1.0) {
+			dR = 180.0;
+		} else {
+			dR = 180.0 / M_PI * acos(dR);
+		}
+		if (dR != dR) {
+			_EXCEPTIONT("NaN value detected");
+		}
 
 		Announce(2, "-- (%lu) : (%1.5f %1.5f) : dx %1.5f",
 			ix, dLatThis, dLonThis, dR);
@@ -886,8 +910,20 @@ bool SatisfiesThreshold(
 		double dLatThis = grid.m_dLat[ix];
 		double dLonThis = grid.m_dLon[ix];
 
-		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
-				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0));
+		double dR =
+			sin(dLat0) * sin(dLatThis)
+			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
+
+		if (dR >= 1.0) {
+			dR = 0.0;
+		} else if (dR <= -1.0) {
+			dR = 180.0;
+		} else {
+			dR = 180.0 / M_PI * acos(dR);
+		}
+		if (dR != dR) {
+			_EXCEPTIONT("NaN value detected");
+		}
 
 		if ((ix != ix0) && (dR > dMaxDist)) {
 			continue;
@@ -996,8 +1032,20 @@ void FindLocalAverage(
 		double dLonThis = grid.m_dLon[ix];
 
 		// Great circle distance to this element
-		double dR = 180.0 / M_PI * acos(sin(dLat0) * sin(dLatThis)
-				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0));
+		double dR =
+			sin(dLat0) * sin(dLatThis)
+			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
+
+		if (dR >= 1.0) {
+			dR = 0.0;
+		} else if (dR <= -1.0) {
+			dR = 180.0;
+		} else {
+			dR = 180.0 / M_PI * acos(dR);
+		}
+		if (dR != dR) {
+			_EXCEPTIONT("NaN value detected");
+		}
 
 		if (dR > dMaxDist) {
 			continue;

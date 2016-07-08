@@ -14,6 +14,8 @@
 ///		or implied warranty.
 ///	</remarks>
 
+#include "BlobUtilities.h"
+
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
@@ -33,118 +35,6 @@
 #include <string>
 #include <set>
 #include <map>
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		A structure for storing a latitude / longitude index.
-///	</summary>
-struct LatLonPair {
-
-	int lat;
-	int lon;
-
-	///	<summary>
-	///		Constructor.
-	///	</summary>
-	LatLonPair(int a_lat, int a_lon) :
-		lat(a_lat), lon(a_lon)
-	{ }
-
-	///	<summary>
-	///		Comparator.
-	///	</summary>
-	bool operator<(const LatLonPair & pr) const {
-		if (lat < pr.lat) {
-			return true;
-		} else if (lat > pr.lat) {
-			return false;
-		}
-
-		if (lon < pr.lon) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	///	<summary>
-	///		Equality operator.
-	///	</summary>
-	bool operator==(const LatLonPair & pr) const {
-		if ((lat == pr.lat) && (lon == pr.lon)) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-};
-
-///	<summary>
-///		A structure for storing a bounding box in latitude / longitude space.
-///	</summary>
-struct LatLonBox {
-
-	///	<summary>
-	///		Bounding latitudes (endpoints are included).
-	///	</summar>
-	int lat[2];
-
-	///	<summary>
-	///		Bounding longitudes (endpoints are included).
-	///	</summary>
-	int lon[2];
-
-	///	<summary>
-	///		Determine this LatLonBox overlaps with box.
-	///	</summary>
-	bool Overlaps(const LatLonBox & box) const {
-
-		// Check latitudes
-		if (lat[0] > box.lat[1]) {
-			return false;
-		}
-		if (lat[1] < box.lat[0]) {
-			return false;
-		}
-
-		// Both boxes cross lon 360
-		if ((lon[0] > lon[1]) && (box.lon[0] > box.lon[1])) {
-			return true;
-		}
-
-		// This box crosses lon 360
-		if (lon[0] > lon[1]) {
-			if (box.lon[1] >= lon[0]) {
-				return true;
-			}
-			if (box.lon[0] <= lon[1]) {
-				return true;
-			}
-			return false;
-		}
-
-		// That box crosses lon 360
-		if (box.lon[0] > box.lon[1]) {
-			if (lon[1] >= box.lon[0]) {
-				return true;
-			}
-			if (lon[0] <= box.lon[1]) {
-				return true;
-			}
-			return false;
-		}
-
-		// No boxes cross lon 360
-		if (box.lon[1] < lon[0]) {
-			return false;
-		}
-		if (box.lon[0] > lon[1]) {
-			return false;
-		}
-		return true;
-	}
-};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -208,96 +98,6 @@ struct Tag {
 		return false;
 	}
 };
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Load in the contents of a text file containing one filename per
-///		line and store in a vector of strings.
-///	</summary>
-void GetInputFileList(
-	const std::string & strInputFileList,
-		std::vector<std::string> & vecInputFiles
-	) {
-		FILE * fp = fopen(strInputFileList.c_str(), "r");
-
-		char szBuffer[1024];
-		for (;;) {
-			fgets(szBuffer, 1024, fp);
-
-			if (feof(fp)) {
-				break;
-			}
-
-			// Remove end-of-line characters
-			for (;;) {
-				int nLen = strlen(szBuffer);
-				if ((szBuffer[nLen-1] == '\n') ||
-					(szBuffer[nLen-1] == '\r') ||
-					(szBuffer[nLen-1] == ' ')
-				) {
-					szBuffer[nLen-1] = '\0';
-					continue;
-				}
-				break;
-			}
-
-			vecInputFiles.push_back(szBuffer);
-	}
-
-	if (vecInputFiles.size() == 0) {
-		_EXCEPTION1("No files found in file \"%s\"", strInputFileList.c_str());
-	}
-
-	fclose(fp);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Get a DataVector containing the time variable across a list of
-///		input files.
-///	</summary>
-void GetAllTimes(
-	const std::vector<std::string> & vecInputFiles,
-	DataVector<double> & dataTimes
-) {
-	std::vector<double> vecTimes;
-
-	for (int f = 0; f < vecInputFiles.size(); f++) {
-		NcFile ncFile(vecInputFiles[f].c_str());
-		if (!ncFile.is_valid()) {
-			_EXCEPTION1("Unable to open input file \"%s\"",
-				vecInputFiles[f].c_str());
-		}
-
-		NcDim * dimTime = ncFile.get_dim("time");
-		if (dimTime == NULL) {
-			_EXCEPTIONT("No dimension \"time\" found in input file");
-		}
-
-		int nTime = dimTime->size();
-
-		NcVar * varTime = ncFile.get_var("time");
-		if (varTime == NULL) {
-			for (int t = 0; t < nTime; t++) {
-				vecTimes.push_back(static_cast<double>(t));
-			}
-
-		} else {
-			DataVector<double> dTime;
-			dTime.Initialize(nTime);
-
-			varTime->get(dTime, nTime);
-			for (int t = 0; t < nTime; t++) {
-				vecTimes.push_back(dTime[t]);
-			}
-		}
-	}
-
-	dataTimes.Initialize(vecTimes.size());
-	memcpy(&(dataTimes[0]), &(vecTimes[0]), vecTimes.size() * sizeof(double));
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -581,52 +381,7 @@ try {
 					vecPatches[ixPatch].insert(pr);
 
 					// Update bounding box
-					if (pr.lat > box.lat[1]) {
-						box.lat[1] = pr.lat;
-					}
-					if (pr.lat < box.lat[0]) {
-						box.lat[0] = pr.lat;
-					}
-					if (pr.lon == nLon-1) {
-						if (box.lon[0] <= box.lon[1]) {
-							if (nLon - 1 - box.lon[1] < box.lon[0] + 1) {
-								box.lon[1] = nLon - 1;
-							} else {
-								box.lon[0] = nLon - 1;
-							}
-						}
-
-					} else if (pr.lon == 0) {
-						if (box.lon[0] <= box.lon[1]) {
-							if (nLon - box.lon[1] < box.lon[0]) {
-								box.lon[1] = 0;
-							} else {
-								box.lon[0] = 0;
-							}
-						}
-
-					} else {
-						if (box.lon[0] <= box.lon[1]) {
-							if (pr.lon < box.lon[0]) {
-								box.lon[0] = pr.lon;
-							}
-							if (pr.lon > box.lon[1]) {
-								box.lon[1] = pr.lon;
-							}
-
-						} else {
-							if ((pr.lon >= box.lon[0]) ||
-								(pr.lon <= box.lon[1])
-							) {
-							} else if (
-								pr.lon - box.lon[1] < box.lon[0] - pr.lon
-							) {
-								box.lon[1] = pr.lon;
-							} else {
-								box.lon[0] = pr.lon;
-							}
-						}
-					}
+					box.InsertPoint(pr.lat, pr.lon, nLat, nLon);
 
 					// Insert neighbors (regional case)
 					if (fRegional) {
@@ -806,7 +561,7 @@ try {
 				if (!boxP.Overlaps(boxQ)) {
 					continue;
 				}
-					
+
 				// Verify that at least one node overlaps between patches
 				bool fHasOverlapNode = false;
 				IndicatorSetConstIterator iter = vecPatches[p].begin();

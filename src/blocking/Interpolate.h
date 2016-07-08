@@ -8,7 +8,7 @@
 #define _INTERP_H_
 
 /////////////////////////////////
-#include "CLIVAR_block_utilities.h"
+#include "BlockingUtilities.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
 #include "DataVector.h"

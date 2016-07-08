@@ -1,18 +1,19 @@
 /////////////////////////////////////////////
 ///
-///          \file CLIVAR_block_utilities.h
+///          \file blockingUtilities.h
 ///          \author Marielle Pinheiro
 ///          \version March 1, 2015
 ///
 
-#ifndef _CLIVARBLOCKUTIL_H_
-#define _CLIVARBLOCKUTIL_H_
+#ifndef _BLOCKINGUTILITIES_H_
+#define _BLOCKINGUTILITIES_H_
 
 ////////////////////////////////////////////////
 
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
 #include "DataVector.h"
+#include "DataMatrix.h"
 #include "DataMatrix3D.h"
 #include "DataMatrix4D.h"
 #include "TimeObj.h"
@@ -105,5 +106,84 @@ void PV_calc(
         double lon_res,
         NcVar *PV,
         NcVar *intPV);
+
+void calcDevsPV(bool leap,
+              int startAvgIndex,
+              NcVar *inIPV,
+              NcVar *outDev,
+              NcVar *outADev,
+              NcVar *outPosIntDev,
+              NcVar *avgIPV,
+              NcVar *inTime,
+              NcVar *avgTime,
+              NcVar *lat,
+              NcVar *outTime,
+              double PVAnom);
+
+void stdDev(DataMatrix3D<double>inDevs,
+              int nTime,
+              int nLat,
+              int nLon,
+              DataMatrix<double> & outStdDev);
+
+
+void calcDevsGH(bool leap,
+              int startAvgIndex,
+              NcVar *inGH,
+              NcVar *outDev,
+              NcVar *outADev,
+              NcVar *outIntDev,
+              NcVar *avgGH,
+              NcVar *inTime,
+              NcVar *avgTime,
+              NcVar *lat,
+              NcVar *outTime,
+              NcVar *stdDevVar);
+
+//Function that calculates TM blocking index
+double GHcheck(double z_0,
+          double z_N,
+          double z_S,
+          double lat_0,
+          double lat_N,
+          double lat_S,
+          std::string hemi );
+
+double tBetweenFiles(
+  std::string strTimeUnits,
+  double nextStartTime,
+  double prevEndTime
+);
+
+
+bool missingValCheck(
+  DataMatrix3D<double> fillData,
+  int nTime,
+  double missingNum
+);
+
+
+void MissingFill(
+  double missingValue,
+  double tRes,
+  double contCheck,
+  int nLat,
+  int nLon,
+  int ArrLen,
+  int & currArrIndex,
+  int & dateIndex,
+  DataMatrix3D<double> & currFillData
+);
+
+bool checkFileLeap(
+  std::string StrTimeUnits,
+  std::string strCalendar,
+  int dateYear,
+  int dateMonth,
+  int dateDay,
+  int dateHour,
+  double timeVal
+);
+
 
 #endif
