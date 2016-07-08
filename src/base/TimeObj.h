@@ -200,6 +200,15 @@ public:
 	}
 
 	///	<summary>
+	///		Add a number of minutes to the Time.
+	///	</summary>
+	inline void AddMinutes(int nMinutes) {
+		m_iSecond += nMinutes * 60;
+
+		NormalizeTime();
+	}
+
+	///	<summary>
 	///		Add a number of hours to the Time.
 	///	</summary>
 	inline void AddHours(int nHours) {

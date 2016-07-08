@@ -729,6 +729,30 @@ void ParseTimeDouble(
 
 		//printf("%s\n", strSubStr.c_str());
 
+	// Time format is "minutes since ..."
+	} else if (
+	    (strTimeUnits.length() >= 14) &&
+	    (strncmp(strTimeUnits.c_str(), "minutes since ", 14) == 0)
+	) {
+		std::string strSubStr = strTimeUnits.substr(14);
+		Time time(cal);
+		time.FromFormattedString(strSubStr);
+
+		time.AddMinutes(static_cast<int>(dTime));
+
+		Announce("Time (YMDS): %i %i %i %i",
+				time.GetYear(),
+				time.GetMonth(),
+				time.GetDay(),
+				time.GetSecond());
+
+		nDateYear = time.GetYear();
+		nDateMonth = time.GetMonth();
+		nDateDay = time.GetDay();
+		nDateHour = time.GetSecond() / 3600;
+
+		//printf("%s\n", strSubStr.c_str());
+
 	} else {
 		_EXCEPTIONT("Unknown \"time::units\" format");
 	}
@@ -1413,7 +1437,21 @@ try {
 	DataVector<double> dTime;
 	dTime.Initialize(nTime);
 
-	varTime->get(dTime, nTime);
+	if (varTime->type() == ncDouble) {
+		varTime->get(dTime, nTime);
+
+	} else if (varTime->type() == ncInt) {
+		DataVector<int> dTimeInt;
+		dTimeInt.Initialize(nTime);
+
+		varTime->get(dTimeInt, nTime);
+		for (int t = 0; t < nTime; t++) {
+			dTime[t] = static_cast<double>(dTimeInt[t]);
+		}
+
+	} else {
+		_EXCEPTIONT("Variable \"time\" has an invalid type: Expected \"double\" or \"int\"");
+	}
 
 	// Open output file
 	FILE * fpOutput = fopen(strOutputFile.c_str(), "w");
@@ -1423,8 +1461,22 @@ try {
 	}
 
 	if (fOutputHeader) {
-		fprintf(fpOutput, "#day\tmonth\tyear\tcount\thour\n");
-		fprintf(fpOutput, "#\t#\ti\tj\tpsl_lon\tpsl_lat\twind_max\tr_wind_max\tpsl_min\n");
+		fprintf(fpOutput, "#year\tmonth\tday\tcount\thour\n");
+
+		if (grid.m_nGridDim.size() == 1) {
+			fprintf(fpOutput, "#\ti\tlon\tlat");
+		} else {
+			fprintf(fpOutput, "#\ti\tj\tlon\tlat");
+		}
+
+		if (vecOutputOp.size() == 0) {
+		}
+
+		for (int i = 0; i < vecOutputOp.size(); i++) {
+			Variable & varOp = varreg.Get(vecOutputOp[i].m_varix);
+			fprintf(fpOutput, "\t%s", varOp.ToString(varreg).c_str());
+		}
+		fprintf(fpOutput, "\n");
 	}
 
 	// Loop through all times
@@ -1745,10 +1797,9 @@ try {
 
 			std::string strTimeUnits = attTimeUnits->as_string(0);
 
-
-			std::string strTimeCalendar = "noleap";
+			std::string strTimeCalendar = "standard";
 			NcAtt * attTimeCalendar = varTime->get_att("calendar");
-			if (attTimeUnits != NULL) {
+			if (attTimeCalendar != NULL) {
 				strTimeCalendar = attTimeCalendar->as_string(0);
 			}
 
