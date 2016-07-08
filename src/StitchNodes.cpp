@@ -319,7 +319,9 @@ public:
 		GreaterThanEqualTo,
 		LessThanEqualTo,
 		EqualTo,
-		NotEqualTo
+		NotEqualTo,
+		AbsGreaterThanEqualTo,
+		AbsLessThanEqualTo
 	};
 
 public:
@@ -381,6 +383,10 @@ public:
 						m_eOp = EqualTo;
 					} else if (strSubStr == "!=") {
 						m_eOp = NotEqualTo;
+					} else if (strSubStr == "|>=") {
+						m_eOp = AbsGreaterThanEqualTo;
+					} else if (strSubStr == "|<=") {
+						m_eOp = AbsLessThanEqualTo;
 					} else {
 						_EXCEPTION1("Threshold invalid operation \"%s\"",
 							strSubStr.c_str());
@@ -440,6 +446,10 @@ public:
 			strDescription += " equal to ";
 		} else if (m_eOp == NotEqualTo) {
 			strDescription += " not equal to ";
+		} else if (m_eOp == AbsGreaterThanEqualTo) {
+			strDescription += " magnitude greater than or equal to ";
+		} else if (m_eOp == AbsLessThanEqualTo) {
+			strDescription += " magnitude less than or equal to ";
 		}
 
 		char szValue[128];
@@ -504,6 +514,18 @@ public:
 			} else if (
 				(m_eOp == NotEqualTo) &&
 				(dCandidateValue != m_dValue)
+			) {
+				nCount++;
+
+			} else if (
+				(m_eOp == AbsGreaterThanEqualTo) &&
+				(fabs(dCandidateValue) >= m_dValue)
+			) {
+				nCount++;
+
+			} else if (
+				(m_eOp == AbsLessThanEqualTo) &&
+				(fabs(dCandidateValue) <= m_dValue)
 			) {
 				nCount++;
 			}
