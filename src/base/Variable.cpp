@@ -153,6 +153,13 @@ int Variable::ParseFromString(
 				_EXCEPTION1("Op argument list must be terminated"
 					" with ): %s", strIn.c_str());
 			}
+
+			// No arguments
+			if (strIn[n] == ')') {
+				return (n+1);
+			}
+
+			// Parse arguments
 			m_varArg.resize(m_nSpecifiedDim+1);
 
 			Variable var;
@@ -439,6 +446,17 @@ void Variable::LoadGridData(
 
 		for (int i = 0; i < m_data.GetRows(); i++) {
 			m_data[i] = dataLeft[i] - dataRight[i];
+		}
+
+	// Evaluate the Coriolis parameter operator
+	} else if (m_strName == "_F") {
+		if (m_varArg.size() != 0) {
+			_EXCEPTION1("_F expects zero arguments: %i given",
+				m_varArg.size());
+		}
+
+		for (int i = 0; i < m_data.GetRows(); i++) {
+			m_data[i] = 2.0 * 7.2921e-5 * sin(grid.m_dLat[i]);
 		}
 
 	} else {
