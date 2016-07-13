@@ -395,7 +395,7 @@ public:
 
 				// Invalid
 				} else if (eReadMode == ReadMode_Invalid) {
-					_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
+					_EXCEPTION1("\nInsufficient entries in output op \"%s\""
 							"\nRequired: \"<name>,<operation>,<distance>\"",
 							strOp.c_str());
 				}
@@ -403,7 +403,7 @@ public:
 		}
 
 		if (eReadMode != ReadMode_Invalid) {
-			_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
+			_EXCEPTION1("\nInsufficient entries in output op \"%s\""
 					"\nRequired: \"<name>,<operation>,<distance>\"",
 					strOp.c_str());
 		}
@@ -1162,8 +1162,8 @@ try {
 		CommandLineDoubleD(dMaxLatitude, "maxlat", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinLatitude, "minlat", 0.0, "(degrees)");
 		CommandLineDoubleD(dMergeDist, "mergedist", 0.0, "(degrees)");
-		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,dist,delta,minmaxdist;...]");
-		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,dist,delta,minmaxdist;...]");
+		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
+		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,op,dist;...]");
 		CommandLineInt(nTimeStride, "timestride", 1);

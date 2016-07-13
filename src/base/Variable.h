@@ -70,6 +70,12 @@ class Variable {
 
 public:
 	///	<summary>
+	///		Maximum number of arguments in variable.
+	///	</summary>
+	static const int MaxArguments = 4;
+
+public:
+	///	<summary>
 	///		Default constructor.
 	///	</summary>
 	Variable() :
@@ -78,7 +84,9 @@ public:
 		m_nSpecifiedDim(0),
 		m_fNoTimeInNcFile(false),
 		m_iTime(-2)
-	{ }
+	{
+		memset(m_iDim, 0, MaxArguments * sizeof(int));
+	}
 
 public:
 	///	<summary>
@@ -147,7 +155,7 @@ public:
 	///	<summary>
 	///		Specified dimension values.
 	///	</summary>
-	int m_iDim[4];
+	int m_iDim[MaxArguments];
 
 	///	<summary>
 	///		Specified operator arguments.
