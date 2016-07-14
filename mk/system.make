@@ -15,10 +15,32 @@ else ifeq ($(UNAME),Linux)
   ifeq ($(NERSC_HOST),babbage)
     SYSTEM= BABBAGE
     SYSTEM_MAKEFILE= babbage.make
-  else ifeq ($(NERSC_HOST),cori)
-    SYSTEM= CORI
-    SYSTEM_MAKEFILE= cori.make
-  else # FIXME: Add a test condition
+  endif
+  ifeq ($(HOSTNAME),yslogin1)
+    SYSTEM= YELLOWSTONE
+    SYSTEM_MAKEFILE= yellowstone.make
+  endif
+  ifeq ($(HOSTNAME),yslogin2)
+    SYSTEM= YELLOWSTONE
+    SYSTEM_MAKEFILE= yellowstone.make
+  endif
+  ifeq ($(HOSTNAME),yslogin3)
+    SYSTEM= YELLOWSTONE
+    SYSTEM_MAKEFILE= yellowstone.make
+  endif
+  ifeq ($(HOSTNAME),yslogin4)
+    SYSTEM= YELLOWSTONE
+    SYSTEM_MAKEFILE= yellowstone.make
+  endif
+  ifeq ($(HOSTNAME),yslogin5)
+    SYSTEM= YELLOWSTONE
+    SYSTEM_MAKEFILE= yellowstone.make
+  endif
+  ifeq ($(HOSTNAME),yslogin6)
+    SYSTEM= YELLOWSTONE
+    SYSTEM_MAKEFILE= yellowstone.make
+  endif
+  ifeq ($(SYSTEM),)
     SYSTEM= AGRI
     SYSTEM_MAKEFILE= agri.make
   endif   
