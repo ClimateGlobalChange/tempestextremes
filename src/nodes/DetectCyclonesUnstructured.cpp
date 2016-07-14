@@ -1122,6 +1122,12 @@ try {
 	// Minimum latitude for detection
 	double dMinLatitude;
 
+	// Maximum longitude for detection
+	double dMaxLongitude;
+
+	// Minimum longitude for detection
+	double dMinLongitude;
+
 	// File containing information on topography
 	std::string strTopoFile;
 
@@ -1159,8 +1165,10 @@ try {
 		CommandLineString(strOutputFile, "out", "");
 		CommandLineStringD(strSearchByMin, "searchbymin", "", "(default PSL)");
 		CommandLineString(strSearchByMax, "searchbymax", "");
-		CommandLineDoubleD(dMaxLatitude, "maxlat", 0.0, "(degrees)");
+		CommandLineDoubleD(dMinLongitude, "minlon", 0.0, "(degrees)");
+		CommandLineDoubleD(dMaxLongitude, "maxlon", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinLatitude, "minlat", 0.0, "(degrees)");
+		CommandLineDoubleD(dMaxLatitude, "maxlat", 0.0, "(degrees)");
 		CommandLineDoubleD(dMergeDist, "mergedist", 0.0, "(degrees)");
 		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
 		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
@@ -1325,16 +1333,46 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
-	// Check minimum latitude and maximum latitude
-	if (dMaxLatitude < 0.0) {
-		_EXCEPTIONT("--maxlat must be nonnegative");
+	// Check minimum/maximum latitude/longitude
+	if ((dMaxLatitude < -90.0) || (dMaxLatitude > 90.0)) {
+		_EXCEPTIONT("--maxlat must in the range [-90,90]");
 	}
-	if (dMinLatitude < 0.0) {
-		_EXCEPTIONT("--minlat must be nonnegative");
+	if ((dMinLatitude < -90.0) || (dMinLatitude > 90.0)) {
+		_EXCEPTIONT("--minlat must in the range [-90,90]");
+	}
+	if (dMinLatitude > dMaxLatitude) {
+		_EXCEPTIONT("--minlat must be less than --maxlat");
 	}
 
 	dMaxLatitude *= M_PI / 180.0;
 	dMinLatitude *= M_PI / 180.0;
+
+	if (dMinLongitude < 0.0) {
+		int iMinLongitude = static_cast<int>(-dMinLongitude / 360.0);
+		dMinLongitude += static_cast<double>(iMinLongitude + 1) * 360.0;
+	}
+	if (dMinLongitude >= 360.0) {
+		int iMinLongitude = static_cast<int>(dMinLongitude / 360.0);
+		dMinLongitude -= static_cast<double>(iMinLongitude - 1) * 360.0;
+	}
+	if (dMaxLongitude < 0.0) {
+		int iMaxLongitude = static_cast<int>(-dMaxLatitude / 360.0);
+		dMaxLongitude += static_cast<double>(iMaxLongitude + 1) * 360.0;
+	}
+	if (dMaxLongitude >= 360.0) {
+		int iMaxLongitude = static_cast<int>(dMaxLongitude / 360.0);
+		dMaxLongitude -= static_cast<double>(iMaxLongitude - 1) * 360.0;
+	}
+
+	if ((dMinLongitude < 0.0) || (dMinLongitude >= 360.0)) {
+		_EXCEPTIONT("Logic error");
+	}
+	if ((dMaxLongitude < 0.0) || (dMaxLongitude >= 360.0)) {
+		_EXCEPTIONT("Logic error");
+	}
+
+	dMaxLongitude *= M_PI / 180.0;
+	dMinLongitude *= M_PI / 180.0;
 
 	// Parse the input file list
 	NcFileVector vecFiles;
@@ -1505,7 +1543,7 @@ try {
 		// Total number of candidates
 		int nTotalCandidates = setCandidates.size();
 
-		int nRejectedLatitude = 0;
+		int nRejectedLocation = 0;
 		int nRejectedTopography = 0;
 		int nRejectedMerge = 0;
 
@@ -1513,40 +1551,55 @@ try {
 		DataVector<int> vecRejectedNoClosedContour(vecNoClosedContourOp.size());
 		DataVector<int> vecRejectedThreshold(vecThresholdOp.size());
 
-		// Eliminate based on maximum latitude
-		if (dMaxLatitude != 0.0) {
-			std::set<int> setNewCandidates;
-
-			std::set<int>::const_iterator iterCandidate
-				= setCandidates.begin();
-
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-				double dLat = grid.m_dLat[*iterCandidate];
-
-				if (fabs(dLat) <= dMaxLatitude) {
-					setNewCandidates.insert(*iterCandidate);
-				} else {
-					nRejectedLatitude++;
-				}
-			}
-
-			setCandidates = setNewCandidates;
-		}
-
-		// Eliminate based on minimum latitude
-		if (dMinLatitude != 0.0) {
+		// Eliminate based on interval
+		if ((dMinLatitude != dMaxLatitude) ||
+		    (dMinLongitude != dMaxLongitude)
+		) {
 			std::set<int> setNewCandidates;
 
 			std::set<int>::const_iterator iterCandidate
 				= setCandidates.begin();
 			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
 				double dLat = grid.m_dLat[*iterCandidate];
+				double dLon = grid.m_dLon[*iterCandidate];
 
-				if (fabs(dLat) >= dMinLatitude) {
-					setNewCandidates.insert(*iterCandidate);
-				} else {
-					nRejectedLatitude++;
+				if (dMinLatitude != dMaxLatitude) {
+					if (dLat < dMinLatitude) {
+						nRejectedLocation++;
+						continue;
+					}
+					if (dLat > dMaxLatitude) {
+						nRejectedLocation++;
+						continue;
+					}
 				}
+				if (dMinLongitude != dMaxLongitude) {
+					if (dLon < 0.0) {
+						int iLonShift = static_cast<int>(dLon / (2.0 * M_PI));
+						dLon += static_cast<double>(iLonShift + 1) * 2.0 * M_PI;
+					}
+					if (dLon >= 2.0 * M_PI) {
+						int iLonShift = static_cast<int>(dLon / (2.0 * M_PI));
+						dLon -= static_cast<double>(iLonShift - 1) * 2.0 * M_PI;
+					}
+					if (dMinLongitude < dMaxLongitude) {
+						if (dLon < dMinLongitude) {
+							nRejectedLocation++;
+							continue;
+						}
+						if (dLon > dMaxLongitude) {
+							nRejectedLocation++;
+							continue;
+						}
+
+					} else {
+						if ((dLon > dMaxLongitude) && (dLon < dMinLongitude)) {
+							nRejectedLocation++;
+							continue;
+						}
+					}
+				}
+				setNewCandidates.insert(*iterCandidate);
 			}
 
 			setCandidates = setNewCandidates;
@@ -1751,7 +1804,7 @@ try {
 		}
 
 		Announce("Total candidates: %i", setCandidates.size());
-		Announce("Rejected (  latitude): %i", nRejectedLatitude);
+		Announce("Rejected (  location): %i", nRejectedLocation);
 		Announce("Rejected (topography): %i", nRejectedTopography);
 		Announce("Rejected (    merged): %i", nRejectedMerge);
 
