@@ -5,7 +5,7 @@
 SEASONS=("MAM" "JJA" "SON" "DJF")
 DATA=("climo" "2xCO2" "SSTplus2" "SSTplus2_2xCO2")
 mstart=(3 6 9 12)
-BLOBS="TRUE"
+BLOBS="FALSE"
 
 if [ "$BLOBS" == "TRUE" ]; then
 for d in ${DATA[@]}; do
