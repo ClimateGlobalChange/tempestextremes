@@ -409,6 +409,23 @@ void Variable::LoadGridData(
 					+ dataRight[i] * dataRight[i]);
 		}
 
+	// Evaluate the absolute value operator
+	} else if (m_strName == "_ABS") {
+		if (m_varArg.size() != 1) {
+			_EXCEPTION1("_ABS expects one argument: %i given",
+				m_varArg.size());
+		}
+
+		m_data.Zero();
+
+		Variable & varParam = varreg.Get(m_varArg[0]);
+		varParam.LoadGridData(varreg, vecFiles, grid, iTime);
+		const DataVector<float> & dataParam  = varParam.m_data;
+
+		for (int i = 0; i < m_data.GetRows(); i++) {
+			m_data[i] = fabs(dataParam[i]);
+		}
+
 	// Evaluate the average operator
 	} else if (m_strName == "_AVG") {
 		if (m_varArg.size() <= 1) {
