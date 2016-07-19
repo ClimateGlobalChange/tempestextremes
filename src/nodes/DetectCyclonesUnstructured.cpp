@@ -1478,6 +1478,15 @@ try {
 	if (varTime->type() == ncDouble) {
 		varTime->get(dTime, nTime);
 
+	} else if (varTime->type() == ncFloat) {
+		DataVector<float> dTimeFloat;
+		dTimeFloat.Initialize(nTime);
+
+		varTime->get(dTimeFloat, nTime);
+		for (int t = 0; t < nTime; t++) {
+			dTime[t] = static_cast<double>(dTimeFloat[t]);
+		}
+
 	} else if (varTime->type() == ncInt) {
 		DataVector<int> dTimeInt;
 		dTimeInt.Initialize(nTime);
