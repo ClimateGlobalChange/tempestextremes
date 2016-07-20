@@ -27,7 +27,19 @@
 
 extern int g_iVerbosityLevel;
 
+extern FILE * g_fpOutputBuffer;
+
 ///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Get the output buffer.
+///	</summary>
+FILE * AnnounceGetOutputBuffer();
+
+///	<summary>
+///		Set the output buffer.
+///	</summary>
+void AnnounceSetOutputBuffer(FILE * fpOutputBuffer);
 
 ///	<summary>
 ///		Set the verbosity level.

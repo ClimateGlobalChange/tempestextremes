@@ -203,19 +203,14 @@ public:
 	///		Add a number of minutes to the Time.
 	///	</summary>
 	inline void AddMinutes(int nMinutes) {
-		m_iSecond += nMinutes * 60;
-
-		NormalizeTime();
+		AddSeconds(nMinutes * 60);
 	}
 
 	///	<summary>
 	///		Add a number of hours to the Time.
 	///	</summary>
 	inline void AddHours(int nHours) {
-		m_iDay += (nHours / 24);
-		m_iSecond += (nHours % 24) * 3600;
-
-		NormalizeTime();
+		AddSeconds(nHours * 3600);
 	}
 
 	///	<summary>
@@ -330,6 +325,13 @@ public:
 	}
 
 	///	<summary>
+	///		Get the TimeType.
+	///	</summary>
+	inline TimeType GetTimeType() const {
+		return m_eTimeType;
+	}
+
+	///	<summary>
 	///		Set the year.
 	///	</summary>
 	inline void SetYear(int iYear) {
@@ -362,6 +364,13 @@ public:
 	///	</summary>
 	inline void SetMicroSecond(int iMicroSecond) {
 		m_iMicroSecond = iMicroSecond;
+	}
+
+	///	<summary>
+	///		Set the time type.
+	///	</summary>
+	inline void SetTimeType(TimeType eTimeType) {
+		m_eTimeType = eTimeType;
 	}
 
 public:

@@ -34,6 +34,10 @@
 #include <set>
 #include <queue>
 
+#if defined(TEMPEST_MPIOMP)
+#include <mpi.h>
+#endif
+
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
@@ -454,6 +458,41 @@ public:
 	///	</summary>
 	double m_dDistance;
 };
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Parse the list of input files.
+///	</summary>
+void ParseInputFiles(
+	const std::string & strInputFile,
+	std::vector<NcFile *> & vecFiles
+) {
+	int iLast = 0;
+	for (int i = 0; i <= strInputFile.length(); i++) {
+		if ((i == strInputFile.length()) ||
+		    (strInputFile[i] == ';')
+		) {
+			std::string strFile =
+				strInputFile.substr(iLast, i - iLast);
+
+			NcFile * pNewFile = new NcFile(strFile.c_str());
+
+			if (!pNewFile->is_valid()) {
+				_EXCEPTION1("Cannot open input file \"%s\"",
+					strFile.c_str());
+			}
+
+			vecFiles.push_back(pNewFile);
+			iLast = i+1;
+		}
+	}
+
+	if (vecFiles.size() == 0) {
+		_EXCEPTION1("No input files found in \"%s\"",
+			strInputFile.c_str());
+	}
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1090,31 +1129,40 @@ void FindLocalAverage(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-int main(int argc, char** argv) {
+class DetectCyclonesParam {
 
-	NcError error(NcError::silent_nonfatal);
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DetectCyclonesParam() :
+		fpLog(NULL),
+		ixSearchBy(0),
+		fSearchByMinima(false),
+		dMaxLatitude(0.0),
+		dMinLatitude(0.0),
+		dMaxLongitude(0.0),
+		dMinLongitude(0.0),
+		dMergeDist(0.0),
+		pvecClosedContourOp(NULL),
+		pvecNoClosedContourOp(NULL),
+		pvecThresholdOp(NULL),
+		pvecOutputOp(NULL),
+		nTimeStride(1),
+		fRegional(false),
+		fOutputHeader(false),
+		iVerbosityLevel(0)
+	{ }
 
-try {
-	// Gravitational constant
-	const float ParamGravity = 9.80616;
+public:
+	// Log
+	FILE * fpLog;
 
-	// Radius of the Earth
-	const float ParamEarthRadius = 6.37122e6;
+	// Variable index to search on
+	VariableIndex ixSearchBy;
 
-	// Input dat file
-	std::string strInputFile;
-
-	// Connectivity file
-	std::string strConnectivity;
-
-	// Output file
-	std::string strOutputFile;
-
-	// Variable to search for the minimum
-	std::string strSearchByMin;
-
-	// Variable to search for the maximum
-	std::string strSearchByMax;
+	// Serach on minima
+	bool fSearchByMinima;
 
 	// Maximum latitude for detection
 	double dMaxLatitude;
@@ -1128,23 +1176,20 @@ try {
 	// Minimum longitude for detection
 	double dMinLongitude;
 
-	// File containing information on topography
-	std::string strTopoFile;
-
 	// Merge distance
 	double dMergeDist;
 
-	// Closed contour commands
-	std::string strClosedContourCmd;
+	// Vector of closed contour operators
+	std::vector<ClosedContourOp> * pvecClosedContourOp;
 
-	// Closed contour commands
-	std::string strNoClosedContourCmd;
+	// Vector of no closed contour operators
+	std::vector<ClosedContourOp> * pvecNoClosedContourOp;
 
-	// Threshold commands
-	std::string strThresholdCmd;
+	// Vector of threshold operators
+	std::vector<ThresholdOp> * pvecThresholdOp;
 
-	// Output commands
-	std::string strOutputCmd;
+	// Vector of output operators
+	std::vector<OutputOp> * pvecOutputOp;
 
 	// Time stride
 	int nTimeStride;
@@ -1158,248 +1203,54 @@ try {
 	// Verbosity level
 	int iVerbosityLevel;
 
-	// Parse the command line
-	BeginCommandLine()
-		CommandLineString(strInputFile, "in_data", "");
-		CommandLineString(strConnectivity, "in_connect", "");
-		CommandLineString(strOutputFile, "out", "");
-		CommandLineStringD(strSearchByMin, "searchbymin", "", "(default PSL)");
-		CommandLineString(strSearchByMax, "searchbymax", "");
-		CommandLineDoubleD(dMinLongitude, "minlon", 0.0, "(degrees)");
-		CommandLineDoubleD(dMaxLongitude, "maxlon", 0.0, "(degrees)");
-		CommandLineDoubleD(dMinLatitude, "minlat", 0.0, "(degrees)");
-		CommandLineDoubleD(dMaxLatitude, "maxlat", 0.0, "(degrees)");
-		CommandLineDoubleD(dMergeDist, "mergedist", 0.0, "(degrees)");
-		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
-		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
-		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
-		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,op,dist;...]");
-		CommandLineInt(nTimeStride, "timestride", 1);
-		CommandLineBool(fRegional, "regional");
-		CommandLineBool(fOutputHeader, "out_header");
-		CommandLineInt(iVerbosityLevel, "verbosity", 0);
+};
 
-		ParseCommandLine(argc, argv);
-	EndCommandLine(argv)
+///////////////////////////////////////////////////////////////////////////////
 
-	AnnounceBanner();
-
-	// Create Variable registry
-	VariableRegistry varreg;
-
-	// Set verbosity level
-	AnnounceSetVerbosityLevel(iVerbosityLevel);
-
-	// Check input
-	if (strInputFile.length() == 0) {
-		_EXCEPTIONT("No input data file (--in_data) specified");
+void DetectCyclonesUnstructured(
+	int iFile,
+	const std::string & strInputFiles,
+	const std::string & strOutputFile,
+	const std::string & strConnectivity,
+	VariableRegistry & varreg,
+	const DetectCyclonesParam & param
+) {
+	// Set the Announce buffer
+	if (param.fpLog == NULL) {
+		_EXCEPTIONT("Invalid log buffer");
 	}
 
-	// Check output
-	if (strOutputFile.length() == 0) {
-		_EXCEPTIONT("No output file (--out) specified");
+	AnnounceSetOutputBuffer(param.fpLog);
+
+	// Check minimum longitude / latitude
+	if ((param.dMinLongitude < 0.0) || (param.dMinLongitude >= 360.0)) {
+		_EXCEPTIONT("Invalid MinLongitude");
 	}
-
-	// Only one of search by min or search by max should be specified
-	if ((strSearchByMin == "") && (strSearchByMax == "")) {
-		strSearchByMin = "PSL";
+	if ((param.dMaxLongitude < 0.0) || (param.dMaxLongitude >= 360.0)) {
+		_EXCEPTIONT("Invalid MaxLongitude");
 	}
-	if ((strSearchByMin != "") && (strSearchByMax != "")) {
-		_EXCEPTIONT("Only one of --searchbymin or --searchbymax can"
-			" be specified");
-	}
-
-	bool fSearchByMinima = false;
-	VariableIndex ixSearchBy;
-	{
-		Variable varSearchByArg;
-		if (strSearchByMin != "") {
-			varSearchByArg.ParseFromString(varreg, strSearchByMin);
-			fSearchByMinima = true;
-		}
-		if (strSearchByMax != "") {
-			varSearchByArg.ParseFromString(varreg, strSearchByMax);
-			fSearchByMinima = false;
-		}
-
-		ixSearchBy = varreg.FindOrRegister(varSearchByArg);
-	}
-
-	// Parse the closed contour command string
-	std::vector<ClosedContourOp> vecClosedContourOp;
-
-	if (strClosedContourCmd != "") {
-		AnnounceStartBlock("Parsing closed contour operations");
-
-		int iLast = 0;
-		for (int i = 0; i <= strClosedContourCmd.length(); i++) {
-
-			if ((i == strClosedContourCmd.length()) ||
-				(strClosedContourCmd[i] == ';') ||
-				(strClosedContourCmd[i] == ':')
-			) {
-				std::string strSubStr =
-					strClosedContourCmd.substr(iLast, i - iLast);
-			
-				int iNextOp = (int)(vecClosedContourOp.size());
-				vecClosedContourOp.resize(iNextOp + 1);
-				vecClosedContourOp[iNextOp].Parse(varreg, strSubStr);
-
-				iLast = i + 1;
-			}
-		}
-
-		AnnounceEndBlock("Done");
-	}
-
-	// Parse the no closed contour command string
-	std::vector<ClosedContourOp> vecNoClosedContourOp;
-
-	if (strNoClosedContourCmd != "") {
-		AnnounceStartBlock("Parsing no closed contour operations");
-
-		int iLast = 0;
-		for (int i = 0; i <= strNoClosedContourCmd.length(); i++) {
-
-			if ((i == strNoClosedContourCmd.length()) ||
-				(strNoClosedContourCmd[i] == ';') ||
-				(strNoClosedContourCmd[i] == ':')
-			) {
-				std::string strSubStr =
-					strNoClosedContourCmd.substr(iLast, i - iLast);
-			
-				int iNextOp = (int)(vecNoClosedContourOp.size());
-				vecNoClosedContourOp.resize(iNextOp + 1);
-				vecNoClosedContourOp[iNextOp].Parse(varreg, strSubStr);
-
-				iLast = i + 1;
-			}
-		}
-
-		AnnounceEndBlock("Done");
-	}
-
-	// Parse the threshold operator command string
-	std::vector<ThresholdOp> vecThresholdOp;
-
-	if (strThresholdCmd != "") {
-		AnnounceStartBlock("Parsing threshold operations");
-
-		int iLast = 0;
-		for (int i = 0; i <= strThresholdCmd.length(); i++) {
-
-			if ((i == strThresholdCmd.length()) ||
-				(strThresholdCmd[i] == ';') ||
-				(strThresholdCmd[i] == ':')
-			) {
-				std::string strSubStr =
-					strThresholdCmd.substr(iLast, i - iLast);
-			
-				int iNextOp = (int)(vecThresholdOp.size());
-				vecThresholdOp.resize(iNextOp + 1);
-				vecThresholdOp[iNextOp].Parse(varreg, strSubStr);
-
-				iLast = i + 1;
-			}
-		}
-
-		AnnounceEndBlock("Done");
-	}
-
-	// Parse the output operator command string
-	std::vector<OutputOp> vecOutputOp;
-
-	if (strOutputCmd != "") {
-		AnnounceStartBlock("Parsing output operations");
-
-		int iLast = 0;
-		for (int i = 0; i <= strOutputCmd.length(); i++) {
-
-			if ((i == strOutputCmd.length()) ||
-				(strOutputCmd[i] == ';') ||
-				(strOutputCmd[i] == ':')
-			) {
-				std::string strSubStr =
-					strOutputCmd.substr(iLast, i - iLast);
-			
-				int iNextOp = (int)(vecOutputOp.size());
-				vecOutputOp.resize(iNextOp + 1);
-				vecOutputOp[iNextOp].Parse(varreg, strSubStr);
-
-				iLast = i + 1;
-			}
-		}
-
-		AnnounceEndBlock("Done");
-	}
-
-	// Check minimum/maximum latitude/longitude
-	if ((dMaxLatitude < -90.0) || (dMaxLatitude > 90.0)) {
+	if ((param.dMaxLatitude < -90.0) || (param.dMaxLatitude > 90.0)) {
 		_EXCEPTIONT("--maxlat must in the range [-90,90]");
 	}
-	if ((dMinLatitude < -90.0) || (dMinLatitude > 90.0)) {
+	if ((param.dMinLatitude < -90.0) || (param.dMinLatitude > 90.0)) {
 		_EXCEPTIONT("--minlat must in the range [-90,90]");
 	}
-	if (dMinLatitude > dMaxLatitude) {
-		_EXCEPTIONT("--minlat must be less than --maxlat");
-	}
 
-	dMaxLatitude *= M_PI / 180.0;
-	dMinLatitude *= M_PI / 180.0;
+	// Dereference pointers to operators
+	std::vector<ClosedContourOp> & vecClosedContourOp =
+		*(param.pvecClosedContourOp);
 
-	if (dMinLongitude < 0.0) {
-		int iMinLongitude = static_cast<int>(-dMinLongitude / 360.0);
-		dMinLongitude += static_cast<double>(iMinLongitude + 1) * 360.0;
-	}
-	if (dMinLongitude >= 360.0) {
-		int iMinLongitude = static_cast<int>(dMinLongitude / 360.0);
-		dMinLongitude -= static_cast<double>(iMinLongitude - 1) * 360.0;
-	}
-	if (dMaxLongitude < 0.0) {
-		int iMaxLongitude = static_cast<int>(-dMaxLatitude / 360.0);
-		dMaxLongitude += static_cast<double>(iMaxLongitude + 1) * 360.0;
-	}
-	if (dMaxLongitude >= 360.0) {
-		int iMaxLongitude = static_cast<int>(dMaxLongitude / 360.0);
-		dMaxLongitude -= static_cast<double>(iMaxLongitude - 1) * 360.0;
-	}
+	std::vector<ClosedContourOp> & vecNoClosedContourOp =
+		*(param.pvecNoClosedContourOp);
 
-	if ((dMinLongitude < 0.0) || (dMinLongitude >= 360.0)) {
-		_EXCEPTIONT("Logic error");
-	}
-	if ((dMaxLongitude < 0.0) || (dMaxLongitude >= 360.0)) {
-		_EXCEPTIONT("Logic error");
-	}
+	std::vector<ThresholdOp> & vecThresholdOp =
+		*(param.pvecThresholdOp);
 
-	dMaxLongitude *= M_PI / 180.0;
-	dMinLongitude *= M_PI / 180.0;
+	std::vector<OutputOp> & vecOutputOp =
+		*(param.pvecOutputOp);
 
-	// Parse the input file list
-	NcFileVector vecFiles;
-	{
-		int iLast = 0;
-		for (int i = 0; i <= strInputFile.length(); i++) {
-			if ((i == strInputFile.length()) ||
-			    (strInputFile[i] == ';')
-			) {
-				std::string strFile =
-					strInputFile.substr(iLast, i - iLast);
-
-				NcFile * pNewFile = new NcFile(strFile.c_str());
-
-				if (!pNewFile->is_valid()) {
-					_EXCEPTION1("Cannot open input file \"%s\"",
-						strFile.c_str());
-				}
-
-				vecFiles.push_back(pNewFile);
-				iLast = i+1;
-			}
-		}
-	}
-	if (vecFiles.size() == 0) {
-		_EXCEPTIONT("At least one input file must be specified");
-	}
+	// Unload data from the VariableRegistry
+	varreg.UnloadAllGridData();
 
 	// Define the SimpleGrid
 	SimpleGrid grid;
@@ -1408,6 +1259,11 @@ try {
 	int nSize = 0;
 	int nLon = 0;
 	int nLat = 0;
+
+	// Load in the benchmark file
+	NcFileVector vecFiles;
+
+	ParseInputFiles(strInputFiles, vecFiles);
 
 	// Check for connectivity file
 	if (strConnectivity != "") {
@@ -1456,7 +1312,7 @@ try {
 		}
 
 		// Generate the SimpleGrid
-		grid.GenerateLatitudeLongitude(vecLat, vecLon, fRegional);
+		grid.GenerateLatitudeLongitude(vecLat, vecLon, param.fRegional);
 	}
 
 	// Get time dimension
@@ -1497,7 +1353,8 @@ try {
 		}
 
 	} else {
-		_EXCEPTIONT("Variable \"time\" has an invalid type: Expected \"double\" or \"int\"");
+		_EXCEPTIONT("Variable \"time\" has an invalid type:\n"
+			"Expected \"float\", \"double\" or \"int\"");
 	}
 
 	// Open output file
@@ -1507,16 +1364,13 @@ try {
 			strOutputFile.c_str());
 	}
 
-	if (fOutputHeader) {
+	if (param.fOutputHeader) {
 		fprintf(fpOutput, "#year\tmonth\tday\tcount\thour\n");
 
 		if (grid.m_nGridDim.size() == 1) {
 			fprintf(fpOutput, "#\ti\tlon\tlat");
 		} else {
 			fprintf(fpOutput, "#\ti\tj\tlon\tlat");
-		}
-
-		if (vecOutputOp.size() == 0) {
 		}
 
 		for (int i = 0; i < vecOutputOp.size(); i++) {
@@ -1527,7 +1381,7 @@ try {
 	}
 
 	// Loop through all times
-	for (int t = 0; t < nTime; t += nTimeStride) {
+	for (int t = 0; t < nTime; t += param.nTimeStride) {
 	//for (int t = 0; t < 1; t++) {
 
 		char szStartBlock[128];
@@ -1535,7 +1389,7 @@ try {
 		AnnounceStartBlock(szStartBlock);
 
 		// Load the data for the search variable
-		Variable & varSearchBy = varreg.Get(ixSearchBy);
+		Variable & varSearchBy = varreg.Get(param.ixSearchBy);
 		varSearchBy.LoadGridData(varreg, vecFiles, grid, t);
 
 		const DataVector<float> & dataSearch = varSearchBy.GetData();
@@ -1543,7 +1397,7 @@ try {
 		// Tag all minima
 		std::set<int> setCandidates;
 
-		if (strSearchByMin != "") {
+		if (param.fSearchByMinima) {
 			FindAllLocalMinima<float>(grid, dataSearch, setCandidates);
 		} else {
 			FindAllLocalMaxima<float>(grid, dataSearch, setCandidates);
@@ -1561,8 +1415,8 @@ try {
 		DataVector<int> vecRejectedThreshold(vecThresholdOp.size());
 
 		// Eliminate based on interval
-		if ((dMinLatitude != dMaxLatitude) ||
-		    (dMinLongitude != dMaxLongitude)
+		if ((param.dMinLatitude != param.dMaxLatitude) ||
+		    (param.dMinLongitude != param.dMaxLongitude)
 		) {
 			std::set<int> setNewCandidates;
 
@@ -1572,17 +1426,17 @@ try {
 				double dLat = grid.m_dLat[*iterCandidate];
 				double dLon = grid.m_dLon[*iterCandidate];
 
-				if (dMinLatitude != dMaxLatitude) {
-					if (dLat < dMinLatitude) {
+				if (param.dMinLatitude != param.dMaxLatitude) {
+					if (dLat < param.dMinLatitude) {
 						nRejectedLocation++;
 						continue;
 					}
-					if (dLat > dMaxLatitude) {
+					if (dLat > param.dMaxLatitude) {
 						nRejectedLocation++;
 						continue;
 					}
 				}
-				if (dMinLongitude != dMaxLongitude) {
+				if (param.dMinLongitude != param.dMaxLongitude) {
 					if (dLon < 0.0) {
 						int iLonShift = static_cast<int>(dLon / (2.0 * M_PI));
 						dLon += static_cast<double>(iLonShift + 1) * 2.0 * M_PI;
@@ -1591,18 +1445,20 @@ try {
 						int iLonShift = static_cast<int>(dLon / (2.0 * M_PI));
 						dLon -= static_cast<double>(iLonShift - 1) * 2.0 * M_PI;
 					}
-					if (dMinLongitude < dMaxLongitude) {
-						if (dLon < dMinLongitude) {
+					if (param.dMinLongitude < param.dMaxLongitude) {
+						if (dLon < param.dMinLongitude) {
 							nRejectedLocation++;
 							continue;
 						}
-						if (dLon > dMaxLongitude) {
+						if (dLon > param.dMaxLongitude) {
 							nRejectedLocation++;
 							continue;
 						}
 
 					} else {
-						if ((dLon > dMaxLongitude) && (dLon < dMinLongitude)) {
+						if ((dLon > param.dMaxLongitude) &&
+						    (dLon < param.dMinLongitude)
+						) {
 							nRejectedLocation++;
 							continue;
 						}
@@ -1615,11 +1471,12 @@ try {
 		}
 
 		// Eliminate based on merge distance
-		if (dMergeDist != 0.0) {
+		if (param.dMergeDist != 0.0) {
 			std::set<int> setNewCandidates;
 
-			// Calculate spherical distance
-			double dSphDist = 2.0 * sin(0.5 * dMergeDist / 180.0 * M_PI);
+			// Calculate chord distance
+			double dSphDist =
+				2.0 * sin(0.5 * param.dMergeDist / 180.0 * M_PI);
 
 			// Create a new KD Tree containing all nodes
 			kdtree * kdMerge = kd_create(3);
@@ -1664,7 +1521,7 @@ try {
 					for (;;) {
 						int * ppr = (int *)(kd_res_item_data(kdresMerge));
 
-						if (fSearchByMinima) {
+						if (param.fSearchByMinima) {
 							if (static_cast<double>(dataSearch[*ppr]) < dValue) {
 								fExtrema = false;
 								break;
@@ -2014,6 +1871,398 @@ try {
 		vecFiles[i]->close();
 	}
 
+	// Reset the Announce buffer
+	AnnounceSetOutputBuffer(stdout);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+int main(int argc, char** argv) {
+
+#if defined(TEMPEST_MPIOMP)
+	// Initialize MPI
+	MPI_Init(&argc, &argv);
+#endif
+
+	// Turn off fatal errors in NetCDF
+	NcError error(NcError::silent_nonfatal);
+
+try {
+	// Parameters for DetectCycloneUnstructured
+	DetectCyclonesParam dcuparam;
+
+	// Input dat file
+	std::string strInputFile;
+
+	// Input list file
+	std::string strInputFileList;
+
+	// Connectivity file
+	std::string strConnectivity;
+
+	// Output file
+	std::string strOutput;
+
+	// Variable to search for the minimum
+	std::string strSearchByMin;
+
+	// Variable to search for the maximum
+	std::string strSearchByMax;
+/*
+	// Maximum latitude for detection
+	double dMaxLatitude;
+
+	// Minimum latitude for detection
+	double dMinLatitude;
+
+	// Maximum longitude for detection
+	double dMaxLongitude;
+
+	// Minimum longitude for detection
+	double dMinLongitude;
+
+	// Merge distance
+	double dMergeDist;
+*/
+	// Closed contour commands
+	std::string strClosedContourCmd;
+
+	// Closed contour commands
+	std::string strNoClosedContourCmd;
+
+	// Threshold commands
+	std::string strThresholdCmd;
+
+	// Output commands
+	std::string strOutputCmd;
+/*
+	// Time stride
+	int nTimeStride;
+
+	// Regional (do not wrap longitudinal boundaries)
+	bool fRegional;
+
+	// Output header
+	bool fOutputHeader;
+
+	// Verbosity level
+	int iVerbosityLevel;
+*/
+	// Parse the command line
+	BeginCommandLine()
+		CommandLineString(strInputFile, "in_data", "");
+		CommandLineString(strInputFileList, "in_data_list", "");
+		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineString(strOutput, "out", "");
+		CommandLineStringD(strSearchByMin, "searchbymin", "", "(default PSL)");
+		CommandLineString(strSearchByMax, "searchbymax", "");
+		CommandLineDoubleD(dcuparam.dMinLongitude, "minlon", 0.0, "(degrees)");
+		CommandLineDoubleD(dcuparam.dMaxLongitude, "maxlon", 0.0, "(degrees)");
+		CommandLineDoubleD(dcuparam.dMinLatitude, "minlat", 0.0, "(degrees)");
+		CommandLineDoubleD(dcuparam.dMaxLatitude, "maxlat", 0.0, "(degrees)");
+		CommandLineDoubleD(dcuparam.dMergeDist, "mergedist", 0.0, "(degrees)");
+		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
+		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
+		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
+		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,op,dist;...]");
+		CommandLineInt(dcuparam.nTimeStride, "timestride", 1);
+		CommandLineBool(dcuparam.fRegional, "regional");
+		CommandLineBool(dcuparam.fOutputHeader, "out_header");
+		CommandLineInt(dcuparam.iVerbosityLevel, "verbosity", 0);
+
+		ParseCommandLine(argc, argv);
+	EndCommandLine(argv)
+
+	AnnounceBanner();
+
+	// Create Variable registry
+	VariableRegistry varreg;
+
+	// Set verbosity level
+	AnnounceSetVerbosityLevel(dcuparam.iVerbosityLevel);
+
+	// Check input
+	if ((strInputFile.length() == 0) && (strInputFileList.length() == 0)) {
+		_EXCEPTIONT("No input data file (--in_data) or (--in_data_list)"
+			" specified");
+	}
+	if ((strInputFile.length() != 0) && (strInputFileList.length() != 0)) {
+		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list)"
+			" may be specified");
+	}
+
+	// Load input file list
+	std::vector<std::string> vecInputFiles;
+	if (strInputFile.length() != 0) {
+		vecInputFiles.push_back(strInputFile);
+
+	} else {
+		std::ifstream ifInputFileList(strInputFileList);
+		if (!ifInputFileList.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\"",
+				strInputFileList.c_str());
+		}
+		std::string strFileLine;
+		while (std::getline(ifInputFileList, strFileLine)) {
+			if (strFileLine.length() == 0) {
+				continue;
+			}
+			if (strFileLine[0] == '#') {
+				continue;
+			}
+			vecInputFiles.push_back(strFileLine);
+		}
+	}
+/*
+	// Check output
+	if (strOutputFile.length() == 0) {
+		_EXCEPTIONT("No output file (--out) specified");
+	}
+*/
+	// Only one of search by min or search by max should be specified
+	if ((strSearchByMin == "") && (strSearchByMax == "")) {
+		strSearchByMin = "PSL";
+	}
+	if ((strSearchByMin != "") && (strSearchByMax != "")) {
+		_EXCEPTIONT("Only one of --searchbymin or --searchbymax can"
+			" be specified");
+	}
+
+	dcuparam.fSearchByMinima = false;
+	{
+		Variable varSearchByArg;
+		if (strSearchByMin != "") {
+			varSearchByArg.ParseFromString(varreg, strSearchByMin);
+			dcuparam.fSearchByMinima = true;
+		}
+		if (strSearchByMax != "") {
+			varSearchByArg.ParseFromString(varreg, strSearchByMax);
+			dcuparam.fSearchByMinima = false;
+		}
+
+		dcuparam.ixSearchBy = varreg.FindOrRegister(varSearchByArg);
+	}
+
+	// Parse the closed contour command string
+	std::vector<ClosedContourOp> vecClosedContourOp;
+	dcuparam.pvecClosedContourOp = &vecClosedContourOp;
+
+	if (strClosedContourCmd != "") {
+		AnnounceStartBlock("Parsing closed contour operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strClosedContourCmd.length(); i++) {
+
+			if ((i == strClosedContourCmd.length()) ||
+				(strClosedContourCmd[i] == ';') ||
+				(strClosedContourCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strClosedContourCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecClosedContourOp.size());
+				vecClosedContourOp.resize(iNextOp + 1);
+				vecClosedContourOp[iNextOp].Parse(varreg, strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	// Parse the no closed contour command string
+	std::vector<ClosedContourOp> vecNoClosedContourOp;
+	dcuparam.pvecNoClosedContourOp = &vecNoClosedContourOp;
+
+	if (strNoClosedContourCmd != "") {
+		AnnounceStartBlock("Parsing no closed contour operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strNoClosedContourCmd.length(); i++) {
+
+			if ((i == strNoClosedContourCmd.length()) ||
+				(strNoClosedContourCmd[i] == ';') ||
+				(strNoClosedContourCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strNoClosedContourCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecNoClosedContourOp.size());
+				vecNoClosedContourOp.resize(iNextOp + 1);
+				vecNoClosedContourOp[iNextOp].Parse(varreg, strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	// Parse the threshold operator command string
+	std::vector<ThresholdOp> vecThresholdOp;
+	dcuparam.pvecThresholdOp = &vecThresholdOp;
+
+	if (strThresholdCmd != "") {
+		AnnounceStartBlock("Parsing threshold operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strThresholdCmd.length(); i++) {
+
+			if ((i == strThresholdCmd.length()) ||
+				(strThresholdCmd[i] == ';') ||
+				(strThresholdCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strThresholdCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecThresholdOp.size());
+				vecThresholdOp.resize(iNextOp + 1);
+				vecThresholdOp[iNextOp].Parse(varreg, strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	// Parse the output operator command string
+	std::vector<OutputOp> vecOutputOp;
+	dcuparam.pvecOutputOp = &vecOutputOp;
+
+	if (strOutputCmd != "") {
+		AnnounceStartBlock("Parsing output operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strOutputCmd.length(); i++) {
+
+			if ((i == strOutputCmd.length()) ||
+				(strOutputCmd[i] == ';') ||
+				(strOutputCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strOutputCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecOutputOp.size());
+				vecOutputOp.resize(iNextOp + 1);
+				vecOutputOp[iNextOp].Parse(varreg, strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	// Check minimum/maximum latitude/longitude
+	if ((dcuparam.dMaxLatitude < -90.0) || (dcuparam.dMaxLatitude > 90.0)) {
+		_EXCEPTIONT("--maxlat must in the range [-90,90]");
+	}
+	if ((dcuparam.dMinLatitude < -90.0) || (dcuparam.dMinLatitude > 90.0)) {
+		_EXCEPTIONT("--minlat must in the range [-90,90]");
+	}
+	if (dcuparam.dMinLatitude > dcuparam.dMaxLatitude) {
+		_EXCEPTIONT("--minlat must be less than --maxlat");
+	}
+
+	dcuparam.dMaxLatitude *= M_PI / 180.0;
+	dcuparam.dMinLatitude *= M_PI / 180.0;
+
+	if (dcuparam.dMinLongitude < 0.0) {
+		int iMinLongitude =
+			static_cast<int>(-dcuparam.dMinLongitude / 360.0);
+		dcuparam.dMinLongitude +=
+			static_cast<double>(iMinLongitude + 1) * 360.0;
+	}
+	if (dcuparam.dMinLongitude >= 360.0) {
+		int iMinLongitude =
+			static_cast<int>(dcuparam.dMinLongitude / 360.0);
+		dcuparam.dMinLongitude -=
+			static_cast<double>(iMinLongitude - 1) * 360.0;
+	}
+	if (dcuparam.dMaxLongitude < 0.0) {
+		int iMaxLongitude =
+			static_cast<int>(-dcuparam.dMaxLatitude / 360.0);
+		dcuparam.dMaxLongitude +=
+			static_cast<double>(iMaxLongitude + 1) * 360.0;
+	}
+	if (dcuparam.dMaxLongitude >= 360.0) {
+		int iMaxLongitude =
+			static_cast<int>(dcuparam.dMaxLongitude / 360.0);
+		dcuparam.dMaxLongitude -=
+			static_cast<double>(iMaxLongitude - 1) * 360.0;
+	}
+
+	dcuparam.dMaxLongitude *= M_PI / 180.0;
+	dcuparam.dMinLongitude *= M_PI / 180.0;
+
+#if defined(TEMPEST_MPIOMP)
+	// Spread files across nodes
+	int nMPIRank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &nMPIRank);
+
+	int nMPISize;
+	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+#endif
+
+	AnnounceStartBlock("Begin search operation");
+	if (vecInputFiles.size() != 1) {
+		if (strOutput == "") {
+			Announce("Output will be written to outXXXXXX.dat");
+		} else {
+			Announce("Output will be written to %sXXXXXX.dat",
+				strOutput.c_str());
+		}
+		Announce("Logs will be written to logXXXXXX.txt");
+	}
+
+	// Loop over all files to be processed
+	for (int f = 0; f < vecInputFiles.size(); f++) {
+#if defined(TEMPEST_MPIOMP)
+		if (f % nMPISize != nMPIRank) {
+			continue;
+		}
+#endif
+		// Generate output file name
+		std::string strOutputFile;
+		if (vecInputFiles.size() == 1) {
+			dcuparam.fpLog = stdout;
+
+			if (strOutput == "") {
+				strOutputFile = "out.dat";
+			} else {
+				strOutputFile = strOutput;
+			}
+
+		} else {
+			char szFileIndex[32];
+			sprintf(szFileIndex, "%06i", f);
+			if (strOutput == "") {
+				strOutputFile = "out" + std::string(szFileIndex) + ".dat";
+			} else {
+				strOutputFile = strOutput + std::string(szFileIndex) + ".dat";
+			}
+
+			std::string strLogFile = "log" + std::string(szFileIndex) + ".txt";
+			dcuparam.fpLog = fopen(strLogFile.c_str(), "w");
+		}
+
+		// Perform DetectCyclonesUnstructured
+		DetectCyclonesUnstructured(
+			f,
+			vecInputFiles[f],
+			strOutputFile,
+			strConnectivity,
+			varreg,
+			dcuparam);
+
+		// Close the log file
+		if (vecInputFiles.size() != 1) {
+			fclose(dcuparam.fpLog);
+		}
+	}
+
 	AnnounceEndBlock("Done");
 
 	AnnounceBanner();
@@ -2021,5 +2270,10 @@ try {
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());
 }
+
+#if defined(TEMPEST_MPIOMP)
+	// Deinitialize MPI
+	MPI_Finalize();
+#endif
 }
 

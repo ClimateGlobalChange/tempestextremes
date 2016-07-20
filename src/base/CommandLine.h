@@ -17,13 +17,14 @@
 #ifndef _COMMANDLINE_H_
 #define _COMMANDLINE_H_
 
+#include "TimeObj.h"
+#include "Announce.h"
 #include "Exception.h"
 
 #include <vector>
 #include <string>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -36,6 +37,7 @@ enum ParameterType {
 	ParameterTypeString,
 	ParameterTypeInt,
 	ParameterTypeDouble,
+	ParameterTypeTime
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -59,8 +61,8 @@ public:
 	///	<summary>
 	///		Virtual destructor.
 	///	</summary>
-	virtual ~CommandLineParameter()
-	{ }
+	virtual ~CommandLineParameter() {
+	}
 
 	///	<summary>
 	///		Identify the type of parameter.
@@ -146,7 +148,7 @@ public:
 	///		Print the usage information of this parameter.
 	///	</summary>
 	virtual void PrintUsage() const {
-		printf("  %s <bool> [%s] %s\n",
+		Announce("  %s <bool> [%s] %s",
 			m_strName.c_str(),
 			(m_fValue)?("true"):("false"),
 			m_strDescription.c_str());
@@ -206,7 +208,7 @@ public:
 	///		Print the usage information of this parameter.
 	///	</summary>
 	virtual void PrintUsage() const {
-		printf("  %s <string> [\"%s\"] %s\n",
+		Announce("  %s <string> [\"%s\"] %s",
 			m_strName.c_str(),
 			m_strValue.c_str(),
 			m_strDescription.c_str());
@@ -272,7 +274,7 @@ public:
 	///		Print the usage information of this parameter.
 	///	</summary>
 	virtual void PrintUsage() const {
-		printf("  %s <integer> [%i] %s\n",
+		Announce("  %s <integer> [%i] %s",
 			m_strName.c_str(),
 			m_dValue,
 			m_strDescription.c_str());
@@ -338,10 +340,17 @@ public:
 	///		Print the usage information of this parameter.
 	///	</summary>
 	virtual void PrintUsage() const {
-		printf("  %s <double> [%f] %s\n",
-			m_strName.c_str(),
-			m_dValue,
-			m_strDescription.c_str());
+		if (fabs(m_dValue) < 1.0e6) {
+			Announce("  %s <double> [%f] %s",
+				m_strName.c_str(),
+				m_dValue,
+				m_strDescription.c_str());
+		} else {
+			Announce("  %s <double> [%e] %s",
+				m_strName.c_str(),
+				m_dValue,
+				m_strDescription.c_str());
+		}
 	}
 
 	///	<summary>
@@ -367,100 +376,88 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		Parse command line parameters.
+///		A command line Time
 ///	</summary>
-void _ParseCommandLine(
-	int argc,
-	char ** argv,
-	std::vector<CommandLineParameter*> & vecParameters,
-	bool & errorCommandLine
-) {
-	for (int command = 1; command < argc; command++) {
-		bool found = false;
+class CommandLineParameterTime : public CommandLineParameter {
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	CommandLineParameterTime(
+		Time & ref,
+		std::string strName,
+	 	std::string strDefaultValue,
+		std::string strDescription,
+		Time::TimeType eTimeType = Time::TypeFixed
+	) :
+		CommandLineParameter(strName, strDescription),
+		m_timeValue(ref),
+		m_eTimeType(eTimeType)
+	{
+		m_timeValue.FromFormattedString(strDefaultValue);
+		m_timeValue.SetTimeType(m_eTimeType);
+	}
 
-		// Include command line arguments from file
-		if ((command == 1) &&
-			(strlen(argv[command]) > 0) &&
-			(argv[command][0] != '-')
-		) {
-			std::vector<std::string> strFileCommands;
-			
-			std::ifstream filein(argv[command]);
-			if (filein.fail()) {
-				_EXCEPTION1("No command line file \"%s\" found",
-					argv[command]);
-			}
+	///	<summary>
+	///		Identify the type of parameter.
+	///	</summary>
+	virtual ParameterType GetParameterType() {
+		return ParameterTypeTime;
+	}
 
-			for (;;) {
-				std::string strInput;
-				filein >> strInput;
-				if (filein.eof()) {
-					break;
-				}
-				strFileCommands.push_back(strInput);
-			}
+	///	<summary>
+	///		Number of values required.
+	///	</summary>
+	virtual int GetValueCount() const {
+		return (1);
+	}
 
-			// Build command
-			if (strFileCommands.size() != 0) {
-				if (strFileCommands[0][0] != '-') {
-					_EXCEPTIONT("Command line file must only contain commands");
-				}
-				int argcin = (int)strFileCommands.size()+1;
-				std::vector<char*> argvin;
-				argvin.reserve(argcin);
-				argvin.push_back(argv[0]);
-				for (int d = 0; d < argcin; d++) {
-					argvin.push_back(&(strFileCommands[d][0]));
-				}
+	///	<summary>
+	///		Print the usage information of this parameter.
+	///	</summary>
+	virtual void PrintUsage() const {
+		if (m_eTimeType == Time::TypeFixed) {
+			Announce("  %s <time> [%s] %s",
+				m_strName.c_str(),
+				m_timeValue.ToFreeString().c_str(),
+				m_strDescription.c_str());
 
-				// Recursively call this routine
-				_ParseCommandLine(
-					argcin, &(argvin[0]), vecParameters, errorCommandLine);
+		} else if (m_eTimeType == Time::TypeDelta) {
+			Announce("  %s <dtime> [%s] %s",
+				m_strName.c_str(),
+				m_timeValue.ToFreeString().c_str(),
+				m_strDescription.c_str());
 
-				continue;
-			}
-		}
-
-		// Parse parameters
-		for (int p = 0; p < vecParameters.size(); p++) {
-			if (vecParameters[p]->m_strName == argv[command]) {
-				found = true;
-				vecParameters[p]->Activate();
-				int z;
-				if (vecParameters[p]->GetValueCount() >= argc - command) {
-					printf("Error: Insufficient values for option %s\n",
-						argv[command]);
-					errorCommandLine = true;
-					command = argc;
-					break;
-				}
-				for (z = 0; z < vecParameters[p]->GetValueCount(); z++) {
-					if ((command + z + 1 < argc) &&
-						(strlen(argv[command + z + 1]) > 2) &&
-						(argv[command + z + 1][0] == '-') &&
-						(argv[command + z + 1][1] == '-')
-					) break;
-					command++;
-					vecParameters[p]->SetValue(z, argv[command]);
-				}
-				if ((vecParameters[p]->GetValueCount() >= 0) &&
-					(z != vecParameters[p]->GetValueCount())
-				) {
-					printf("Error: Insufficient values for option %s\n",
-						argv[command]);
-					errorCommandLine = true;
-					command = argc;
-					break;
-				}
-			}
-		}
-		if (!found) {
-			printf("Error: Invalid parameter \"%s\"\n", argv[command]);
-			errorCommandLine = true;
-			break;
+		} else {
+			_EXCEPTIONT("Invalid TimeType");
 		}
 	}
-}
+
+	///	<summary>
+	///		Set the value from a string.
+	///	</summary>
+	virtual void SetValue(
+		int ix,
+		std::string strValue
+	) {
+		if (ix != 0) {
+			_EXCEPTIONT("Invalid value index.");
+		}
+		m_timeValue.FromFormattedString(strValue);
+		m_timeValue.SetTimeType(m_eTimeType);
+	}
+
+public:
+	///	<summary>
+	///		Parameter value.
+	///	</summary>
+	Time & m_timeValue;
+
+	///	<summary>
+	///		Time type.
+	///	</summary>
+	Time::TimeType m_eTimeType;
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -528,11 +525,37 @@ void _ParseCommandLine(
 		new CommandLineParameterDouble(ref, name, value, desc));
 
 ///	<summary>
+///		Define a new command line Time parameter.
+///	</summary>
+#define CommandLineFixedTime(ref, name, value) \
+	_vecParameters.push_back( \
+		new CommandLineParameterTime(ref, name, value, "", Time::TypeFixed));
+
+///	<summary>
+///		Define a new command line Time parameter with description.
+///	</summary>
+#define CommandLineFixedTimeD(ref, name, value, desc) \
+	_vecParameters.push_back( \
+		new CommandLineParameterTime(ref, name, value, desc, Time::TypeFixed));
+
+///	<summary>
+///		Define a new command line Time parameter.
+///	</summary>
+#define CommandLineDeltaTime(ref, name, value) \
+	_vecParameters.push_back( \
+		new CommandLineParameterTime(ref, name, value, "", Time::TypeDelta));
+
+///	<summary>
+///		Define a new command line Time parameter with description.
+///	</summary>
+#define CommandLineDeltaTimeD(ref, name, value, desc) \
+	_vecParameters.push_back( \
+		new CommandLineParameterTime(ref, name, value, desc, Time::TypeDelta));
+
+///	<summary>
 ///		Begin the loop for command line parameters.
 ///	</summary>
 #define ParseCommandLine(argc, argv) \
-	_ParseCommandLine(argc, argv, _vecParameters, _errorCommandLine);
-/*
     for(int _command = 1; _command < argc; _command++) { \
 		bool _found = false; \
 		for(int _p = 0; _p < _vecParameters.size(); _p++) { \
@@ -541,7 +564,7 @@ void _ParseCommandLine(
 				_vecParameters[_p]->Activate(); \
 				int _z; \
 				if (_vecParameters[_p]->GetValueCount() >= argc - _command) { \
-					printf("Error: Insufficient values for option %s\n", \
+					Announce("Error: Insufficient values for option %s", \
 						argv[_command]); \
 					_errorCommandLine = true; \
 					_command = argc; \
@@ -559,7 +582,7 @@ void _ParseCommandLine(
 				if ((_vecParameters[_p]->GetValueCount() >= 0) && \
 					(_z != _vecParameters[_p]->GetValueCount()) \
 				) { \
-					printf("Error: Insufficient values for option %s\n", \
+					Announce("Error: Insufficient values for option %s", \
 						argv[_command]); \
 					_errorCommandLine = true; \
 					_command = argc; \
@@ -568,19 +591,17 @@ void _ParseCommandLine(
 			} \
 		} \
 		if (!_found) { \
-			printf("Error: Invalid parameter \"%s\"\n", argv[_command]); \
-			_errorCommandLine = true; \
-			break; \
+			Announce("Warning: Invalid parameter \"%s\"", argv[_command]); \
 		} \
 	}
-*/
+
 ///	<summary>
 ///		Print usage information.
 ///	</summary>
 #define PrintCommandLineUsage(argv) \
 	if (_errorCommandLine) \
-		printf("\nUsage: %s <Parameter List>\n", argv[0]); \
-	printf("Parameters:\n"); \
+		Announce("\nUsage: %s <Parameter List>", argv[0]); \
+	Announce("Parameters:"); \
 	for (int _p = 0; _p < _vecParameters.size(); _p++) \
 		_vecParameters[_p]->PrintUsage(); \
 	if (_errorCommandLine) \

@@ -54,6 +54,11 @@ public:
 	///	</summary>
 	Variable & Get(VariableIndex varix);
 
+	///	<summary>
+	///		Unload all data.
+	///	</summary>
+	void UnloadAllGridData();
+
 private:
 	///	<summary>
 	///		Array of variables.
@@ -128,6 +133,11 @@ public:
 		const SimpleGrid & grid,
 		int iTime = (-1)
 	);
+
+	///	<summary>
+	///		Unload the current data block.
+	///	</summary>
+	void UnloadGridData();
 
 	///	<summary>
 	///		Get the data associated with this variable.

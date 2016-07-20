@@ -127,7 +127,7 @@ bool Time::operator>(const Time & time) const {
 
 void Time::VerifyTime() {
 
-	// Calendar without / with leap years
+	// Calendar with no leap years
 	if ((m_eCalendarType == CalendarNoLeap) || 
 		(m_eCalendarType == CalendarStandard)
 	) {
@@ -135,10 +135,7 @@ void Time::VerifyTime() {
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 		if (m_eCalendarType == CalendarStandard) {
-			if (((m_iYear % 4) == 0) && ((m_iYear % 100) != 0)) {
-				nDaysPerMonth[1] = 29;
-			}
-			if ((m_iYear % 400) == 0) {
+			if (((m_iYear % 4) == 0) && ((m_iYear % 1000) != 0)) {
 				nDaysPerMonth[1] = 29;
 			}
 		}
@@ -177,10 +174,7 @@ void Time::NormalizeTime() {
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 		if (m_eCalendarType == CalendarStandard) {
-			if (((m_iYear % 4) == 0) && ((m_iYear % 100) != 0)) {
-				nDaysPerMonth[1] = 29;
-			}
-			if ((m_iYear % 400) == 0) {
+			if (((m_iYear % 4) == 0) && ((m_iYear % 1000) != 0)) {
 				nDaysPerMonth[1] = 29;
 			}
 		}
@@ -231,13 +225,10 @@ void Time::NormalizeTime() {
 
 				// Adjust number of days per month
 				if (m_eCalendarType == CalendarStandard) {
-					nDaysPerMonth[1] = 28;
-
-					if (((m_iYear % 4) == 0) && ((m_iYear % 100) != 0)) {
+					if (((m_iYear % 4) == 0) && ((m_iYear % 1000) != 0)) {
 						nDaysPerMonth[1] = 29;
-					}
-					if ((m_iYear % 400) == 0) {
-						nDaysPerMonth[1] = 29;
+					} else {
+						nDaysPerMonth[1] = 28;
 					}
 				}
 			}
@@ -254,13 +245,10 @@ void Time::NormalizeTime() {
 
 				// Adjust number of days per month
 				if (m_eCalendarType == CalendarStandard) {
-					nDaysPerMonth[1] = 28;
-
-					if (((m_iYear % 4) == 0) && ((m_iYear % 100) != 0)) {
+					if (((m_iYear % 4) == 0) && ((m_iYear % 1000) != 0)) {
 						nDaysPerMonth[1] = 29;
-					}
-					if ((m_iYear % 400) == 0) {
-						nDaysPerMonth[1] = 29;
+					} else {
+						nDaysPerMonth[1] = 28;
 					}
 				}
 			}
@@ -299,6 +287,14 @@ void Time::AddTime(const Time & timeDelta) {
 	NormalizeTime();
 }
 
+///////////////////////////////////////////////////////////////////////////////
+/*
+Time Time::operator+(double dSeconds) const {
+	Time timeNew = (*this);
+	timeNew += dSeconds;
+	return timeNew;
+}
+*/
 ///////////////////////////////////////////////////////////////////////////////
 
 double Time::operator-(const Time & time) const {
@@ -472,10 +468,6 @@ std::string Time::ToFreeString() const {
 
 	char szBuffer[100];
 
-	if (m_eTimeType != TypeDelta) {
-		_EXCEPTIONT("ToFreeString() only valid for Time::TypeDelta");
-	}
-
 	if (m_iYear != 0) {
 		sprintf(szBuffer, "%iy", m_iYear);
 		strFreeString += szBuffer;
@@ -566,13 +558,10 @@ void Time::FromFormattedString(
 		    (strFormattedTime[i] == ' ')
 		) {
 			if (state != FormatState_Date) {
-				break;
-/*
 				_EXCEPTION1(
 					"Malformed Time string (%s): "
 						"Cannot return to Date format",
 						strFormattedTime.c_str());
-*/
 			}
 
 			if (szYear == NULL) {
