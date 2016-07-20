@@ -1903,6 +1903,9 @@ try {
 	// Output file
 	std::string strOutput;
 
+	// Output file list
+	std::string strOutputFileList;
+
 	// Variable to search for the minimum
 	std::string strSearchByMin;
 
@@ -1954,6 +1957,7 @@ try {
 		CommandLineString(strInputFileList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineString(strOutput, "out", "");
+		CommandLineString(strOutputFileList, "out_list", "");
 		CommandLineStringD(strSearchByMin, "searchbymin", "", "(default PSL)");
 		CommandLineString(strSearchByMax, "searchbymax", "");
 		CommandLineDoubleD(dcuparam.dMinLongitude, "minlon", 0.0, "(degrees)");
@@ -1991,8 +1995,15 @@ try {
 			" may be specified");
 	}
 
+	// Check output
+	if ((strOutput.length() != 0) && (strOutputFileList.length() != 0)) {
+		_EXCEPTIONT("Only one of (--out) or (--out_data_list)"
+			" may be specified");
+	}
+
 	// Load input file list
 	std::vector<std::string> vecInputFiles;
+
 	if (strInputFile.length() != 0) {
 		vecInputFiles.push_back(strInputFile);
 
@@ -2013,12 +2024,33 @@ try {
 			vecInputFiles.push_back(strFileLine);
 		}
 	}
-/*
-	// Check output
-	if (strOutputFile.length() == 0) {
-		_EXCEPTIONT("No output file (--out) specified");
+
+	// Load output file list
+	std::vector<std::string> vecOutputFiles;
+
+	if (strOutputFileList.length() != 0) {
+
+		std::ifstream ifOutputFileList(strOutputFileList);
+		if (!ifOutputFileList.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\"",
+				strOutputFileList.c_str());
+		}
+		std::string strFileLine;
+		while (std::getline(ifOutputFileList, strFileLine)) {
+			if (strFileLine.length() == 0) {
+				continue;
+			}
+			if (strFileLine[0] == '#') {
+				continue;
+			}
+			vecOutputFiles.push_back(strFileLine);
+		}
+
+		if (vecOutputFiles.size() != vecInputFiles.size()) {
+			_EXCEPTIONT("File --in_file_list must match --out_file_list");
+		}
 	}
-*/
+
 	// Only one of search by min or search by max should be specified
 	if ((strSearchByMin == "") && (strSearchByMax == "")) {
 		strSearchByMin = "PSL";
@@ -2208,7 +2240,9 @@ try {
 
 	AnnounceStartBlock("Begin search operation");
 	if (vecInputFiles.size() != 1) {
-		if (strOutput == "") {
+		if (vecOutputFiles.size() != 0) {
+			Announce("Output will be written following --out_file_list");
+		} else if (strOutput == "") {
 			Announce("Output will be written to outXXXXXX.dat");
 		} else {
 			Announce("Output will be written to %sXXXXXX.dat",
@@ -2238,10 +2272,17 @@ try {
 		} else {
 			char szFileIndex[32];
 			sprintf(szFileIndex, "%06i", f);
-			if (strOutput == "") {
-				strOutputFile = "out" + std::string(szFileIndex) + ".dat";
+
+			if (vecOutputFiles.size() != 0) {
+				strOutputFile = vecOutputFiles[f];
 			} else {
-				strOutputFile = strOutput + std::string(szFileIndex) + ".dat";
+				if (strOutput == "") {
+					strOutputFile =
+						"out" + std::string(szFileIndex) + ".dat";
+				} else {
+					strOutputFile =
+						strOutput + std::string(szFileIndex) + ".dat";
+				}
 			}
 
 			std::string strLogFile = "log" + std::string(szFileIndex) + ".txt";
