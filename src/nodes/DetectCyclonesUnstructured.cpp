@@ -1957,7 +1957,7 @@ try {
 		CommandLineString(strInputFileList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineString(strOutput, "out", "");
-		CommandLineString(strOutputFileList, "out_list", "");
+		CommandLineString(strOutputFileList, "out_file_list", "");
 		CommandLineStringD(strSearchByMin, "searchbymin", "", "(default PSL)");
 		CommandLineString(strSearchByMax, "searchbymax", "");
 		CommandLineDoubleD(dcuparam.dMinLongitude, "minlon", 0.0, "(degrees)");

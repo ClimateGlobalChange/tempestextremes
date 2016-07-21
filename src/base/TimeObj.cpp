@@ -135,8 +135,11 @@ void Time::VerifyTime() {
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 		if (m_eCalendarType == CalendarStandard) {
-			if (((m_iYear % 4) == 0) && ((m_iYear % 1000) != 0)) {
+			if ((m_iYear % 4) == 0) {
 				nDaysPerMonth[1] = 29;
+				if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
+					nDaysPerMonth[1] = 28;
+				}
 			}
 		}
 
@@ -174,8 +177,11 @@ void Time::NormalizeTime() {
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
 		if (m_eCalendarType == CalendarStandard) {
-			if (((m_iYear % 4) == 0) && ((m_iYear % 1000) != 0)) {
+			if ((m_iYear % 4) == 0) {
 				nDaysPerMonth[1] = 29;
+				if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
+					nDaysPerMonth[1] = 28;
+				}
 			}
 		}
 
@@ -225,10 +231,12 @@ void Time::NormalizeTime() {
 
 				// Adjust number of days per month
 				if (m_eCalendarType == CalendarStandard) {
-					if (((m_iYear % 4) == 0) && ((m_iYear % 1000) != 0)) {
+					nDaysPerMonth[1] = 28;
+					if ((m_iYear % 4) == 0) {
 						nDaysPerMonth[1] = 29;
-					} else {
-						nDaysPerMonth[1] = 28;
+						if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
+							nDaysPerMonth[1] = 28;
+						}
 					}
 				}
 			}
@@ -245,10 +253,12 @@ void Time::NormalizeTime() {
 
 				// Adjust number of days per month
 				if (m_eCalendarType == CalendarStandard) {
-					if (((m_iYear % 4) == 0) && ((m_iYear % 1000) != 0)) {
+					nDaysPerMonth[1] = 28;
+					if ((m_iYear % 4) == 0) {
 						nDaysPerMonth[1] = 29;
-					} else {
-						nDaysPerMonth[1] = 28;
+						if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
+							nDaysPerMonth[1] = 28;
+						}
 					}
 				}
 			}
@@ -558,10 +568,13 @@ void Time::FromFormattedString(
 		    (strFormattedTime[i] == ' ')
 		) {
 			if (state != FormatState_Date) {
+				break;
+/*
 				_EXCEPTION1(
 					"Malformed Time string (%s): "
 						"Cannot return to Date format",
 						strFormattedTime.c_str());
+*/
 			}
 
 			if (szYear == NULL) {
