@@ -36,6 +36,11 @@ int g_iVerbosityLevel = 0;
 ///	</summary>
 FILE * g_fpAnnounceOutput = stdout;
 
+///	<summary>
+///		Only output on rank 0.
+///	</summary>
+bool g_fOnlyOutputOnRankZero = true;
+
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
@@ -83,6 +88,18 @@ void AnnounceSetVerbosityLevel(int iVerbosityLevel) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void AnnounceOnlyOutputOnRankZero() {
+	g_fOnlyOutputOnRankZero = true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void AnnounceOutputOnAllRanks() {
+	g_fOnlyOutputOnRankZero = false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void AnnounceStartBlock(const char * szText) {
 
 	// Do not start a block at maximum indentation level
@@ -91,13 +108,15 @@ void AnnounceStartBlock(const char * szText) {
 	}
 
 #ifdef TEMPEST_MPIOMP
-	// Retrieve the rank of this processor
-	int nRank;
+	// Only output on rank zero
+	if (g_fOnlyOutputOnRankZero) {
+		int nRank;
 
-	MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
+		MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
 
-	if (nRank > 0) {
-		return;
+		if (nRank > 0) {
+			return;
+		}
 	}
 #endif
 
@@ -144,13 +163,15 @@ void AnnounceEndBlock(const char * szText) {
 	}
 
 #ifdef TEMPEST_MPIOMP
-	// Retrieve the rank of this processor
-	int nRank;
+	// Only output on rank zero
+	if (g_fOnlyOutputOnRankZero) {
+		int nRank;
 
-	MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
+		MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
 
-	if (nRank > 0) {
-		return;
+		if (nRank > 0) {
+			return;
+		}
 	}
 #endif
 
@@ -191,13 +212,15 @@ void AnnounceEndBlock(
 void Announce(const char * szText, ...) {
 
 #ifdef TEMPEST_MPIOMP
-	// Retrieve the rank of this processor
-	int nRank;
+	// Only output on rank zero
+	if (g_fOnlyOutputOnRankZero) {
+		int nRank;
 
-	MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
+		MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
 
-	if (nRank > 0) {
-		return;
+		if (nRank > 0) {
+			return;
+		}
 	}
 #endif
 
@@ -246,13 +269,15 @@ void Announce(
 ) {
 
 #ifdef TEMPEST_MPIOMP
-	// Retrieve the rank of this processor
-	int nRank;
+	// Only output on rank zero
+	if (g_fOnlyOutputOnRankZero) {
+		int nRank;
 
-	MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
+		MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
 
-	if (nRank > 0) {
-		return;
+		if (nRank > 0) {
+			return;
+		}
 	}
 #endif
 
@@ -302,13 +327,15 @@ void Announce(
 void AnnounceBanner(const char * szText) {
 
 #ifdef TEMPEST_MPIOMP
-	// Retrieve the rank of this processor
-	int nRank;
+	// Only output on rank zero
+	if (g_fOnlyOutputOnRankZero) {
+		int nRank;
 
-	MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
+		MPI_Comm_rank(MPI_COMM_WORLD, &nRank);
 
-	if (nRank > 0) {
-		return;
+		if (nRank > 0) {
+			return;
+		}
 	}
 #endif
 

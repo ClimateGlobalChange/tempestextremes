@@ -29,6 +29,8 @@ extern int g_iVerbosityLevel;
 
 extern FILE * g_fpOutputBuffer;
 
+extern bool g_fOnlyOutputOnRankZero;
+
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
@@ -45,6 +47,16 @@ void AnnounceSetOutputBuffer(FILE * fpOutputBuffer);
 ///		Set the verbosity level.
 ///	</summary>
 void AnnounceSetVerbosityLevel(int iVerbosityLevel);
+
+///	<summary>
+///		Only output on rank zero.
+///	</summary>
+void AnnounceOnlyOutputOnRankZero();
+
+///	<summary>
+///		Allow output on all ranks.
+///	</summary>
+void AnnounceOutputOnAllRanks();
 
 ///	<summary>
 ///		Begin a new announcement block.

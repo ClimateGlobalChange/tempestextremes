@@ -1221,6 +1221,7 @@ void DetectCyclonesUnstructured(
 	}
 
 	AnnounceSetOutputBuffer(param.fpLog);
+	AnnounceOutputOnAllRanks();
 
 	// Check minimum longitude / latitude
 	if ((param.dMinLongitude < 0.0) || (param.dMinLongitude >= 360.0)) {
@@ -1873,6 +1874,7 @@ void DetectCyclonesUnstructured(
 
 	// Reset the Announce buffer
 	AnnounceSetOutputBuffer(stdout);
+	AnnounceOnlyOutputOnRankZero();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
