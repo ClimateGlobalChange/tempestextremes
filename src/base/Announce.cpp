@@ -39,7 +39,7 @@ FILE * g_fpAnnounceOutput = stdout;
 ///	<summary>
 ///		Only output on rank 0.
 ///	</summary>
-bool g_fOnlyOutputOnRankZero = true;
+bool g_fOnlyOutputOnRankZero = false;
 
 ///////////////////////////////////////////////////////////////////////////////
 

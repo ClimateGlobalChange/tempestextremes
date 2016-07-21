@@ -1889,6 +1889,9 @@ int main(int argc, char** argv) {
 	// Turn off fatal errors in NetCDF
 	NcError error(NcError::silent_nonfatal);
 
+	// Enable output only on rank zero
+	AnnounceOnlyOutputOnRankZero();
+
 try {
 	// Parameters for DetectCycloneUnstructured
 	DetectCyclonesParam dcuparam;
