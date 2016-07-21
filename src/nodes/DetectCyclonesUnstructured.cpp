@@ -2013,7 +2013,7 @@ try {
 		vecInputFiles.push_back(strInputFile);
 
 	} else {
-		std::ifstream ifInputFileList(strInputFileList);
+		std::ifstream ifInputFileList(strInputFileList.c_str());
 		if (!ifInputFileList.is_open()) {
 			_EXCEPTION1("Unable to open file \"%s\"",
 				strInputFileList.c_str());
@@ -2035,7 +2035,7 @@ try {
 
 	if (strOutputFileList.length() != 0) {
 
-		std::ifstream ifOutputFileList(strOutputFileList);
+		std::ifstream ifOutputFileList(strOutputFileList.c_str());
 		if (!ifOutputFileList.is_open()) {
 			_EXCEPTION1("Unable to open file \"%s\"",
 				strOutputFileList.c_str());
