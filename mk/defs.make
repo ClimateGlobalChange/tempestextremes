@@ -44,6 +44,7 @@ else ifeq ($(PARALLEL),HPX)
   CXXFLAGS+= -DTEMPEST_HPX $(HPX_CXXFLAGS)
   LIBRARIES+= $(HPX_LIBRARIES)
   LDFLAGS+=   $(HPX_LDFLAGS)
+else ifeq ($(PARALLEL),NONE)
 else
   $(error mk/config.make does not properly define PARALLEL)
 endif
