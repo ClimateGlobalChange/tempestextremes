@@ -1141,6 +1141,7 @@ public:
 		fSearchByMinima(false),
 		dMaxLatitude(0.0),
 		dMinLatitude(0.0),
+		dMinAbsLatitude(0.0),
 		dMaxLongitude(0.0),
 		dMinLongitude(0.0),
 		dMergeDist(0.0),
@@ -1169,6 +1170,9 @@ public:
 
 	// Minimum latitude for detection
 	double dMinLatitude;
+
+	// Minimum absolute value of latitude for detection
+	double dMinAbsLatitude;
 
 	// Maximum longitude for detection
 	double dMaxLongitude;
@@ -1235,6 +1239,9 @@ void DetectCyclonesUnstructured(
 	}
 	if ((param.dMinLatitude < -90.0) || (param.dMinLatitude > 90.0)) {
 		_EXCEPTIONT("--minlat must in the range [-90,90]");
+	}
+	if ((param.dMinAbsLatitude < 0.0) || (param.dMinAbsLatitude > 90.0)) {
+		_EXCEPTIONT("--minabslat must in the range [0,90]");
 	}
 
 	// Dereference pointers to operators
@@ -1417,7 +1424,8 @@ void DetectCyclonesUnstructured(
 
 		// Eliminate based on interval
 		if ((param.dMinLatitude != param.dMaxLatitude) ||
-		    (param.dMinLongitude != param.dMaxLongitude)
+		    (param.dMinLongitude != param.dMaxLongitude) ||
+			(param.dMinAbsLatitude != 0.0)
 		) {
 			std::set<int> setNewCandidates;
 
@@ -1463,6 +1471,12 @@ void DetectCyclonesUnstructured(
 							nRejectedLocation++;
 							continue;
 						}
+					}
+				}
+				if (param.dMinAbsLatitude != 0.0) {
+					if (fabs(dLat) < param.dMinAbsLatitude) {
+						nRejectedLocation++;
+						continue;
 					}
 				}
 				setNewCandidates.insert(*iterCandidate);
@@ -1916,22 +1930,7 @@ try {
 
 	// Variable to search for the maximum
 	std::string strSearchByMax;
-/*
-	// Maximum latitude for detection
-	double dMaxLatitude;
 
-	// Minimum latitude for detection
-	double dMinLatitude;
-
-	// Maximum longitude for detection
-	double dMaxLongitude;
-
-	// Minimum longitude for detection
-	double dMinLongitude;
-
-	// Merge distance
-	double dMergeDist;
-*/
 	// Closed contour commands
 	std::string strClosedContourCmd;
 
@@ -1943,19 +1942,7 @@ try {
 
 	// Output commands
 	std::string strOutputCmd;
-/*
-	// Time stride
-	int nTimeStride;
 
-	// Regional (do not wrap longitudinal boundaries)
-	bool fRegional;
-
-	// Output header
-	bool fOutputHeader;
-
-	// Verbosity level
-	int iVerbosityLevel;
-*/
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in_data", "");
@@ -1969,6 +1956,7 @@ try {
 		CommandLineDoubleD(dcuparam.dMaxLongitude, "maxlon", 0.0, "(degrees)");
 		CommandLineDoubleD(dcuparam.dMinLatitude, "minlat", 0.0, "(degrees)");
 		CommandLineDoubleD(dcuparam.dMaxLatitude, "maxlat", 0.0, "(degrees)");
+		CommandLineDoubleD(dcuparam.dMinAbsLatitude, "minabslat", 0.0, "(degrees)");
 		CommandLineDoubleD(dcuparam.dMergeDist, "mergedist", 0.0, "(degrees)");
 		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
 		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
