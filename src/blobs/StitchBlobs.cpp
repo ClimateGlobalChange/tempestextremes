@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
-///	\file    StitchNodes.cpp
+///	\file    StitchBlobs.cpp
 ///	\author  Paul Ullrich
 ///	\version October 1st, 2014
 ///
@@ -35,6 +35,10 @@
 #include <string>
 #include <set>
 #include <map>
+
+///////////////////////////////////////////////////////////////////////////////
+
+static const double EarthRadius = 6.37122e6;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -101,6 +105,384 @@ struct Tag {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// Set of indicator locations stored as latitude-longitude pairs
+typedef std::set<LatLonPair> IndicatorSet;
+typedef IndicatorSet::iterator IndicatorSetIterator;
+typedef IndicatorSet::const_iterator IndicatorSetConstIterator;
+
+///////////////////////////////////////////////////////////////////////////////
+
+class BlobThresholdOp {
+
+public:
+	///	<summary>
+	///		Possible operations.
+	///	</summary>
+	enum ThresholdQuantity {
+		MinArea,
+		MaxArea,
+		MinArealFraction,
+		MaxArealFraction,
+		EastwardOrientation,
+		WestwardOrientation
+	};
+
+public:
+	///	<summary>
+	///		Parse a threshold operator string.
+	///	</summary>
+	void Parse(
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Quantity,
+			ReadMode_Value,
+			ReadMode_MinCount,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Quantity;
+
+		// Loop through string
+		int iLast = 0;
+		for (int i = 0; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in threshold quantity
+				if (eReadMode == ReadMode_Quantity) {
+					if (strSubStr == "minarea") {
+						m_eQuantity = MinArea;
+						eReadMode = ReadMode_Value;
+
+					} else if (strSubStr == "maxarea") {
+						m_eQuantity = MaxArea;
+						eReadMode = ReadMode_Value;
+
+					} else if (strSubStr == "minarealfraction") {
+						m_eQuantity = MinArealFraction;
+						eReadMode = ReadMode_Value;
+
+					} else if (strSubStr == "maxarealfraction") {
+						m_eQuantity = MaxArealFraction;
+						eReadMode = ReadMode_Value;
+
+					} else if (strSubStr == "eastwardorientation") {
+						m_eQuantity = EastwardOrientation;
+						eReadMode = ReadMode_MinCount;
+
+					} else if (strSubStr == "westwardorientation") {
+						m_eQuantity = WestwardOrientation;
+						eReadMode = ReadMode_MinCount;
+
+					} else {
+						_EXCEPTION1("Threshold invalid quantity \"%s\"",
+							strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+
+				// Read in value
+				} else if (eReadMode == ReadMode_Value) {
+					m_dValue = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_MinCount;
+
+				// Read in minimum count
+				} else if (eReadMode == ReadMode_MinCount) {
+					if (strSubStr == "all") {
+						m_nMinimumCount = (-1);
+					} else {
+						m_nMinimumCount = atoi(strSubStr.c_str());
+					}
+
+					if (m_nMinimumCount < -1) {
+						_EXCEPTION1("Invalid minimum count \"%i\"",
+							m_nMinimumCount);
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("Too many entries in threshold string \"%s\"",
+						strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("Insufficient entries in threshold string \"%s\"",
+					strOp.c_str());
+		}
+
+		// Output announcement
+		std::string strDescription;
+
+		char szValue[128];
+		sprintf(szValue, "%f", m_dValue);
+
+		if (m_eQuantity == MinArea) {
+			strDescription += "Minimum area ";
+			strDescription += szValue;
+		} else if (m_eQuantity == MaxArea) {
+			strDescription += "Maximum area ";
+			strDescription += szValue;
+		} else if (m_eQuantity == MinArealFraction) {
+			strDescription += "Minimum areal fraction ";
+			strDescription += szValue;
+		} else if (m_eQuantity == MaxArealFraction) {
+			strDescription += "Maximum areal fraction ";
+			strDescription += szValue;
+		} else if (m_eQuantity == EastwardOrientation) {
+			strDescription += "Eastward orientation ";
+		} else if (m_eQuantity == WestwardOrientation) {
+			strDescription += "Westward orientation ";
+		}
+
+		char szMinCount[160];
+		if (m_nMinimumCount == -1) {
+			strDescription += " at all times";
+		} else {
+			sprintf(szMinCount, " at least %i time(s)", m_nMinimumCount);
+			strDescription += szMinCount;
+		}
+
+		Announce("%s", strDescription.c_str());
+	}
+
+	///	<summary>
+	///		Verify that the specified path satisfies the threshold op.
+	///	</summary>
+	void Apply(
+		const DataVector<double> & dCellArea,
+		const DataVector<double> & dLatDeg,
+		const DataVector<double> & dLonDeg,
+		const std::vector<Tag> & vecBlobTags,
+		const std::vector<IndicatorSet> & vecBlobs,
+		const std::vector<LatLonBox> & vecBlobBoxes,
+		std::map<int, bool> & mapSatisfiesThreshold
+	) {
+		if (vecBlobTags.size() != vecBlobs.size()) {
+			_EXCEPTIONT("ASSERT: vecBlobTags.size() != vecBlobs.size()");
+		}
+		if (vecBlobTags.size() != vecBlobBoxes.size()) {
+			_EXCEPTIONT("ASSERT: vecBlobTags.size() != vecBlobBoxes.size()");
+		}
+
+		mapSatisfiesThreshold.clear();
+
+		// Number of longitudes
+		int nLonCount = dLonDeg.GetRows();
+
+		// Thresholds related to area
+		if ((m_eQuantity == MinArea) ||
+		    (m_eQuantity == MaxArea) ||
+		    (m_eQuantity == MinArealFraction) ||
+		    (m_eQuantity == MaxArealFraction)
+		) {
+			// Loop through all blobs
+			for (int p = 0; p < vecBlobTags.size(); p++) {
+
+				double dBoxArea = 0.0;
+				double dBlobArea = 0.0;
+
+				// Obtain an iterator to this blob in the satisfies
+				// threshold map.
+				std::map<int, bool>::iterator iterSatisfies =
+					mapSatisfiesThreshold.find(vecBlobTags[p].global_id);
+
+				if (iterSatisfies == mapSatisfiesThreshold.end()) {
+					iterSatisfies = mapSatisfiesThreshold.insert(
+						std::pair<int,bool>(
+							vecBlobTags[p].global_id, true)).first;
+
+				} else if (!iterSatisfies->second) {
+					continue;
+				}
+
+				// Calculate the area of each blob box
+				for (int i = vecBlobBoxes[p].lat[0];
+				     i <= vecBlobBoxes[p].lat[1]; i++
+				) {
+					dBoxArea += dCellArea[i]
+						* static_cast<double>(
+							vecBlobBoxes[p].Width(nLonCount));
+				}
+
+				// Calculate the area and mean lat/lon of each blob
+				IndicatorSetIterator iterBlob = vecBlobs[p].begin();
+				for (; iterBlob != vecBlobs[p].end(); iterBlob++) {
+					dBlobArea += dCellArea[iterBlob->lat];
+				}
+
+				// Minimum area
+				if (m_eQuantity == MinArea) {
+					if (dBlobArea < m_dValue) {
+						iterSatisfies->second = false;
+					}
+
+				// Maximum area
+				} else if (m_eQuantity == MaxArea) {
+					if (dBlobArea > m_dValue) {
+						iterSatisfies->second = false;
+					}
+
+				// Minimum areal fraction
+				} else if (m_eQuantity == MinArealFraction) {
+					if (dBlobArea < m_dValue * dBoxArea) {
+						iterSatisfies->second = false;
+					}
+
+				// Maximum areal fraction
+				} else if (m_eQuantity == MinArealFraction) {
+					if (dBlobArea > m_dValue * dBoxArea) {
+						iterSatisfies->second = false;
+					}
+				}
+			}
+
+		// Thresholds related to orientation
+		} else if ((m_eQuantity == EastwardOrientation) ||
+		           (m_eQuantity == WestwardOrientation)
+		) {
+			// Loop through all blobs
+			for (int p = 0; p < vecBlobTags.size(); p++) {
+
+				double dNorthHemiMeanLat = 0.0;
+				double dNorthHemiMeanLon = 0.0;
+				double dNorthHemiMeanLon2 = 0.0;
+				double dNorthHemiCoLatLon = 0.0;
+
+				double dSouthHemiMeanLat = 0.0;
+				double dSouthHemiMeanLon = 0.0;
+				double dSouthHemiMeanLon2 = 0.0;
+				double dSouthHemiCoLatLon = 0.0;
+
+				// Obtain an iterator to this blob in the satisfies
+				// threshold map.
+				std::map<int, bool>::iterator iterSatisfies =
+					mapSatisfiesThreshold.find(vecBlobTags[p].global_id);
+
+				if (iterSatisfies == mapSatisfiesThreshold.end()) {
+					iterSatisfies = mapSatisfiesThreshold.insert(
+						std::pair<int,bool>(
+							vecBlobTags[p].global_id, true)).first;
+
+				} else if (!iterSatisfies->second) {
+					continue;
+				}
+
+				// Calculate regression coefficients for this blob
+				IndicatorSetIterator iterBlob = vecBlobs[p].begin();
+				for (; iterBlob != vecBlobs[p].end(); iterBlob++) {
+
+					double dAltLon = 0.0;
+					if (dLatDeg[iterBlob->lat] > 0.0) {
+						if (iterBlob->lon < vecBlobBoxes[p].lon[0]) {
+							dAltLon = dLonDeg[iterBlob->lon] + 360.0;
+						} else {
+							dAltLon = dLonDeg[iterBlob->lon];
+						}
+
+						dNorthHemiMeanLat += dLatDeg[iterBlob->lat];
+						dNorthHemiMeanLon += dAltLon;
+						dNorthHemiMeanLon2 += dAltLon * dAltLon;
+						dNorthHemiCoLatLon += dLatDeg[iterBlob->lat] * dAltLon;
+
+					} else if (dLatDeg[iterBlob->lat] < 0.0) {
+						if (iterBlob->lon < vecBlobBoxes[p].lon[0]) {
+							dAltLon = dLonDeg[iterBlob->lon] + 360.0;
+						} else {
+							dAltLon = dLonDeg[iterBlob->lon];
+						}
+
+						dSouthHemiMeanLat += dLatDeg[iterBlob->lat];
+						dSouthHemiMeanLon += dAltLon;
+						dSouthHemiMeanLon2 += dAltLon * dAltLon;
+						dSouthHemiCoLatLon += dLatDeg[iterBlob->lat] * dAltLon;
+					}
+				}
+
+				double dBlobCount = static_cast<double>(vecBlobs[p].size());
+
+				dNorthHemiMeanLat /= dBlobCount;
+				dNorthHemiMeanLon /= dBlobCount;
+				dNorthHemiMeanLon2 /= dBlobCount;
+				dNorthHemiCoLatLon /= dBlobCount;
+
+				dSouthHemiMeanLat /= dBlobCount;
+				dSouthHemiMeanLon /= dBlobCount;
+				dSouthHemiMeanLon2 /= dBlobCount;
+				dSouthHemiCoLatLon /= dBlobCount;
+
+				// Calculate the slope of the regression line
+				double dNorthSlopeNum =
+					dNorthHemiCoLatLon
+						- dNorthHemiMeanLat * dNorthHemiMeanLon;
+
+				double dNorthSlopeDen =
+					dNorthHemiMeanLon2
+						- dNorthHemiMeanLon * dNorthHemiMeanLon;
+
+				double dSouthSlopeNum =
+					dNorthHemiCoLatLon
+						- dNorthHemiMeanLat * dNorthHemiMeanLon;
+
+				double dSouthSlopeDen =
+					dNorthHemiMeanLon2
+						- dNorthHemiMeanLon * dNorthHemiMeanLon;
+
+				// Check orientation
+				if (m_eQuantity == EastwardOrientation) {
+					if (dNorthSlopeNum * dNorthSlopeDen < 0.0) {
+						iterSatisfies->second = false;
+					}
+
+				} else if (m_eQuantity == WestwardOrientation) {
+					if (dNorthSlopeNum * dNorthSlopeDen > 0.0) {
+						iterSatisfies->second = false;
+					}
+				}
+			}
+
+		// Invalid quantity
+		} else {
+			_EXCEPTIONT("Invalid quantity");
+		}
+	}
+
+	///	<summary>
+	///		Get the minimum count associated with this threshold.
+	///	</summary>
+	int GetMinimumCount() const {
+		return m_nMinimumCount;
+	}
+
+protected:
+	///	<summary>
+	///		Threshold quantity.
+	///	</summary>
+	ThresholdQuantity m_eQuantity;
+
+	///	<summary>
+	///		Threshold value.
+	///	</summary>
+	double m_dValue;
+
+	///	<summary>
+	///		Minimum number of segments that need to satisfy the op.
+	///	</summary>
+	int m_nMinimumCount;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 	NcError error(NcError::silent_nonfatal);
@@ -122,14 +504,17 @@ try {
 	// Output variable name
 	std::string strOutputVariable;
 
-	// Minimum patch size
-	int nMinPatchSize;
+	// Minimum blob size (in grid points)
+	int nMinBlobSize;
 
-	// Minimum number of timesteps
+	// Minimum number of timesteps for blob
 	int nMinTime;
 
-	// Operate on a regional patch (no periodic boundaries)
+	// Operate on a regional area (no periodic boundaries)
 	bool fRegional;
+
+	// Threshold commands
+	std::string strThresholdCmd;
 
 	// Parse the command line
 	BeginCommandLine()
@@ -138,9 +523,10 @@ try {
 		CommandLineString(strOutputFile, "out", "");
 		CommandLineString(strVariable, "var", "");
 		CommandLineString(strOutputVariable, "outvar", "");
-		CommandLineInt(nMinPatchSize, "minsize", 1);
+		CommandLineInt(nMinBlobSize, "minsize", 1);
 		CommandLineInt(nMinTime, "mintime", 1);
 		CommandLineBool(fRegional, "regional");
+		CommandLineString(strThresholdCmd, "thresholdcmd", "");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -182,15 +568,44 @@ try {
 
 	int nFiles = vecInputFiles.size();
 
+	// Parse the threshold string
+	std::vector<BlobThresholdOp> vecThresholdOp;
+
+	if (strThresholdCmd != "") {
+		AnnounceStartBlock("Parsing thresholds");
+
+		int iLast = 0;
+		for (int i = 0; i <= strThresholdCmd.length(); i++) {
+
+			if ((i == strThresholdCmd.length()) ||
+			    (strThresholdCmd[i] == ';')
+			) {
+				std::string strSubStr =
+					strThresholdCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecThresholdOp.size());
+				vecThresholdOp.resize(iNextOp + 1);
+				vecThresholdOp[iNextOp].Parse(strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
 	// Load in spatial dimension data
 	int nLat;
 	int nLon;
 
 	DataVector<double> dataLatDeg;
-	DataVector<double> dataLat;
+	DataVector<double> dataLatRad;
 
 	DataVector<double> dataLonDeg;
-	DataVector<double> dataLon;
+	DataVector<double> dataLonRad;
+
+	// Cell areas as a function of latitude index
+	DataVector<double> dCellArea;
 
 	{
 		// Load the first netcdf input file
@@ -226,19 +641,33 @@ try {
 		nLon = dimLon->size();
 
 		dataLatDeg.Initialize(nLat);
-		dataLat.Initialize(nLat);
+		dataLatRad.Initialize(nLat);
 
 		dataLonDeg.Initialize(nLon);
-		dataLon.Initialize(nLon);
+		dataLonRad.Initialize(nLon);
 
 		varLat->get(dataLatDeg, nLat);
 		for (int j = 0; j < nLat; j++) {
-			dataLat[j] = dataLatDeg[j] * M_PI / 180.0;
+			dataLatRad[j] = dataLatDeg[j] * M_PI / 180.0;
 		}
 
 		varLon->get(dataLonDeg, nLon);
 		for (int i = 0; i < nLon; i++) {
-			dataLon[i] = dataLonDeg[i] * M_PI / 180.0;
+			dataLonRad[i] = dataLonDeg[i] * M_PI / 180.0;
+		}
+
+		// Calculate cell areas in m^2
+		double dDeltaLon = 2.0 * M_PI / static_cast<double>(nLon);
+		double dDeltaLat = M_PI / static_cast<double>(nLat);
+
+		dCellArea.Initialize(nLat);
+		for (int j = 0; j < nLat; j++) {
+			dCellArea[j] =
+				EarthRadius
+				* EarthRadius
+				* cos(dataLatRad[j])
+				* dDeltaLon
+				* dDeltaLat;
 		}
 
 		// Close first netcdf file
@@ -257,21 +686,21 @@ try {
 	// Build blobs at each time level
 	AnnounceStartBlock("Building blob set at each time level");
 
-	// Set of indicator locations
-	typedef std::set<LatLonPair> IndicatorSet;
-	typedef IndicatorSet::iterator IndicatorSetIterator;
-	typedef IndicatorSet::const_iterator IndicatorSetConstIterator;
-
+	// Buffer variables used for looping through indicators
 	IndicatorSet setIndicators;
 	IndicatorSet setNeighbors;
 
-	// Set of nodes contained in all patches
-	std::vector< std::vector<IndicatorSet> > vecAllPatches;
-	vecAllPatches.resize(nTime);
+	///////////////////////////////////////////////////////////////////////////
+	// Build the set of nodes at each time contained in each blob
+	///////////////////////////////////////////////////////////////////////////
 
-	// Bounding boxes for all patches
-	std::vector< std::vector<LatLonBox> > vecAllPatchBoxes;
-	vecAllPatchBoxes.resize(nTime);
+	// Set of nodes at each time contained in each blob
+	std::vector< std::vector<IndicatorSet> > vecAllBlobs;
+	vecAllBlobs.resize(nTime);
+
+	// Bounding boxes at each time for each blob
+	std::vector< std::vector<LatLonBox> > vecAllBlobBoxes;
+	vecAllBlobBoxes.resize(nTime);
 
 	// Time index across all files
 	int iTime = 0;
@@ -308,9 +737,9 @@ try {
 		for (int t = 0; t < nLocalTimes; t++, iTime++) {
 
 			// Get the current patch vector
-			std::vector<IndicatorSet> & vecPatches = vecAllPatches[iTime];
+			std::vector<IndicatorSet> & vecBlobs = vecAllBlobs[iTime];
 
-			std::vector<LatLonBox> & vecPatchBoxes = vecAllPatchBoxes[iTime];
+			std::vector<LatLonBox> & vecBlobBoxes = vecAllBlobBoxes[iTime];
 
 			// New announcement block for timestep
 			char szStartBlock[128];
@@ -342,12 +771,12 @@ try {
 				LatLonPair pr = *(setIndicators.begin());
 
 				// Current patch
-				int ixPatch = vecPatches.size();
-				vecPatches.resize(ixPatch+1);
-				vecPatchBoxes.resize(ixPatch+1);
+				int ixBlob = vecBlobs.size();
+				vecBlobs.resize(ixBlob+1);
+				vecBlobBoxes.resize(ixBlob+1);
 
 				// Initialize bounding box
-				LatLonBox & box = vecPatchBoxes[ixPatch];
+				LatLonBox & box = vecBlobBoxes[ixBlob];
 
 				box.lat[0] = pr.lat;
 				box.lat[1] = pr.lat;
@@ -362,8 +791,8 @@ try {
 					setNeighbors.erase(setNeighbors.begin());
 
 					// This node is already included in the patch
-					if (vecPatches[ixPatch].find(pr) !=
-						vecPatches[ixPatch].end()
+					if (vecBlobs[ixBlob].find(pr) !=
+						vecBlobs[ixBlob].end()
 					) {
 						continue;
 					}
@@ -378,7 +807,7 @@ try {
 					setIndicators.erase(iterIndicator);
 
 					// Insert the node into the patch
-					vecPatches[ixPatch].insert(pr);
+					vecBlobs[ixBlob].insert(pr);
 
 					// Update bounding box
 					box.InsertPoint(pr.lat, pr.lon, nLat, nLon);
@@ -469,23 +898,23 @@ try {
 				}
 
 				// Check patch size
-				if (vecPatches[ixPatch].size() < nMinPatchSize) {
+				if (vecBlobs[ixBlob].size() < nMinBlobSize) {
 					nRejectedMinSize++;
-					vecPatches.resize(ixPatch);
-					vecPatchBoxes.resize(ixPatch);
+					vecBlobs.resize(ixBlob);
+					vecBlobBoxes.resize(ixBlob);
 				}
 			}
 
-			Announce("Patches detected: %i", vecPatches.size());
+			Announce("Blobs detected: %i", vecBlobs.size());
 			Announce("Rejected (min size): %i", nRejectedMinSize);
 
-			for (int p = 0; p < vecPatchBoxes.size(); p++) {
+			for (int p = 0; p < vecBlobBoxes.size(); p++) {
 				Announce("Blob %i [%i, %i] x [%i, %i]",
 					p+1,
-					vecPatchBoxes[p].lat[0],
-					vecPatchBoxes[p].lat[1],
-					vecPatchBoxes[p].lon[0],
-					vecPatchBoxes[p].lon[1]);
+					vecBlobBoxes[p].lat[0],
+					vecBlobBoxes[p].lat[1],
+					vecBlobBoxes[p].lon[0],
+					vecBlobBoxes[p].lon[1]);
 			}
 
 			AnnounceEndBlock("Done");
@@ -497,30 +926,33 @@ try {
 
 	AnnounceEndBlock("Done");
 
-	// Stitch blobs together in time
+	///////////////////////////////////////////////////////////////////////////
+	// Stitch blobs together in time using graph search
+	///////////////////////////////////////////////////////////////////////////
+
 	AnnounceStartBlock("Stitching Blobs");
 
-	// Patch tags for each blob
-	std::vector< std::vector<Tag> > vecAllPatchTags;
-	vecAllPatchTags.resize(nTime);
+	// Tags for each blob at each time slice
+	std::vector< std::vector<Tag> > vecAllBlobTags;
+	vecAllBlobTags.resize(nTime);
 
 	// Next available patch tag
-	Tag tagNextPatch(1, 0);
+	Tag tagNextBlob(1, 0);
 
-	// Give patch tags to the initial set of patches
+	// Give blob tags to the initial set of blobs
 	std::set<Tag> setAllTags;
 
 	for (int t = 0; t < nTime; t++) {
-		vecAllPatchTags[t].resize(vecAllPatches[t].size());
+		vecAllBlobTags[t].resize(vecAllBlobs[t].size());
 
-		tagNextPatch.id = 0;
-		for (int p = 0; p < vecAllPatchTags[t].size(); p++) {
-			vecAllPatchTags[t][p] = tagNextPatch;
-			setAllTags.insert(tagNextPatch);
+		tagNextBlob.id = 0;
+		for (int p = 0; p < vecAllBlobTags[t].size(); p++) {
+			vecAllBlobTags[t][p] = tagNextBlob;
+			setAllTags.insert(tagNextBlob);
 
-			tagNextPatch.id++;
+			tagNextBlob.id++;
 		}
-		tagNextPatch.time++;
+		tagNextBlob.time++;
 	}
 
 	// Array of equivalent tags
@@ -533,41 +965,41 @@ try {
 	// Loop through all remaining time steps
 	for (int t = 1; t < nTime; t++) {
 
-		// Get the current patch vector
-		const std::vector<Tag> & vecPrevPatchTags = vecAllPatchTags[t-1];
+		// Get the current blob vector
+		const std::vector<Tag> & vecPrevBlobTags = vecAllBlobTags[t-1];
 
-		std::vector<Tag> & vecPatchTags = vecAllPatchTags[t];
+		std::vector<Tag> & vecBlobTags = vecAllBlobTags[t];
 
-		const std::vector<IndicatorSet> & vecPrevPatches = vecAllPatches[t-1];
+		const std::vector<IndicatorSet> & vecPrevBlobs = vecAllBlobs[t-1];
 
-		const std::vector<IndicatorSet> & vecPatches = vecAllPatches[t];
+		const std::vector<IndicatorSet> & vecBlobs = vecAllBlobs[t];
 
-		const std::vector<LatLonBox> & vecPrevPatchBoxes = vecAllPatchBoxes[t-1];
+		const std::vector<LatLonBox> & vecPrevBlobBoxes = vecAllBlobBoxes[t-1];
 
-		const std::vector<LatLonBox> & vecPatchBoxes = vecAllPatchBoxes[t];
+		const std::vector<LatLonBox> & vecBlobBoxes = vecAllBlobBoxes[t];
 
-		// Determine overlaps between these patches and previous patches
-		vecPatchTags.resize(vecPatches.size());
-		for (int p = 0; p < vecPatchTags.size(); p++) {
+		// Determine overlaps between these blobs and previous blobs
+		vecBlobTags.resize(vecBlobs.size());
+		for (int p = 0; p < vecBlobTags.size(); p++) {
 
-			const LatLonBox & boxP = vecPatchBoxes[p];
+			const LatLonBox & boxP = vecBlobBoxes[p];
 
 			// Find overlap with bounding boxes at previous time
-			for (int q = 0; q < vecPrevPatchTags.size(); q++) {
+			for (int q = 0; q < vecPrevBlobTags.size(); q++) {
 
-				const LatLonBox & boxQ = vecPrevPatchBoxes[q];
+				const LatLonBox & boxQ = vecPrevBlobBoxes[q];
 
 				// Check if bounding boxes overlap
 				if (!boxP.Overlaps(boxQ)) {
 					continue;
 				}
 
-				// Verify that at least one node overlaps between patches
+				// Verify that at least one node overlaps between blobs
 				bool fHasOverlapNode = false;
-				IndicatorSetConstIterator iter = vecPatches[p].begin();
-				for (; iter != vecPatches[p].end(); iter++) {
-					if (vecPrevPatches[q].find(*iter) !=
-						vecPrevPatches[q].end()
+				IndicatorSetConstIterator iter = vecBlobs[p].begin();
+				for (; iter != vecBlobs[p].end(); iter++) {
+					if (vecPrevBlobs[q].find(*iter) !=
+						vecPrevBlobs[q].end()
 					) {
 						fHasOverlapNode = true;
 						break;
@@ -581,11 +1013,11 @@ try {
 				// Insert bidirectional edge in graph
 				multimapTagGraph.insert(
 					std::pair<Tag, Tag>(
-						vecPatchTags[p], vecPrevPatchTags[q]));
+						vecBlobTags[p], vecPrevBlobTags[q]));
 
 				multimapTagGraph.insert(
 					std::pair<Tag, Tag>(
-						vecPrevPatchTags[q], vecPatchTags[p]));
+						vecPrevBlobTags[q], vecBlobTags[p]));
 			}
 		}
 	}
@@ -670,22 +1102,100 @@ try {
 		}
 	}
 
-	// Apply equivalent tags
+	// Merge blobs at each time step with equivalent tags
 	for (int t = 0; t < nTime; t++) {
 
-		std::vector<Tag> & vecPatchTags = vecAllPatchTags[t];
+		std::vector<Tag> & vecBlobTags = vecAllBlobTags[t];
 
-		for (int p = 0; p < vecPatchTags.size(); p++) {
+		for (int p = 0; p < vecBlobTags.size(); p++) {
 			std::map<Tag, Tag>::const_iterator iterTagPair =
-				mapEquivalentTags.find(vecPatchTags[p]);
+				mapEquivalentTags.find(vecBlobTags[p]);
 
 			if (iterTagPair != mapEquivalentTags.end()) {
-				vecPatchTags[p] = iterTagPair->second;
+				vecBlobTags[p] = iterTagPair->second;
 			}
 		}
 	}
 
 	Announce("Blobs found: %i", nTotalBlobCount);
+
+	// Apply threshold operators
+	std::vector<bool> fRejectedBlob;
+	fRejectedBlob.resize(nTotalBlobCount, false);
+
+	if (vecThresholdOp.size() != 0) {
+		AnnounceStartBlock("Applying threshold commands");
+
+		// Whether or not each blob (global_id) satisfies each threshold
+		// at each time
+		std::vector< std::vector< std::vector<bool> > >
+			vecBlobSatisfiesThreshold;
+
+		vecBlobSatisfiesThreshold.resize(nTotalBlobCount);
+		for (int p = 0; p < nTotalBlobCount; p++) {
+			vecBlobSatisfiesThreshold[p].resize(
+				vecThresholdOp.size());
+		}
+
+		// Determine if blobs satisfy the threshold at each time
+		for (int t = 0; t < nTime; t++) {
+
+			std::vector<Tag> & vecBlobTags = vecAllBlobTags[t];
+
+			std::vector<IndicatorSet> & vecBlobs = vecAllBlobs[t];
+
+			std::vector<LatLonBox> & vecBlobBoxes = vecAllBlobBoxes[t];
+
+			for (int x = 0; x < vecThresholdOp.size(); x++) {
+
+				std::map<int, bool> mapSatisfiesThreshold;
+
+				vecThresholdOp[x].Apply(
+					dCellArea,
+					dataLatDeg,
+					dataLonDeg,
+					vecBlobTags,
+					vecBlobs,
+					vecBlobBoxes,
+					mapSatisfiesThreshold);
+
+				std::map<int,bool>::const_iterator iter =
+					mapSatisfiesThreshold.begin();
+
+				for (; iter != mapSatisfiesThreshold.end(); iter++) {
+					int iGlobalBlobIndex = iter->first;
+					vecBlobSatisfiesThreshold[iter->first][x].
+						push_back(iter->second);
+				}
+			}
+		}
+
+		// Number of blobs rejected for each reason
+		std::vector<int> nBlobsRejected;
+		nBlobsRejected.resize(vecThresholdOp.size());
+
+		for (int p = 0; p < nTotalBlobCount; p++) {
+		for (int x = 0; x < vecThresholdOp.size(); x++) {
+			int nCount = 0;
+			for (int t = 0; t < vecBlobSatisfiesThreshold[p][x].size(); t++) {
+				if (vecBlobSatisfiesThreshold[p][x][t]) {
+					nCount++;
+				}
+			}
+			if (nCount < vecThresholdOp[x].GetMinimumCount()) {
+				nBlobsRejected[x]++;
+				break;
+			}
+		}
+		}
+
+		// Announce rejections
+		for (int x = 0; x < vecThresholdOp.size(); x++) {
+			Announce("Rejected (threshold %i): %i", x, nBlobsRejected[x]);
+		}
+
+		AnnounceEndBlock("Done");
+	}
 
 	AnnounceEndBlock("Done");
 
@@ -762,35 +1272,38 @@ try {
 			dimOutputLon);
 
 	// Loop through all time steps
-	DataMatrix<int> dataPatchTag;
-	dataPatchTag.Initialize(nLat, nLon);
+	DataMatrix<int> dataBlobTag;
+	dataBlobTag.Initialize(nLat, nLon);
 
 	for (int t = 0; t < nTime; t++) {
 
-		dataPatchTag.Zero();
+		dataBlobTag.Zero();
 
-		// Get the current patch vectors
-		const std::vector<Tag> & vecPatchTags = vecAllPatchTags[t];
+		// Get the current blob vectors
+		const std::vector<Tag> & vecBlobTags = vecAllBlobTags[t];
 
-		const std::vector<IndicatorSet> & vecPatches = vecAllPatches[t];
+		const std::vector<IndicatorSet> & vecBlobs = vecAllBlobs[t];
 
-		// Put patch information into matrix
-		for (int p = 0; p < vecPatchTags.size(); p++) {
+		// Put blob information into matrix
+		for (int p = 0; p < vecBlobTags.size(); p++) {
 
-			if (vecPatchTags[p].global_id == 0) {
+			if (vecBlobTags[p].global_id == 0) {
+				continue;
+			}
+			if (fRejectedBlob[vecBlobTags[p].global_id]) {
 				continue;
 			}
 
-			IndicatorSetConstIterator iter = vecPatches[p].begin();
-			for (; iter != vecPatches[p].end(); iter++) {
-				dataPatchTag[iter->lat][iter->lon] =
-					vecPatchTags[p].global_id;
+			IndicatorSetConstIterator iter = vecBlobs[p].begin();
+			for (; iter != vecBlobs[p].end(); iter++) {
+				dataBlobTag[iter->lat][iter->lon] =
+					vecBlobTags[p].global_id;
 			}
 		}
 
 		// Write to file
 		varData->set_cur(t, 0, 0);
-		varData->put(&(dataPatchTag[0][0]), 1, nLat, nLon);
+		varData->put(&(dataBlobTag[0][0]), 1, nLat, nLon);
 	}
 
 	ncOutput.close();

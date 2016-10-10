@@ -110,7 +110,7 @@ public:
 	///	</summary>
 	int Width(
 		int nLonCount
-	) {
+	) const {
 		if (is_null) {
 			return 0;
 		}
