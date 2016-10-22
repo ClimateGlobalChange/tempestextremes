@@ -117,13 +117,11 @@ try {
 			strInputFile.c_str());
 	}
 
-#pragma message "Change to file create mode"
-	// Open the NetCDF output file
-	NcFile ncOutput(strOutputFile.c_str());
 
-	if (!ncOutput.is_valid()) {
-		_EXCEPTION1("Unable to open NetCDF file \"%s\" for writing",
-			strOutputFile.c_str());
+	// Get the time dimension
+	NcDim * dimTime = ncInput.get_dim("time");
+	if (dimTime == NULL) {
+		_EXCEPTIONT("Error accessing dimension \"time\"");
 	}
 
 	// Get the longitude dimension
@@ -163,100 +161,134 @@ try {
 			strIWVVariable.c_str());
 	}
 
-	DataMatrix<float> dIWV(dimLon->size(), dimLat->size());
-	varIWV->get(&(dIWV[0][0]), dimLon->size(), dimLat->size());
+	DataMatrix<float> dIWV(dimLat->size(), dimLon->size());
 
-	// Announce
-	AnnounceEndBlock("Done");
-
-	AnnounceStartBlock("Compute zonal/meridional thresholds");
-
-	// Compute zonal threshold
-	DataVector<float> dZonalThreshold(dimLat->size());
-	for (int j = 0; j < dimLat->size(); j++) {
-		float dMaxZonalIWV = dIWV[0][j];
-		for (int i = 0; i < dimLon->size(); i++) {
-			dZonalThreshold[j] += dIWV[i][j];
-			if (dIWV[i][j] > dMaxZonalIWV) {
-				dMaxZonalIWV = dIWV[i][j];
-			}
-		}
-		dZonalThreshold[j] /= static_cast<float>(dimLon->size());
-
-		dZonalThreshold[j] =
-			dZonalMeanWeight * dZonalThreshold[j]
-			+ dZonalMaxWeight * dMaxZonalIWV;
+	// Open the NetCDF output file
+	NcFile ncOutput(strOutputFile.c_str(), NcFile::Replace);
+	if (!ncOutput.is_valid()) {
+		_EXCEPTION1("Unable to open NetCDF file \"%s\" for writing",
+			strOutputFile.c_str());
 	}
 
-	// Compute meridional threshold
-	DataVector<float> dMeridThreshold(dimLon->size());
-	for (int i = 0; i < dimLon->size(); i++) {
-		float dMaxMeridIWV = dIWV[i][0];
-		for (int j = 0; j < dimLat->size(); j++) {
-			dMeridThreshold[i] += dIWV[i][j];
-			if (dIWV[i][j] > dMaxMeridIWV) {
-				dMaxMeridIWV = dIWV[i][j];
-			}
-		}
-		dMeridThreshold[i] /= static_cast<float>(dimLon->size());
-
-		dMeridThreshold[i] =
-			dMeridMeanWeight * dMeridThreshold[i]
-			+ dMeridMaxWeight * dMaxMeridIWV;
-	}
-
-	// Announce
-	AnnounceEndBlock("Done");
-
-	AnnounceStartBlock("Build tagged cell array");
-
-	// Build tagged cell array
-	DataMatrix<int> dIWVtag(dimLon->size(), dimLat->size());
-
-	for (int i = 0; i < dimLon->size(); i++) {
-	for (int j = 0; j < dimLat->size(); j++) {
-		if (fabs(dLatDeg[j]) < dMinAbsLat) {
-			continue;
-		}
-		if (dIWV[i][j] < dMinIWV) {
-			continue;
-		}
-		if (dIWV[i][j] < dZonalThreshold[j]) {
-			continue;
-		}
-		if (dIWV[i][j] < dMeridThreshold[i]) {
-			continue;
-		}
-
-		dIWVtag[i][j] = 1;
-	}
-	}
-
-	// Announce
-	AnnounceEndBlock("Done");
-
-	AnnounceStartBlock("Writing results");
-
-	// Output tagged cell array
+	// Copy over latitude, longitude and time variables to output file
+	CopyNcVar(ncInput, ncOutput, "time", true);
 	CopyNcVar(ncInput, ncOutput, "lat", true);
 	CopyNcVar(ncInput, ncOutput, "lon", true);
 
-	NcVar * varIWVtag =
-		ncOutput.add_var(strOutputVariable.c_str(), ncInt, dimLon, dimLat);
+	NcDim * dimTimeOut = ncOutput.get_dim("time");
+	if (dimTimeOut == NULL) {
+		_EXCEPTIONT("Error copying variable \"time\" to output file");
+	}
+	NcDim * dimLonOut = ncOutput.get_dim("lon");
+	if (dimLonOut == NULL) {
+		_EXCEPTIONT("Error copying variable \"lon\" to output file");
+	}
+	NcDim * dimLatOut = ncOutput.get_dim("lat");
+	if (dimLatOut == NULL) {
+		_EXCEPTIONT("Error copying variable \"lat\" to output file");
+	}
 
-	varIWVtag->put(&(dIWVtag[0][0]), dimLon->size(), dimLat->size());
+	NcVar * varIWVtag =
+		ncOutput.add_var(
+			strOutputVariable.c_str(),
+			ncInt,
+			dimTimeOut,
+			dimLatOut,
+			dimLonOut);
 
 	AnnounceEndBlock("Done");
 
-/*
-	1) Restrict domain to >15N/S
-2) Grid point IWV > 20mm*
-3) IWV ≥ IWVzonal mean  +  0.3**(IWVzonal max - IWVzonal mean)  		and
-IWV ≥ IWVmeridional mean  +  0.1**(IWVmeridional max - IWVmeridional mean)
-4) A connected component labeling algorithm to discard small structures (< 2.5x10^5 km2)***
-5) Shape analysis: confine AR region to rectagular box "of minimal size" (?) and calculate areal fraction AR occupies in box. If the fraction <0.75, the AR is "elongated" and it passes.
-6) Check orientation by regressing lats onto lons (make sure it is not northeast)****
-*/
+	// Tagged cell array
+	DataMatrix<int> dIWVtag(dimLat->size(), dimLon->size());
+
+	// Loop through all times
+	for (int t = 0; t < dimTime->size(); t++) {
+
+		char szBuffer[20];
+		sprintf(szBuffer, "Time %i", t);
+		AnnounceStartBlock(szBuffer);
+
+		// Get the IWV array
+		varIWV->set_cur(t, 0, 0);
+		NcBool b = varIWV->get(&(dIWV[0][0]), 1, dimLat->size(), dimLon->size());
+
+		AnnounceStartBlock("Compute zonal/meridional thresholds");
+
+		// Compute zonal threshold
+		DataVector<float> dZonalThreshold(dimLat->size());
+		for (int j = 0; j < dimLat->size(); j++) {
+			float dMaxZonalIWV = dIWV[j][0];
+			for (int i = 0; i < dimLon->size(); i++) {
+				dZonalThreshold[j] += dIWV[j][i];
+				if (dIWV[j][i] > dMaxZonalIWV) {
+					dMaxZonalIWV = dIWV[j][i];
+				}
+			}
+			dZonalThreshold[j] /= static_cast<float>(dimLon->size());
+
+			dZonalThreshold[j] =
+				dZonalMeanWeight * dZonalThreshold[j]
+				+ dZonalMaxWeight * dMaxZonalIWV;
+		}
+
+		// Compute meridional threshold
+		DataVector<float> dMeridThreshold(dimLon->size());
+		for (int i = 0; i < dimLon->size(); i++) {
+			float dMaxMeridIWV = dIWV[0][i];
+			for (int j = 0; j < dimLat->size(); j++) {
+				dMeridThreshold[i] += dIWV[j][i];
+				if (dIWV[j][i] > dMaxMeridIWV) {
+					dMaxMeridIWV = dIWV[j][i];
+				}
+			}
+			dMeridThreshold[i] /= static_cast<float>(dimLon->size());
+
+			dMeridThreshold[i] =
+				dMeridMeanWeight * dMeridThreshold[i]
+				+ dMeridMaxWeight * dMaxMeridIWV;
+		}
+
+		// Announce
+		AnnounceEndBlock("Done");
+
+		AnnounceStartBlock("Build tagged cell array");
+
+		// Build tagged cell array
+		dIWVtag.Zero();
+
+		for (int j = 0; j < dimLat->size(); j++) {
+		for (int i = 0; i < dimLon->size(); i++) {
+			if (fabs(dLatDeg[j]) < dMinAbsLat) {
+				continue;
+			}
+			if (dIWV[j][i] < dMinIWV) {
+				continue;
+			}
+			if (dIWV[j][i] < dZonalThreshold[j]) {
+				continue;
+			}
+			if (dIWV[j][i] < dMeridThreshold[i]) {
+				continue;
+			}
+
+			dIWVtag[j][i] = 1;
+		}
+		}
+
+		AnnounceEndBlock("Done");
+
+		AnnounceStartBlock("Writing results");
+
+		// Output tagged cell array
+		varIWVtag->set_cur(t, 0, 0);
+		varIWVtag->put(&(dIWVtag[0][0]), 1, dimLatOut->size(), dimLonOut->size());
+
+		AnnounceEndBlock("Done");
+
+		AnnounceEndBlock(NULL);
+	}
+
+	AnnounceEndBlock("Done");
 
 	AnnounceBanner();
 

@@ -157,9 +157,19 @@ void CopyNcVar(
 			}
 		}
 		if (dimOut[d]->size() != dimA->size()) {
-			_EXCEPTION3("Mismatch between input file dimension \"%s\" and "
-				"output file dimension (%i / %i)",
-				dimA->name(), dimA->size(), dimOut[d]->size());
+			if (dimA->is_unlimited() && !dimOut[d]->is_unlimited()) {
+				_EXCEPTION2("Mismatch between input file dimension \"%s\" and "
+					"output file dimension (UNLIMITED / %i)",
+					dimA->name(), dimOut[d]->size());
+			} else if (!dimA->is_unlimited() && dimOut[d]->is_unlimited()) {
+				_EXCEPTION2("Mismatch between input file dimension \"%s\" and "
+					"output file dimension (%i / UNLIMITED)",
+					dimA->name(), dimA->size());
+			} else if (!dimA->is_unlimited() && !dimOut[d]->is_unlimited()) {
+				_EXCEPTION3("Mismatch between input file dimension \"%s\" and "
+					"output file dimension (%i / %i)",
+					dimA->name(), dimA->size(), dimOut[d]->size());
+			}
 		}
 
 		counts[d] = dimOut[d]->size();
