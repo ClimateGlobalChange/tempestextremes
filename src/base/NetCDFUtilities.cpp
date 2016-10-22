@@ -172,7 +172,7 @@ void CopyNcVar(
 			}
 		}
 
-		counts[d] = dimOut[d]->size();
+		counts[d] = dimA->size();
 		nDataSize *= counts[d];
 	}
 
