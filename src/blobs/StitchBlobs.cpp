@@ -55,7 +55,7 @@ struct Tag {
 	int time;
 
 	///	<summary>
-	///		Global id associated with this tag.
+	///		Global id associated with this tag (minimum value 1).
 	///	</summary>
 	int global_id;
 
@@ -431,21 +431,34 @@ public:
 						- dNorthHemiMeanLon * dNorthHemiMeanLon;
 
 				double dSouthSlopeNum =
-					dNorthHemiCoLatLon
-						- dNorthHemiMeanLat * dNorthHemiMeanLon;
+					dSouthHemiCoLatLon
+						- dSouthHemiMeanLat * dSouthHemiMeanLon;
 
 				double dSouthSlopeDen =
-					dNorthHemiMeanLon2
-						- dNorthHemiMeanLon * dNorthHemiMeanLon;
+					dSouthHemiMeanLon2
+						- dSouthHemiMeanLon * dSouthHemiMeanLon;
 
 				// Check orientation
 				if (m_eQuantity == EastwardOrientation) {
+
 					if (dNorthSlopeNum * dNorthSlopeDen < 0.0) {
+						if (vecBlobTags[p].global_id == 11) {
+							_EXCEPTION();
+						}
+						iterSatisfies->second = false;
+					}
+					if (dSouthSlopeNum * dSouthSlopeDen > 0.0) {
+						if (vecBlobTags[p].global_id == 11) {
+							_EXCEPTION();
+						}
 						iterSatisfies->second = false;
 					}
 
 				} else if (m_eQuantity == WestwardOrientation) {
 					if (dNorthSlopeNum * dNorthSlopeDen > 0.0) {
+						iterSatisfies->second = false;
+					}
+					if (dSouthSlopeNum * dSouthSlopeDen < 0.0) {
 						iterSatisfies->second = false;
 					}
 				}
@@ -454,6 +467,16 @@ public:
 		// Invalid quantity
 		} else {
 			_EXCEPTIONT("Invalid quantity");
+		}
+
+		std::map<int, bool>::iterator iterSatisfies =
+			mapSatisfiesThreshold.find(11);
+
+		if (iterSatisfies == mapSatisfiesThreshold.end()) {
+			_EXCEPTION();
+		}
+		if (iterSatisfies->second == false) {
+			_EXCEPTION();
 		}
 	}
 
@@ -1121,7 +1144,7 @@ try {
 
 	// Apply threshold operators
 	std::vector<bool> fRejectedBlob;
-	fRejectedBlob.resize(nTotalBlobCount, false);
+	fRejectedBlob.resize(nTotalBlobCount+1, false);
 
 	if (vecThresholdOp.size() != 0) {
 		AnnounceStartBlock("Applying threshold commands");
@@ -1131,9 +1154,9 @@ try {
 		std::vector< std::vector< std::vector<bool> > >
 			vecBlobSatisfiesThreshold;
 
-		vecBlobSatisfiesThreshold.resize(nTotalBlobCount);
-		for (int p = 0; p < nTotalBlobCount; p++) {
-			vecBlobSatisfiesThreshold[p].resize(
+		vecBlobSatisfiesThreshold.resize(nTotalBlobCount+1);
+		for (int gid = 1; gid <= nTotalBlobCount; gid++) {
+			vecBlobSatisfiesThreshold[gid].resize(
 				vecThresholdOp.size());
 		}
 
@@ -1164,7 +1187,14 @@ try {
 
 				for (; iter != mapSatisfiesThreshold.end(); iter++) {
 					int iGlobalBlobIndex = iter->first;
-					vecBlobSatisfiesThreshold[iter->first][x].
+
+					if ((iGlobalBlobIndex < 1) ||
+					    (iGlobalBlobIndex > nTotalBlobCount)
+					) {
+						_EXCEPTION1("global_id out of range (%i)",
+							iGlobalBlobIndex);
+					}
+					vecBlobSatisfiesThreshold[iGlobalBlobIndex][x].
 						push_back(iter->second);
 				}
 			}
@@ -1174,15 +1204,26 @@ try {
 		std::vector<int> nBlobsRejected;
 		nBlobsRejected.resize(vecThresholdOp.size());
 
-		for (int p = 0; p < nTotalBlobCount; p++) {
+		for (int gid = 1; gid <= nTotalBlobCount; gid++) {
 		for (int x = 0; x < vecThresholdOp.size(); x++) {
 			int nCount = 0;
-			for (int t = 0; t < vecBlobSatisfiesThreshold[p][x].size(); t++) {
-				if (vecBlobSatisfiesThreshold[p][x][t]) {
+			for (int t = 0; t < vecBlobSatisfiesThreshold[gid][x].size(); t++) {
+				if (vecBlobSatisfiesThreshold[gid][x][t]) {
 					nCount++;
 				}
 			}
-			if (nCount < vecThresholdOp[x].GetMinimumCount()) {
+
+			// Criteria must be satisfied at all times
+			if (vecThresholdOp[x].GetMinimumCount() == (-1)) {
+				if (nCount != vecBlobSatisfiesThreshold[gid][x].size()) {
+					fRejectedBlob[gid] = true;
+					nBlobsRejected[x]++;
+					break;
+				}
+
+			// Criteria must be satisfied at a minimum number of times
+			} else if (nCount < vecThresholdOp[x].GetMinimumCount()) {
+				fRejectedBlob[gid] = true;
 				nBlobsRejected[x]++;
 				break;
 			}
