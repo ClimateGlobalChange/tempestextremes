@@ -138,7 +138,7 @@ public:
 		enum {
 			ReadMode_Quantity,
 			ReadMode_Value,
-			ReadMode_MinCount,
+			//ReadMode_MinCount,
 			ReadMode_Invalid
 		} eReadMode = ReadMode_Quantity;
 
@@ -172,11 +172,11 @@ public:
 
 					} else if (strSubStr == "eastwardorientation") {
 						m_eQuantity = EastwardOrientation;
-						eReadMode = ReadMode_MinCount;
+						eReadMode = ReadMode_Invalid;
 
 					} else if (strSubStr == "westwardorientation") {
 						m_eQuantity = WestwardOrientation;
-						eReadMode = ReadMode_MinCount;
+						eReadMode = ReadMode_Invalid;
 
 					} else {
 						_EXCEPTION1("Threshold invalid quantity \"%s\"",
@@ -190,8 +190,8 @@ public:
 					m_dValue = atof(strSubStr.c_str());
 
 					iLast = i + 1;
-					eReadMode = ReadMode_MinCount;
-
+					eReadMode = ReadMode_Invalid;
+/*
 				// Read in minimum count
 				} else if (eReadMode == ReadMode_MinCount) {
 					if (strSubStr == "all") {
@@ -207,7 +207,7 @@ public:
 
 					iLast = i + 1;
 					eReadMode = ReadMode_Invalid;
-
+*/
 				// Invalid
 				} else if (eReadMode == ReadMode_Invalid) {
 					_EXCEPTION1("Too many entries in threshold string \"%s\"",
@@ -244,7 +244,7 @@ public:
 		} else if (m_eQuantity == WestwardOrientation) {
 			strDescription += "Westward orientation ";
 		}
-
+/*
 		char szMinCount[160];
 		if (m_nMinimumCount == -1) {
 			strDescription += " at all times";
@@ -252,10 +252,170 @@ public:
 			sprintf(szMinCount, " at least %i time(s)", m_nMinimumCount);
 			strDescription += szMinCount;
 		}
-
+*/
 		Announce("%s", strDescription.c_str());
 	}
 
+	///	<summary>
+	///		Verify that the specified path satisfies the threshold op.
+	///	</summary>
+	bool Apply(
+		const DataVector<double> & dCellArea,
+		const DataVector<double> & dLatDeg,
+		const DataVector<double> & dLonDeg,
+		const IndicatorSet & setBlobPoints,
+		const LatLonBox & boxBlob
+	) {
+		// Number of longitudes
+		int nLonCount = dLonDeg.GetRows();
+
+		// Thresholds related to area
+		if ((m_eQuantity == MinArea) ||
+		    (m_eQuantity == MaxArea) ||
+		    (m_eQuantity == MinArealFraction) ||
+		    (m_eQuantity == MaxArealFraction)
+		) {
+			double dBoxArea = 0.0;
+			double dBlobArea = 0.0;
+
+			// Calculate the area of each blob box
+			for (int i = boxBlob.lat[0]; i <= boxBlob.lat[1]; i++) {
+				dBoxArea += dCellArea[i]
+					* static_cast<double>(boxBlob.Width(nLonCount));
+			}
+
+			// Calculate the area and mean lat/lon of each blob
+			IndicatorSetIterator iterBlob = setBlobPoints.begin();
+			for (; iterBlob != setBlobPoints.end(); iterBlob++) {
+				dBlobArea += dCellArea[iterBlob->lat];
+			}
+
+			// Minimum area
+			if (m_eQuantity == MinArea) {
+				if (dBlobArea < m_dValue) {
+					return false;
+				}
+
+			// Maximum area
+			} else if (m_eQuantity == MaxArea) {
+				if (dBlobArea > m_dValue) {
+					return false;
+				}
+
+			// Minimum areal fraction
+			} else if (m_eQuantity == MinArealFraction) {
+				if (dBlobArea < m_dValue * dBoxArea) {
+					return false;
+				}
+
+			// Maximum areal fraction
+			} else if (m_eQuantity == MaxArealFraction) {
+				if (dBlobArea > m_dValue * dBoxArea) {
+					return false;
+				}
+			}
+
+		// Thresholds related to orientation
+		} else if ((m_eQuantity == EastwardOrientation) ||
+		           (m_eQuantity == WestwardOrientation)
+		) {
+			double dNorthHemiMeanLat = 0.0;
+			double dNorthHemiMeanLon = 0.0;
+			double dNorthHemiMeanLon2 = 0.0;
+			double dNorthHemiCoLatLon = 0.0;
+
+			double dSouthHemiMeanLat = 0.0;
+			double dSouthHemiMeanLon = 0.0;
+			double dSouthHemiMeanLon2 = 0.0;
+			double dSouthHemiCoLatLon = 0.0;
+
+			// Calculate regression coefficients for this blob
+			IndicatorSetIterator iterBlob = setBlobPoints.begin();
+			for (; iterBlob != setBlobPoints.end(); iterBlob++) {
+
+				double dAltLon = 0.0;
+				if (dLatDeg[iterBlob->lat] > 0.0) {
+					if (iterBlob->lon < boxBlob.lon[0]) {
+						dAltLon = dLonDeg[iterBlob->lon] + 360.0;
+					} else {
+						dAltLon = dLonDeg[iterBlob->lon];
+					}
+
+					dNorthHemiMeanLat += dLatDeg[iterBlob->lat];
+					dNorthHemiMeanLon += dAltLon;
+					dNorthHemiMeanLon2 += dAltLon * dAltLon;
+					dNorthHemiCoLatLon += dLatDeg[iterBlob->lat] * dAltLon;
+
+				} else if (dLatDeg[iterBlob->lat] < 0.0) {
+					if (iterBlob->lon < boxBlob.lon[0]) {
+						dAltLon = dLonDeg[iterBlob->lon] + 360.0;
+					} else {
+						dAltLon = dLonDeg[iterBlob->lon];
+					}
+
+					dSouthHemiMeanLat += dLatDeg[iterBlob->lat];
+					dSouthHemiMeanLon += dAltLon;
+					dSouthHemiMeanLon2 += dAltLon * dAltLon;
+					dSouthHemiCoLatLon += dLatDeg[iterBlob->lat] * dAltLon;
+				}
+			}
+
+			double dBlobCount = static_cast<double>(setBlobPoints.size());
+
+			dNorthHemiMeanLat /= dBlobCount;
+			dNorthHemiMeanLon /= dBlobCount;
+			dNorthHemiMeanLon2 /= dBlobCount;
+			dNorthHemiCoLatLon /= dBlobCount;
+
+			dSouthHemiMeanLat /= dBlobCount;
+			dSouthHemiMeanLon /= dBlobCount;
+			dSouthHemiMeanLon2 /= dBlobCount;
+			dSouthHemiCoLatLon /= dBlobCount;
+
+			// Calculate the slope of the regression line
+			double dNorthSlopeNum =
+				dNorthHemiCoLatLon
+					- dNorthHemiMeanLat * dNorthHemiMeanLon;
+
+			double dNorthSlopeDen =
+				dNorthHemiMeanLon2
+					- dNorthHemiMeanLon * dNorthHemiMeanLon;
+
+			double dSouthSlopeNum =
+				dSouthHemiCoLatLon
+					- dSouthHemiMeanLat * dSouthHemiMeanLon;
+
+			double dSouthSlopeDen =
+				dSouthHemiMeanLon2
+					- dSouthHemiMeanLon * dSouthHemiMeanLon;
+
+			// Check orientation
+			if (m_eQuantity == EastwardOrientation) {
+
+				if (dNorthSlopeNum * dNorthSlopeDen < 0.0) {
+					return false;
+				}
+				if (dSouthSlopeNum * dSouthSlopeDen > 0.0) {
+					return false;
+				}
+
+			} else if (m_eQuantity == WestwardOrientation) {
+				if (dNorthSlopeNum * dNorthSlopeDen > 0.0) {
+					return false;
+				}
+				if (dSouthSlopeNum * dSouthSlopeDen < 0.0) {
+					return false;
+				}
+			}
+
+		// Invalid quantity
+		} else {
+			_EXCEPTIONT("Invalid quantity");
+		}
+
+		return true;
+	}
+/*
 	///	<summary>
 	///		Verify that the specified path satisfies the threshold op.
 	///	</summary>
@@ -295,12 +455,12 @@ public:
 				// Obtain an iterator to this blob in the satisfies
 				// threshold map.
 				std::map<int, bool>::iterator iterSatisfies =
-					mapSatisfiesThreshold.find(vecBlobTags[p].global_id);
+					mapSatisfiesThreshold.find(vecBlobTags[p].id);
 
 				if (iterSatisfies == mapSatisfiesThreshold.end()) {
 					iterSatisfies = mapSatisfiesThreshold.insert(
 						std::pair<int,bool>(
-							vecBlobTags[p].global_id, true)).first;
+							vecBlobTags[p].id, true)).first;
 
 				} else if (!iterSatisfies->second) {
 					continue;
@@ -340,7 +500,7 @@ public:
 					}
 
 				// Maximum areal fraction
-				} else if (m_eQuantity == MinArealFraction) {
+				} else if (m_eQuantity == MaxArealFraction) {
 					if (dBlobArea > m_dValue * dBoxArea) {
 						iterSatisfies->second = false;
 					}
@@ -367,12 +527,12 @@ public:
 				// Obtain an iterator to this blob in the satisfies
 				// threshold map.
 				std::map<int, bool>::iterator iterSatisfies =
-					mapSatisfiesThreshold.find(vecBlobTags[p].global_id);
+					mapSatisfiesThreshold.find(vecBlobTags[p].id);
 
 				if (iterSatisfies == mapSatisfiesThreshold.end()) {
 					iterSatisfies = mapSatisfiesThreshold.insert(
 						std::pair<int,bool>(
-							vecBlobTags[p].global_id, true)).first;
+							vecBlobTags[p].id, true)).first;
 
 				} else if (!iterSatisfies->second) {
 					continue;
@@ -442,15 +602,9 @@ public:
 				if (m_eQuantity == EastwardOrientation) {
 
 					if (dNorthSlopeNum * dNorthSlopeDen < 0.0) {
-						if (vecBlobTags[p].global_id == 11) {
-							_EXCEPTION();
-						}
 						iterSatisfies->second = false;
 					}
 					if (dSouthSlopeNum * dSouthSlopeDen > 0.0) {
-						if (vecBlobTags[p].global_id == 11) {
-							_EXCEPTION();
-						}
 						iterSatisfies->second = false;
 					}
 
@@ -468,25 +622,16 @@ public:
 		} else {
 			_EXCEPTIONT("Invalid quantity");
 		}
-
-		std::map<int, bool>::iterator iterSatisfies =
-			mapSatisfiesThreshold.find(11);
-
-		if (iterSatisfies == mapSatisfiesThreshold.end()) {
-			_EXCEPTION();
-		}
-		if (iterSatisfies->second == false) {
-			_EXCEPTION();
-		}
 	}
-
+*/
+/*
 	///	<summary>
 	///		Get the minimum count associated with this threshold.
 	///	</summary>
 	int GetMinimumCount() const {
 		return m_nMinimumCount;
 	}
-
+*/
 protected:
 	///	<summary>
 	///		Threshold quantity.
@@ -497,11 +642,12 @@ protected:
 	///		Threshold value.
 	///	</summary>
 	double m_dValue;
-
+/*
 	///	<summary>
 	///		Minimum number of segments that need to satisfy the op.
 	///	</summary>
 	int m_nMinimumCount;
+*/
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -787,6 +933,9 @@ try {
 			// Rejections due to insufficient node count
 			int nRejectedMinSize = 0;
 
+			DataVector<int> nRejectedThreshold;
+			nRejectedThreshold.Initialize(vecThresholdOp.size());
+
 			// Find all patches
 			for (; setIndicators.size() != 0;) {
 
@@ -925,11 +1074,35 @@ try {
 					nRejectedMinSize++;
 					vecBlobs.resize(ixBlob);
 					vecBlobBoxes.resize(ixBlob);
+
+				// Check other thresholds
+				} else {
+					for (int x = 0; x < vecThresholdOp.size(); x++) {
+
+						bool fSatisfies =
+							vecThresholdOp[x].Apply(
+								dCellArea,
+								dataLatDeg,
+								dataLonDeg,
+								vecBlobs[ixBlob],
+								box);
+
+						if (!fSatisfies) {
+							nRejectedThreshold[x]++;
+							vecBlobs.resize(ixBlob);
+							vecBlobBoxes.resize(ixBlob);
+							break;
+						}
+					}
 				}
 			}
 
 			Announce("Blobs detected: %i", vecBlobs.size());
 			Announce("Rejected (min size): %i", nRejectedMinSize);
+			for (int x = 0; x < vecThresholdOp.size(); x++) {
+				Announce("Rejected (threshold %i): %i",
+					x, nRejectedThreshold[x]);
+			}
 
 			for (int p = 0; p < vecBlobBoxes.size(); p++) {
 				Announce("Blob %i [%i, %i] x [%i, %i]",
@@ -1141,7 +1314,7 @@ try {
 	}
 
 	Announce("Blobs found: %i", nTotalBlobCount);
-
+/*
 	// Apply threshold operators
 	std::vector<bool> fRejectedBlob;
 	fRejectedBlob.resize(nTotalBlobCount+1, false);
@@ -1237,7 +1410,7 @@ try {
 
 		AnnounceEndBlock("Done");
 	}
-
+*/
 	AnnounceEndBlock("Done");
 
 	// Output
@@ -1331,10 +1504,11 @@ try {
 			if (vecBlobTags[p].global_id == 0) {
 				continue;
 			}
+/*
 			if (fRejectedBlob[vecBlobTags[p].global_id]) {
 				continue;
 			}
-
+*/
 			IndicatorSetConstIterator iter = vecBlobs[p].begin();
 			for (; iter != vecBlobs[p].end(); iter++) {
 				dataBlobTag[iter->lat][iter->lon] =
