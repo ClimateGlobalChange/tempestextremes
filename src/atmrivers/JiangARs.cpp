@@ -46,6 +46,9 @@ try {
 	// Minimum absolute latitude
 	double dMinAbsLat;
 
+	// Maximum absolute latitude of equatorial band
+	double dEqBandMaxLat;
+
 	// Minimum pointwise integrated water vapor
 	double dMinIWV;
 
@@ -75,6 +78,7 @@ try {
 		CommandLineString(strIWVVariable, "iwvvar", "");
 		CommandLineString(strOutputVariable, "outvar", "");
 		CommandLineDouble(dMinAbsLat, "minabslat", 15.0);
+		CommandLineDouble(dEqBandMaxLat, "eqbandmaxlat", 15.0);
 		CommandLineDouble(dMinIWV, "miniwv", 20.0);
 		CommandLineDouble(dZonalMeanWeight, "zonalmeanwt", 0.7);
 		CommandLineDouble(dZonalMaxWeight, "zonalmaxwt", 0.3);
@@ -273,6 +277,39 @@ try {
 
 			dIWVtag[j][i] = 1;
 		}
+		}
+
+		// Remove points connected with equatorial moisture band
+		for (int i = 0; i < dimLon->size(); i++) {
+			bool fSouthDone = false;
+			bool fNorthDone = false;
+
+			for (int j = 0; j < dimLat->size(); j++) {
+				if ((!fSouthDone) && (dLatDeg[j] > -dMinAbsLat)) {
+					for (int k = j-1; k > 0; k--) {
+						if (dIWVtag[k][i] == 0) {
+							break;
+						}
+						if (dLatDeg[k] < -dEqBandMaxLat) {
+							break;
+						}
+						dIWVtag[k][i] = 0;
+					}
+					fSouthDone = true;
+				}
+				if ((!fNorthDone) && (dLatDeg[j] > dMinAbsLat)) {
+					for (int k = j-1; k < dimLat->size(); k++) {
+						if (dIWVtag[k][i] == 0) {
+							break;
+						}
+						if (dLatDeg[k] > dEqBandMaxLat) {
+							break;
+						}
+						dIWVtag[k][i] = 0;
+					}
+					fNorthDone = true;
+				}
+			}
 		}
 
 		AnnounceEndBlock("Done");
