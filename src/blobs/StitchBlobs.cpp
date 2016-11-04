@@ -679,6 +679,18 @@ try {
 	// Minimum number of timesteps for blob
 	int nMinTime;
 
+	// Minimum latitude for detections
+	double dMinLat;
+
+	// Maximum latitude for detections
+	double dMaxLat;
+
+	// Minimum longitude for detections
+	double dMinLon;
+
+	// Maximum longitude for detections
+	double dMaxLon;
+
 	// Operate on a regional area (no periodic boundaries)
 	bool fRegional;
 
@@ -695,6 +707,10 @@ try {
 		CommandLineInt(nMinBlobSize, "minsize", 1);
 		CommandLineInt(nMinTime, "mintime", 1);
 		CommandLineBool(fRegional, "regional");
+		CommandLineDouble(dMinLat, "minlat", -90.0);
+		CommandLineDouble(dMaxLat, "maxlat", 90.0);
+		CommandLineDouble(dMinLon, "minlon", 0.0);
+		CommandLineDouble(dMaxLon, "maxlon", 360.0);
 		CommandLineString(strThresholdCmd, "thresholdcmd", "");
 
 		ParseCommandLine(argc, argv);
@@ -918,6 +934,43 @@ try {
 			// Load in the data at this time
 			varIndicator->set_cur(t, 0, 0);
 			varIndicator->get(&(dataIndicator[0][0]), 1, nLat, nLon);
+
+			// Elminate detections out of range
+			if ((dMinLat != -90.0) || (dMaxLat != 90.0) ||
+			    (dMinLon != 0.0) || (dMaxLon != 360.0)
+			) {
+				for (int j = 0; j < nLat; j++) {
+				for (int i = 0; i < nLon; i++) {
+					if (dataIndicator[j][i] != 0) {
+						if ((dMinLat != -90.0) || (dMaxLat != 90.0)) {
+							if (dataLatDeg[j] < dMinLat) {
+								dataIndicator[j][i] = 0;
+							}
+							if (dataLatDeg[j] > dMaxLat) {
+								dataIndicator[j][i] = 0;
+							}
+						}
+						if ((dMinLon != 0.0) || (dMaxLon != 360.0)) {
+							if (dMinLon < dMaxLon) {
+								if (dataLonDeg[i] < dMinLon) {
+									dataIndicator[j][i] = 0;
+								}
+								if (dataLonDeg[i] > dMaxLon) {
+									dataIndicator[j][i] = 0;
+								}
+
+							} else {
+								if ((dataLonDeg[i] < dMinLon) &&
+								    (dataLonDeg[i] > dMaxLon)
+								) {
+									dataIndicator[j][i] = 0;
+								}
+							}
+						}
+					}
+				}
+				}
+			}
 
 			// Insert all detected locations into set
 			for (int j = 0; j < nLat; j++) {
