@@ -4,6 +4,8 @@ library("maptools")
 library("mapproj")
 library("abind")
 library("RColorBrewer")
+
+
 library("MASS")
 
 #NOTE!!!!!!!!!!!!!!!!!!!
@@ -24,16 +26,13 @@ get_arr<-function(var,lat,lon,sec,hemi){
     l2=get_index(lat,75.)
     
     if (sec=="ATL"){
-      n1=get_index(lon,280.)
+      n1=get_index(lon,259.)
       n2=get_index(lon,40.) 
     }else if (sec=="PAC"){
       n1=get_index(lon,140.)
-      n2=get_index(lon,250.)
-    }else if (sec=="CONT1"){
-      n1=get_index(lon,251.) 
-      n2=get_index(lon,279.)
-    }else if (sec=="CONT2"){
-      n1=get_index(lon,41.)
+      n2=get_index(lon,260.)
+    }else if (sec=="CONT"){
+      n1=get_index(lon,41.) 
       n2=get_index(lon,139.)
     }
     print(n1)
@@ -90,6 +89,12 @@ lon_convert<-function(lon){
     lon,
     -(180-distFrom180)
   ))
+}
+
+
+#-180 to 180 -> 
+lon_convert2<-function(lon){
+  return(ifelse(lon<0,360+lon,lon))
 }
 
 
