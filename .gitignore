@@ -24,3 +24,7 @@ test/*.dat
 test/*.txt
 
 test/*.g
+
+test/*.png
+
+test/statfigs/*

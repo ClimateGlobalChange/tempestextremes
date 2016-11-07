@@ -1,0 +1,1570 @@
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1980
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA_1980_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA_1980_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA_1980_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1980_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA_1980_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA_1980_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA_1980_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1980_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA_1980_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA_1980_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA_1980_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1980_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1980/ERA_1980_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA_1981_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA_1981_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1980_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1981
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA_1981_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA_1981_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA_1981_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1981_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA_1981_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA_1981_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA_1981_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1981_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA_1981_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA_1981_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA_1981_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1981_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1981/ERA_1981_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA_1982_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA_1982_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1981_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1982
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA_1982_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA_1982_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA_1982_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1982_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA_1982_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA_1982_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA_1982_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1982_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA_1982_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA_1982_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA_1982_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1982_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1982/ERA_1982_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA_1983_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA_1983_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1982_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1983
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA_1983_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA_1983_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA_1983_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1983_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA_1983_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA_1983_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA_1983_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1983_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA_1983_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA_1983_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA_1983_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1983_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1983/ERA_1983_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA_1984_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA_1984_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1983_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1984
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA_1984_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA_1984_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA_1984_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1984_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA_1984_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA_1984_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA_1984_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1984_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA_1984_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA_1984_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA_1984_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1984_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1984/ERA_1984_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA_1985_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA_1985_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1984_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1985
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA_1985_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA_1985_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA_1985_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1985_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA_1985_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA_1985_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA_1985_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1985_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA_1985_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA_1985_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA_1985_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1985_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1985/ERA_1985_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA_1986_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA_1986_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1985_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1986
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA_1986_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA_1986_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA_1986_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1986_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA_1986_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA_1986_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA_1986_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1986_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA_1986_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA_1986_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA_1986_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1986_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1986/ERA_1986_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA_1987_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA_1987_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1986_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1987
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA_1987_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA_1987_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA_1987_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1987_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA_1987_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA_1987_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA_1987_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1987_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA_1987_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA_1987_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA_1987_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1987_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1987/ERA_1987_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA_1988_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA_1988_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1987_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1988
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA_1988_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA_1988_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA_1988_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1988_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA_1988_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA_1988_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA_1988_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1988_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA_1988_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA_1988_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA_1988_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1988_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1988/ERA_1988_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA_1989_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA_1989_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1988_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1989
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA_1989_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA_1989_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA_1989_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1989_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA_1989_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA_1989_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA_1989_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1989_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA_1989_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA_1989_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA_1989_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1989_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1989/ERA_1989_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA_1990_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA_1990_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1989_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1990
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA_1990_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA_1990_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA_1990_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1990_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA_1990_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA_1990_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA_1990_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1990_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA_1990_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA_1990_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA_1990_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1990_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1990/ERA_1990_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA_1991_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA_1991_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1990_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1991
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA_1991_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA_1991_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA_1991_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1991_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA_1991_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA_1991_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA_1991_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1991_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA_1991_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA_1991_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA_1991_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1991_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1991/ERA_1991_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA_1992_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA_1992_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1991_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1992
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA_1992_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA_1992_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA_1992_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1992_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA_1992_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA_1992_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA_1992_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1992_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA_1992_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA_1992_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA_1992_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1992_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1992/ERA_1992_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA_1993_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA_1993_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1992_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1993
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA_1993_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA_1993_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA_1993_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1993_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA_1993_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA_1993_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA_1993_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1993_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA_1993_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA_1993_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA_1993_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1993_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1993/ERA_1993_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA_1994_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA_1994_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1993_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1994
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA_1994_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA_1994_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA_1994_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1994_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA_1994_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA_1994_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA_1994_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1994_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA_1994_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA_1994_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA_1994_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1994_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1994/ERA_1994_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA_1995_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA_1995_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1994_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1995
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA_1995_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA_1995_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA_1995_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1995_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA_1995_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA_1995_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA_1995_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1995_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA_1995_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA_1995_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA_1995_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1995_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1995/ERA_1995_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA_1996_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA_1996_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1995_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1996
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA_1996_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA_1996_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA_1996_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1996_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA_1996_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA_1996_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA_1996_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1996_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA_1996_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA_1996_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA_1996_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1996_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1996/ERA_1996_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA_1997_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA_1997_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1996_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1997
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA_1997_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA_1997_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA_1997_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1997_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA_1997_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA_1997_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA_1997_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1997_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA_1997_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA_1997_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA_1997_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1997_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1997/ERA_1997_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA_1998_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA_1998_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1997_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1998
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA_1998_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA_1998_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA_1998_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1998_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA_1998_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA_1998_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA_1998_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1998_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA_1998_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA_1998_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA_1998_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1998_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1998/ERA_1998_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA_1999_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA_1999_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1998_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_1999
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA_1999_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA_1999_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA_1999_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1999_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA_1999_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA_1999_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA_1999_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1999_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA_1999_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA_1999_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA_1999_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1999_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_1999/ERA_1999_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA_2000_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA_2000_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_1999_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_2000
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA_2000_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA_2000_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA_2000_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2000_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA_2000_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA_2000_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA_2000_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2000_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA_2000_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA_2000_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA_2000_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2000_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_2000/ERA_2000_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA_2001_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA_2001_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2000_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_2001
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA_2001_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA_2001_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA_2001_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2001_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA_2001_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA_2001_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA_2001_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2001_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA_2001_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA_2001_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA_2001_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2001_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_2001/ERA_2001_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA_2002_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA_2002_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2001_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_2002
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA_2002_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA_2002_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA_2002_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2002_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA_2002_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA_2002_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA_2002_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2002_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA_2002_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA_2002_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA_2002_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2002_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_2002/ERA_2002_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA_2003_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA_2003_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2002_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_2003
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA_2003_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA_2003_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA_2003_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2003_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA_2003_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA_2003_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA_2003_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2003_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA_2003_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA_2003_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA_2003_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2003_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_2003/ERA_2003_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA_2004_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA_2004_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2003_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_2004
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA_2004_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA_2004_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA_2004_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2004_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA_2004_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA_2004_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA_2004_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2004_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA_2004_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA_2004_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA_2004_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2004_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_2004/ERA_2004_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA_2005_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA_2005_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2004_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+Entering subdirectory /Volumes/ExFAT_drive/ERA_files/ERA_2005
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA*_{03,04,05}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA_2005_03_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA_2005_04_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA_2005_05_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2005_MAM_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA*_{06,07,08}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA_2005_06_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA_2005_07_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA_2005_08_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2005_JJA_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA*_{09,10,11}_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA_2005_09_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA_2005_10_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA_2005_11_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2005_SON_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+DJF!
+/Volumes/ExFAT_drive/ERA_files/ERA_2005/ERA_2005_12_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2006/ERA_2006_01_vars_integ_devs.nc
+/Volumes/ExFAT_drive/ERA_files/ERA_2006/ERA_2006_02_vars_integ_devs.nc
+Parameters:
+  --in <string> [""] 
+  --inlist <string> ["bloblist"] 
+  --var <string> ["INT_ADIPV"] 
+  --out <string> ["/Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA_2005_DJF_var_dens.nc"] 
+  --std <bool> [false] 
+------------------------------------------------------------
+There are 3 files.
+Copying dimension attributes.
+Creating density variable.
+ERA_1980_MAM_blobs.nc
+ERA_1981_MAM_blobs.nc
+ERA_1982_MAM_blobs.nc
+ERA_1983_MAM_blobs.nc
+ERA_1984_MAM_blobs.nc
+ERA_1985_MAM_blobs.nc
+ERA_1986_MAM_blobs.nc
+ERA_1987_MAM_blobs.nc
+ERA_1988_MAM_blobs.nc
+ERA_1989_MAM_blobs.nc
+ERA_1990_MAM_blobs.nc
+ERA_1991_MAM_blobs.nc
+ERA_1992_MAM_blobs.nc
+ERA_1993_MAM_blobs.nc
+ERA_1994_MAM_blobs.nc
+ERA_1995_MAM_blobs.nc
+ERA_1996_MAM_blobs.nc
+ERA_1997_MAM_blobs.nc
+ERA_1998_MAM_blobs.nc
+ERA_1999_MAM_blobs.nc
+ERA_2000_MAM_blobs.nc
+There are 21 files
+ERA_1980_JJA_blobs.nc
+ERA_1981_JJA_blobs.nc
+ERA_1982_JJA_blobs.nc
+ERA_1983_JJA_blobs.nc
+ERA_1984_JJA_blobs.nc
+ERA_1985_JJA_blobs.nc
+ERA_1986_JJA_blobs.nc
+ERA_1987_JJA_blobs.nc
+ERA_1988_JJA_blobs.nc
+ERA_1989_JJA_blobs.nc
+ERA_1990_JJA_blobs.nc
+ERA_1991_JJA_blobs.nc
+ERA_1992_JJA_blobs.nc
+ERA_1993_JJA_blobs.nc
+ERA_1994_JJA_blobs.nc
+ERA_1995_JJA_blobs.nc
+ERA_1996_JJA_blobs.nc
+ERA_1997_JJA_blobs.nc
+ERA_1998_JJA_blobs.nc
+ERA_1999_JJA_blobs.nc
+ERA_2000_JJA_blobs.nc
+There are 21 files
+ERA_1980_SON_blobs.nc
+ERA_1981_SON_blobs.nc
+ERA_1982_SON_blobs.nc
+ERA_1983_SON_blobs.nc
+ERA_1984_SON_blobs.nc
+ERA_1985_SON_blobs.nc
+ERA_1986_SON_blobs.nc
+ERA_1987_SON_blobs.nc
+ERA_1988_SON_blobs.nc
+ERA_1989_SON_blobs.nc
+ERA_1990_SON_blobs.nc
+ERA_1991_SON_blobs.nc
+ERA_1992_SON_blobs.nc
+ERA_1993_SON_blobs.nc
+ERA_1994_SON_blobs.nc
+ERA_1995_SON_blobs.nc
+ERA_1996_SON_blobs.nc
+ERA_1997_SON_blobs.nc
+ERA_1998_SON_blobs.nc
+ERA_1999_SON_blobs.nc
+ERA_2000_SON_blobs.nc
+There are 21 files
+ERA_1980_DJF_blobs.nc
+ERA_1981_DJF_blobs.nc
+ERA_1982_DJF_blobs.nc
+ERA_1983_DJF_blobs.nc
+ERA_1984_DJF_blobs.nc
+ERA_1985_DJF_blobs.nc
+ERA_1986_DJF_blobs.nc
+ERA_1987_DJF_blobs.nc
+ERA_1988_DJF_blobs.nc
+ERA_1989_DJF_blobs.nc
+ERA_1990_DJF_blobs.nc
+ERA_1991_DJF_blobs.nc
+ERA_1992_DJF_blobs.nc
+ERA_1993_DJF_blobs.nc
+ERA_1994_DJF_blobs.nc
+ERA_1995_DJF_blobs.nc
+ERA_1996_DJF_blobs.nc
+ERA_1997_DJF_blobs.nc
+ERA_1998_DJF_blobs.nc
+ERA_1999_DJF_blobs.nc
+ERA_2000_DJF_blobs.nc
+There are 21 files
