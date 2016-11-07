@@ -5,7 +5,7 @@
 SEASONS=("MAM" "JJA" "SON" "DJF")
 DATA=("climo" "2xCO2" "SSTplus2" "SSTplus2_2xCO2")
 mstart=(3 6 9 12)
-BLOBS="FALSE"
+BLOBS="TRUE"
 
 #Addition of regional parameters
 SECTOR=("NA" "NC" "NP" "SA" "SI" "SP")
@@ -44,11 +44,11 @@ for d in ${DATA[@]}; do
       fi
       #run StitchBlobs
       #New addition! Regional stitching
-      for n in {0..5}; do
+      for n in {0..0}; do
       #for n in {0..3}; do
         secname=${SECTOR[n]}
         
-        echo "$s""_""$yf"
+        echo "$s""_""$secname""_""$yf"
         #blobsname="$bdir/$s""_""$yf""_blobs_""$d.nc"
         #statsname="$bdir/$s""_""$yf""_stats_""$d.txt"
         #densname="$bdir/$s""_""$yf""_dens_""$d.nc"
@@ -56,8 +56,8 @@ for d in ${DATA[@]}; do
         statsname="$bdir/$s""_""$yf""_""$secname""_stats_""$d.txt"
         densname="$bdir/$s""_""$yf""_""$secname""_dens_""$d.nc"  
         ~/tempestextremes/bin/StitchBlobs --inlist bloblist --out $blobsname --var INT_ADIPV --outvar PV_BLOB --mintime 40 --minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]}
-        ~/tempestextremes/bin/BlobStats --infile $blobsname --outfile $statsname --invar PV_BLOB --out minlat,maxlat,minlon,maxlon,centlat,centlon,area
-        ~/tempestextremes/bin/DensityCalculations --in $blobsname --var PV_BLOB --out $densname
+       # ~/tempestextremes/bin/BlobStats --infile $blobsname --outfile $statsname --invar PV_BLOB --out minlat,maxlat,minlon,maxlon,centlat,centlon,area
+       # ~/tempestextremes/bin/DensityCalculations --in $blobsname --var PV_BLOB --out $densname
         n=$((n+1))
       done
       i=$((i+1))
