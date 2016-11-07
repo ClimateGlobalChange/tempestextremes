@@ -16,10 +16,6 @@ else ifeq ($(UNAME),Linux)
     SYSTEM= BABBAGE
     SYSTEM_MAKEFILE= babbage.make
   endif
-  ifeq ($(NERSC_HOST),cori)
-    SYSTEM= CORI
-    SYSTEM_MAKEFILE= cori.make
-  endif
   ifeq ($(HOSTNAME),yslogin1)
     SYSTEM= YELLOWSTONE
     SYSTEM_MAKEFILE= yellowstone.make
