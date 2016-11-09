@@ -20,7 +20,8 @@
 # minlon_c/maxlon_c/centlon_c: longitude recalculated to 180W->180E
 
 source("~/tempestextremes/test/sector_funcs.R")
-setwd("~/data_netcdf")
+#setwd("~/data_netcdf")
+setwd("~/new_stats/")
 
 latlon_dist<-function(lat1,lon1,lat2,lon2){
   dlat=(lat2-lat1)*pi/180
@@ -54,12 +55,12 @@ df_tot = data.frame(Dataset=character(),nYears=numeric(),Season=character(),year
                     dist=numeric(),split=character(),newnum=numeric())
 
 df_each=data.frame(Dataset=character(),Season=character(),year=numeric(),
-                   Blob=numeric(),Hemi=character(),Sector=character(),
+                   Blob=numeric(),Hemi=character(),Sector_tot=character(),
                    centlat_start=numeric(),centlon_start=numeric(),
                    centlat_end=numeric(),centlon_end=numeric(),
                    centlat_span=numeric(),centlon_span=numeric(),duration=numeric(),
                    min_area=numeric(),max_area=numeric(),mean_area=numeric(),dist=numeric(),
-                   sector_start=character(),sector_end=character(),split=character(),newnum=numeric())
+                   sector_start=character(),sector_end=character(),split=character(),newnum=numeric(),Sector=character())
 
 files_masterlist=list.files(pattern="*statlist")
 print("Beginning to read in data files.")
@@ -100,12 +101,12 @@ for (a in files_masterlist){
   end_df_index=0
   
   #Initialize summary dataframe
-  col_summ=c('Dataset','Season','year','Blob','Hemi','Sector',
+  col_summ=c('Dataset','Season','year','Blob','Hemi','Sector_tot',
              'centlat_start','centlon_start',
              'centlat_end','centlon_end',
              'centlat_span','centlon_span','duration',
              'min_area','max_area','mean_area',"dist",
-             "sector_start", "sector_end","split","newnum")
+             "sector_start", "sector_end","split","newnum","Sector")
   ncols_summ=length(col_summ)
   df_summ=data.frame(matrix(ncol=ncols_summ,nrow=1))
   colnames(df_summ)<-col_summ
@@ -114,6 +115,7 @@ for (a in files_masterlist){
   for (x in 1:nFiles){
     #Read file
     f=listfiles[x]
+    print(f)
     #Get number of lines
     lines=readLines(f)
     nlines=length(lines)
@@ -132,12 +134,14 @@ for (a in files_masterlist){
       dataname=ystring[1]
       year=as.numeric(ystring[2])
       season=ystring[3]
+      sector_string=ystring[4]
       tstep=6
     }else{
       season=ystring[1]
       year=as.numeric(ystring[2])
+      sector_string=ystring[3]
       tstep=3
-      if (length(ystring)>4){
+      if (length(ystring)>5){
         datapaste=paste(ystring[length(ystring)-1],ystring[length(ystring)],sep="_")
         datastring=unlist(strsplit(datapaste,split="[.]"))
       }else{
@@ -204,9 +208,9 @@ for (a in files_masterlist){
       df_summ[1,"Hemi"]=subset[1,"Hemi"]
       sub_sectors=unique(subset$Sector)
       if (length(sub_sectors)==1){
-        df_summ[1,"Sector"]=sub_sectors[1]
+        df_summ[1,"Sector_tot"]=sub_sectors[1]
       }else{
-        df_summ[1,"Sector"]=paste(sub_sectors,collapse=" ")
+        df_summ[1,"Sector_tot"]=paste(sub_sectors,collapse=" ")
       }
       df_summ[1,"centlat_start"]=subset$centlat[1]
       df_summ[1,"centlat_end"]=subset$centlat[length(subset$centlat)]
@@ -233,6 +237,7 @@ for (a in files_masterlist){
       df_summ[1,"dist"]=sum(subset$dist)
       df_summ[1,"split"]=ifelse(any(subset$dist>2000),"Y","N")
       df_summ[1,"newnum"]=newblob_num
+      df_summ[1,"Sector"]=sector_string
       df_each<-rbind(df_each,df_summ)
       
       start_df_index = end_df_index + 1

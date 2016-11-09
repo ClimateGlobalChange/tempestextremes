@@ -7,7 +7,14 @@ ycalc=2005
 yend=2000
 DDIR=/Volumes/ExFAT_drive/ERA_files
 BDIR=$DDIR/ERA_blobs
-VAR="GH"
+VAR="IPV"
+
+#Addition of regional parameters
+SECTOR=("NA" "NC" "NP" "SA" "SI" "SP")
+LEFT_BOUND=(250 30 130 290 20 120)
+RIGHT_BOUND=(50 150 270 40 140 310)
+MIN_LAT=(25 25 25 -75 -75 -75)
+MAX_LAT=(75 75 75 -25 -25 -25)
 
 SUFF=""  
 BLOB_SUFF=""  
@@ -88,37 +95,45 @@ for ((y=ystart; y<=ycalc; y++)); do
      echo "ls $mstring" | sh > bloblist
     fi
     cat bloblist
-    
-    blobsname="$BDIR/ERA_"$y"_"$s"_"$BLOB_SUFF
-    statsname="$BDIR/ERA_"$y"_"$s"_"$STAT_SUFF
-    densname="$BDIR/ERA_"$y"_"$s"_"$DENS_SUFF
-    vdensname="$BDIR/ERA_"$y"_"$s"_var_"$DENS_SUFF
+    for n in {0..5}; do
+      secname=${SECTOR[n]}
+#    blobsname="$BDIR/ERA_"$y"_"$s"_"$BLOB_SUFF
+#    statsname="$BDIR/ERA_"$y"_"$s"_"$STAT_SUFF
+#    densname="$BDIR/ERA_"$y"_"$s"_"$DENS_SUFF
+#    vdensname="$BDIR/ERA_"$y"_"$s"_var_"$DENS_SUFF
 
-    ~/tempestextremes/bin/StitchBlobs --inlist bloblist --out $blobsname --var $INVAR --outvar $BLOB_VAR --mintime 20
-    ~/tempestextremes/bin/BlobStats --infile $blobsname --outfile $statsname --invar $BLOB_VAR --out minlat,maxlat,minlon,maxlon,centlat,centlon,area
-    ~/tempestextremes/bin/DensityCalculations --in $blobsname --var $BLOB_VAR --out $densname
-    ~/tempestextremes/bin/DensityCalculations --inlist bloblist --var $INVAR --out $vdensname
+      blobsname="$BDIR/ERA_"$y"_"$s"_""$secname""_"$BLOB_SUFF
+      statsname="$BDIR/ERA_"$y"_"$s"_""$secname""_"$STAT_SUFF
+      densname="$BDIR/ERA_"$y"_"$s"_""$secname""_"$DENS_SUFF
+      vdensname="$BDIR/ERA_"$y"_"$s"_var_""$secname""_"$DENS_SUFF
+
+      ~/tempestextremes/bin/StitchBlobs --inlist bloblist --out $blobsname --var $INVAR --outvar $BLOB_VAR --mintime 20 -minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]}
+      ~/tempestextremes/bin/BlobStats --infile $blobsname --outfile $statsname --invar $BLOB_VAR --out minlat,maxlat,minlon,maxlon,centlat,centlon,area
+   #   ~/tempestextremes/bin/DensityCalculations --in $blobsname --var $BLOB_VAR --out $densname
+   #   ~/tempestextremes/bin/DensityCalculations --inlist bloblist --var $INVAR --out $vdensname
+      n=$((n+1))
+    done
     i=$((i+1))
   done
 done
 
-cd $BDIR
-for s in ${SEASONS[@]}; do
-  lsname="ERA_"$s"_blobs"
-  if [ -e $lsname ]; then
-    rm $lsname
-  fi
-  outname="$BDIR/ERA_"$s"_avg_"$DENS_SUFF
-  for ((y=ystart; y<=yend; y++)); do
-    echo "ls ERA_"$y"_"$s"_"$BLOB_SUFF" >> $lsname" | sh
-  done
-  cat $lsname
+#cd $BDIR
+#for s in ${SEASONS[@]}; do
+#  lsname="ERA_"$s"_blobs"
+#  if [ -e $lsname ]; then
+#    rm $lsname
+#  fi
+#  outname="$BDIR/ERA_"$s"_avg_"$DENS_SUFF
+#  for ((y=ystart; y<=yend; y++)); do
+#    echo "ls ERA_"$y"_"$s"_"$BLOB_SUFF" >> $lsname" | sh
+#  done
+#  cat $lsname
 
-  numfiles=$(cat $lsname | wc -l)
-  n=$((numfiles))
-  echo "There are $n files"
-  ~/tempestextremes/bin/DensityCalculations --std --inlist $lsname --var $BLOB_VAR --out $outname
-  python ~/tempestextremes/test/plot_density.py $outname "ERA $n yr $s" "avg" "$PLOT_TITLE"
-done
+#  numfiles=$(cat $lsname | wc -l)
+#  n=$((numfiles))
+#  echo "There are $n files"
+#  ~/tempestextremes/bin/DensityCalculations --std --inlist $lsname --var $BLOB_VAR --out $outname
+#  python ~/tempestextremes/test/plot_density.py $outname "ERA $n yr $s" "avg" "$PLOT_TITLE"
+#done
 
-cp /Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA*plot.png ~/figs/
+#cp /Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA*plot.png ~/figs/
