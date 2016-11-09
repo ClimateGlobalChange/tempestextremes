@@ -44,7 +44,7 @@ for d in ${DATA[@]}; do
       fi
       #run StitchBlobs
       #New addition! Regional stitching
-      for n in {0..0}; do
+      for n in {0..5}; do
       #for n in {0..3}; do
         secname=${SECTOR[n]}
         
@@ -56,8 +56,8 @@ for d in ${DATA[@]}; do
         statsname="$bdir/$s""_""$yf""_""$secname""_stats_""$d.txt"
         densname="$bdir/$s""_""$yf""_""$secname""_dens_""$d.nc"  
         ~/tempestextremes/bin/StitchBlobs --inlist bloblist --out $blobsname --var INT_ADIPV --outvar PV_BLOB --mintime 40 --minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]}
-       # ~/tempestextremes/bin/BlobStats --infile $blobsname --outfile $statsname --invar PV_BLOB --out minlat,maxlat,minlon,maxlon,centlat,centlon,area
-       # ~/tempestextremes/bin/DensityCalculations --in $blobsname --var PV_BLOB --out $densname
+        ~/tempestextremes/bin/BlobStats --infile $blobsname --outfile $statsname --invar PV_BLOB --out minlat,maxlat,minlon,maxlon,centlat,centlon,area
+        ~/tempestextremes/bin/DensityCalculations --in $blobsname --var PV_BLOB --out $densname
         n=$((n+1))
       done
       i=$((i+1))
