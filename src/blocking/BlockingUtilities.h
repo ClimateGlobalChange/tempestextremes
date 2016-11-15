@@ -95,7 +95,6 @@ void rVort_calc(
 void PV_calc(
         NcVar *U,
         NcVar *V,
-        NcVar *T,
         DataMatrix4D<double> PTMat,
         DataMatrix4D<double> RVMat,
         NcVar *pVals,
@@ -106,11 +105,7 @@ void PV_calc(
         double lat_res,
         double lon_res,
         NcVar *PV,
-        NcVar *intPV,
-        NcVar *avgT,
-        NcVar *avgU,
-        NcVar *avgV
-);
+        NcVar *intPV);
 
 void calcDevsPV(bool leap,
               int startAvgIndex,

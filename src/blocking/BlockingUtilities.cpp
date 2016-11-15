@@ -477,7 +477,6 @@ void rVort_calc(
 void PV_calc(
 	NcVar *U, 
 	NcVar *V, 
-        NcVar *T,
 	DataMatrix4D<double> PTMat,
 	DataMatrix4D<double> RVMat,
         NcVar *pVals, 	
@@ -488,10 +487,7 @@ void PV_calc(
         double lat_res,
         double lon_res,
 	NcVar *PV,
-        NcVar *intPV,
-        NcVar *avgT,
-        NcVar *avgU,
-        NcVar *avgV){
+        NcVar *intPV){
 
 
   int nTime,nPlev,nLat,nLon;
@@ -509,7 +505,6 @@ void PV_calc(
   //Input matrices
   DataMatrix4D<double> UMat(nTime, nPlev, nLat, nLon);
   DataMatrix4D<double> VMat(nTime, nPlev, nLat, nLon);
-  DataMatrix4D<double> TMat(nTime, nPlev, nLat, nLon);
 
   //Load data
   U->set_cur(0,0,0,0); 
@@ -517,9 +512,6 @@ void PV_calc(
 
   V->set_cur(0,0,0,0);
   V->get(&(VMat[0][0][0][0]), nTime, nPlev, nLat, nLon);
-
-  T->set_cur(0,0,0,0);
-  T->get(&(TMat[0][0][0][0]),nTime,nPlev,nLat,nLon);
 
   //Pressure axis values
   DataVector<double> pVec(nPlev);
@@ -628,28 +620,13 @@ void PV_calc(
     pos_top = temp;
   }
 
-  //Matrices for variables averaged over 100-500 mb
+
   DataMatrix3D<double> iPVMat(nTime, nLat, nLon);
-  DataMatrix3D<double> avgTMat(nTime,nLat,nLon);
-  DataMatrix3D<double> avgUMat(nTime,nLat,nLon);
-  DataMatrix3D<double> avgVMat(nTime,nLat,nLon);
 
   double PVbot;
-  double PVmid = 0.0;
+  double PVmid;
   double PVtop;
   
-  double Tbot;
-  double Tmid = 0.0;
-  double Ttop;  
-
-  double Ubot; 
-  double Umid = 0.0;;
-  double Utop;
-
-  double Vbot;
-  double Vmid = 0.0;
-  double Vtop;
-
 //Eliminate polar regions from calculations
   int i10 = std::fabs(10/lat_res);
   int i171 = std::fabs(171/lat_res);
@@ -674,40 +651,18 @@ void PV_calc(
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
         PVtop = PVMat[t][pos_top][a][b];
-        Ttop = TMat[t][pos_top][a][b];
-        Utop = UMat[t][pos_top][a][b];
-        Vtop = VMat[t][pos_top][a][b];
-
         PVbot = PVMat[t][pos_bot][a][b];
-        Tbot = TMat[t][pos_bot][a][b];
-        Ubot = UMat[t][pos_bot][a][b];
-        Vbot = VMat[t][pos_bot][a][b];        
-
+        PVmid = 0.0;
         for (int p=(pos_top+1); p<pos_bot; p++){
           PVmid+=2.0*PVMat[t][p][a][b];
-          Tmid+=2.0*TMat[t][p][a][b];
-          Umid+=2.0*UMat[t][p][a][b];
-          Vmid+=2.0*VMat[t][p][a][b];
         }
         iPVMat[t][a][b] = (PVtop+PVbot+PVmid)*invLevLen;
-        avgTMat[t][a][b] = (Ttop + Tbot + Tmid) * invLevLen;
-        avgUMat[t][a][b] = (Utop + Ubot + Umid) * invLevLen;
-        avgVMat[t][a][b] = (Vtop + Vbot + Vmid) * invLevLen;
       }
     }
   }
  
-  intPV->set_cur(0,0,0);
+  intPV->set_cur(0,0,0,0);
   intPV->put(&(iPVMat[0][0][0]),nTime,nLat,nLon);
-  
-  avgT->set_cur(0,0,0);
-  avgU->set_cur(0,0,0);
-  avgV->set_cur(0,0,0);
-
-  avgT->put(&(avgTMat[0][0][0]),nTime,nLat,nLon);
-  avgU->put(&(avgUMat[0][0][0]),nTime,nLat,nLon);
-  avgV->put(&(avgVMat[0][0][0]),nTime,nLat,nLon);
-
   std::cout<<"Finished integrating PV."<<std::endl;
 } 
 //////////////////////////////////////////////////////////////////////////////////////////////////

@@ -20,15 +20,6 @@ MAX_LAT=(75 75 75 -25 -25 -25)
 #MIN_LAT=(25 25 -75 -75)
 #MAX_LAT=(75 75 -25 -25)
 
-for d in ${DATA[@]}; do
-  for s in ${SEASONS[@]}; do
-    b_all="$d""_""$s""_all_bloblist"
-    if [ -e $b_all ]; then
-      rm $b_all
-    fi
-  done
-done
-
 if [ "$BLOBS" == "TRUE" ]; then
 for d in ${DATA[@]}; do
   cd $SCRATCH/$d/data
@@ -39,22 +30,18 @@ for d in ${DATA[@]}; do
   for y in {2..23}; do
     i=0
     for s in ${SEASONS[@]}; do
-      #b_all="$d""_""$s""_all_bloblist"
-      bloblist="$d""_""$s""_bloblist"
-      echo $bloblist
       yf=$(printf "%04d" $y)
       m=${mstart[i]}
       mf=$(printf "%02d" $m)
 
       if [ $m -eq 12 ]; then
-        ls *$yf-$mf*devs.nc > $bloblist
+        ls *$yf-$mf*devs.nc > bloblist
         yf=$(printf "%04d" $((y+1)))
-        ls *$yf-0[12]*devs.nc >> $bloblist
+        ls *$yf-0[12]*devs.nc >> bloblist
       else
         mstring=$(printf "*$yf-{%02d,%02d,%02d}*devs.nc" $m $((m+1)) $((m+2)))
-        echo "ls $mstring" | sh > $bloblist
+        echo "ls $mstring" | sh > bloblist
       fi
-      #cat $bloblist >> $b_all
       #run StitchBlobs
       #New addition! Regional stitching
       for n in {0..5}; do
@@ -68,7 +55,7 @@ for d in ${DATA[@]}; do
         blobsname="$bdir/$s""_""$yf""_""$secname""_blobs_""$d.nc"
         statsname="$bdir/$s""_""$yf""_""$secname""_stats_""$d.txt"
         densname="$bdir/$s""_""$yf""_""$secname""_dens_""$d.nc"  
-        ~/tempestextremes/bin/StitchBlobs --inlist $bloblist --out $blobsname --var INT_ADIPV --outvar PV_BLOB --mintime 40 --minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]}
+        ~/tempestextremes/bin/StitchBlobs --inlist bloblist --out $blobsname --var INT_ADIPV --outvar PV_BLOB --mintime 40 --minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]}
         ~/tempestextremes/bin/BlobStats --infile $blobsname --outfile $statsname --invar PV_BLOB --out minlat,maxlat,minlon,maxlon,centlat,centlon,area
         ~/tempestextremes/bin/DensityCalculations --in $blobsname --var PV_BLOB --out $densname
         n=$((n+1))
