@@ -174,7 +174,9 @@ int main(int argc, char ** argv ){
       break;
     }
   }
-
+  if (monthStartIndex==nTime){
+    _EXCEPTIONT("Check file; did not find 1st of the month.");
+  }
   
   //create the output file names
   int year1=0;
