@@ -261,7 +261,7 @@ df_tot[,2]=lapply(df_tot[2],as.numeric)
 df_tot$area=df_tot$area*6371*6371
 df_each$days=df_each$duration/24.
 
-colvec=c("blue","red","green","purple","pink")
+c("blueviolet","blue","green","aquamarine2","cyan4")
 
 df_each$col_data=ifelse(df_each$Dataset=="ERA","blueviolet",
                    ifelse(df_each$Dataset=="climo","blue",

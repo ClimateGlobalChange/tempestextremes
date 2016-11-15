@@ -107,7 +107,7 @@ for ((y=ystart; y<=ycalc; y++)); do
       densname="$BDIR/ERA_"$y"_"$s"_""$secname""_"$DENS_SUFF
       vdensname="$BDIR/ERA_"$y"_"$s"_var_""$secname""_"$DENS_SUFF
 
-      ~/tempestextremes/bin/StitchBlobs --inlist bloblist --out $blobsname --var $INVAR --outvar $BLOB_VAR --mintime 20 --minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]}
+      ~/tempestextremes/bin/StitchBlobs --inlist bloblist --out $blobsname --var $INVAR --outvar $BLOB_VAR --mintime 20 -minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]}
       ~/tempestextremes/bin/BlobStats --infile $blobsname --outfile $statsname --invar $BLOB_VAR --out minlat,maxlat,minlon,maxlon,centlat,centlon,area
    #   ~/tempestextremes/bin/DensityCalculations --in $blobsname --var $BLOB_VAR --out $densname
    #   ~/tempestextremes/bin/DensityCalculations --inlist bloblist --var $INVAR --out $vdensname
