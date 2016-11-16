@@ -187,6 +187,13 @@ int main(int argc, char **argv){
 
   NcVar *pv_var = file_out.add_var("PV", ncDouble, out_time, out_plev, out_lat, out_lon);
   NcVar *intpv_var = file_out.add_var("IPV", ncDouble, out_time, out_lat, out_lon);
+  NcVar *avgt_var = file_out.add_var("AVGT", ncDouble, out_time, out_lat, out_lon);
+  NcVar *avgu_var = file_out.add_var("AVGU", ncDouble, out_time, out_lat, out_lon);
+  NcVar *avgv_var = file_out.add_var("AVGV", ncDouble, out_time, out_lat, out_lon);
+  
+  VarPressureAvg(temp,lev_vals,avgt_var);
+  VarPressureAvg(uvar,lev_vals,avgu_var);
+  VarPressureAvg(vvar,lev_vals,avgv_var);
   PV_calc(uvar, vvar, PTVar, RVVar, lev_vals, coriolis,cosphi, dphi, dlambda,\
     lat_res, lon_res, pv_var, intpv_var);
 

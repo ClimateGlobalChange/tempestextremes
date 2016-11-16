@@ -91,6 +91,13 @@ void rVort_calc(
         DataMatrix4D<double> & RVMat
 );
 
+//Function that averages generic variable over upper troposphere
+void VarPressureAvg(
+       NcVar *invar,
+       NcVar * pVals,
+       NcVar * outvar
+);
+
 //Function that calculates PV
 void PV_calc(
         NcVar *U,

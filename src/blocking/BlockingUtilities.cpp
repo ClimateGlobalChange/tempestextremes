@@ -472,6 +472,73 @@ void rVort_calc(
   std::cout<<"Finished calculating relative vorticity."<<std::endl;
 }
 
+
+void VarPressureAvg(
+	NcVar * invar,
+	NcVar * pVals,
+	NcVar * outvar
+){
+	int nTime,nLat,nLon,nPlev;
+	nTime = invar->get_dim(0)->size();
+	nPlev = invar->get_dim(1)->size();
+	nLat = invar->get_dim(2)->size();
+	nLon = invar->get_dim(3)->size();
+
+	//Input into Matrix
+	DataMatrix4D<double> inMat(nTime,nPlev,nLat,nLon);
+	invar->set_cur(0,0,0,0);
+	invar->get(&(inMat[0][0][0][0]),nTime,nPlev,nLat,nLon);
+	
+    //Pressure axis values
+    DataVector<double> pVec(nPlev);
+    pVals->set_cur((long) 0);
+    pVals->get(&(pVec[0]), nPlev);
+
+	
+	//Integrate values over upper troposphere
+    int pos_top;
+    int pos_bot;
+
+    for (int x=0; x<nPlev; x++){
+      if (std::fabs(pVec[x]-15000.0)<0.0001){
+        pos_top = x;
+      }
+      if (std::fabs(pVec[x]-50000.0)<0.0001){
+        pos_bot = x;
+      }
+    }
+   //if level axis starts at ground, reverse positions
+    if (pos_top>pos_bot){
+      int temp = pos_bot;
+      pos_bot = pos_top;
+      pos_top = temp;
+    }
+
+    DataMatrix3D<double> outMat(nTime, nLat, nLon);  
+    double bot,mid,top;
+    double modLevLen = pos_bot-pos_top;
+    double invLevLen = 1.0/(2.0*modLevLen);
+
+    //Calculate integration parts
+    for (int t=0; t<nTime; t++){
+      for (int a=0; a<nLat; a++){
+        for (int b=0; b<nLon; b++){
+          top = inMat[t][pos_top][a][b];
+          bot = inMat[t][pos_bot][a][b];
+          mid = 0.0;
+          for (int p=(pos_top+1); p<pos_bot; p++){
+            mid+=2.0*inMat[t][p][a][b];
+          }
+          outMat[t][a][b] = (top+bot+mid)*invLevLen;
+        }
+      }
+    }
+ 
+    outvar->set_cur(0,0,0);
+    outvar->put(&(outMat[0][0][0]),nTime,nLat,nLon);
+    std::cout<<"Finished integrating variable."<<std::endl;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 void PV_calc(
@@ -479,15 +546,15 @@ void PV_calc(
 	NcVar *V, 
 	DataMatrix4D<double> PTMat,
 	DataMatrix4D<double> RVMat,
-        NcVar *pVals, 	
+    NcVar *pVals, 	
 	DataVector<double> coriolis,
-        DataVector<double>cosphi,
+    DataVector<double>cosphi,
 	double dphi,
 	double dlambda,
-        double lat_res,
-        double lon_res,
+    double lat_res,
+    double lon_res,
 	NcVar *PV,
-        NcVar *intPV){
+    NcVar *intPV){
 
 
   int nTime,nPlev,nLat,nLon;
@@ -661,7 +728,7 @@ void PV_calc(
     }
   }
  
-  intPV->set_cur(0,0,0,0);
+  intPV->set_cur(0,0,0);
   intPV->put(&(iPVMat[0][0][0]),nTime,nLat,nLon);
   std::cout<<"Finished integrating PV."<<std::endl;
 } 
@@ -1078,7 +1145,6 @@ double GHcheck(double z_0,
           double lat_N,
           double lat_S,
           std::string hemi ){
-
   double GHGS;
   double GHGN;
   double gval;
