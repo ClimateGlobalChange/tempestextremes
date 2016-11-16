@@ -39,6 +39,12 @@ void Varto2Dsum(NcVar *inVar, int v, DataMatrix3D<double> & outMat){
             }
         }
     }
+	//check that values are correct!
+	/*std::cout<<"Added ";
+	for (int t=0;t<tLen; t++){
+		std::cout<<inMat[t][5][10]<<",";
+	}
+	std::cout<<" to get "<<outMat[5][10][v]<<std::endl;*/
 }
 
 int main(int argc, char ** argv){
@@ -114,9 +120,9 @@ int main(int argc, char ** argv){
 		//increment the length of the time axis to accommodate
 		for (int f=1; f<vecFiles.size(); f++){
 		    NcFile addread(vecFiles[f].c_str());
+			tLen += addread.get_dim("time")->size();
 			for (int v=0; v<varLen; v++){
 				NcVar * invar = addread.get_var(varVec[v].c_str());
-				tLen += addread.get_dim("time")->size();
 				Varto2Dsum(invar, v, storeMat);
 			}
 			addread.close();	
@@ -127,9 +133,6 @@ int main(int argc, char ** argv){
 			for (int b=0; b<lonLen; b++){
 				for (int v=0; v<varLen; v++){
 					storeMat[a][b][v] = storeMat[a][b][v]*invtLen;
-					if (a==5 && b==10){
-						std::cout<<" now "<<storeMat[a][b][v]<<std::endl;
-					}
 				}
 			}
 		}
