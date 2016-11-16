@@ -213,6 +213,7 @@ if [ "$PV_BOOL" == "TRUE" ]; then
   echo "#SBATCH -o pv_batch.output" >> $PV_BATCH_NAME
   echo "#SBATCH -t 20:00:00" >> $PV_BATCH_NAME
   echo "#SBATCH --mem=20GB" >> $PV_BATCH_NAME
+  echo "#SBATCH -C haswell" >> $PV_BATCH_NAME
   echo "" >> $PV_BATCH_NAME
   echo "cd $DATA_DIR" >> $PV_BATCH_NAME
   echo "cat combined_list.txt | awk '{print \"$BINDIR/BlockingPV --ipl --in \"\$1 \" --in2d \"\$2\" --out \"\$3}'| sh" >> $PV_BATCH_NAME
@@ -253,6 +254,7 @@ if [ "$AVG_BOOL" == "TRUE" ]; then
   echo "#SBATCH -p shared" >> $AVG_BATCH_NAME
   echo "#SBATCH -o avg_batch.output">> $AVG_BATCH_NAME
   echo "#SBATCH -t 0:30:00" >> $AVG_BATCH_NAME
+  echo "#SBATCH -C haswell" >> $AVG_BATCH_NAME
   echo "" >> $AVG_BATCH_NAME
   echo "cd $DATA_DIR" >> $AVG_BATCH_NAME
   if [ "$MISSING_FILES" == "TRUE" ]; then
@@ -295,6 +297,7 @@ if [ "$DEV_BOOL" == "TRUE" ]; then
   echo "#SBATCH -p shared" >> $DEV_BATCH_NAME
   echo "#SBATCH -o dev_batch.output">>$DEV_BATCH_NAME
   echo "#SBATCH -t 2:00:00" >> $DEV_BATCH_NAME
+  echo "#SBATCH -C haswell">> $DEV_BATCH_NAME
   echo "" >> $DEV_BATCH_NAME
   echo "cd $DATA_DIR" >> $DEV_BATCH_NAME
   echo "$BINDIR/BlockingDevs --inlist $LIST_PV --avg $AVGFILE --varname $VARNAME --avgname $AVGNAME" >> $DEV_BATCH_NAME

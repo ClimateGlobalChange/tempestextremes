@@ -25,7 +25,7 @@ EXEC_FILES= BlockingAvg.cpp\
 	    DensityCalculations.cpp \
             Var4Dto3D.cpp\
             split_file.cpp\
-            avgVar.cpp 
+            AvgVar.cpp 
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 
