@@ -175,7 +175,9 @@ int main(int argc, char ** argv ){
     }
   }
 
-  
+  if (monthStartIndex<1){
+    _EXCEPTIONT("Check file-- no beginning month date found.");
+  }  
   //create the output file names
   int year1=0;
   int month1=0;
