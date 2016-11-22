@@ -23,7 +23,9 @@
 #    ;;
 #  esac
 #done
-DIR=$SCRATCH/climo
+DATAS=("climo" "2xCO2" "SSTplus2")
+for d in ${DATAS[@]}; do
+DIR=$SCRATCH/$d
 SEASONS=("DJF" "MAM" "JJA" "SON")
 for s in ${SEASONS[@]}; do
   SEASON=$s
@@ -64,5 +66,6 @@ for YEAR in {2..24}; do
       ~/tempestextremes/bin/split_file --in $SPLIT_FILE --rename --vars IPV,AVGT,AVGU,AVGV
     fi
   fi
+done
 done
 done
