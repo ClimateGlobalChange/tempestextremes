@@ -172,7 +172,7 @@ for (a in files_masterlist){
       bvec=rep(nBlob,lsub)
       yvec=rep(year,lsub)
       svec=rep(season,lsub)
-      nYearVec=rep(nFiles,lsub)
+      nYearVec=rep(nFiles/6,lsub)
       end_df_index=end_df_index + lsub
   
       #Data
@@ -272,7 +272,22 @@ df_each$short_name=ifelse(df_each$Dataset=="ERA","E",
                           ifelse(df_each$Dataset=="2xCO2","2C",
                                  ifelse(df_each$Dataset=="SSTplus2","S2","SC"))))
 
+df_tot$Sector2=ifelse(df_tot$Hemi=="NH",ifelse(df_tot$Sector=="ATL","NA",
+                                               ifelse(df_tot$Sector=="PAC","NP","NC")),
+                      ifelse(df_tot$Sector=="ATL","SA",
+                             ifelse(df_tot$Sector=="PAC","SP","SI")))
 
+df_tot$nYears=ifelse(df_tot$Dataset=="ERA",21,
+                     ifelse(df_tot$Season=="DJF",
+                            ifelse(df_tot$Dataset=="climo" | df_tot$Dataset=="SSTplus2_2xCO2",20,22),
+                            ifelse(df_tot$Season=="MAM",22,
+                                   ifelse(df_tot$Season=="JJA",
+                                          ifelse(df_tot$Dataset=="climo",21,22),
+                                          ifelse(df_tot$Dataset=="SSTplus2_2xCO2",22,21)
+                                          )
+                                   )
+                            )
+                     )
 #test_vals$col_data=ifelse(test_vals$class=="ERA","orange",
 #                        ifelse(test_vals$class=="climo","blue",
 #                               ifelse(test_vals$class=="2xCO2","green",

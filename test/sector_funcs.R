@@ -10,6 +10,142 @@ library("MASS")
 
 #NOTE!!!!!!!!!!!!!!!!!!!
 #NETCDF VARIABLES ARE INDEXED AS LON,LAT,TIME!!
+calc_newpt<-function(x1,y1,x2,y2,xcalc){
+  dy=y2-y1
+  #convert points 
+  nx1=lon_convert(x1)
+  nx2=lon_convert(x2)
+  dx=nx2-nx1
+  
+  slope=dy/dx
+  y=slope*(xcalc-nx1) + y1
+  return(y)
+}
+
+plot_pac<-function(dat,xvar,yvar,lcol="purple",lty=1,lwd=2){
+  
+  #check for periodic condition!
+  start_i <-c(1)
+  end_i<-c()
+  
+  for (i in 1:(nrow(dat)-1)){
+    distx=abs(dat[i,xvar]-dat[i+1,xvar])
+    if (distx>180){
+      end_i=c(end_i,i)
+      start_i=c(start_i,i+1)
+    }
+  }
+  end_i=c(end_i,nrow(dat))
+  
+  for (j in 1:length(start_i)){
+    
+    subdat=dat[start_i[j]:end_i[j],]
+    slen=nrow(subdat)
+    xvec=subdat[,xvar]
+    yvec=subdat[,yvar]
+    #Need to connect segments
+    #for all but the last segment, add row to end
+    if (j<length(start_i)){
+      #Look at the next point
+      lastx=subdat[nrow(subdat),xvar]
+      lasty=subdat[nrow(subdat),yvar]
+      nextx=dat[end_i[j]+1,xvar]
+      nexty=dat[end_i[j]+1,yvar]
+      inty=calc_newpt(lastx,lasty,nextx,nexty,0)
+      #Going eastward
+      if (lastx>nextx){
+        xvec=c(xvec,360)
+      }else{
+        xvec=c(xvec,0)
+      }
+      yvec=c(yvec,inty)
+    }
+    
+    #for all but first segment, add row to beginning
+    if (j>1){
+      nextx=subdat[1,xvar]
+      nexty=subdat[1,yvar]
+      lastx=dat[start_i[j]-1,xvar]
+      lasty=dat[start_i[j]-1,yvar]
+      inty=calc_newpt(lastx,lasty,nextx,nexty,0)
+      if (lastx<nextx){
+        xvec=c(360,xvec)
+      }else{
+        xvec=c(0,xvec)
+      }
+      yvec=c(inty,yvec)
+    }
+    lines(xvec,yvec,col=lcol,lwd=2,lty=lty)
+  }
+}
+
+produce_sectormap<-function(xlim=c(-180,180),ylim=c(-90,90)){
+  m<-map('world',plot=FALSE)
+  map('world',col='gray90',fill=TRUE,xlim=xlim,ylim=ylim)
+  map.axes()
+  
+  #Boxes defining sectors
+  #NH ATL
+  rect(lon_convert(260),25,40,75,border="blue")
+  text(((lon_convert(260)+40)/2),50,"NA")
+  #NH PAC
+  rect(140,25,185,75,border="blue")
+  text((140+180)/2,50,"NP")
+  rect(-185,25,lon_convert(260),75,border="blue")
+  text((-100-180)/2,50,"NP")
+  #CONTINENTS
+  rect(40,25,140,75,border="red")
+  text(90,50,"NC")
+  
+  #SH ATL
+  rect(-60,-75,30,-25,border="blue")
+  text(-15,-50,"SA")
+  
+  #SH PAC
+  rect(130,-75,185,-25,border="blue")
+  text((130+180)/2,-50,"SP")
+  rect(-185,-75,-60,-25,border="blue")
+  text(-120,-50,"SP")
+  
+  #Indian Ocean
+  rect(30,-75,130,-25,border="blue")
+  text(80,-50,"SI")
+  
+}
+produce_sectormap2<-function(xlim=c(0,360),ylim=c(-90,90)){
+  m<-map('world2',plot=FALSE)
+  map('world2',xlim=xlim,ylim=ylim,fill=TRUE,col='gray90')
+  map.axes()
+  
+  #Boxes defining sectors
+  #NH ATL
+  rect(260,25,365,75,border="blue")
+  text(((260+360)/2),50,"NA")
+  rect(0,25,40,75,border="blue")
+  text(20,50,"NA")
+  #NH PAC
+  rect(140,25,260,75,border="blue")
+  text((140+260)/2,50,"NP")
+
+  #CONTINENTS
+  rect(40,25,140,75,border="red")
+  text(90,50,"NC")
+  
+  #SH ATL
+  rect(300,-75,365,-25,border="blue")
+  text((300+360)/2,-50,"SA")
+  rect(-5,-75,30,-25,border="blue")
+  text(15,-50,"SA")
+  
+  #SH PAC
+  rect(130,-75,300,-25,border="blue")
+  text((130+300)/2,-50,"SP")
+  
+  #Indian Ocean
+  rect(30,-75,130,-25,border="blue")
+  text(80,-50,"SI")
+  
+}
 
 #Function that returns the index that most closely matches the specified degree
 #Arguments: lat or lon array, degree
