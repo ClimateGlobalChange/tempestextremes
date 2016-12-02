@@ -80,8 +80,8 @@ int main(int argc, char **argv){
     //Interpolated file name
     std::string interp_file = strfile_in.replace(strfile_in.end()-3,strfile_in.end(),"_ipl.nc");
     std::cout<< "Interpolated file name is "<<interp_file<<std::endl;
-    std::cout<<"About to open interpolated file."<<std::endl;
-    //open interpolated file
+
+    //open file that interpolated variables will be written to
     NcFile readin_out(interp_file.c_str(), NcFile::Replace, NULL,\
       0, NcFile::Offset64Bits);
     if (!readin_out.is_valid()) {
@@ -89,9 +89,12 @@ int main(int argc, char **argv){
         interp_file.c_str());
     }
 
-    //Interpolate variable and write to new file
+    //Interpolate variables and write to new file
     std::cout << "About to interpolate files. Entering interp util."<<std::endl;
-    interp_util(readin_int, strfile_2d, readin_out);
+//    interp_util(readin_int, strfile_2d, readin_out);
+    std::string varlist="T,U,V";
+
+    interp_util(readin_int,strfile_2d,varlist,readin_out);
     readin_out.close();
     strfile_in = interp_file;
   }
