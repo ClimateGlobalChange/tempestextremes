@@ -21,6 +21,7 @@
 
 void interp_util(NcFile & readin,
                  const std::string & strname_2d,
+                 const std::string & varlist,
                  NcFile & ifile_out);
 
 #endif

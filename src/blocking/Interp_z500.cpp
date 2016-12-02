@@ -88,6 +88,7 @@ void interp_1lev(NcVar *var,
 
 void interp_z500(NcFile & readin, 
                  const std::string & strname_2d, 
+                 const std::string & varname,
                  NcFile & ifile_out) {
 
   //open 2D PS file
@@ -114,7 +115,7 @@ void interp_z500(NcFile & readin,
   NcVar *lonvar = readin.get_var("lon");
 
   //Variables
-  NcVar *zvar = readin.get_var("Z");
+  NcVar *zvar = readin.get_var(varname.c_str());
   
   //2D variables
   NcVar *ps = readin_2d.get_var("PS");
@@ -135,7 +136,7 @@ void interp_z500(NcFile & readin,
   copy_dim_var(lonvar, ilon_vals);
 
   //Add interpolated variables to interpolated outfile
-  NcVar *iz = ifile_out.add_var("Z", ncDouble, itime, ilat, ilon);
+  NcVar *iz = ifile_out.add_var("Z500",, ncDouble, itime, ilat, ilon);
   interp_1lev(zvar, hyam, hybm, ps, 50000.0, iz);
 
 

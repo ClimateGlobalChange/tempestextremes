@@ -159,8 +159,8 @@ int main(int argc, char** argv){
         }
       }
     }
-    else if (varName == "GH"){
-      NcVar *zvar = readin.get_var("GH");
+    else if (varName == "GH500"){
+      NcVar *zvar = readin.get_var("GH500");
       zvar->set_cur(0,0,0);
       zvar->get(&(ZData[0][0][0]),nTime,nLat,nLon);
 
@@ -186,9 +186,9 @@ int main(int argc, char** argv){
     copy_dim_var(lonvar, lon_vals);
 
   //FOR DEBUG: WRITE 500 mb GH to file
-  NcVar *gh_vals = file_out.add_var("GH",ncDouble,out_time,out_lat,out_lon);
-  gh_vals->set_cur(0,0,0);
-  gh_vals->put(&(ZData[0][0][0]),nTime,nLat,nLon); 
+//  NcVar *gh_vals = file_out.add_var("GH",ncDouble,out_time,out_lat,out_lon);
+//  gh_vals->set_cur(0,0,0);
+//  gh_vals->put(&(ZData[0][0][0]),nTime,nLat,nLon); 
 
   //get the spatial resolution 
     DataVector<double> latVec(nLat);

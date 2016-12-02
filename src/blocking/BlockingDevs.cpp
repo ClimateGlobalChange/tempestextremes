@@ -181,7 +181,7 @@ int main(int argc, char **argv){
         calcDevsPV(leap, startIndex, varData, devOut, aDevOut, devIntOut, AvarData, inTime,\
         avgTimeVals, inLat, tVarOut, anomVal);
       }
-      else if (varName == "GH"){
+      else if (varName == "GH500"){
         NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);

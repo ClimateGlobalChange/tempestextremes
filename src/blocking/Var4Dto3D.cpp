@@ -26,13 +26,21 @@ int main(int argc, char** argv){
   try{
 
     std::string fileIn;
+    std::string fileIn_2D;
     std::string fileOut;
     bool is_hPa;
+    bool interp_check;
+    bool ZtoGH;
+    std::string varlist;
 
     BeginCommandLine()
       CommandLineString(fileIn,"in","");
+      CommandLineString(fileIn_2D,"in2d","");
       CommandLineString(fileOut,"out","");
       CommandLineBool(is_hPa,"hpa");
+      CommandLineBool(interp_check,"ipl");
+      CommandLineBool(ZtoGH,"gh");
+      CommandLineString(varlist,"varlist","");
       ParseCommandLine(argc,argv);
     EndCommandLine(argv);
 
@@ -42,9 +50,35 @@ int main(int argc, char** argv){
 
     if (fileOut == ""){
       std::string fileInCopy = fileIn;
-      fileOut = fileInCopy.replace(fileInCopy.end()-3,fileInCopy.end(),"_GH.nc");
+      fileOut = fileInCopy.replace(fileInCopy.end()-3,fileInCopy.end(),"_500.nc");
+    }
+    if (varname == ""){
+       _EXCEPTIONT("Need to provide variable name with --var flag.");
+    }
+    //if variable needs to be interpolated, do that first!
+    if (interp_check){
+      if (fileIn_2D==""){
+        _EXCEPTIONT("No input file (--in2d) specified for surface variables");
+      }
+      if (varlist==""){
+        _EXCEPTIONT("Need to provide at least 1 variable name with the --varlist flag");
+      }
+      NcFile interp_in(fileIn.c_str());
+      std::string interp_outname = fileIn.replace(fileIn.end()-3,fileIn.end(),"_ipl_3D.nc");
+      //open output file for interpolated variable
+      NcFile interp_out(interp_outname.c_str(),NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
+      if (!interp_out.is_valid()){
+        _EXCEPTIONT("Unable to open file for interpolated variables");
+      }
+      //Interpolate variables specified by list into file
+      interp_util(fileIn,fileIn_2D,varlist,interp_out);
+      interp_out.close();
+      //set input file name to the name of the file that was interpolated
+      fileIn = interp_outname;
+
     }
 
+  
     NcFile readin(fileIn.c_str());
 
     //Dimensions and associated variables
@@ -56,6 +90,7 @@ int main(int argc, char** argv){
     int nLev = lev->size();
     NcVar *levvar = readin.get_var("lev");
 
+    //Create a data vector with the associated pressure values 
     DataVector<double> pVec(nLev);
     levvar->set_cur((long) 0);
     levvar->get(&(pVec[0]),nLev);
@@ -68,10 +103,7 @@ int main(int argc, char** argv){
     int nLon = lon->size();
     NcVar *lonvar = readin.get_var("lon");
 
-    //Variables for calculations
-    NcVar *zvar = readin.get_var("Z");
-    DataMatrix3D<double> ZData(nTime, nLat, nLon);
-
+    //Find the index of the 500 mb level
     double pval = 50000.0;
     if (is_hPa){
       pval = 500.0;
@@ -84,16 +116,8 @@ int main(int argc, char** argv){
       }
     }
     std::cout<<"pIndex: "<<pIndex<<std::endl;
-    zvar->set_cur(0,pIndex,0,0);
-    zvar->get(&(ZData[0][0][0]),nTime,1,nLat,nLon);
 
-    for (int t=0; t<nTime; t++){
-      for (int a=0; a<nLat;a++){
-        for (int b=0; b<nLon; b++){
-          ZData[t][a][b]/=9.8;
-        }
-      }
-    }
+    //Open output file
     NcFile file_out(fileOut.c_str(),NcFile::Replace,NULL,0,NcFile::Offset64Bits);
 
     //Dimensions: time, lat, lon
@@ -113,9 +137,52 @@ int main(int argc, char** argv){
     copy_dim_var(latvar, lat_vals);
     copy_dim_var(lonvar, lon_vals);
 
-    NcVar *gh_vals = file_out.add_var("GH",ncDouble,out_time,out_lat,out_lon);
-    gh_vals->set_cur(0,0,0);
-    gh_vals->put(&(ZData[0][0][0]),nTime,nLat,nLon);
+    //Split var list  
+    std::string delim = ",";
+    size_t pos = 0;
+    std::string token;
+    std::vector<std::string> varVec;
+
+    while((pos = varlist.find(delim)) != std::string::npos){
+      token = varlist.substr(0,pos);
+      varVec.push_back(token);
+      varlist.erase(0,pos + delim.length());
+    }
+    varVec.push_back(varlist);
+    for (int v=0; v<varVec.size(); v++){
+      std::cout<<"Vector contains string "<<varVec[v].c_str()<<std::endl;
+
+      NcVar *vvar = readin.get_var(varVec[v].c_str());
+      DataMatrix3D<double> VData(nTime, nLat, nLon);
+
+      vvar->set_cur(0,pIndex,0,0);
+      vvar->get(&(VData[0][0][0]),nTime,1,nLat,nLon);
+      if (varVec[v]=="Z" && ZtoGH){
+        for (int t=0; t<nTime; t++){
+          for (int a=0; a<nLat; a++){
+            for (int b=0; b<nLon; b++){
+              VData[t][a][b]/=9.8;
+            }
+          }
+        }
+      }
+
+      NcVar *outvar = file_out.add_var(varVec[v].c_str(),ncDouble,out_time,out_lat,out_lon);
+      outvar->set_cur(0,0,0);
+      outvar->put(&(VData[0][0][0]),nTime,nLat,nLon);
+    }
+
+
+/*
+    for (int t=0; t<nTime; t++){
+      for (int a=0; a<nLat;a++){
+        for (int b=0; b<nLon; b++){
+          ZData[t][a][b]/=9.8;
+        }
+      }
+    }
+*/
+
 
     file_out.close();
   }catch (Exception & e){
