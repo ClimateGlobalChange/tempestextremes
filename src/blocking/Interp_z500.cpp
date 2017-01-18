@@ -136,7 +136,7 @@ void interp_z500(NcFile & readin,
   copy_dim_var(lonvar, ilon_vals);
 
   //Add interpolated variables to interpolated outfile
-  NcVar *iz = ifile_out.add_var("Z500",, ncDouble, itime, ilat, ilon);
+  NcVar *iz = ifile_out.add_var("Z500", ncDouble, itime, ilat, ilon);
   interp_1lev(zvar, hyam, hybm, ps, 50000.0, iz);
 
 

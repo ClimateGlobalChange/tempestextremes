@@ -119,31 +119,31 @@ produce_sectormap2<-function(xlim=c(0,360),ylim=c(-90,90)){
   
   #Boxes defining sectors
   #NH ATL
-  rect(260,25,365,75,border="blue")
-  text(((260+360)/2),50,"NA")
-  rect(0,25,40,75,border="blue")
-  text(20,50,"NA")
+  rect(260,25,365,75,lwd=2)
+  text(((260+360)/2)+5,50,"NA",cex=2,font=2)
+  rect(0,25,40,75,lwd=2)
+  text(20,50,"NA",cex=2,font=2)
   #NH PAC
-  rect(140,25,260,75,border="blue")
-  text((140+260)/2,50,"NP")
-
+  rect(140,25,260,75,lwd=2)
+  text((140+260)/2,50,"NP",cex=2,font=2)
+  
   #CONTINENTS
-  rect(40,25,140,75,border="red")
-  text(90,50,"NC")
+  rect(40,25,140,75,lwd=2)
+  text(100,50,"NC",cex=2,font=2)
   
   #SH ATL
-  rect(300,-75,365,-25,border="blue")
-  text((300+360)/2,-50,"SA")
-  rect(-5,-75,30,-25,border="blue")
-  text(15,-50,"SA")
+  rect(300,-75,365,-25,lwd=2)
+  text((300+360)/2,-50,"SA",cex=2,font=2)
+  rect(-5,-75,30,-25,lwd=2)
+  text(15,-50,"SA",cex=2,font=2)
   
   #SH PAC
-  rect(130,-75,300,-25,border="blue")
-  text((130+300)/2,-50,"SP")
+  rect(130,-75,300,-25,lwd=2)
+  text((130+300)/2,-50,"SP",cex=2,font=2)
   
   #Indian Ocean
-  rect(30,-75,130,-25,border="blue")
-  text(80,-50,"SI")
+  rect(30,-75,130,-25,lwd=2)
+  text(80,-50,"SI",cex=2,font=2)
   
 }
 
