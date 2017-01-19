@@ -91,14 +91,27 @@ void interp_util(NcFile & readin,
   size_t pos = 0;
   std::string token;
   std::vector<std::string> varVec;
+  std::string listcopy = varlist;
 
+  while ((pos = listcopy.find(delim)) != std::string::npos){
+    token = listcopy.substr(0,pos);
+    varVec.push_back(token);
+    listcopy.erase(0,pos + delim.length());
+  }
+  varVec.push_back(listcopy);
+
+/*
   //reads the string (separated by the delimiter) into the vector
   while((pos = varlist.find(delim)) != std::string::npos){
-    token = varlist.substr(0,pos);
+//    token = varlist.substr(0,pos);
     varVec.push_back(token);
     varlist.erase(0,pos + delim.length());
+//    varlist.erase((std::string::size_type)0,(std::string::size_type)pos + delim.length());
+
   }
   varVec.push_back(varlist);
+*/
+
   for (int v=0; v<varVec.size(); v++){
     std::cout<<"Vector contains string "<<varVec[v].c_str()<<std::endl;
   }

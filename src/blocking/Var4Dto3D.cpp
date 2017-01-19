@@ -15,6 +15,7 @@ only along the lev axis)*/
 #include "DataMatrix3D.h"
 #include "DataMatrix4D.h"
 #include "BlockingUtilities.h"
+#include "Interpolate.h"
 
 #include <cstdlib>
 #include <cmath>
@@ -52,8 +53,8 @@ int main(int argc, char** argv){
       std::string fileInCopy = fileIn;
       fileOut = fileInCopy.replace(fileInCopy.end()-3,fileInCopy.end(),"_500.nc");
     }
-    if (varname == ""){
-       _EXCEPTIONT("Need to provide variable name with --var flag.");
+    if (varlist == ""){
+       _EXCEPTIONT("Need to provide variable names with --varlist flag.");
     }
     //if variable needs to be interpolated, do that first!
     if (interp_check){
@@ -71,7 +72,7 @@ int main(int argc, char** argv){
         _EXCEPTIONT("Unable to open file for interpolated variables");
       }
       //Interpolate variables specified by list into file
-      interp_util(fileIn,fileIn_2D,varlist,interp_out);
+      interp_util(interp_in,fileIn_2D,varlist,interp_out);
       interp_out.close();
       //set input file name to the name of the file that was interpolated
       fileIn = interp_outname;

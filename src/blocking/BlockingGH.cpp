@@ -88,7 +88,7 @@ int main(int argc, char** argv){
         _EXCEPTION1("Unable to open file \"%s\" for writing",zfile.c_str());
       }
       //interpolate file
-      interp_z500(readin_int, file2d, readin_out);
+      interp_z500(readin_int, file2d,varName, readin_out);
       readin_out.close();
       fileIn = zfile;
 

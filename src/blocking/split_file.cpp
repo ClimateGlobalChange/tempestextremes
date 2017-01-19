@@ -115,7 +115,7 @@ int main(int argc, char ** argv ){
     _EXCEPTIONT("Need to provide list of variables to split (--vars).");
   }
 
-  if ((!rename) && (fOut1 == "")){
+  if ((!rename_f) && (fOut1 == "")){
     _EXCEPTIONT("Need to either specify --rename or provide a new filename for out1.");
   }
 
@@ -202,7 +202,7 @@ int main(int argc, char ** argv ){
 
 //Deal with the file names for the new and old files
   
-  if (rename){
+  if (rename_f){
     std::string fNew;
 
     std::string fname_copy = fName;
