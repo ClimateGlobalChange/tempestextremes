@@ -38,15 +38,25 @@ int main(int argc, char **argv){
     std::string avgName;
     std::string varName;
     std::string avgVarName;
+    bool PVCalc;
+    bool GHCalc;
+
 
     BeginCommandLine()
       CommandLineString(fileList, "inlist", "");
       CommandLineString(varName,"varname","");
       CommandLineString(avgName, "avg", "");
       CommandLineString(avgVarName, "avgname","");
+      CommandLineBool(PVCalc,"pv");
+      CommandLineBool(GHCalc,"gh");
       ParseCommandLine(argc, argv);
     EndCommandLine(argv);
     AnnounceBanner();
+
+    if ((!PVCalc) && (!GHCalc)){
+      _EXCEPTIONT("Need to specify either PV (--pv) or GH (--gh) calculations.");
+    }
+  
 
    int nFiles,avgTime,nTime,nLat,nLon;
    double anomVal = 1.3*std::pow(10,-6);
@@ -173,7 +183,7 @@ int main(int argc, char **argv){
 
       //Create variables for Deviations
 
-      if (varName == "IPV"){
+      if (PVCalc){
         NcVar *devOut = outfile.add_var("DIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
@@ -181,7 +191,7 @@ int main(int argc, char **argv){
         calcDevsPV(leap, startIndex, varData, devOut, aDevOut, devIntOut, AvarData, inTime,\
         avgTimeVals, inLat, tVarOut, anomVal);
       }
-      else if (varName == "GH500"){
+      else if (GHCalc){
         NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);

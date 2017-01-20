@@ -300,7 +300,7 @@ if [ "$DEV_BOOL" == "TRUE" ]; then
   echo "#SBATCH -C haswell">> $DEV_BATCH_NAME
   echo "" >> $DEV_BATCH_NAME
   echo "cd $DATA_DIR" >> $DEV_BATCH_NAME
-  echo "$BINDIR/BlockingDevs --inlist $LIST_PV --avg $AVGFILE --varname $VARNAME --avgname $AVGNAME" >> $DEV_BATCH_NAME
+  echo "$BINDIR/BlockingDevs --pv --inlist $LIST_PV --avg $AVGFILE --varname $VARNAME --avgname $AVGNAME" >> $DEV_BATCH_NAME
 
   if [ "$AVG_BOOL" == "FALSE" ]; then 
     echo "Submitting deviations batch file."
