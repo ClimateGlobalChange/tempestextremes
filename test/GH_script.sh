@@ -15,17 +15,12 @@
 # --bdir=[PATH WHERE BINARIES ARE LOCATED] ##MANDATORY
 # JOB FLAGS:
 # --Z500: run the binary Var4Dto3D (extracts 500 mb height)
-# --avg: find long term daily average using provided list of Z500 files
-# --dev: find the deviations from the long term daily average
 # FOR Z500 CALCULATIONS ONLY:
 # --h2dir=[PATH WHERE H2 FILES LOCATED] ##MANDATORY
 # --h4dir=[PATH WHERE H4 FILES LOCATED] ##MANDATORY
 # FOR AVERAGE CALCULATIONS:
 # --listz=[LIST OF INPUT FILES] ##MANDATORY IF NOT DOING Z500
 # --varname=[NAME OF VARIABLE BEING AVERAGED] ##MANDATORY
-# --avgfile=[NAME OF AVERAGING FILE] ##MANDATORY
-# --missing: specify if there are gaps in the data (otherwise
-#         the averaging code will prematurely terminate!)
 # FOR THE DEVIATION CALCULATIONS:
 # --listz=[LIST OF INPUT FILES] ##MANDATORY IF NOT DOING Z500
 # --avgfile=[NAME OF AVERAGED FILE] ##MANDATORY IF NOT RUNNING AVG
@@ -204,8 +199,9 @@ if [ "$AVG_BOOL" == "TRUE" ]; then
   #Create the averaged file name
   if [ "$AVGFILE" == "" ]; then
     AVG_START=$(head -1 $LIST_Z | cut -d "." -f 1,2)
-    AVG_FILE=$AVG_START".Z500_avg.nc"
+    AVGFILE=$AVG_START".Z500_avg.nc"
   fi
+  
   cd $DATA_DIR
   #Create the batch file
   echo "#!/bin/bash -l" > $AVG_BATCH_NAME
