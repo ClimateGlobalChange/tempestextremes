@@ -173,7 +173,8 @@ if [ "$Z_BOOL" == "TRUE" ]; then
   echo "" >> $Z_BATCH_NAME
   echo "#SBATCH -p shared" >> $Z_BATCH_NAME
   echo "#SBATCH -o zbatch.output" >> $Z_BATCH_NAME
-  echo "#SBATCH -t 2:00:00" >> $Z_BATCH_NAME
+  echo "#SBATCH -t 5:00:00" >> $Z_BATCH_NAME
+  echo "#SBATCH --mem=20GB" >> $Z_BATCH_NAME
   echo "#SBATCH -C haswell" >> $Z_BATCH_NAME
   echo "#SBATCH -L SCRATCH" >> $Z_BATCH_NAME
   echo "" >> $Z_BATCH_NAME
@@ -208,7 +209,8 @@ if [ "$AVG_BOOL" == "TRUE" ]; then
   echo "" >> $AVG_BATCH_NAME
   echo "#SBATCH -p shared" >> $AVG_BATCH_NAME
   echo "#SBATCH -o avg_batch.output">> $AVG_BATCH_NAME
-  echo "#SBATCH -t 0:30:00" >> $AVG_BATCH_NAME
+  echo "#SBATCH -t 1:00:00" >> $AVG_BATCH_NAME
+  echo "#SBATCH --mem=20GB" >> $AVG_BATCH_NAME
   echo "#SBATCH -C haswell" >> $AVG_BATCH_NAME
   echo "#SBATCH -L SCRATCH" >> $AVG_BATCH_NAME
   echo "" >> $AVG_BATCH_NAME
@@ -240,7 +242,8 @@ if [ "$DEV_BOOL" == "TRUE" ]; then
   echo "" >> $DEV_BATCH_NAME
   echo "#SBATCH -p shared" >> $DEV_BATCH_NAME
   echo "#SBATCH -o dev_batch.output">>$DEV_BATCH_NAME
-  echo "#SBATCH -t 2:00:00" >> $DEV_BATCH_NAME
+  echo "#SBATCH -t 5:00:00" >> $DEV_BATCH_NAME
+  echo "#SBATCH --mem=20GB" >> $DEV_BATCH_NAME
   echo "#SBATCH -C haswell">> $DEV_BATCH_NAME
   echo "#SBATCH -L SCRATCH" >> $DEV_BATCH_NAME
   echo "" >> $DEV_BATCH_NAME
