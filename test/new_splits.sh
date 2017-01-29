@@ -50,7 +50,7 @@ for YEAR in {2..24}; do
   M=$(printf "%02d" $MONTH)
 
 #Check that file hasn't already been split
-  FILE_CHECK=$(ls $DIR/data/*$YF-$M-01*integ.nc 2>/dev/null | wc -l)
+  FILE_CHECK=$(ls $DIR/data/*$YF-$M-01*z500_devs.nc 2>/dev/null | wc -l)
 
   if [[ $FILE_CHECK -gt 0 ]]; then
    echo "File has already been split."
@@ -58,12 +58,12 @@ for YEAR in {2..24}; do
 
 
     MF=$(printf "%02d" $MINIT)
-    SPLIT_FILE=$(ls $DIR/data/*$YF-$MF*integ.nc | tail -1)
+    SPLIT_FILE=$(ls $DIR/data/*$YF-$MF*z500_devs.nc | tail -1)
     if [[ "$SPLIT_FILE" == "" ]]; then
       echo "File doesn't exist."
     else
       echo $SPLIT_FILE
-      ~/tempestextremes/bin/split_file --in $SPLIT_FILE --rename --vars IPV,AVGT,AVGU,AVGV
+      ~/tempestextremes/bin/split_file --in $SPLIT_FILE --rename --vars DGH,ADGH,INT_ADGH
     fi
   fi
 done

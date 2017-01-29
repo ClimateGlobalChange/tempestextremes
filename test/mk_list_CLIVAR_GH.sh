@@ -13,14 +13,14 @@ RIGHT_BOUND=(50 150 270 40 140 310)
 MIN_LAT=(25 25 25 -75 -75 -75)
 MAX_LAT=(75 75 75 -25 -25 -25)
 
-LIST_TYPE="DEV"
+LIST_TYPE="GH"
 
 for d in ${DATA[@]}; do
   for s in ${SEASONS[@]}; do
-    if [ "$LIST_TYPE" == "PV" ]; then
-      listname="$SCRATCH/$d/data/"$d"_"$s"_all_bloblist"
+    if [ "$LIST_TYPE" == "GH" ]; then
+      listname="$SCRATCH/$d/data/"$d"_"$s"_all_blobzlist"
     else
-      listname="$SCRATCH/$d/data/"$d"_"$s"_all_devs_bloblist"
+      listname="$SCRATCH/$d/data/"$d"_"$s"_all_devs_blobzlist"
     fi
     if [[ -e $listname ]]; then
       rm $listname
@@ -34,26 +34,26 @@ for d in ${DATA[@]}; do
   for y in {2..23}; do
     i=0
     for s in ${SEASONS[@]}; do
-      if [ "$LIST_TYPE" == "PV" ]; then      
-        listname="$SCRATCH/$d/data/"$d"_"$s"_all_bloblist"
-        suffix="integ"
+      if [ "$LIST_TYPE" == "GH" ]; then      
+        listname="$SCRATCH/$d/data/"$d"_"$s"_all_blobzlist"
+        suffix="z500"
       else
-        listname="$SCRATCH/$d/data/"$d"_"$s"_all_devs_bloblist"
-        suffix="integ_devs"
+        listname="$SCRATCH/$d/data/"$d"_"$s"_all_devs_blobzlist"
+        suffix="z500_devs"
       fi
       yf=$(printf "%04d" $y)
       m=${mstart[i]}
       mf=$(printf "%02d" $m)
       if [ $m -eq 12 ]; then
-        ls *$yf-$mf*$suffix.nc > bloblist
+        ls *$yf-$mf*$suffix.nc > blobzlist
         yf=$(printf "%04d" $((y+1)))
-        ls *$yf-0[12]*$suffix.nc >> bloblist
+        ls *$yf-0[12]*$suffix.nc >> blobzlist
       else
         mstring=$(printf "*$yf-{%02d,%02d,%02d}*$suffix.nc" $m $((m+1)) $((m+2)))
-        echo "ls $mstring" | sh > bloblist
+        echo "ls $mstring" | sh > blobzlist
       fi
       i=$((i+1))
-      cat bloblist >> $listname
+      cat blobzlist >> $listname
     done
   done
 done

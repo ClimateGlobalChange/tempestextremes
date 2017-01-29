@@ -7,7 +7,7 @@ SEASONS=("MAM" "JJA" "SON" "DJF")
 DATA=("climo" "2xCO2" "SSTplus2")
 mstart=(3 6 9 12)
 BLOBS="TRUE"
-
+#BLOTS="FALSE"
 #Addition of regional parameters
 SECTOR=("NA" "NC" "NP" "SA" "SI" "SP")
 LEFT_BOUND=(250 30 130 290 20 120)
@@ -68,20 +68,20 @@ done
 
 #removing the files that contain missing dates!
 #climo dataset
-rm $SCRATCH/climo/blobs/DJF_0004_*
-rm $SCRATCH/climo/blobs/DJF_0010_*
-rm $SCRATCH/climo/blobs/JJA_0012_*
-rm $SCRATCH/climo/blobs/SON_0020_*
+#rm $SCRATCH/climo/blobs/DJF_0004_*
+#rm $SCRATCH/climo/blobs/DJF_0010_*
+#rm $SCRATCH/climo/blobs/JJA_0012_*
+#rm $SCRATCH/climo/blobs/SON_0020_*
 
 #2xCO2 dataset
-rm $SCRATCH/2xCO2/blobs/SON_0007_*
+#rm $SCRATCH/2xCO2/blobs/SON_0007_*
 
 #SSTplus2 dataset
-rm $SCRATCH/SSTplus2/blobs/SON_0016_*
+#rm $SCRATCH/SSTplus2/blobs/SON_0016_*
 
 #SSTplus2_2xCO2 dataset
-rm $SCRATCH/SSTplus2_2xCO2/blobs/DJF_0007_*
-rm $SCRATCH/SSTplus2_2xCO2/blobs/DJF_0016_*
+#rm $SCRATCH/SSTplus2_2xCO2/blobs/DJF_0007_*
+#rm $SCRATCH/SSTplus2_2xCO2/blobs/DJF_0016_*
 
 fi
 
