@@ -166,9 +166,9 @@ void ParseTimeDouble(
 		std::string strSubStr = strTimeUnits.substr(12);
 		Time time(cal);
 		time.FromFormattedString(strSubStr);
-              //  printf("Debug: dTime is %10f \n",dTime);
+                printf("Debug: dTime is %10f \n",dTime);
 		time.AddHours(static_cast<int>(dTime));
-
+                printf("Debug: after AddHours dTime is %10f\n",dTime);
 	/*	Announce("Time (YMDS): %i %i %i %i",
 				time.GetYear(),
 				time.GetMonth(),
@@ -179,7 +179,7 @@ void ParseTimeDouble(
 		nDateMonth = time.GetMonth();
 		nDateDay = time.GetDay();
 		nDateHour = time.GetSecond() / 3600;
-
+                std::cout<<"Debug: Y/M/D:"<<nDateYear<<"/"<<nDateMonth<<"/"<<nDateDay<<std::endl;
 		//printf("%s\n", strSubStr.c_str());
 
 	} else {
@@ -1032,10 +1032,12 @@ void calcDevsGH(bool leap,
       break;
     }
     int nDayIncrease = d/nSteps;
-    std::cout<<"Number of days increased since start is "<<nDayIncrease<<std::endl;
+   // std::cout<<"Number of days increased since start is "<<nDayIncrease<<std::endl;
     int currAvgIndex = startAvgIndex + nDayIncrease;
+    std::cout<<"Avg index:"<<currAvgIndex<<std::endl;
     if (currAvgIndex>364){
       currAvgIndex-=365;
+    //  std::cout<<"Going back to beginning of average index."<<std::endl;
     }
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
@@ -1043,6 +1045,7 @@ void calcDevsGH(bool leap,
       }
     }
     newTime[d] = timeVec[t];
+    std::cout<<"d,t:"<<d<<","<<t<<std::endl;
     d++;
   }
   outTime->set_cur((long) 0);
@@ -1100,8 +1103,6 @@ void calcDevsGH(bool leap,
   outADev->put(&(aDevMat[0][0][0]),nOutTime,nLat,nLon);
   std::cout<<"Wrote smoothed devs to file."<<std::endl;
 //Divide matrix by GH anomaly value 
-//We are looking for negative anomalies in NH and positive anomalies in SH
-
 
   DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
   DataMatrix<double> stdDevs(nLat,nLon);

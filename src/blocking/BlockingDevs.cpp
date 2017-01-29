@@ -84,6 +84,7 @@ int main(int argc, char **argv){
       if(!infile.is_valid()){
         _EXCEPTION1("Unable to open file \"%s\".",InputFiles[0].c_str());
       }
+      std::cout<<"Opening file "<<InputFiles[x].c_str()<<std::endl;
       NcDim *tDim = infile.get_dim("time");
       NcDim *latDim = infile.get_dim("lat");
       NcDim *lonDim = infile.get_dim("lon");
@@ -124,11 +125,13 @@ int main(int argc, char **argv){
       int dateMonth;
       int dateDay;
       int dateHour;
-
+      std::cout<<"time units and calendar: "<<strTimeUnits<<","<<strCalendar<<std::endl;
+      std::cout<<"first value of time variable:"<<timeVals[0]<<std::endl;
       ParseTimeDouble(strTimeUnits, strCalendar, timeVals[0], dateYear,\
         dateMonth, dateDay, dateHour);
-
+      std::cout<<"D/M/Y:"<<dateDay<<"/"<<dateMonth<<"/"<<dateYear<<std::endl;
       int day = DayInYear(dateMonth,dateDay);
+      std::cout<<"For month "<<dateMonth<<" and day "<<dateDay<<" day is "<<day<<std::endl;
       int startIndex = day-1;
 
     //  int nSteps = int(1.0/(timeVals[1]-timeVals[0]));
@@ -160,7 +163,7 @@ int main(int argc, char **argv){
       //Create output file that corresponds to IPV data
       std::string strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
         InputFiles[x].end(), "_devs.nc");
-
+      std::cout<<"Writing variables to file "<<strOutFile.c_str()<<std::endl;
       NcFile outfile(strOutFile.c_str(), NcFile::Replace, NULL,0,NcFile::Offset64Bits);
       int nOutTime;
       if (leap){
@@ -197,6 +200,7 @@ int main(int argc, char **argv){
         NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);
         NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
         calcDevsGH(leap,GHVal, startIndex, varData, devOut,aDevOut,devIntOut,AvarData,inTime,avgTimeVals,inLat,tVarOut,stdDevOut);
+        std::cout<<"Finished writing to file "<<strOutFile.c_str()<<std::endl;
       }
       else{
         _EXCEPTIONT("Invalid variable specified!");
