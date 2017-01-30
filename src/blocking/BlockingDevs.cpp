@@ -68,13 +68,27 @@ int main(int argc, char **argv){
 
     //Open averages file
     NcFile avgFile(avgName.c_str());
+	if (!avgFile.is_valid()) {
+		_EXCEPTION1("Cannot open NetCDF file \"%s\"", avgName.c_str());
+	}
 
     //time data (average)
-    avgTime = avgFile.get_dim("time")->size();
+	NcDim *dimTime = avgFile.get_dim("time");
+	if (dimTime == NULL) {
+		_EXCEPTION1("\"%s\" is missing dimension \"time\"", avgName.c_str());
+	}
+
+    avgTime = dimTime->size();
     NcVar *avgTimeVals = avgFile.get_var("time");
-    
+   	if (avgTimeVals == NULL) {
+		_EXCEPTION1("\"%s\" is missing variable \"time\"", avgName.c_str());
+	}
+
     //averaged var
     NcVar *AvarData = avgFile.get_var(avgVarName.c_str());
+   	if (AvarData == NULL) {
+		_EXCEPTION2("\"%s\" is missing variable \"%s\"", avgName.c_str(), avgVarName.c_str());
+	}
 
     //Open var files
 

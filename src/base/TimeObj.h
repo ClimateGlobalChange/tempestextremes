@@ -203,14 +203,16 @@ public:
 	///		Add a number of minutes to the Time.
 	///	</summary>
 	inline void AddMinutes(int nMinutes) {
-		AddSeconds(nMinutes * 60);
+		AddHours(nMinutes / 60);
+		AddSeconds((nMinutes % 60) * 60);
 	}
 
 	///	<summary>
 	///		Add a number of hours to the Time.
 	///	</summary>
 	inline void AddHours(int nHours) {
-		AddSeconds(nHours * 3600);
+		AddDays(nHours / 24);
+		AddSeconds((nHours % 24) * 60);
 	}
 
 	///	<summary>
