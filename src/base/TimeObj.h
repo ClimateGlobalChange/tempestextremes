@@ -212,7 +212,7 @@ public:
 	///	</summary>
 	inline void AddHours(int nHours) {
 		AddDays(nHours / 24);
-		AddSeconds((nHours % 24) * 60);
+		AddSeconds((nHours % 24) * 3600);
 	}
 
 	///	<summary>
