@@ -139,13 +139,13 @@ int main(int argc, char **argv){
       int dateMonth;
       int dateDay;
       int dateHour;
-      std::cout<<"time units and calendar: "<<strTimeUnits<<","<<strCalendar<<std::endl;
-      std::cout<<"first value of time variable:"<<timeVals[0]<<std::endl;
+      //std::cout<<"time units and calendar: "<<strTimeUnits<<","<<strCalendar<<std::endl;
+      //std::cout<<"first value of time variable:"<<timeVals[0]<<std::endl;
       ParseTimeDouble(strTimeUnits, strCalendar, timeVals[0], dateYear,\
         dateMonth, dateDay, dateHour);
-      std::cout<<"D/M/Y:"<<dateDay<<"/"<<dateMonth<<"/"<<dateYear<<std::endl;
+      //std::cout<<"D/M/Y:"<<dateDay<<"/"<<dateMonth<<"/"<<dateYear<<std::endl;
       int day = DayInYear(dateMonth,dateDay);
-      std::cout<<"For month "<<dateMonth<<" and day "<<dateDay<<" day is "<<day<<std::endl;
+      //std::cout<<"For month "<<dateMonth<<" and day "<<dateDay<<" day is "<<day<<std::endl;
       int startIndex = day-1;
 
     //  int nSteps = int(1.0/(timeVals[1]-timeVals[0]));

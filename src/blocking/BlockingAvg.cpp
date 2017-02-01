@@ -260,10 +260,10 @@ int main(int argc, char **argv){
     }    
 
     if (hasMissingValues){
-      std::cout<< "This array has missing values, will not be added to sum."<<std::endl;
+      //std::cout<< "This array has missing values, will not be added to sum."<<std::endl;
     }
     else{
-      std::cout<<"No missing values found. Adding array to sum."<<std::endl;
+      //std::cout<<"No missing values found. Adding array to sum."<<std::endl;
       for (int t=0; t<arrLen; t++){
         for (int a=0; a<nLat; a++){
           for (int b=0; b<nLon; b++){
@@ -280,14 +280,14 @@ int main(int argc, char **argv){
 
     }
    
-    std::cout<<"Filled date index number "<<dateIndex<<std::endl; 
+    //std::cout<<"Filled date index number "<<dateIndex<<std::endl; 
     dateIndex+=1;
     currArrIndex = 0;
   //Check if new file needs to be opened before entering while loop
 
     if(tEnd>=nTime){
       infile.close();
-      std::cout<<"First while loop. Closed "<<InputFiles[x]<<std::endl;
+      //std::cout<<"First while loop. Closed "<<InputFiles[x]<<std::endl;
       x+=1;
       NcFile infile(InputFiles[x].c_str());
       nTime = infile.get_dim("time")->size();
@@ -316,7 +316,7 @@ int main(int argc, char **argv){
     }
 
     else if (tEnd<nTime){
-      std::cout<<"First while loop. Still have data left on current file. Will continue on."<<std::endl;
+      //std::cout<<"First while loop. Still have data left on current file. Will continue on."<<std::endl;
       tStart = tEnd;
       tEnd = tStart + nSteps;
     }
@@ -326,9 +326,9 @@ int main(int argc, char **argv){
     bool newFile = false;
 
     while (x<nFiles){
-      std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
+      //std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
         <<nTime<<"; tStart/end is "<<tStart<<" and "<<tEnd<<std::endl;
-      std::cout<<"Current date index is "<<dateIndex<<std::endl;
+      //std::cout<<"Current date index is "<<dateIndex<<std::endl;
        //1: check if current day is a leap day
       if (leap==true){
       //  std::cout<<"Checking date for leap day."<<std::endl;
@@ -337,12 +337,12 @@ int main(int argc, char **argv){
         if (leapMonth==2 && leapDay ==29){
           tStart = tEnd;
           tEnd = tStart + nSteps;
-          std::cout<<"#1: This day is a leap day. Resetting tStart/tEnd to "\
+          //std::cout<<"#1: This day is a leap day. Resetting tStart/tEnd to "\
             <<tStart<<" and "<<tEnd<<std::endl;
         } 
         if (tEnd>nTime){
           newFile = true;
-          std::cout<<"For leap day file, reached EOF."<<std::endl;
+          //std::cout<<"For leap day file, reached EOF."<<std::endl;
         }
       }
       //2: if new file needs to be opened, open it
@@ -362,7 +362,7 @@ int main(int argc, char **argv){
         if (x<nFiles){
           NcFile infile(InputFiles[x].c_str());
           newFile = false;
-          std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
+          //std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
           nTime = infile.get_dim("time")->size();
           nLat = infile.get_dim("lat")->size();
           nLon = infile.get_dim("lon")->size();
@@ -439,9 +439,9 @@ int main(int argc, char **argv){
      }
      //Do not add sum of array to average if array contains missing values!
      if (hasMissingValues){
-       std::cout<<"This array has missing values, will not be added to sum."<<std::endl;
+       //std::cout<<"This array has missing values, will not be added to sum."<<std::endl;
      }else{
-       std::cout<<"Filled in values at date index "<<dateIndex<<std::endl;
+       //std::cout<<"Filled in values at date index "<<dateIndex<<std::endl;
        //Fill date with sum of new array values
           for (int t=0; t<arrLen; t++){
             for (int a=0; a<nLat; a++){
@@ -481,7 +481,7 @@ int main(int argc, char **argv){
             if (leapMonth==2 && leapDay ==29){
               tStart = tEnd;
               tEnd = tStart + nSteps;
-              std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
+              //std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
                 <<tStart<<" and "<<tEnd<<std::endl;
             }
             //re-check tEnd

@@ -179,7 +179,7 @@ void ParseTimeDouble(
 		nDateMonth = time.GetMonth();
 		nDateDay = time.GetDay();
 		nDateHour = time.GetSecond() / 3600;
-                std::cout<<"Debug: Y/M/D:"<<nDateYear<<"/"<<nDateMonth<<"/"<<nDateDay<<std::endl;
+                //std::cout<<"Debug: Y/M/D:"<<nDateYear<<"/"<<nDateMonth<<"/"<<nDateDay<<std::endl;
 		//printf("%s\n", strSubStr.c_str());
 
 	} else {
@@ -1005,7 +1005,7 @@ void calcDevsGH(bool leap,
 
 //Number of days in IPV
   int nDays = nTime*tRes;
-  std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
+  //std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
 
 
 //Deal with skipped days          
@@ -1017,14 +1017,14 @@ void calcDevsGH(bool leap,
   int leapDay=0;
   int leapHour=0;
 
-  std::cout<<"Starting avg index is "<<startAvgIndex<<std::endl;
+  //std::cout<<"Starting avg index is "<<startAvgIndex<<std::endl;
 
   for (int t=0; t<nTime; t++){
     if (leap){
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
         leapMonth, leapDay, leapHour);
       if (leapMonth==2 && leapDay == 29){
-        std::cout<<"Leap day! Skipping day."<<std::endl;
+        //std::cout<<"Leap day! Skipping day."<<std::endl;
         t+=nSteps;
       }
     }
@@ -1034,7 +1034,7 @@ void calcDevsGH(bool leap,
     int nDayIncrease = d/nSteps;
    // std::cout<<"Number of days increased since start is "<<nDayIncrease<<std::endl;
     int currAvgIndex = startAvgIndex + nDayIncrease;
-    std::cout<<"Avg index:"<<currAvgIndex<<std::endl;
+    //std::cout<<"Avg index:"<<currAvgIndex<<std::endl;
     if (currAvgIndex>364){
       currAvgIndex-=365;
     //  std::cout<<"Going back to beginning of average index."<<std::endl;
@@ -1045,7 +1045,7 @@ void calcDevsGH(bool leap,
       }
     }
     newTime[d] = timeVec[t];
-    std::cout<<"d,t:"<<d<<","<<t<<std::endl;
+    //std::cout<<"d,t:"<<d<<","<<t<<std::endl;
     d++;
   }
   outTime->set_cur((long) 0);
@@ -1219,7 +1219,7 @@ void MissingFill(
 
   int nFill = contCheck/tRes-1;
   int nDaysSkip = int(contCheck-tRes);
-  std::cout<<"ContCheck is " << contCheck << " and tRes is "<<\
+  //std::cout<<"ContCheck is " << contCheck << " and tRes is "<<\
    tRes <<" and nFill is "<<nFill << std::endl;
   for (int n=0; n<nFill; n++){
     for (int a=0; a<nLat; a++){
@@ -1236,7 +1236,7 @@ void MissingFill(
   if (dateIndex >= 365){
     dateIndex-=365;
   }
-  std::cout<<"The new date index is "<<dateIndex<<" at the end of the missing fill."<<std::endl;
+  //std::cout<<"The new date index is "<<dateIndex<<" at the end of the missing fill."<<std::endl;
 }
 
 bool checkFileLeap(
