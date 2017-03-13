@@ -37,6 +37,7 @@ int main(int argc, char **argv){
     std::string strfile_out;
     std::string varName;
     std::string avgName;
+    std::string tname,latname,lonname;
     bool missingFiles;
 
     BeginCommandLine()
@@ -45,11 +46,20 @@ int main(int argc, char **argv){
       CommandLineString(varName, "varname","");
       CommandLineString(avgName, "avgname","");
       CommandLineBool(missingFiles, "missing");
+      CommandLineString(tname,"tname","time");
+      CommandLineString(latname,"latname","lat");
+      CommandLineString(lonname,"lonname","lon");
       ParseCommandLine(argc, argv);
+
 
     EndCommandLine(argv)
     AnnounceBanner();
-
+    if (fileList == ""){
+      _EXCEPTIONT("No file list (--inlist) provided");
+    }
+    if (strfile_out == ""){
+      _EXCEPTIONT("No output file name (--out) provided");
+    }
     if (varName == ""){
       _EXCEPTIONT("No variable name (--varname) specified");
     }
@@ -67,9 +77,9 @@ int main(int argc, char **argv){
 
     //Open first file 
     NcFile infile(InputFiles[0].c_str());
-    int nTime = infile.get_dim("time")->size();
-    int nLat = infile.get_dim("lat")->size();
-    int nLon = infile.get_dim("lon")->size();
+    int nTime = infile.get_dim(tname.c_str())->size();
+    int nLat = infile.get_dim(latname.c_str())->size();
+    int nLon = infile.get_dim(lonname.c_str())->size();
 
     //IPV variable and data matrix
     NcVar *inPV = infile.get_var(varName.c_str());
@@ -78,7 +88,7 @@ int main(int argc, char **argv){
     inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
 
     //time variable
-    NcVar *timeVal = infile.get_var("time");
+    NcVar *timeVal = infile.get_var(tname.c_str());
     DataVector<double> timeVec(nTime);
     timeVal->set_cur((long) 0);
     timeVal->get(&(timeVec[0]),nTime);
@@ -135,7 +145,7 @@ int main(int argc, char **argv){
 
     //Number of time steps per day
     int nSteps = 1/tRes;
-    std::cout<<"tRes is "<<tRes<<" and nSteps is "<<nSteps<<std::endl;
+    //std::cout<<"tRes is "<<tRes<<" and nSteps is "<<nSteps<<std::endl;
     double endTime = timeVec[nTime-1];
     int currArrIndex = 0;
 
@@ -198,19 +208,24 @@ int main(int argc, char **argv){
         //Open new file and increment file counter
         x+=1;
         NcFile infile(InputFiles[x].c_str());
-        nTime = infile.get_dim("time")->size();
-        nLat = infile.get_dim("lat")->size();
-        nLon = infile.get_dim("lon")->size();
+        nTime = infile.get_dim(tname.c_str())->size();
+        nLat = infile.get_dim(latname.c_str())->size();
+        nLon = infile.get_dim(lonname.c_str())->size();
 
         //IPV variable
         NcVar *inPV = infile.get_var(varName.c_str());
         IPVData.Initialize(nTime,nLat,nLon);
 
+        int nDims = inPV->num_dims();
+        if (nDims != 3){
+          _EXCEPTIONT("Variable does not have the correct number of dimensions (3).");
+        } 
+
         inPV->set_cur(0,0,0);
         inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
 
         //Time variable
-        NcVar *timeVal = infile.get_var("time");
+        NcVar *timeVal = infile.get_var(tname.c_str());
         timeVec.Initialize(nTime);
         timeVal->set_cur((long) 0);
         timeVal->get(&(timeVec[0]),nTime);
@@ -290,9 +305,9 @@ int main(int argc, char **argv){
       //std::cout<<"First while loop. Closed "<<InputFiles[x]<<std::endl;
       x+=1;
       NcFile infile(InputFiles[x].c_str());
-      nTime = infile.get_dim("time")->size();
-      nLat = infile.get_dim("lat")->size();
-      nLon = infile.get_dim("lon")->size();
+      nTime = infile.get_dim(tname.c_str())->size();
+      nLat = infile.get_dim(latname.c_str())->size();
+      nLon = infile.get_dim(lonname.c_str())->size();
 
       //IPV variable
       NcVar *inPV = infile.get_var(varName.c_str());
@@ -302,7 +317,7 @@ int main(int argc, char **argv){
       inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
 
       //Time variable
-      NcVar *timeVal = infile.get_var("time");
+      NcVar *timeVal = infile.get_var(tname.c_str());
       timeVec.Initialize(nTime);
 
       timeVal->set_cur((long) 0);
@@ -363,9 +378,9 @@ int main(int argc, char **argv){
           NcFile infile(InputFiles[x].c_str());
           newFile = false;
           //std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
-          nTime = infile.get_dim("time")->size();
-          nLat = infile.get_dim("lat")->size();
-          nLon = infile.get_dim("lon")->size();
+          nTime = infile.get_dim(tname.c_str())->size();
+          nLat = infile.get_dim(latname.c_str())->size();
+          nLon = infile.get_dim(lonname.c_str())->size();
 
         //IPV variable
           NcVar *inPV = infile.get_var(varName.c_str());
@@ -375,7 +390,7 @@ int main(int argc, char **argv){
           inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
 
         //Time variable
-          NcVar *timeVal = infile.get_var("time");
+          NcVar *timeVal = infile.get_var(tname.c_str());
           timeVec.Initialize(nTime);
           timeVal->set_cur((long) 0);
           timeVal->get(&(timeVec[0]),nTime);
@@ -512,29 +527,32 @@ int main(int argc, char **argv){
 
     NcFile refFile(InputFiles[0].c_str());
 
-    NcDim *inLatDim = refFile.get_dim("lat");
-    NcDim *inLonDim = refFile.get_dim("lon");
-    NcVar *inLatVar = refFile.get_var("lat");
-    NcVar *inLonVar = refFile.get_var("lon");
+    NcDim *inLatDim = refFile.get_dim(latname.c_str());
+    NcDim *inLonDim = refFile.get_dim(lonname.c_str());
+    NcVar *inLatVar = refFile.get_var(latname.c_str());
+    NcVar *inLonVar = refFile.get_var(lonname.c_str());
 
 
   //Output to file
     NcFile outfile(strfile_out.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
 
-    NcDim *outTime = outfile.add_dim("time", yearLen);
+    NcDim *outTime = outfile.add_dim(tname.c_str(), yearLen);
     DataVector<int> timeVals(yearLen);
     for (int t=0; t<yearLen; t++){
       timeVals[t] = t+1;
     }
 
-    NcVar *outTimeVar = outfile.add_var("time", ncInt, outTime);
+    NcVar *outTimeVar = outfile.add_var(tname.c_str(), ncInt, outTime);
     outTimeVar->set_cur((long) 0);
     outTimeVar->put(&(timeVals[0]),yearLen);
 
-    NcDim *outLat = outfile.add_dim("lat", nLat);
-    NcDim *outLon = outfile.add_dim("lon", nLon);
-    NcVar *outLatVar = outfile.add_var("lat", ncDouble, outLat);
-    NcVar *outLonVar = outfile.add_var("lon", ncDouble, outLon);
+    //Add time units (necessary for time conversion)
+    outTimeVar->add_att("units","days since 0001-12-31"); 
+
+    NcDim *outLat = outfile.add_dim(latname.c_str(), nLat);
+    NcDim *outLon = outfile.add_dim(lonname.c_str(), nLon);
+    NcVar *outLatVar = outfile.add_var(latname.c_str(), ncDouble, outLat);
+    NcVar *outLonVar = outfile.add_var(lonname.c_str(), ncDouble, outLon);
 
     copy_dim_var(inLatVar,outLatVar);
     copy_dim_var(inLonVar,outLonVar);

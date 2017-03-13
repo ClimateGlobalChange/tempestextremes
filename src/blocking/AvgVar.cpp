@@ -6,6 +6,11 @@
 //
 //  \date November 15, 2016
 
+
+/*
+This program takes a list of files and variable names. 
+It averages the entire list of files over the time axis
+*/
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
 #include "DataVector.h"
@@ -22,6 +27,12 @@
 
 //Outputs a matrix that is the SUM of the elements along the time axis
 void Varto2Dsum(NcVar *inVar, int v, DataMatrix3D<double> & outMat){
+    //Check that the number of dimensions is 3
+    int nDims = inVar->num_dims();
+    if (nDims != 3){
+      _EXCEPTIONT("This variable does not have the right number of axes (3).");
+    }
+
     int tLen,latLen,lonLen;
     tLen = inVar->get_dim(0)->size();
     latLen = inVar->get_dim(1)->size();
@@ -49,12 +60,15 @@ void Varto2Dsum(NcVar *inVar, int v, DataMatrix3D<double> & outMat){
 
 int main(int argc, char ** argv){
 	try{
-		std::string fileList, outFile, varList;
+		std::string fileList, outFile, varList, tname, latname, lonname;
 		
 		BeginCommandLine()
 			CommandLineString(fileList,"inlist","");
 			CommandLineString(outFile,"out","");
 			CommandLineString(varList,"varlist","");
+                        CommandLineString(tname,"tname","time");
+                        CommandLineString(latname,"latname","lat");
+                        CommandLineString(lonname,"lonname","lon");
 			ParseCommandLine(argc,argv);
 		EndCommandLine(argv)
 		AnnounceBanner();
@@ -92,17 +106,17 @@ int main(int argc, char ** argv){
 		}  
 
 		int tLen,latLen,lonLen;
-	    NcDim * time = readin.get_dim("time");
+	    NcDim * time = readin.get_dim(tname.c_str());
 	    tLen = time->size();
-	    NcVar * timeVar = readin.get_var("time");
+	    NcVar * timeVar = readin.get_var(tname.c_str());
 
-	    NcDim * lat = readin.get_dim("lat");
+	    NcDim * lat = readin.get_dim(latname.c_str());
 	    latLen = lat->size();
-	    NcVar * latVar = readin.get_var("lat");
+	    NcVar * latVar = readin.get_var(latname.c_str());
 
-	    NcDim * lon = readin.get_dim("lon");
+	    NcDim * lon = readin.get_dim(lonname.c_str());
 	    lonLen = lon->size();
-	    NcVar * lonVar = readin.get_var("lon");
+	    NcVar * lonVar = readin.get_var(lonname.c_str());
 		
 		//Create your working matrix; 
 		// The third axis is the length of your variable vector
@@ -120,7 +134,7 @@ int main(int argc, char ** argv){
 		//increment the length of the time axis to accommodate
 		for (int f=1; f<vecFiles.size(); f++){
 		    NcFile addread(vecFiles[f].c_str());
-			tLen += addread.get_dim("time")->size();
+			tLen += addread.get_dim(tname.c_str())->size();
 			for (int v=0; v<varLen; v++){
 				NcVar * invar = addread.get_var(varVec[v].c_str());
 				Varto2Dsum(invar, v, storeMat);
@@ -139,11 +153,11 @@ int main(int argc, char ** argv){
 		
 		//output the variables to file
 	    NcFile readout(outFile.c_str(),NcFile::Replace, NULL,0,NcFile::Offset64Bits);
-	    NcDim * outLat = readout.add_dim("lat", latLen);
-	    NcDim * outLon = readout.add_dim("lon", lonLen);
+	    NcDim * outLat = readout.add_dim(latname.c_str(), latLen);
+	    NcDim * outLon = readout.add_dim(lonname.c_str(), lonLen);
 		NcDim * varvar = readout.add_dim("varnum",varLen);
-	    NcVar * outLatVar = readout.add_var("lat",ncDouble,outLat);
-	    NcVar * outLonVar = readout.add_var("lon",ncDouble,outLon);
+	    NcVar * outLatVar = readout.add_var(latname.c_str(),ncDouble,outLat);
+	    NcVar * outLonVar = readout.add_var(lonname.c_str(),ncDouble,outLon);
 	    std::cout<<"Copying dimension attributes."<<std::endl;
 	    copy_dim_var(latVar,outLatVar);
 	    copy_dim_var(lonVar,outLonVar);

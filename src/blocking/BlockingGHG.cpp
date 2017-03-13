@@ -41,12 +41,16 @@ int main(int argc, char** argv){
     std::string outFile;
     //input variable
     std::string varName;
-
+    //axis names
+    std::string tname,latname,lonname;
 
     BeginCommandLine()
       CommandLineString(fileIn, "in","")
       CommandLineString(outFile,"out","")
       CommandLineString(varName,"varname","")
+      CommandLineString(tname,"tname","time");
+      CommandLineString(latname,"latname","lat");
+      CommandLineString(lonname,"lonname","lon");
     ParseCommandLine(argc,argv);
     EndCommandLine(argv);
     AnnounceBanner();
@@ -67,20 +71,25 @@ int main(int argc, char** argv){
       _EXCEPTION1("Invalid file \"%s\"", fileIn.c_str());
     }
     //Dimensions and associated variables
-    NcDim *time = readin.get_dim("time");
+    NcDim *time = readin.get_dim(tname.c_str());
     int nTime = time->size();
-    NcVar *timevar = readin.get_var("time");
+    NcVar *timevar = readin.get_var(tname.c_str());
 
-    NcDim *lat = readin.get_dim("lat");
+    NcDim *lat = readin.get_dim(latname.c_str());
     int nLat = lat->size();
-    NcVar *latvar = readin.get_var("lat");
+    NcVar *latvar = readin.get_var(latname.c_str());
 
-    NcDim *lon = readin.get_dim("lon");
+    NcDim *lon = readin.get_dim(lonname.c_str());
     int nLon = lon->size();
-    NcVar *lonvar = readin.get_var("lon");
+    NcVar *lonvar = readin.get_var(lonname.c_str());
 
     DataMatrix3D<double>ZData(nTime,nLat,nLon);
     NcVar *zvar = readin.get_var(varName.c_str());
+    int nDims = zvar->num_dims();
+    if (nDims != 3){
+      _EXCEPTIONT("Error: variable does not have correct number of dimensions (3).");
+    }
+
     zvar->set_cur(0,0,0);
     zvar->get(&(ZData[0][0][0]),nTime,nLat,nLon);
 
@@ -88,14 +97,14 @@ int main(int argc, char** argv){
     NcFile file_out(outFile.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
 
     //Dimensions: time, lat, lon
-    NcDim *out_time = file_out.add_dim("time", nTime);
-    NcDim *out_lat = file_out.add_dim("lat", nLat);
-    NcDim *out_lon = file_out.add_dim("lon", nLon);
+    NcDim *out_time = file_out.add_dim(tname.c_str(), nTime);
+    NcDim *out_lat = file_out.add_dim(latname.c_str(), nLat);
+    NcDim *out_lon = file_out.add_dim(lonname.c_str(), nLon);
 
     //COPY EXISTING DIMENSION VALUES
-    NcVar *time_vals = file_out.add_var("time", ncDouble, out_time);
-    NcVar *lat_vals = file_out.add_var("lat", ncDouble, out_lat);
-    NcVar *lon_vals = file_out.add_var("lon", ncDouble, out_lon);
+    NcVar *time_vals = file_out.add_var(tname.c_str(), ncDouble, out_time);
+    NcVar *lat_vals = file_out.add_var(latname.c_str(), ncDouble, out_lat);
+    NcVar *lon_vals = file_out.add_var(lonname.c_str(), ncDouble, out_lon);
 
     copy_dim_var(timevar, time_vals);
     copy_dim_var(latvar, lat_vals);

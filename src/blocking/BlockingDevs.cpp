@@ -38,6 +38,7 @@ int main(int argc, char **argv){
     std::string avgName;
     std::string varName;
     std::string avgVarName;
+    std::string tname,latname,lonname;
     bool PVCalc;
     bool GHCalc;
 
@@ -49,6 +50,9 @@ int main(int argc, char **argv){
       CommandLineString(avgVarName, "avgname","");
       CommandLineBool(PVCalc,"pv");
       CommandLineBool(GHCalc,"gh");
+      CommandLineString(tname,"tname","time");
+      CommandLineString(latname,"latname","lat");
+      CommandLineString(lonname,"lonname","lon");
       ParseCommandLine(argc, argv);
     EndCommandLine(argv);
     AnnounceBanner();
@@ -73,13 +77,13 @@ int main(int argc, char **argv){
 	}
 
     //time data (average)
-	NcDim *dimTime = avgFile.get_dim("time");
+	NcDim *dimTime = avgFile.get_dim(tname.c_str());
 	if (dimTime == NULL) {
 		_EXCEPTION1("\"%s\" is missing dimension \"time\"", avgName.c_str());
 	}
 
     avgTime = dimTime->size();
-    NcVar *avgTimeVals = avgFile.get_var("time");
+    NcVar *avgTimeVals = avgFile.get_var(tname.c_str());
    	if (avgTimeVals == NULL) {
 		_EXCEPTION1("\"%s\" is missing variable \"time\"", avgName.c_str());
 	}
@@ -99,17 +103,17 @@ int main(int argc, char **argv){
         _EXCEPTION1("Unable to open file \"%s\".",InputFiles[0].c_str());
       }
       std::cout<<"Opening file "<<InputFiles[x].c_str()<<std::endl;
-      NcDim *tDim = infile.get_dim("time");
-      NcDim *latDim = infile.get_dim("lat");
-      NcDim *lonDim = infile.get_dim("lon");
+      NcDim *tDim = infile.get_dim(tname.c_str());
+      NcDim *latDim = infile.get_dim(latname.c_str());
+      NcDim *lonDim = infile.get_dim(lonname.c_str());
       
       nTime = tDim->size();
       nLat = latDim->size();
       nLon = lonDim->size();
 
-      NcVar *inTime = infile.get_var("time");
-      NcVar *inLat = infile.get_var("lat");
-      NcVar *inLon = infile.get_var("lon");
+      NcVar *inTime = infile.get_var(tname.c_str());
+      NcVar *inLat = infile.get_var(latname.c_str());
+      NcVar *inLon = infile.get_var(lonname.c_str());
       NcVar *varData = infile.get_var(varName.c_str());
 
       NcAtt *attTime = inTime->get_att("units");
@@ -186,16 +190,16 @@ int main(int argc, char **argv){
       else{
         nOutTime = nTime;
       }
-      NcDim *tDimOut = outfile.add_dim("time",nOutTime);
-      NcDim *latDimOut = outfile.add_dim("lat",nLat);
-      NcDim *lonDimOut = outfile.add_dim("lon",nLon);
+      NcDim *tDimOut = outfile.add_dim(tname.c_str(),nOutTime);
+      NcDim *latDimOut = outfile.add_dim(latname.c_str(),nLat);
+      NcDim *lonDimOut = outfile.add_dim(lonname.c_str(),nLon);
 
-      NcVar *tVarOut = outfile.add_var("time",ncDouble,tDimOut);
+      NcVar *tVarOut = outfile.add_var(tname.c_str(),ncDouble,tDimOut);
       CopyNcVarAttributes(inTime,tVarOut);      
 
-      NcVar *latVarOut = outfile.add_var("lat",ncDouble,latDimOut);
+      NcVar *latVarOut = outfile.add_var(latname.c_str(),ncDouble,latDimOut);
       copy_dim_var(inLat,latVarOut);
-      NcVar *lonVarOut = outfile.add_var("lon",ncDouble,lonDimOut);
+      NcVar *lonVarOut = outfile.add_var(lonname.c_str(),ncDouble,lonDimOut);
       copy_dim_var(inLon,lonVarOut);
 
       //Create variables for Deviations

@@ -166,9 +166,9 @@ void ParseTimeDouble(
 		std::string strSubStr = strTimeUnits.substr(12);
 		Time time(cal);
 		time.FromFormattedString(strSubStr);
-                printf("Debug: dTime is %10f \n",dTime);
+//                printf("Debug: dTime is %10f \n",dTime);
 		time.AddHours(static_cast<int>(dTime));
-                printf("Debug: after AddHours dTime is %10f\n",dTime);
+  //              printf("Debug: after AddHours dTime is %10f\n",dTime);
 	/*	Announce("Time (YMDS): %i %i %i %i",
 				time.GetYear(),
 				time.GetMonth(),
