@@ -94,7 +94,7 @@ produce_sectormap<-function(xlim=c(-180,180),ylim=c(-90,90)){
   rect(-185,25,lon_convert(260),75,border="blue")
   text((-100-180)/2,50,"NP")
   #CONTINENTS
-  rect(40,25,140,75,border="red")
+  rect(40,25,140,75,border="blue")
   text(90,50,"NC")
   
   #SH ATL
