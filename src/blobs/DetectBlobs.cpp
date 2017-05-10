@@ -1204,7 +1204,7 @@ try {
 		tagNextBlob.time++;
 	}
 
-/*	// Array of equivalent tags
+	// Array of equivalent tags
 	typedef std::multimap<Tag, Tag> MapGraph;
 	typedef MapGraph::const_iterator MapGraphConstIterator;
 	typedef MapGraph::iterator MapGraphIterator;
@@ -1361,13 +1361,15 @@ try {
 				mapEquivalentTags.find(vecBlobTags[p]);
 
 			if (iterTagPair != mapEquivalentTags.end()) {
-				vecBlobTags[p] = iterTagPair->second;
+//				vecBlobTags[p] = iterTagPair->second;
+				vecBlobTags[p] = iterTagPair->first;
+				vecBlobTags[p].global_id = vecBlobTags[p].id;
 			}
 		}
 	}
 
 	Announce("Blobs found: %i", nTotalBlobCount);
-*/
+
 /*
 	// Apply threshold operators
 	std::vector<bool> fRejectedBlob;
