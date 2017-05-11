@@ -27,7 +27,7 @@ EXEC_FILES= BlockingAvg.cpp\
             Var4Dto3D.cpp\
             split_file.cpp\
             AvgVar.cpp\
-            AvgDFT.cpp 
+            BlockingDFT.cpp 
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 

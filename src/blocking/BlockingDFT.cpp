@@ -86,7 +86,7 @@ int main(int argc, char ** argv){
       }
 
       tLen = readin.get_dim(tname.c_str()) ->size();
-
+      //std::cout<<"Reading in file #"<<x<<", "<<vecFiles[x].c_str()<<std::endl;
       //Input data
       inputData.Initialize(tLen, latLen, lonLen);
       NcVar *inputVar = readin.get_var(varName.c_str());
@@ -116,6 +116,7 @@ int main(int argc, char ** argv){
 
       int dateYear, dateMonth, dateDay, dateHour, dayIndex;
       bool leap;
+      //std::cout<<"Storing values."<<std::endl;
       //Store the values and counts in the matrices at the appropriate day index
       for (int t=0; t<tLen; t++){
         ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t],\
@@ -123,7 +124,8 @@ int main(int argc, char ** argv){
         leap = checkFileLeap(strTimeUnits, strCalendar, dateYear,\
           dateMonth, dateDay, dateHour, timeVec[t]);
         if (leap == false){
-          dayIndex = DayInYear(dateMonth, dateDay);
+          dayIndex = DayInYear(dateMonth, dateDay)-1;
+          //std::cout<<"Day index is "<<dayIndex<<std::endl;
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
               storeMat[dayIndex][a][b]+= inputData[t][a][b];
@@ -132,6 +134,7 @@ int main(int argc, char ** argv){
           }
         }
       }
+      //std::cout<<"Closing file."<<std::endl;
       readin.close();
 
     }
@@ -143,7 +146,7 @@ int main(int argc, char ** argv){
         }
       }
     }
-
+    //std::cout<<"Divided values to get average."<<std::endl;
     std::vector<double> inputDaily(yearLen);
     std::vector<std::complex <double> > FourierCoefs(yearLen);
     std::vector<double> outputDaily(yearLen);
