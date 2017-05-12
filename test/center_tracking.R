@@ -2,9 +2,9 @@ source("~/tempestextremes/test/sector_funcs.R")
 
 
 
-f_dir="/Volumes/ExFAT_drive/ERA_files/ERA_blobs/"
-#search_patt="ERA_1986_DJF_NA_*stats.txt"
-search_patt="ERA_2003_JJA_NA_*stats.txt"
+f_dir="/Volumes/ExFAT_drive/ERA_files/ERA_detect/"
+#search_patt="ERA_1986_DJF_NA_*stats_nostitch.txt"
+search_patt="ERA_2003_JJA_NA_*stats_nostitch.txt"
 files_masterlist=list.files(path=f_dir,pattern=glob2rx(search_patt))
 files_masterlist=paste(f_dir,files_masterlist,sep="")
 nFiles=length(files_masterlist)
@@ -17,8 +17,8 @@ bnum=0
 for (a in files_masterlist){
   #gather the info from filename
   finfo<-unlist(strsplit(a,split="_"))
-  vartype=ifelse(finfo[length(finfo)]=="stats.txt","PV",ifelse(
-    finfo[length(finfo)]=="Zstats.txt","Z","GHG"
+  vartype=ifelse(finfo[length(finfo)-1]=="stats","PV",ifelse(
+    finfo[length(finfo)-1]=="Zstats","Z","GHG"
   ))
   lines<-readLines(a)
   for (l in lines){
@@ -35,6 +35,7 @@ for (a in files_masterlist){
       nhours<-infoline[1]*6
       #print(sprintf("bnum is %f, nhours is %f,mult by 6 is %f.",bnum,infoline[1],nhours))
       t<-as.Date(nhours/24,origin="2003-06-01")
+      #t<-as.Date(nhours/24,origin="1986-12-01")
       #print(t)
       hr<-nhours%%24
       infoline[8]<-infoline[8]*6371000

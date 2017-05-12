@@ -4,25 +4,54 @@ library("maptools")
 library("mapproj")
 #test overlaps with heat wave data
 
-#All Z* has value of 100
-nonz<-which(z_blob_sub>0)
-z_blob2<-z_blob_sub
-z_blob2[nonz]<-z_blob2[nonz]/z_blob2[nonz]
-z_blob2<-z_blob2*100
-#All PV* has value of 10
+#All PV* has value of 1
 nonz<-which(pv_blob_sub>0)
 pv_blob2<-pv_blob_sub
 pv_blob2[nonz]<-pv_blob2[nonz]/pv_blob2[nonz]
-pv_blob2<-pv_blob2*1000
+
+#All Z* has value of 10
+nonz<-which(z_blob_sub>0)
+z_blob2<-z_blob_sub
+z_blob2[nonz]<-z_blob2[nonz]/z_blob2[nonz]
+z_blob2<-z_blob2*10
 
 #All ZG has value of 100
 nonz<-which(gh_blob_sub>0)
 gh_blob2<-gh_blob_sub
 gh_blob2[nonz]<-gh_blob2[nonz]/gh_blob2[nonz]
-gh_blob2<-gh_blob2*10000
+gh_blob2<-gh_blob2*100
 
 overlaps_sub<-z_blob2+pv_blob2+gh_blob2
 overlaps_nonz<-nonz<-overlaps_sub[which(overlaps_sub>0)]
+
+overlaps_str<-ifelse(overlaps_sub==0,"None",ifelse(
+  overlaps_sub==1,"PV*",ifelse(
+    overlaps_sub==10,"Z*",ifelse(
+      overlaps_sub==11,"PV*/Z*",ifelse(
+        overlaps_sub==100,"ZG",ifelse(
+          overlaps_sub==101,"ZG/PV*",ifelse(
+            overlaps_sub==110,"ZG/Z*","ZG/Z*/PV*"
+          )
+        )
+      )
+    )
+  )
+))
+
+
+overlaps_cat<-as.factor(overlaps_str)
+hgt_vec<-as.vector(z_hgt_sub)
+
+fit1<-lm(z_hgt_sub~overlaps_str)
+fit2<-lm(hgt_vec~overlaps_cat)
+a2<-anova(fit2)
+
+str_nonz<-overlaps_str[which(overlaps_sub>0)]
+cat_nonz<-as.factor(str_nonz)
+hgt_nonz<-z_hgt_sub[which(overlaps_sub>0)]
+hgt_nonz_vec<-as.vector(hgt_nonz)
+fit3<-lm(hgt_nonz_vec~cat_nonz)
+
 #Counts of overlap/nonoverlap
 overlaps_tab<-table(overlaps_nonz)
 pct_overlaps<-overlaps_tab/sum(overlaps_tab)*100

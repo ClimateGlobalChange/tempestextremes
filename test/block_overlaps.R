@@ -1,4 +1,4 @@
-#load("~/block_r_data/stats_cold_spell.RData")
+load("~/block_r_data/stats_cold_spell.RData")
 
 check_overlaps<-function(Alt,Alb,All,Alr,
                          Blt,Blb,Bll,Blr){
@@ -6,26 +6,26 @@ check_overlaps<-function(Alt,Alb,All,Alr,
   #use centered lons for Atlantic
   #Check that the latitudes overlap
   if ((Alt<Blb) | (Alb>Blt)){
-    ##print("lats don't overlap")
+    ###print("lats don't overlap")
     return(FALSE)
   }
   #Check that the longitudes overlap
   else if((Alr<Bll) | (All>Blr)){
-    ##print("lons don't overlap")
+    ###print("lons don't overlap")
     return(FALSE)
   }else{
-    ##print("overlap!")
+    ###print("overlap!")
     return(TRUE)
   }
 }
 
 
 v_count<-data.frame(PV=numeric(),Z=numeric(),GHG=numeric())
-
+var_tally<-data.frame(PV=0,Z=0,GHG=0)
 for (t in sort(unique(df_tot$tstep))){
-  #for (t in 271:271){
+#for (t in 129:129){
   df_sub<-df_tot[df_tot$tstep==t,c("var","date","hr","minlat","maxlat","minlon_c","maxlon_c")]
-  ##print(df_sub)
+  ###print(df_sub)
   namevec<-unique(df_sub$var)
   if (length(namevec)>1){
     v1<-df_sub[df_sub$var==namevec[1],]
@@ -42,7 +42,7 @@ for (t in sort(unique(df_tot$tstep))){
       minlen<-min(l1,l2)
       #if v2<v1, swap, else keep the same
       if (minlen!=l1){
-        ##print("swapping 1 and 2")
+        ###print("swapping 1 and 2")
         vtemp<-v1
         vartemp<-varA
         v1<-v2
@@ -52,6 +52,12 @@ for (t in sort(unique(df_tot$tstep))){
       }
       l1<-dim(v1)[1]
       l2<-dim(v2)[1]
+      
+      poss_A<-l1
+      poss_B<-l1
+      #print(s#printf("possible A, B: %d, %d",poss_A, poss_B))
+      var_tally[1,varA]<-var_tally[1,varA]+poss_A
+      var_tally[1,varB]<-var_tally[1,varB]+poss_B
       #ar<-array(rep(0, l1*l2), dim=c(l1,l2,1))
     }
     else{
@@ -65,7 +71,7 @@ for (t in sort(unique(df_tot$tstep))){
         m2<-min(l2,l3)
         #l3 is smallest, swap 1 and 3
         if (m2!=l2){
-          ##print("Min: swapping 1 and 3")
+          ###print("Min: swapping 1 and 3")
           vtemp<-v1
           vartemp<-varA
           v1<-v3
@@ -73,7 +79,7 @@ for (t in sort(unique(df_tot$tstep))){
           v3<-vtemp
           varC<-vartemp
         }else{
-          ##print("Min: swapping 1 and 2")
+          ###print("Min: swapping 1 and 2")
           vtemp<-v1
           vartemp<-varA
           v1<-v2
@@ -91,7 +97,7 @@ for (t in sort(unique(df_tot$tstep))){
         m2<-max(l1,l2)
         #l1 is biggest, swap 1 and 3
         if (m2!=l2){
-          ##print("Max: swapping 1 and 3")
+          ###print("Max: swapping 1 and 3")
           vtemp<-v1
           vartemp<-varA
           v1<-v3
@@ -99,7 +105,7 @@ for (t in sort(unique(df_tot$tstep))){
           v3<-vtemp
           varC<-vartemp
         }else{
-          ##print("Min: swapping 2 and 3")
+          ###print("Min: swapping 2 and 3")
           vtemp<-v3
           vartemp<-varC
           v3<-v2
@@ -111,68 +117,102 @@ for (t in sort(unique(df_tot$tstep))){
       l1<-dim(v1)[1]
       l2<-dim(v2)[1]
       l3<-dim(v3)[1]
-      #print("nblobs:")
-      #print(c(l1,l2,l3))
+      
+      poss_A<-2*l1
+      poss_B<-l1+l2
+      poss_C<-l1+l2
+      
+      #print(s#printf("possible A, B, C: %d, %d, %d",poss_A, poss_B, poss_C))
+      
+      var_tally[1,varA]<-var_tally[1,varA]+poss_A
+      var_tally[1,varB]<-var_tally[1,varB]+poss_B
+      var_tally[1,varC]<-var_tally[1,varC]+poss_C
+      ##print("nblobs:")
+      ##print(c(l1,l2,l3))
+      ##print(s##printf("%s,%s,%s",varA,varB,varC))
       #ar<-array(rep(0, l1*l2*l3), dim=c(l1,l2,l3))
     }
-    #print(s#printf("NOTE:t=%d",t))
+    ###print(s##printf("NOTE:t=%d",t))
     #now that the variables are sorted, check overlaps
     A_MAT<-matrix(0,nrow=l1,ncol=3)
     colnames(A_MAT)<-c("AB","AC","ABC")
     B_MAT<-matrix(0,nrow=l2,ncol=1)
+
     for (a in 1:dim(v1)[1]){
+      check_AB<-FALSE
       for (b in 1:dim(v2)[1]){
-        check_AB<-FALSE
-        check_AB<-check_overlaps(v1$maxlat[a],v1$minlat[a],v1$minlon_c[a],v1$maxlon_c[a],
-                                 v2$maxlat[b],v2$minlat[b],v2$minlon_c[b],v2$maxlon_c[b])
-        
+        if (check_AB==FALSE){
+          check_AB<-check_overlaps(v1$maxlat[a],v1$minlat[a],v1$minlon_c[a],v1$maxlon_c[a],
+                                   v2$maxlat[b],v2$minlat[b],v2$minlon_c[b],v2$maxlon_c[b])
+        }
+
+        str_AB<-ifelse(check_AB==TRUE,"true","false")
+
         if (!is.null(v3)){
+          check_BC<-FALSE
+          check_AC<-FALSE
+
           for (c in 1:dim(v3)[1]){
-            check_BC<-FALSE
-            check_BC<-check_overlaps(v3$maxlat[c],v3$minlat[c],v3$minlon_c[c],v3$maxlon_c[c],
-                                     v2$maxlat[b],v2$minlat[b],v2$minlon_c[b],v2$maxlon_c[b])
-            check_AC<-FALSE
-            check_AC<-check_overlaps(v1$maxlat[a],v1$minlat[a],v1$minlon_c[a],v1$maxlon_c[a],
-                                     v3$maxlat[c],v3$minlat[c],v3$minlon_c[c],v3$maxlon_c[c])
-            if (check_AB==TRUE){
+            ##print(s##printf("Checking %d,%d,%d:",a,b,c))
+            if (check_BC==FALSE){
+              check_BC<-check_overlaps(v3$maxlat[c],v3$minlat[c],v3$minlon_c[c],v3$maxlon_c[c],
+                                       v2$maxlat[b],v2$minlat[b],v2$minlon_c[b],v2$maxlon_c[b])
+            }
+
+            str_BC<-ifelse(check_BC==TRUE,"true","false")
+            if (check_AC==FALSE){
+              check_AC<-check_overlaps(v1$maxlat[a],v1$minlat[a],v1$minlon_c[a],v1$maxlon_c[a],
+                                       v3$maxlat[c],v3$minlat[c],v3$minlon_c[c],v3$maxlon_c[c])
+            }
+
+            str_AC<-ifelse(check_AC==TRUE,"true","false")
+            ##print(s##printf("AB, AC, BC: %s, %s, %s",str_AB,str_AC,str_BC))
+            
+            if (check_AB==TRUE & check_AC==TRUE & check_BC==TRUE){
+              ##print("BREAK!")
+              break
+            }
+
+            ##print(s##printf("Ending c=%d",c))
+          }
+          if (check_AB==TRUE){
+            if (check_AC==TRUE){
               if (check_BC==TRUE){
                 #ABC
-                if (check_AC==TRUE){
-                  A_MAT[a,3]=1
-                }
-                else{
-                  #AB and BC
-                  A_MAT[a,1]=1
-                  B_MAT[b,1]=1
-                }
-              }else{
-                if (check_AC==TRUE){
-                  #AB and AC
-                  A_MAT[a,1]=1
-                  A_MAT[a,2]=1
-                }else{
-                  #AB
-                  A_MAT[a,1]=1
-                }
+                A_MAT[a,3]=1
               }
-            }else{
+              else if (check_BC==FALSE){
+                #AB and AC
+                A_MAT[a,1]=1
+                A_MAT[a,2]=1
+              }
+            }
+            else if (check_AC==FALSE){
               if (check_BC==TRUE){
-                if (check_AC==TRUE){
-                  #AC and BC
-                  A_MAT[a,2]=1
-                  B_MAT[b,1]=1
-                }
-                else{
-                  #BC
-                  B_MAT[b,1]=1
-                }
+                #AB and BC
+                A_MAT[a,1]=1
+                B_MAT[b,1]=1
               }
-              else{
+              else if (check_BC==FALSE){
+                #AB
+                A_MAT[a,1]=1
+              }
+            }
+          }else if (check_AB==FALSE){
+            if (check_AC==TRUE){
+              if (check_BC==TRUE){
+                #AC and BC
+                A_MAT[a,2]=1
+                B_MAT[b,1]=1
+              }
+              else if (check_BC==FALSE){
                 #AC
-                if (check_AC==TRUE){
-                  A_MAT[a,2]=1
-                }
+                A_MAT[a,2]=1
               }
+            }
+            else if (check_AC==FALSE & check_BC==TRUE){
+              #BC
+              B_MAT[b,1]=1
             }
           }
         }
@@ -181,6 +221,7 @@ for (t in sort(unique(df_tot$tstep))){
           A_MAT[a,1]=1
         }
       }
+
     }
     #Now to add a row for each of the counts
     #AB
@@ -222,33 +263,29 @@ for (t in sort(unique(df_tot$tstep))){
 }
 
 #Now process the array
+
+#Number of blocks
 nPV<-dim(df_tot[df_tot$var=="PV",])[1]
 nZ<-dim(df_tot[df_tot$var=="Z",])[1]
 nGHG<-dim(df_tot[df_tot$var=="GHG",])[1]
 nTOT<-nPV+nZ+nGHG
 
-##print("num each:")
-##print(c(nPV,nZ,nGHG,nTOT))
-
+#Percentage of blocks
 PPV<-nPV/nTOT
 PZ<-nZ/nTOT
 PGHG<-nGHG/nTOT
 
+#Tally of possible blocks per overlaps is in var_tally
+#Actual number of blocks per overlaps
 
-# PPV<-nPV/nTimeSteps
-# PZ<-nZ/nTimeSteps
-# PGHG<-nGHG/nTimeSteps
-
-##print("prob each:")
-##print(c(PPV,PZ,PGHG))
-
-nZZG<-dim(v_count[v_count$Z==1 & v_count$GHG==1 & v_count$PV==0,])[1]
-nPVZ<-dim(v_count[v_count$Z==1 & v_count$GHG==0 & v_count$PV==1,])[1]
-nPVZG<-dim(v_count[v_count$Z==0 & v_count$GHG==1 & v_count$PV==1,])[1]
+  
+nZZG<-dim(v_count[v_count$Z==1 & v_count$GHG==1 ,])[1]
+nPVZ<-dim(v_count[v_count$Z==1  & v_count$PV==1,])[1]
+nPVZG<-dim(v_count[v_count$GHG==1 & v_count$PV==1,])[1]
 nall<-dim(v_count[v_count$Z==1 & v_count$GHG==1 & v_count$PV==1,])[1]
 
-##print("num combo:")
-##print(c(nPVZ,nPVZG,nZZG,nall))
+###print("num combo:")
+###print(c(nPVZ,nPVZG,nZZG,nall))
 
 #PV and Z
 PZPV<-nPVZ/nTOT
@@ -270,8 +307,8 @@ Pall<-nall/nTOT
 # #all
 # Pall<-nall/nTimeSteps
 
-##print("prob combo:")
-##print(c(PZPV,PPVGHG,PZGHG,Pall))
+###print("prob combo:")
+###print(c(PZPV,PPVGHG,PZGHG,Pall))
 
 matp<-matrix(1,nrow=3,ncol=3)
 

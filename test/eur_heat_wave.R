@@ -94,9 +94,9 @@ for (t in first_ind:length(time_format)){
     levels=seq(-65,55,5),col=temp.cols,plot.axes={axis(1);axis(2); 
     map('world',add=TRUE,xlim=c(-110,50),ylim=c(25,75));  
       contour(lon_seq,lat_seq,z_hgt_sub[,,t],levels=seq(4500,6100,50),add=TRUE);
-    contour(lon_seq,lat_seq,pv_blob_sub[,,t],levels=c(0,1),add=TRUE,col="darkgreen",drawlabels=FALSE,lwd=3);
-      contour(lon_seq,lat_seq,z_blob_sub[,,t],levels=c(0,1),add=TRUE,col="blue",drawlabels=FALSE,lwd=3);
-      contour(lon_seq,lat_seq,gh_blob_sub[,,t],levels=c(0,1),add=TRUE,col="purple",drawlabels=FALSE,lwd=3)})  
+    contour(lon_seq,lat_seq,pv_blob_sub[,,t],levels=c(0,1),add=TRUE,col="chartreuse4",drawlabels=FALSE,lwd=5);
+      contour(lon_seq,lat_seq,z_blob_sub[,,t],levels=c(0,1),add=TRUE,col="cornflowerblue",drawlabels=FALSE,lwd=5);
+      contour(lon_seq,lat_seq,gh_blob_sub[,,t],levels=c(0,1),add=TRUE,col="purple",drawlabels=FALSE,lwd=5)})  
     dev.off()
 }
 
@@ -106,13 +106,13 @@ for (t in first_ind:length(time_format)){
   fname<-sprintf("~/Dropbox/eur_heat_wave/noT/eur_heat_%s_%02dZ_noT.png",time_format[t],time_hours[t])
   png(fname,height=600,width=800)
 
- map('world',xlim=c(-110,50),ylim=c(25,75),fill=TRUE)
+ map('world',xlim=c(-110,50),ylim=c(25,75),fill=TRUE,col=)
  title(sprintf("Z500 %s %02dZ, PV* (green) Z* (blue) ZG (purple)",time_format[t],time_hours[t]))
  map.axes()
- contour(lon_seq,lat_seq,z_hgt_sub[,,t],levels=seq(4500,6100,50),add=TRUE,col=hgt.cols,lwd=2)
- contour(lon_seq,lat_seq,pv_blob_sub[,,t],levels=c(0,1),add=TRUE,col="darkgreen",drawlabels=FALSE,lwd=4)
- contour(lon_seq,lat_seq,z_blob_sub[,,t],levels=c(0,1),add=TRUE,col="blue",drawlabels=FALSE,lwd=4)
- contour(lon_seq,lat_seq,gh_blob_sub[,,t],levels=c(0,1),add=TRUE,col="purple",drawlabels=FALSE,lwd=4)
+ contour(lon_seq,lat_seq,z_hgt_sub[,,t],levels=seq(4500,6100,50),drawlabels=FALSE,add=TRUE,col=hgt.cols,lwd=2)
+ contour(lon_seq,lat_seq,pv_blob_sub[,,t],levels=c(0,1),add=TRUE,col="chartreuse4",drawlabels=FALSE,lwd=5)
+ contour(lon_seq,lat_seq,z_blob_sub[,,t],levels=c(0,1),add=TRUE,col="cornflowerblue",drawlabels=FALSE,lwd=5)
+ contour(lon_seq,lat_seq,gh_blob_sub[,,t],levels=c(0,1),add=TRUE,col="purple",drawlabels=FALSE,lwd=5)
   dev.off()
 }
 #combine 

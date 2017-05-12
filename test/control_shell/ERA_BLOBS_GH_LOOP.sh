@@ -7,7 +7,7 @@ ycalc=1987
 yend=2000
 DDIR=/Volumes/ExFAT_drive/ERA_files
 BDIR=$DDIR/ERA_blobs
-VAR="IPV"
+VAR="Z"
 
 #Addition of regional parameters
 SECTOR=("NA" "NC" "NP" "SA" "SI" "SP")

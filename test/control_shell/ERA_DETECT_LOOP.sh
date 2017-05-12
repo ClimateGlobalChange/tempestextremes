@@ -3,11 +3,13 @@
 SEASONS=("MAM" "JJA" "SON" "DJF")
 mstart=(3 6 9 12)
 ystart=1980
-ycalc=1987
+ycalc=2003
 yend=2000
 DDIR=/Volumes/ExFAT_drive/ERA_files
-BDIR=$DDIR/ERA_blobs
-VAR="IPV"
+BDIR=$DDIR/ERA_detect
+#VAR="GHGrad"
+
+VARVEC=("GHGrad" "Z" "IPV")
 
 #Addition of regional parameters
 SECTOR=("NA" "NC" "NP" "SA" "SI" "SP")
@@ -23,27 +25,30 @@ DENS_SUFF=""
 INVAR=""
 BLOB_VAR=""
 PLOT_TITLE=""
+
+for VAR in ${VARVEC[@]}; do
+
 if [ "$VAR" == "IPV" ]; then
   SUFF="integ_devs.nc"
-  BLOB_SUFF="blobs.nc"
-  STAT_SUFF="stats.txt"
-  DENS_SUFF="dens.nc"
+  BLOB_SUFF="blobs_nostitch.nc"
+  STAT_SUFF="stats_nostitch.txt"
+  DENS_SUFF="dens_nostitch.nc"
   INVAR="INT_ADIPV"
   BLOB_VAR="PV_BLOB"
   PLOT_TITLE="PV blocking"
 elif [ "$VAR" == "Z" ]; then
   SUFF="z500_devs.nc"
-  BLOB_SUFF="Zblobs.nc"
-  STAT_SUFF="Zstats.txt"
-  DENS_SUFF="Zdens.nc"
+  BLOB_SUFF="Zblobs_nostitch.nc"
+  STAT_SUFF="Zstats_nostitch.txt"
+  DENS_SUFF="Zdens_nostitch.nc"
   INVAR="INT_ADGH"
   BLOB_VAR="Z_BLOB"
   PLOT_TITLE="Z blocking"
 elif [ "$VAR" == "GHGrad" ]; then
   SUFF="z500_GHG.nc"
-  BLOB_SUFF="GHGblobs.nc"
-  STAT_SUFF="GHGstats.txt"
-  DENS_SUFF="GHGdens.nc"
+  BLOB_SUFF="GHGblobs_nostitch.nc"
+  STAT_SUFF="GHGstats_nostitch.txt"
+  DENS_SUFF="GHGdens_nostitch.nc"
   INVAR="GHGrad"
   BLOB_VAR="GHG_BLOB"
   PLOT_TITLE="GHG blocking"
@@ -51,13 +56,11 @@ fi
 
 
 
-
-
 if [ ! -e $BDIR ]; then
   mkdir -p $BDIR
 fi
 
-for ((y=1980; y<=2005; y++)); do
+for ((y=ycalc; y<=ycalc; y++)); do
   i=0
   SUBDIR=$DDIR/ERA_$y
   echo "Entering subdirectory $SUBDIR"
@@ -115,7 +118,7 @@ for ((y=1980; y<=2005; y++)); do
       densname="$BDIR/ERA_"$y"_"$s"_""$secname""_"$DENS_SUFF
       vdensname="$BDIR/ERA_"$y"_"$s"_var_""$secname""_"$DENS_SUFF
 
-      ~/tempestextremes/bin/StitchBlobs --inlist bloblist --out $blobsname --var $INVAR --outvar $BLOB_VAR --mintime 20 --minsize 36  --minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]}
+      ~/tempestextremes/bin/DetectBlobs --inlist bloblist --out $blobsname --var $INVAR --outvar $BLOB_VAR --minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]}
       ~/tempestextremes/bin/BlobStats --infile $blobsname --outfile $statsname --invar $BLOB_VAR --out minlat,maxlat,minlon,maxlon,centlat,centlon,area
    #   ~/tempestextremes/bin/DensityCalculations --in $blobsname --var $BLOB_VAR --out $densname
    #   ~/tempestextremes/bin/DensityCalculations --inlist bloblist --var $INVAR --out $vdensname
@@ -143,5 +146,5 @@ done
 #  ~/tempestextremes/bin/DensityCalculations --std --inlist $lsname --var $BLOB_VAR --out $outname
 #  python ~/tempestextremes/test/plot_density.py $outname "ERA $n yr $s" "avg" "$PLOT_TITLE"
 #done
-
+done
 #cp /Volumes/ExFAT_drive/ERA_files/ERA_blobs/ERA*plot.png ~/figs/
