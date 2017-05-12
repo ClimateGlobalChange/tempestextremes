@@ -80,7 +80,8 @@ int main(int argc, char **argv){
     //Interpolated file name
     std::string interp_file = strfile_in.replace(strfile_in.end()-3,strfile_in.end(),"_ipl.nc");
     std::cout<< "Interpolated file name is "<<interp_file<<std::endl;
-    //open interpolated file
+
+    //open file that interpolated variables will be written to
     NcFile readin_out(interp_file.c_str(), NcFile::Replace, NULL,\
       0, NcFile::Offset64Bits);
     if (!readin_out.is_valid()) {
@@ -88,9 +89,12 @@ int main(int argc, char **argv){
         interp_file.c_str());
     }
 
-    //Interpolate variable and write to new file
+    //Interpolate variables and write to new file
     std::cout << "About to interpolate files. Entering interp util."<<std::endl;
-    interp_util(readin_int, strfile_2d, readin_out);
+//    interp_util(readin_int, strfile_2d, readin_out);
+    std::string varlist="T,U,V";
+
+    interp_util(readin_int,strfile_2d,varlist,readin_out);
     readin_out.close();
     strfile_in = interp_file;
   }
@@ -186,6 +190,13 @@ int main(int argc, char **argv){
 
   NcVar *pv_var = file_out.add_var("PV", ncDouble, out_time, out_plev, out_lat, out_lon);
   NcVar *intpv_var = file_out.add_var("IPV", ncDouble, out_time, out_lat, out_lon);
+  NcVar *avgt_var = file_out.add_var("AVGT", ncDouble, out_time, out_lat, out_lon);
+  NcVar *avgu_var = file_out.add_var("AVGU", ncDouble, out_time, out_lat, out_lon);
+  NcVar *avgv_var = file_out.add_var("AVGV", ncDouble, out_time, out_lat, out_lon);
+  
+  VarPressureAvg(temp,lev_vals,avgt_var);
+  VarPressureAvg(uvar,lev_vals,avgu_var);
+  VarPressureAvg(vvar,lev_vals,avgv_var);
   PV_calc(uvar, vvar, PTVar, RVVar, lev_vals, coriolis,cosphi, dphi, dlambda,\
     lat_res, lon_res, pv_var, intpv_var);
 

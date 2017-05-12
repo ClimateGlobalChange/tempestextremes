@@ -37,6 +37,7 @@ int main(int argc, char **argv){
     std::string strfile_out;
     std::string varName;
     std::string avgName;
+    std::string tname,latname,lonname;
     bool missingFiles;
 
     BeginCommandLine()
@@ -45,11 +46,20 @@ int main(int argc, char **argv){
       CommandLineString(varName, "varname","");
       CommandLineString(avgName, "avgname","");
       CommandLineBool(missingFiles, "missing");
+      CommandLineString(tname,"tname","time");
+      CommandLineString(latname,"latname","lat");
+      CommandLineString(lonname,"lonname","lon");
       ParseCommandLine(argc, argv);
+
 
     EndCommandLine(argv)
     AnnounceBanner();
-
+    if (fileList == ""){
+      _EXCEPTIONT("No file list (--inlist) provided");
+    }
+    if (strfile_out == ""){
+      _EXCEPTIONT("No output file name (--out) provided");
+    }
     if (varName == ""){
       _EXCEPTIONT("No variable name (--varname) specified");
     }
@@ -67,9 +77,9 @@ int main(int argc, char **argv){
 
     //Open first file 
     NcFile infile(InputFiles[0].c_str());
-    int nTime = infile.get_dim("time")->size();
-    int nLat = infile.get_dim("lat")->size();
-    int nLon = infile.get_dim("lon")->size();
+    int nTime = infile.get_dim(tname.c_str())->size();
+    int nLat = infile.get_dim(latname.c_str())->size();
+    int nLon = infile.get_dim(lonname.c_str())->size();
 
     //IPV variable and data matrix
     NcVar *inPV = infile.get_var(varName.c_str());
@@ -78,7 +88,7 @@ int main(int argc, char **argv){
     inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
 
     //time variable
-    NcVar *timeVal = infile.get_var("time");
+    NcVar *timeVal = infile.get_var(tname.c_str());
     DataVector<double> timeVec(nTime);
     timeVal->set_cur((long) 0);
     timeVal->get(&(timeVec[0]),nTime);
@@ -135,7 +145,7 @@ int main(int argc, char **argv){
 
     //Number of time steps per day
     int nSteps = 1/tRes;
-    std::cout<<"tRes is "<<tRes<<" and nSteps is "<<nSteps<<std::endl;
+    //std::cout<<"tRes is "<<tRes<<" and nSteps is "<<nSteps<<std::endl;
     double endTime = timeVec[nTime-1];
     int currArrIndex = 0;
 
@@ -176,7 +186,7 @@ int main(int argc, char **argv){
             leapMonth,leapDay,leapHour);
           if (leapMonth==2 && leapDay == 29){
             while (leapMonth ==2 && leapDay ==29){
-              std::cout<<"Leap day! Skipping this step."<<std::endl;
+            //  std::cout<<"Leap day! Skipping this step."<<std::endl;
               t++;
               ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
                 leapMonth, leapDay, leapHour);
@@ -198,19 +208,24 @@ int main(int argc, char **argv){
         //Open new file and increment file counter
         x+=1;
         NcFile infile(InputFiles[x].c_str());
-        nTime = infile.get_dim("time")->size();
-        nLat = infile.get_dim("lat")->size();
-        nLon = infile.get_dim("lon")->size();
+        nTime = infile.get_dim(tname.c_str())->size();
+        nLat = infile.get_dim(latname.c_str())->size();
+        nLon = infile.get_dim(lonname.c_str())->size();
 
         //IPV variable
         NcVar *inPV = infile.get_var(varName.c_str());
         IPVData.Initialize(nTime,nLat,nLon);
 
+        int nDims = inPV->num_dims();
+        if (nDims != 3){
+          _EXCEPTIONT("Variable does not have the correct number of dimensions (3).");
+        } 
+
         inPV->set_cur(0,0,0);
         inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
 
         //Time variable
-        NcVar *timeVal = infile.get_var("time");
+        NcVar *timeVal = infile.get_var(tname.c_str());
         timeVec.Initialize(nTime);
         timeVal->set_cur((long) 0);
         timeVal->get(&(timeVec[0]),nTime);
@@ -260,10 +275,10 @@ int main(int argc, char **argv){
     }    
 
     if (hasMissingValues){
-      std::cout<< "This array has missing values, will not be added to sum."<<std::endl;
+      //std::cout<< "This array has missing values, will not be added to sum."<<std::endl;
     }
     else{
-      std::cout<<"No missing values found. Adding array to sum."<<std::endl;
+      //std::cout<<"No missing values found. Adding array to sum."<<std::endl;
       for (int t=0; t<arrLen; t++){
         for (int a=0; a<nLat; a++){
           for (int b=0; b<nLon; b++){
@@ -280,19 +295,19 @@ int main(int argc, char **argv){
 
     }
    
-    std::cout<<"Filled date index number "<<dateIndex<<std::endl; 
+    //std::cout<<"Filled date index number "<<dateIndex<<std::endl; 
     dateIndex+=1;
     currArrIndex = 0;
   //Check if new file needs to be opened before entering while loop
 
     if(tEnd>=nTime){
       infile.close();
-      std::cout<<"First while loop. Closed "<<InputFiles[x]<<std::endl;
+      //std::cout<<"First while loop. Closed "<<InputFiles[x]<<std::endl;
       x+=1;
       NcFile infile(InputFiles[x].c_str());
-      nTime = infile.get_dim("time")->size();
-      nLat = infile.get_dim("lat")->size();
-      nLon = infile.get_dim("lon")->size();
+      nTime = infile.get_dim(tname.c_str())->size();
+      nLat = infile.get_dim(latname.c_str())->size();
+      nLon = infile.get_dim(lonname.c_str())->size();
 
       //IPV variable
       NcVar *inPV = infile.get_var(varName.c_str());
@@ -302,7 +317,7 @@ int main(int argc, char **argv){
       inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
 
       //Time variable
-      NcVar *timeVal = infile.get_var("time");
+      NcVar *timeVal = infile.get_var(tname.c_str());
       timeVec.Initialize(nTime);
 
       timeVal->set_cur((long) 0);
@@ -316,7 +331,7 @@ int main(int argc, char **argv){
     }
 
     else if (tEnd<nTime){
-      std::cout<<"First while loop. Still have data left on current file. Will continue on."<<std::endl;
+      //std::cout<<"First while loop. Still have data left on current file. Will continue on."<<std::endl;
       tStart = tEnd;
       tEnd = tStart + nSteps;
     }
@@ -326,9 +341,9 @@ int main(int argc, char **argv){
     bool newFile = false;
 
     while (x<nFiles){
-      std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
+      //std::cout<<"7: Inside while loop: file currently "<<InputFiles[x]<<" and nTime is "\
         <<nTime<<"; tStart/end is "<<tStart<<" and "<<tEnd<<std::endl;
-      std::cout<<"Current date index is "<<dateIndex<<std::endl;
+      //std::cout<<"Current date index is "<<dateIndex<<std::endl;
        //1: check if current day is a leap day
       if (leap==true){
       //  std::cout<<"Checking date for leap day."<<std::endl;
@@ -337,28 +352,35 @@ int main(int argc, char **argv){
         if (leapMonth==2 && leapDay ==29){
           tStart = tEnd;
           tEnd = tStart + nSteps;
-          std::cout<<"#1: This day is a leap day. Resetting tStart/tEnd to "\
+          //std::cout<<"#1: This day is a leap day. Resetting tStart/tEnd to "\
             <<tStart<<" and "<<tEnd<<std::endl;
         } 
         if (tEnd>nTime){
           newFile = true;
-          std::cout<<"For leap day file, reached EOF."<<std::endl;
+          //std::cout<<"For leap day file, reached EOF."<<std::endl;
         }
       }
       //2: if new file needs to be opened, open it
       if(newFile==true){
         endTime = timeVec[nTime-1];
-        std::cout<<"#2: Reached end of file."<<std::endl;
+        //cases with incomplete days
+        if (nTime-tStart < nSteps) {
+          double extraSteps = nSteps - (nTime-tStart);
+        //  std::cout<<"Need to add "<<extraSteps<<" extra steps."<<std::endl;
+          endTime += (extraSteps * tRes);
+        //  std::cout<<"New end time is "<<endTime<<std::endl;
+        }
+      //  std::cout<<"#2: Reached end of file."<<std::endl;
         infile.close();
         std::cout<<"Closed "<<InputFiles[x]<<std::endl;
         x+=1;
         if (x<nFiles){
           NcFile infile(InputFiles[x].c_str());
           newFile = false;
-          std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
-          nTime = infile.get_dim("time")->size();
-          nLat = infile.get_dim("lat")->size();
-          nLon = infile.get_dim("lon")->size();
+          //std::cout<<"x is currently "<<x<<", opening file "<<InputFiles[x]<<std::endl;
+          nTime = infile.get_dim(tname.c_str())->size();
+          nLat = infile.get_dim(latname.c_str())->size();
+          nLon = infile.get_dim(lonname.c_str())->size();
 
         //IPV variable
           NcVar *inPV = infile.get_var(varName.c_str());
@@ -368,7 +390,7 @@ int main(int argc, char **argv){
           inPV->get(&(IPVData[0][0][0]),nTime,nLat,nLon);
 
         //Time variable
-          NcVar *timeVal = infile.get_var("time");
+          NcVar *timeVal = infile.get_var(tname.c_str());
           timeVec.Initialize(nTime);
           timeVal->set_cur((long) 0);
           timeVal->get(&(timeVec[0]),nTime);
@@ -381,7 +403,7 @@ int main(int argc, char **argv){
 
           if (contCheck > tRes){
             if (!missingFiles){
-              std::cout<<"contCheck is "<<contCheck<<std::endl;
+            //  std::cout<<"contCheck is "<<contCheck<<std::endl;
               _EXCEPTIONT("New file is not continuous with previous file");
             }else{
               MissingFill(missingValue, tRes, contCheck, nLat, nLon, arrLen, \
@@ -398,18 +420,32 @@ int main(int argc, char **argv){
       }    
       //3: fill array for next value
       if (newFile==false){
-        std::cout<<"At time "<<tStart<<" to "<<tEnd<< "Filled in values at array index "<<currArrIndex<<" that will fill date "<<dateIndex<<std::endl;
+      //  std::cout<<"At time "<<tStart<<" to "<<tEnd<< "Filled in values at array index "<<currArrIndex<<" that will fill date "<<dateIndex<<std::endl;
+       
+      //  if (nTime-tStart < nSteps) {
+        //  std::cout<< "Incomplete day. Skipping."<<std::endl;
+      //  }
+ 
         for (int t=tStart; t<tEnd; t++){
           for (int a=0; a<nLat; a++){
             for (int b=0; b<nLon; b++){
-              currFillData[currArrIndex][a][b] = IPVData[t][a][b];
+              if (nTime-tStart < nSteps){
+                currFillData[currArrIndex][a][b] = missingValue;
+              }
+              else{
+                if (std::fabs(IPVData[t][a][b]) > 10e10){
+                  std::cout<<"WARNING: File "<<InputFiles[x]<<" has suspicious value! "<<IPVData[t][a][b]<<std::endl;
+                }
+                currFillData[currArrIndex][a][b] = IPVData[t][a][b];
+              }
             }
           }
           currArrIndex+=1;
+        //  std::cout<< "Array index is now "<<currArrIndex<<" (arrlen is "<<arrLen<<")"<<std::endl;
         }
         //check for periodic boundary condition for 31 day array
         if (currArrIndex>=arrLen){
-          std::cout<<"currArrIndex is "<<currArrIndex<<" and periodic boundary: 31 day length met or exceeded."<<std::endl;
+       //   std::cout<<"currArrIndex is "<<currArrIndex<<" and periodic boundary: 31 day length met or exceeded."<<std::endl;
           currArrIndex-=arrLen;
         }
      //Check to see if array contains missing values
@@ -418,9 +454,9 @@ int main(int argc, char **argv){
      }
      //Do not add sum of array to average if array contains missing values!
      if (hasMissingValues){
-       std::cout<<"This array has missing values, will not be added to sum."<<std::endl;
+       //std::cout<<"This array has missing values, will not be added to sum."<<std::endl;
      }else{
-       std::cout<<"Filled in values at date index "<<dateIndex<<std::endl;
+       //std::cout<<"Filled in values at date index "<<dateIndex<<std::endl;
        //Fill date with sum of new array values
           for (int t=0; t<arrLen; t++){
             for (int a=0; a<nLat; a++){
@@ -443,15 +479,15 @@ int main(int argc, char **argv){
           dateIndex-=yearLen;
         }
         if (tEnd >= nTime){
-          std::cout<<"Current tEnd is "<<tEnd << " and nTime is "<<nTime<<std::endl;
+       //   std::cout<<"Current tEnd is "<<tEnd << " and nTime is "<<nTime<<std::endl;
           newFile = true;
-          std::cout<<"Else: Reached EOF. Will open new file in next iteration."<<std::endl;
+       //   std::cout<<"Else: Reached EOF. Will open new file in next iteration."<<std::endl;
 
         }
         else{
           tStart = tEnd;
           tEnd = tStart + nSteps;
-          std::cout<<"Filled array. Resetting tstart/tend to "<<tStart<< " and "<<tEnd<<std::endl;
+        //  std::cout<<"Filled array. Resetting tstart/tend to "<<tStart<< " and "<<tEnd<<std::endl;
           //Check for leap year
           if (leap==true){
           //  std::cout<<"Checking date for leap day."<<std::endl;
@@ -460,7 +496,7 @@ int main(int argc, char **argv){
             if (leapMonth==2 && leapDay ==29){
               tStart = tEnd;
               tEnd = tStart + nSteps;
-              std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
+              //std::cout<<"This day is a leap day. Resetting tStart/tEnd to "\
                 <<tStart<<" and "<<tEnd<<std::endl;
             }
             //re-check tEnd
@@ -491,29 +527,32 @@ int main(int argc, char **argv){
 
     NcFile refFile(InputFiles[0].c_str());
 
-    NcDim *inLatDim = refFile.get_dim("lat");
-    NcDim *inLonDim = refFile.get_dim("lon");
-    NcVar *inLatVar = refFile.get_var("lat");
-    NcVar *inLonVar = refFile.get_var("lon");
+    NcDim *inLatDim = refFile.get_dim(latname.c_str());
+    NcDim *inLonDim = refFile.get_dim(lonname.c_str());
+    NcVar *inLatVar = refFile.get_var(latname.c_str());
+    NcVar *inLonVar = refFile.get_var(lonname.c_str());
 
 
   //Output to file
     NcFile outfile(strfile_out.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
 
-    NcDim *outTime = outfile.add_dim("time", yearLen);
+    NcDim *outTime = outfile.add_dim(tname.c_str(), yearLen);
     DataVector<int> timeVals(yearLen);
     for (int t=0; t<yearLen; t++){
       timeVals[t] = t+1;
     }
 
-    NcVar *outTimeVar = outfile.add_var("time", ncInt, outTime);
+    NcVar *outTimeVar = outfile.add_var(tname.c_str(), ncInt, outTime);
     outTimeVar->set_cur((long) 0);
     outTimeVar->put(&(timeVals[0]),yearLen);
 
-    NcDim *outLat = outfile.add_dim("lat", nLat);
-    NcDim *outLon = outfile.add_dim("lon", nLon);
-    NcVar *outLatVar = outfile.add_var("lat", ncDouble, outLat);
-    NcVar *outLonVar = outfile.add_var("lon", ncDouble, outLon);
+    //Add time units (necessary for time conversion)
+    outTimeVar->add_att("units","days since 0001-12-31"); 
+
+    NcDim *outLat = outfile.add_dim(latname.c_str(), nLat);
+    NcDim *outLon = outfile.add_dim(lonname.c_str(), nLon);
+    NcVar *outLatVar = outfile.add_var(latname.c_str(), ncDouble, outLat);
+    NcVar *outLonVar = outfile.add_var(lonname.c_str(), ncDouble, outLon);
 
     copy_dim_var(inLatVar,outLatVar);
     copy_dim_var(inLonVar,outLonVar);

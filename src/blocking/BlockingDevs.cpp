@@ -38,19 +38,33 @@ int main(int argc, char **argv){
     std::string avgName;
     std::string varName;
     std::string avgVarName;
+    std::string tname,latname,lonname;
+    bool PVCalc;
+    bool GHCalc;
+
 
     BeginCommandLine()
       CommandLineString(fileList, "inlist", "");
       CommandLineString(varName,"varname","");
       CommandLineString(avgName, "avg", "");
       CommandLineString(avgVarName, "avgname","");
+      CommandLineBool(PVCalc,"pv");
+      CommandLineBool(GHCalc,"gh");
+      CommandLineString(tname,"tname","time");
+      CommandLineString(latname,"latname","lat");
+      CommandLineString(lonname,"lonname","lon");
       ParseCommandLine(argc, argv);
     EndCommandLine(argv);
     AnnounceBanner();
 
+    if ((!PVCalc) && (!GHCalc)){
+      _EXCEPTIONT("Need to specify either PV (--pv) or GH (--gh) calculations.");
+    }
+  
+
    int nFiles,avgTime,nTime,nLat,nLon;
    double anomVal = 1.3*std::pow(10,-6);
-   double GHVal = 200;
+   double GHVal = 170.;
    //Create list of input files
     std::vector<std::string> InputFiles;
     GetInputFileList(fileList, InputFiles);
@@ -58,13 +72,27 @@ int main(int argc, char **argv){
 
     //Open averages file
     NcFile avgFile(avgName.c_str());
+	if (!avgFile.is_valid()) {
+		_EXCEPTION1("Cannot open NetCDF file \"%s\"", avgName.c_str());
+	}
 
     //time data (average)
-    avgTime = avgFile.get_dim("time")->size();
-    NcVar *avgTimeVals = avgFile.get_var("time");
-    
+	NcDim *dimTime = avgFile.get_dim(tname.c_str());
+	if (dimTime == NULL) {
+		_EXCEPTION1("\"%s\" is missing dimension \"time\"", avgName.c_str());
+	}
+
+    avgTime = dimTime->size();
+    NcVar *avgTimeVals = avgFile.get_var(tname.c_str());
+   	if (avgTimeVals == NULL) {
+		_EXCEPTION1("\"%s\" is missing variable \"time\"", avgName.c_str());
+	}
+
     //averaged var
     NcVar *AvarData = avgFile.get_var(avgVarName.c_str());
+   	if (AvarData == NULL) {
+		_EXCEPTION2("\"%s\" is missing variable \"%s\"", avgName.c_str(), avgVarName.c_str());
+	}
 
     //Open var files
 
@@ -74,17 +102,18 @@ int main(int argc, char **argv){
       if(!infile.is_valid()){
         _EXCEPTION1("Unable to open file \"%s\".",InputFiles[0].c_str());
       }
-      NcDim *tDim = infile.get_dim("time");
-      NcDim *latDim = infile.get_dim("lat");
-      NcDim *lonDim = infile.get_dim("lon");
+      std::cout<<"Opening file "<<InputFiles[x].c_str()<<std::endl;
+      NcDim *tDim = infile.get_dim(tname.c_str());
+      NcDim *latDim = infile.get_dim(latname.c_str());
+      NcDim *lonDim = infile.get_dim(lonname.c_str());
       
       nTime = tDim->size();
       nLat = latDim->size();
       nLon = lonDim->size();
 
-      NcVar *inTime = infile.get_var("time");
-      NcVar *inLat = infile.get_var("lat");
-      NcVar *inLon = infile.get_var("lon");
+      NcVar *inTime = infile.get_var(tname.c_str());
+      NcVar *inLat = infile.get_var(latname.c_str());
+      NcVar *inLon = infile.get_var(lonname.c_str());
       NcVar *varData = infile.get_var(varName.c_str());
 
       NcAtt *attTime = inTime->get_att("units");
@@ -100,7 +129,7 @@ int main(int argc, char **argv){
       }
       std::string strCalendar = attCal->as_string(0);
 
-      std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
+   //   std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
 
 
 
@@ -114,11 +143,13 @@ int main(int argc, char **argv){
       int dateMonth;
       int dateDay;
       int dateHour;
-
+      //std::cout<<"time units and calendar: "<<strTimeUnits<<","<<strCalendar<<std::endl;
+      //std::cout<<"first value of time variable:"<<timeVals[0]<<std::endl;
       ParseTimeDouble(strTimeUnits, strCalendar, timeVals[0], dateYear,\
         dateMonth, dateDay, dateHour);
-
+      //std::cout<<"D/M/Y:"<<dateDay<<"/"<<dateMonth<<"/"<<dateYear<<std::endl;
       int day = DayInYear(dateMonth,dateDay);
+      //std::cout<<"For month "<<dateMonth<<" and day "<<dateDay<<" day is "<<day<<std::endl;
       int startIndex = day-1;
 
     //  int nSteps = int(1.0/(timeVals[1]-timeVals[0]));
@@ -150,7 +181,7 @@ int main(int argc, char **argv){
       //Create output file that corresponds to IPV data
       std::string strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
         InputFiles[x].end(), "_devs.nc");
-
+      std::cout<<"Writing variables to file "<<strOutFile.c_str()<<std::endl;
       NcFile outfile(strOutFile.c_str(), NcFile::Replace, NULL,0,NcFile::Offset64Bits);
       int nOutTime;
       if (leap){
@@ -159,21 +190,21 @@ int main(int argc, char **argv){
       else{
         nOutTime = nTime;
       }
-      NcDim *tDimOut = outfile.add_dim("time",nOutTime);
-      NcDim *latDimOut = outfile.add_dim("lat",nLat);
-      NcDim *lonDimOut = outfile.add_dim("lon",nLon);
+      NcDim *tDimOut = outfile.add_dim(tname.c_str(),nOutTime);
+      NcDim *latDimOut = outfile.add_dim(latname.c_str(),nLat);
+      NcDim *lonDimOut = outfile.add_dim(lonname.c_str(),nLon);
 
-      NcVar *tVarOut = outfile.add_var("time",ncDouble,tDimOut);
+      NcVar *tVarOut = outfile.add_var(tname.c_str(),ncDouble,tDimOut);
       CopyNcVarAttributes(inTime,tVarOut);      
 
-      NcVar *latVarOut = outfile.add_var("lat",ncDouble,latDimOut);
+      NcVar *latVarOut = outfile.add_var(latname.c_str(),ncDouble,latDimOut);
       copy_dim_var(inLat,latVarOut);
-      NcVar *lonVarOut = outfile.add_var("lon",ncDouble,lonDimOut);
+      NcVar *lonVarOut = outfile.add_var(lonname.c_str(),ncDouble,lonDimOut);
       copy_dim_var(inLon,lonVarOut);
 
       //Create variables for Deviations
 
-      if (varName == "IPV"){
+      if (PVCalc){
         NcVar *devOut = outfile.add_var("DIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
@@ -181,12 +212,13 @@ int main(int argc, char **argv){
         calcDevsPV(leap, startIndex, varData, devOut, aDevOut, devIntOut, AvarData, inTime,\
         avgTimeVals, inLat, tVarOut, anomVal);
       }
-      else if (varName == "GH"){
+      else if (GHCalc){
         NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);
         NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
-        calcDevsGH(leap, startIndex, varData, devOut,aDevOut,devIntOut,AvarData,inTime,avgTimeVals,inLat,tVarOut,stdDevOut);
+        calcDevsGH(leap,GHVal, startIndex, varData, devOut,aDevOut,devIntOut,AvarData,inTime,avgTimeVals,inLat,tVarOut,stdDevOut);
+        std::cout<<"Finished writing to file "<<strOutFile.c_str()<<std::endl;
       }
       else{
         _EXCEPTIONT("Invalid variable specified!");

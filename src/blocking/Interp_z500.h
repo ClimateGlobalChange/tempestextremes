@@ -29,6 +29,7 @@ void interp_1lev(NcVar *var,
 
 void interp_z500(NcFile & readin,
                  const std::string & strname_2d,
+                 const std::string & varname,
                  NcFile & ifile_out);
 
 #endif

@@ -166,9 +166,9 @@ void ParseTimeDouble(
 		std::string strSubStr = strTimeUnits.substr(12);
 		Time time(cal);
 		time.FromFormattedString(strSubStr);
-              //  printf("Debug: dTime is %10f \n",dTime);
+//                printf("Debug: dTime is %10f \n",dTime);
 		time.AddHours(static_cast<int>(dTime));
-
+  //              printf("Debug: after AddHours dTime is %10f\n",dTime);
 	/*	Announce("Time (YMDS): %i %i %i %i",
 				time.GetYear(),
 				time.GetMonth(),
@@ -179,7 +179,7 @@ void ParseTimeDouble(
 		nDateMonth = time.GetMonth();
 		nDateDay = time.GetDay();
 		nDateHour = time.GetSecond() / 3600;
-
+                //std::cout<<"Debug: Y/M/D:"<<nDateYear<<"/"<<nDateMonth<<"/"<<nDateDay<<std::endl;
 		//printf("%s\n", strSubStr.c_str());
 
 	} else {
@@ -241,7 +241,7 @@ void interpolate_lev(NcVar *var,
   pLev->set_cur((long) 0);
   pLev->get(&(vecpLev[0]), npLev);
  
-  std::cout<<"within interpolate_lev: about to interpolate"<<std::endl; 
+  //std::cout<<"within interpolate_lev: about to interpolate"<<std::endl; 
   //Loop over input data and interpolate to output var
   for (int t=0; t<nTime; t++){
     for (int l=0; l<(nLev-1); l++){
@@ -278,17 +278,14 @@ void copy_dim_var(
 	NcVar *inVar, 
 	NcVar *outVar
 	){
-  std::cout<<"Within copy_dim_var: starting copy"<<std::endl;
 //Get necessary information from infile
   int varLen = inVar->get_dim(0)->size();
-  std::cout<<"Variable dimension length is "<<varLen<<std::endl;
   DataVector<double> inVec(varLen);
   inVar->set_cur((long) 0);
   inVar->get(&(inVec[0]), varLen);
 //Copy data to new outgoing variable
   outVar->set_cur((long) 0);
   outVar->put(&(inVec[0]), varLen);
-  std::cout<<"Copying attributes."<<std::endl;
 //Copy other attributes
   CopyNcVarAttributes(inVar, outVar);
 }
@@ -475,6 +472,73 @@ void rVort_calc(
   std::cout<<"Finished calculating relative vorticity."<<std::endl;
 }
 
+
+void VarPressureAvg(
+	NcVar * invar,
+	NcVar * pVals,
+	NcVar * outvar
+){
+	int nTime,nLat,nLon,nPlev;
+	nTime = invar->get_dim(0)->size();
+	nPlev = invar->get_dim(1)->size();
+	nLat = invar->get_dim(2)->size();
+	nLon = invar->get_dim(3)->size();
+
+	//Input into Matrix
+	DataMatrix4D<double> inMat(nTime,nPlev,nLat,nLon);
+	invar->set_cur(0,0,0,0);
+	invar->get(&(inMat[0][0][0][0]),nTime,nPlev,nLat,nLon);
+	
+    //Pressure axis values
+    DataVector<double> pVec(nPlev);
+    pVals->set_cur((long) 0);
+    pVals->get(&(pVec[0]), nPlev);
+
+	
+	//Integrate values over upper troposphere
+    int pos_top;
+    int pos_bot;
+
+    for (int x=0; x<nPlev; x++){
+      if (std::fabs(pVec[x]-15000.0)<0.0001){
+        pos_top = x;
+      }
+      if (std::fabs(pVec[x]-50000.0)<0.0001){
+        pos_bot = x;
+      }
+    }
+   //if level axis starts at ground, reverse positions
+    if (pos_top>pos_bot){
+      int temp = pos_bot;
+      pos_bot = pos_top;
+      pos_top = temp;
+    }
+
+    DataMatrix3D<double> outMat(nTime, nLat, nLon);  
+    double bot,mid,top;
+    double modLevLen = pos_bot-pos_top;
+    double invLevLen = 1.0/(2.0*modLevLen);
+
+    //Calculate integration parts
+    for (int t=0; t<nTime; t++){
+      for (int a=0; a<nLat; a++){
+        for (int b=0; b<nLon; b++){
+          top = inMat[t][pos_top][a][b];
+          bot = inMat[t][pos_bot][a][b];
+          mid = 0.0;
+          for (int p=(pos_top+1); p<pos_bot; p++){
+            mid+=2.0*inMat[t][p][a][b];
+          }
+          outMat[t][a][b] = (top+bot+mid)*invLevLen;
+        }
+      }
+    }
+ 
+    outvar->set_cur(0,0,0);
+    outvar->put(&(outMat[0][0][0]),nTime,nLat,nLon);
+    std::cout<<"Finished integrating variable."<<std::endl;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 void PV_calc(
@@ -482,15 +546,15 @@ void PV_calc(
 	NcVar *V, 
 	DataMatrix4D<double> PTMat,
 	DataMatrix4D<double> RVMat,
-        NcVar *pVals, 	
+    NcVar *pVals, 	
 	DataVector<double> coriolis,
-        DataVector<double>cosphi,
+    DataVector<double>cosphi,
 	double dphi,
 	double dlambda,
-        double lat_res,
-        double lon_res,
+    double lat_res,
+    double lon_res,
 	NcVar *PV,
-        NcVar *intPV){
+    NcVar *intPV){
 
 
   int nTime,nPlev,nLat,nLon;
@@ -664,7 +728,7 @@ void PV_calc(
     }
   }
  
-  intPV->set_cur(0,0,0,0);
+  intPV->set_cur(0,0,0);
   intPV->put(&(iPVMat[0][0][0]),nTime,nLat,nLon);
   std::cout<<"Finished integrating PV."<<std::endl;
 } 
@@ -741,7 +805,7 @@ void calcDevsPV(bool leap,
 
 //Number of days in IPV
   int nDays = nTime*tRes;
-  std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
+ // std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
 
 
 //Deal with skipped days          
@@ -758,7 +822,7 @@ void calcDevsPV(bool leap,
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
         leapMonth, leapDay, leapHour);
       if (leapMonth==2 && leapDay == 29){
-        std::cout<<"Leap day! Skipping day."<<std::endl;
+      //  std::cout<<"Leap day! Skipping day."<<std::endl;
         t+=nSteps;
       }
     }
@@ -781,7 +845,7 @@ void calcDevsPV(bool leap,
   outTime->set_cur((long) 0);
   outTime->put(&(newTime[0]),nOutTime);
 
-  std::cout<<"About to implement smoothing."<<std::endl;
+ // std::cout<<"About to implement smoothing."<<std::endl;
   double div = (double) 2*nSteps;
   double invDiv = 1.0/div;
 
@@ -802,7 +866,7 @@ void calcDevsPV(bool leap,
     }
   }
 
-  std::cout<<"Finished smoothing."<<std::endl;
+ // std::cout<<"Finished smoothing."<<std::endl;
   outDev->set_cur(0,0,0);
   outDev->put(&(devMat[0][0][0]),nOutTime,nLat,nLon);
   std::cout<<"Wrote devs to file."<<std::endl;
@@ -861,15 +925,16 @@ void stdDev(DataMatrix3D<double>inDevs,
       }
       variance = sigSum/nTime;
       outStdDev[a][b] = std::sqrt(variance);
-      if (a==32 && b== 50){
-        std::cout<<"Standard deviation value: "<<std::sqrt(variance)<<std::endl;
-      }
+    //  if (a==32 && b== 50){
+    //    std::cout<<"Standard deviation value: "<<std::sqrt(variance)<<std::endl;
+   //   }
     }
   }
 }
 
 
 void calcDevsGH(bool leap,
+              double GHAnom,
               int startAvgIndex,
               NcVar *inGH,
               NcVar *outDev,
@@ -940,7 +1005,7 @@ void calcDevsGH(bool leap,
 
 //Number of days in IPV
   int nDays = nTime*tRes;
-  std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
+  //std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
 
 
 //Deal with skipped days          
@@ -952,12 +1017,14 @@ void calcDevsGH(bool leap,
   int leapDay=0;
   int leapHour=0;
 
+  //std::cout<<"Starting avg index is "<<startAvgIndex<<std::endl;
+
   for (int t=0; t<nTime; t++){
     if (leap){
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
         leapMonth, leapDay, leapHour);
       if (leapMonth==2 && leapDay == 29){
-        std::cout<<"Leap day! Skipping day."<<std::endl;
+        //std::cout<<"Leap day! Skipping day."<<std::endl;
         t+=nSteps;
       }
     }
@@ -965,9 +1032,12 @@ void calcDevsGH(bool leap,
       break;
     }
     int nDayIncrease = d/nSteps;
+   // std::cout<<"Number of days increased since start is "<<nDayIncrease<<std::endl;
     int currAvgIndex = startAvgIndex + nDayIncrease;
+    //std::cout<<"Avg index:"<<currAvgIndex<<std::endl;
     if (currAvgIndex>364){
       currAvgIndex-=365;
+    //  std::cout<<"Going back to beginning of average index."<<std::endl;
     }
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
@@ -975,6 +1045,7 @@ void calcDevsGH(bool leap,
       }
     }
     newTime[d] = timeVec[t];
+    //std::cout<<"d,t:"<<d<<","<<t<<std::endl;
     d++;
   }
   outTime->set_cur((long) 0);
@@ -1014,7 +1085,7 @@ void calcDevsGH(bool leap,
         sineRatio = 0.;
       }
       else{
-        denom = std::fabs(std::sin(latVec[a]*pi/180));
+        denom = std::fabs(std::sin(latVec[a]*pi/180.));
         sineRatio = num/denom;
       }
       for (int b=0; b<nLon; b++){
@@ -1032,8 +1103,6 @@ void calcDevsGH(bool leap,
   outADev->put(&(aDevMat[0][0][0]),nOutTime,nLat,nLon);
   std::cout<<"Wrote smoothed devs to file."<<std::endl;
 //Divide matrix by GH anomaly value 
-//We are looking for negative anomalies in NH and positive anomalies in SH
-
 
   DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
   DataMatrix<double> stdDevs(nLat,nLon);
@@ -1048,7 +1117,7 @@ void calcDevsGH(bool leap,
         invAnom = 0.;
       }
       else{
-       invAnom = 1./180.;
+       invAnom = 1./GHAnom;;
       }
       for (int t=0; t<nOutTime; t++){
         pos = aDevMat[t][a][b]*invAnom;
@@ -1077,7 +1146,6 @@ double GHcheck(double z_0,
           double lat_N,
           double lat_S,
           std::string hemi ){
-
   double GHGS;
   double GHGN;
   double gval;
@@ -1151,7 +1219,7 @@ void MissingFill(
 
   int nFill = contCheck/tRes-1;
   int nDaysSkip = int(contCheck-tRes);
-  std::cout<<"ContCheck is " << contCheck << " and tRes is "<<\
+  //std::cout<<"ContCheck is " << contCheck << " and tRes is "<<\
    tRes <<" and nFill is "<<nFill << std::endl;
   for (int n=0; n<nFill; n++){
     for (int a=0; a<nLat; a++){
@@ -1168,7 +1236,7 @@ void MissingFill(
   if (dateIndex >= 365){
     dateIndex-=365;
   }
-  std::cout<<"The new date index is "<<dateIndex<<" at the end of the missing fill."<<std::endl;
+  //std::cout<<"The new date index is "<<dateIndex<<" at the end of the missing fill."<<std::endl;
 }
 
 bool checkFileLeap(
