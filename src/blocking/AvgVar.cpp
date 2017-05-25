@@ -10,6 +10,9 @@
 /*
 This program takes a list of files and variable names. 
 It averages the entire list of files over the time axis
+
+The output file has the same variable name as the input variable,
+but only has the axes [lat,lon]
 */
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"

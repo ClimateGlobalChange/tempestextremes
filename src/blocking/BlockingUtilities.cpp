@@ -22,8 +22,13 @@
 #include <cstring>
 #include <vector>
 
+//////////////////////////////////////
+//    SECTION: FILE OPERATIONS      //
+//////////////////////////////////////
 
-//Copied from StitchBlobs
+//Copied from StitchBlobs: This function
+//takes an input text file list and creates
+//a character string vector of the file names+
 void GetInputFileList(
         const std::string & strInputFileList,
                 std::vector<std::string> & vecInputFiles
@@ -61,9 +66,46 @@ void GetInputFileList(
         fclose(fp);
 }
 
+//////////////////////////////////////
+//    SECTION: TIME OPERATIONS      //
+//////////////////////////////////////
+
+//Used to determine if the input time value
+//is a leap day or not. Returns boolean for
+//that particular time value
+bool checkFileLeap(
+  std::string strTimeUnits,
+  std::string strCalendar,
+  int dateYear,
+  int dateMonth,
+  int dateDay,
+  int dateHour,
+  double timeVal
+){
+
+  bool leap = false;
+
+  int leapYear=0;
+  int leapMonth=0;
+  int leapDay=0;
+  int leapHour=0;
+
+  if (strCalendar!="noleap" && dateMonth<=2){
+    //Check whether file contains a Feb 29
+
+    ParseTimeDouble(strTimeUnits, strCalendar, timeVal, leapYear,\
+      leapMonth, leapDay, leapHour);
+
+    if ((leapMonth==2 && leapDay==29) || (dateMonth==2&&leapMonth==3)){
+      //Check when parsing the indices
+      leap = true;
+    }
+  }
+  return leap;
+}
 
 //Function to get number of day in year
-
+//Returns an integer value in the range 1-365
 int DayInYear(int nMonth, int nDay){
   int day=0;
   if (nMonth>1){
@@ -83,9 +125,10 @@ int DayInYear(int nMonth, int nDay){
   return(day);
 }
 
-
-
-//Copied from DetectCyclones
+//Copied from DetectCyclones: This function
+//takes a time value (in units of hours or 
+//days since reference date) and returns 4
+//integer values: year, month, day, and hour
 void ParseTimeDouble(
 	const std::string & strTimeUnits,
 	const std::string & strTimeCalendar,
@@ -188,13 +231,52 @@ void ParseTimeDouble(
 	//_EXCEPTION();
 }
 
+//Takes the last time value of the previous file
+//and the first time value of the current file
+//and returns the difference in the amount of time 
+//between these two values. Used in BlockingAvg to 
+//check if this value exceeds the time axis resolution
+double tBetweenFiles(
+  std::string strTimeUnits,
+  double nextStartTime,
+  double prevEndTime
+){
+  double contCheck;
+  if ((strTimeUnits.length() >= 11) && \
+    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
+    contCheck = std::fabs(nextStartTime-prevEndTime);
+  }
+  else{
+    contCheck = std::fabs(nextStartTime-prevEndTime)/24.0;
+  }
+  return(contCheck);
+}
 
+//////////////////////////////////////
+//    SECTION: AXIS OPERATIONS      //
+//////////////////////////////////////
 
+//Takes an input file's axis variable and copies
+//relevant attributes to output file's axis variable
+void copy_dim_var(
+	NcVar *inVar, 
+	NcVar *outVar
+	){
+  //Get necessary information from infile
+  int varLen = inVar->get_dim(0)->size();
+  DataVector<double> inVec(varLen);
+  inVar->set_cur((long) 0);
+  inVar->get(&(inVec[0]), varLen);
+  //Copy data to new outgoing variable
+  outVar->set_cur((long) 0);
+  outVar->put(&(inVec[0]), varLen);
+  //Copy other attributes
+  CopyNcVarAttributes(inVar, outVar);
+}
 
-
-
-///////////////////////////////////////////////////////////////////////////////////////
 //Function to interpolate variables from hybrid levels to pressure levels
+//Takes input variable and reference variables hyam,hybm and returns
+//variable with new pressure level axis (specified by pLev)
 void interpolate_lev(NcVar *var, 
                      NcVar *hyam, 
                      NcVar *hybm, 
@@ -271,28 +353,125 @@ void interpolate_lev(NcVar *var,
   CopyNcVarAttributes(var, NewVar);
 }
 
-////////////////////////////////////////////////////////////////////////
+//Function that takes an input variable (with pressure axis as vertical)
+//and averages variable along the pressure dimension from 150-500 hPa. 
+//Returns variable with dimensions [time, lat, lon]
+void VarPressureAvg(
+	NcVar * invar,
+	NcVar * pVals,
+	NcVar * outvar
+){
+	int nTime,nLat,nLon,nPlev;
+	nTime = invar->get_dim(0)->size();
+	nPlev = invar->get_dim(1)->size();
+	nLat = invar->get_dim(2)->size();
+	nLon = invar->get_dim(3)->size();
 
-//Function to copy dimension variables to outfile
-void copy_dim_var(
-	NcVar *inVar, 
-	NcVar *outVar
-	){
-//Get necessary information from infile
-  int varLen = inVar->get_dim(0)->size();
-  DataVector<double> inVec(varLen);
-  inVar->set_cur((long) 0);
-  inVar->get(&(inVec[0]), varLen);
-//Copy data to new outgoing variable
-  outVar->set_cur((long) 0);
-  outVar->put(&(inVec[0]), varLen);
-//Copy other attributes
-  CopyNcVarAttributes(inVar, outVar);
+	//Input into Matrix
+	DataMatrix4D<double> inMat(nTime,nPlev,nLat,nLon);
+	invar->set_cur(0,0,0,0);
+	invar->get(&(inMat[0][0][0][0]),nTime,nPlev,nLat,nLon);
+	
+    //Pressure axis values
+    DataVector<double> pVec(nPlev);
+    pVals->set_cur((long) 0);
+    pVals->get(&(pVec[0]), nPlev);
+
+	
+	//Integrate values over upper troposphere
+    int pos_top;
+    int pos_bot;
+
+    for (int x=0; x<nPlev; x++){
+      if (std::fabs(pVec[x]-15000.0)<0.0001){
+        pos_top = x;
+      }
+      if (std::fabs(pVec[x]-50000.0)<0.0001){
+        pos_bot = x;
+      }
+    }
+   //if level axis starts at ground, reverse positions
+    if (pos_top>pos_bot){
+      int temp = pos_bot;
+      pos_bot = pos_top;
+      pos_top = temp;
+    }
+
+    DataMatrix3D<double> outMat(nTime, nLat, nLon);  
+    double bot,mid,top;
+    double modLevLen = pos_bot-pos_top;
+    double invLevLen = 1.0/(2.0*modLevLen);
+
+    //Calculate integration parts
+    for (int t=0; t<nTime; t++){
+      for (int a=0; a<nLat; a++){
+        for (int b=0; b<nLon; b++){
+          top = inMat[t][pos_top][a][b];
+          bot = inMat[t][pos_bot][a][b];
+          mid = 0.0;
+          for (int p=(pos_top+1); p<pos_bot; p++){
+            mid+=2.0*inMat[t][p][a][b];
+          }
+          outMat[t][a][b] = (top+bot+mid)*invLevLen;
+        }
+      }
+    }
+ 
+    outvar->set_cur(0,0,0);
+    outvar->put(&(outMat[0][0][0]),nTime,nLat,nLon);
+    std::cout<<"Finished integrating variable."<<std::endl;
 }
 
-///////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////
+//    SECTION: INTERMEDIATE VARIABLE CALCULATIONS      //
+/////////////////////////////////////////////////////////
 
-//Function that calculates dlat, don, etc for PV calculation
+//Takes temperature and pressure variables and returns
+//a 4D data matrix (time, lev, lat, lon) with potential 
+//temperature values
+void PT_calc(
+	NcVar *T, 
+	NcVar *pLev, 
+	DataMatrix4D<double> &PTMat
+){
+
+  int nTime,nPlev,nLat,nLon;
+  double pFrac;
+  double exp = 287.0/1004.5;
+
+  nTime = T->get_dim(0)->size();
+  nPlev = T->get_dim(1)->size();
+  nLat = T->get_dim(2)->size();
+  nLon = T->get_dim(3)->size();
+
+  //INPUTS
+  DataMatrix4D<double> TMat(nTime, nPlev, nLat, nLon);
+  DataVector<double> pVec(nPlev);
+
+  T->set_cur(0,0,0,0);
+  T->get(&(TMat[0][0][0][0]), nTime, nPlev, nLat, nLon);
+
+  pLev->set_cur((long) 0);
+  pLev->get(&(pVec[0]), nPlev);
+
+  //OUTPUT: PT
+//  DataMatrix4D<double> PTMat(nTime, nPlev, nLat, nLon);
+  for (int t=0; t<nTime; t++){
+    for (int p=0; p<nPlev; p++){
+      pFrac = 100000.0/pVec[p];
+      for (int a=0; a<nLat; a++){
+        for (int b=0; b<nLon; b++){
+          PTMat[t][p][a][b] = TMat[t][p][a][b]*std::pow(pFrac, exp);
+        }
+      }
+    }
+  }
+  std::cout<<"Finished calculating PT."<<std::endl;
+}
+
+//Used in BlockingPV. Input lat, lon, and pressure variables
+//and returns the variables necessary to calculate PV (dlat,
+//dlon, vector of coriolis parameter values,etc)
 void pv_vars_calc(
   NcVar *lat,
   NcVar *lon,
@@ -339,51 +518,10 @@ void pv_vars_calc(
     cosphi[i] = std::cos(latVec[i]*inv_radian);
   }
 }
-/////////////////////////////////////////////////////////////////
 
-//Function that calculates PT
-void PT_calc(
-	NcVar *T, 
-	NcVar *pLev, 
-	DataMatrix4D<double> &PTMat
-){
-
-  int nTime,nPlev,nLat,nLon;
-  double pFrac;
-  double exp = 287.0/1004.5;
-
-  nTime = T->get_dim(0)->size();
-  nPlev = T->get_dim(1)->size();
-  nLat = T->get_dim(2)->size();
-  nLon = T->get_dim(3)->size();
-
-  //INPUTS
-  DataMatrix4D<double> TMat(nTime, nPlev, nLat, nLon);
-  DataVector<double> pVec(nPlev);
-
-  T->set_cur(0,0,0,0);
-  T->get(&(TMat[0][0][0][0]), nTime, nPlev, nLat, nLon);
-
-  pLev->set_cur((long) 0);
-  pLev->get(&(pVec[0]), nPlev);
-
-  //OUTPUT: PT
-//  DataMatrix4D<double> PTMat(nTime, nPlev, nLat, nLon);
-  for (int t=0; t<nTime; t++){
-    for (int p=0; p<nPlev; p++){
-      pFrac = 100000.0/pVec[p];
-      for (int a=0; a<nLat; a++){
-        for (int b=0; b<nLon; b++){
-          PTMat[t][p][a][b] = TMat[t][p][a][b]*std::pow(pFrac, exp);
-        }
-      }
-    }
-  }
-  std::cout<<"Finished calculating PT."<<std::endl;
-}
-///////////////////////////////////////////////////////////////////////
-
-//Function that calculates relative vorticity
+//Takes wind variables, phi/lambda resolution and coriolis values
+//and returns a 4D data matrix (time, lev, lat, lon) with relative 
+//vorticity values
 void rVort_calc(
 	NcVar *U,
 	NcVar *V,
@@ -472,75 +610,14 @@ void rVort_calc(
   std::cout<<"Finished calculating relative vorticity."<<std::endl;
 }
 
+//////////////////////////////////////////////////
+//    SECTION: FINAL VARIABLE CALCULATIONS      //
+//////////////////////////////////////////////////
 
-void VarPressureAvg(
-	NcVar * invar,
-	NcVar * pVals,
-	NcVar * outvar
-){
-	int nTime,nLat,nLon,nPlev;
-	nTime = invar->get_dim(0)->size();
-	nPlev = invar->get_dim(1)->size();
-	nLat = invar->get_dim(2)->size();
-	nLon = invar->get_dim(3)->size();
-
-	//Input into Matrix
-	DataMatrix4D<double> inMat(nTime,nPlev,nLat,nLon);
-	invar->set_cur(0,0,0,0);
-	invar->get(&(inMat[0][0][0][0]),nTime,nPlev,nLat,nLon);
-	
-    //Pressure axis values
-    DataVector<double> pVec(nPlev);
-    pVals->set_cur((long) 0);
-    pVals->get(&(pVec[0]), nPlev);
-
-	
-	//Integrate values over upper troposphere
-    int pos_top;
-    int pos_bot;
-
-    for (int x=0; x<nPlev; x++){
-      if (std::fabs(pVec[x]-15000.0)<0.0001){
-        pos_top = x;
-      }
-      if (std::fabs(pVec[x]-50000.0)<0.0001){
-        pos_bot = x;
-      }
-    }
-   //if level axis starts at ground, reverse positions
-    if (pos_top>pos_bot){
-      int temp = pos_bot;
-      pos_bot = pos_top;
-      pos_top = temp;
-    }
-
-    DataMatrix3D<double> outMat(nTime, nLat, nLon);  
-    double bot,mid,top;
-    double modLevLen = pos_bot-pos_top;
-    double invLevLen = 1.0/(2.0*modLevLen);
-
-    //Calculate integration parts
-    for (int t=0; t<nTime; t++){
-      for (int a=0; a<nLat; a++){
-        for (int b=0; b<nLon; b++){
-          top = inMat[t][pos_top][a][b];
-          bot = inMat[t][pos_bot][a][b];
-          mid = 0.0;
-          for (int p=(pos_top+1); p<pos_bot; p++){
-            mid+=2.0*inMat[t][p][a][b];
-          }
-          outMat[t][a][b] = (top+bot+mid)*invLevLen;
-        }
-      }
-    }
- 
-    outvar->set_cur(0,0,0);
-    outvar->put(&(outMat[0][0][0]),nTime,nLat,nLon);
-    std::cout<<"Finished integrating variable."<<std::endl;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-
+//Takes 4D variables for wind, potential temperature,
+//relative vorticity, etc and outputs both 4D (time,
+//lev, lat, lon) and 3D (time, lat, lon) vertically 
+//averaged potential vorticity variables
 void PV_calc(
 	NcVar *U, 
 	NcVar *V, 
@@ -555,8 +632,6 @@ void PV_calc(
     double lon_res,
 	NcVar *PV,
     NcVar *intPV){
-
-
   int nTime,nPlev,nLat,nLon;
   double invdp,invdp1,invdp2;
   double invdphi= 1.0/(2.0*dphi);
@@ -732,8 +807,15 @@ void PV_calc(
   intPV->put(&(iPVMat[0][0][0]),nTime,nLat,nLon);
   std::cout<<"Finished integrating PV."<<std::endl;
 } 
-//////////////////////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////
+//    SECTION: VARIABLE ANOMALY CALCULATIONS      //
+////////////////////////////////////////////////////
+
+//Takes vertically averaged instantaneous PV and long term 
+//daily average PV and outputs 3 variables: instantaneous 
+//anomalies, anomalies with 2-day smoothing, and a normalized
+//anomaly (all values below threshold or wrong sign set to 0)
 void calcDevsPV(bool leap,
               int startAvgIndex,
               NcVar *inIPV,
@@ -1173,21 +1255,7 @@ double GHcheck(double z_0,
 }
 
 
-double tBetweenFiles(
-  std::string strTimeUnits,
-  double nextStartTime,
-  double prevEndTime
-){
-  double contCheck;
-  if ((strTimeUnits.length() >= 11) && \
-    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
-    contCheck = std::fabs(nextStartTime-prevEndTime);
-  }
-  else{
-    contCheck = std::fabs(nextStartTime-prevEndTime)/24.0;
-  }
-  return(contCheck);
-}
+
 
 bool missingValCheck(
   DataMatrix3D<double> fillData,
@@ -1239,33 +1307,4 @@ void MissingFill(
   //std::cout<<"The new date index is "<<dateIndex<<" at the end of the missing fill."<<std::endl;
 }
 
-bool checkFileLeap(
-  std::string strTimeUnits,
-  std::string strCalendar,
-  int dateYear,
-  int dateMonth,
-  int dateDay,
-  int dateHour,
-  double timeVal
-){
 
-  bool leap = false;
-
-  int leapYear=0;
-  int leapMonth=0;
-  int leapDay=0;
-  int leapHour=0;
-
-  if (strCalendar!="noleap" && dateMonth<=2){
-    //Check whether file contains a Feb 29
-
-    ParseTimeDouble(strTimeUnits, strCalendar, timeVal, leapYear,\
-      leapMonth, leapDay, leapHour);
-
-    if ((leapMonth==2 && leapDay==29) || (dateMonth==2&&leapMonth==3)){
-      //Check when parsing the indices
-      leap = true;
-    }
-  }
-  return leap;
-}
