@@ -30,6 +30,7 @@ the average file.
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
+#include <complex>
 
 int main(int argc, char ** argv){
   try{
@@ -52,9 +53,6 @@ int main(int argc, char ** argv){
 		if (avgFile==""){
 			_EXCEPTIONT("No average file name provided.");
 		}
-    if (outFile==""){
-      _EXCEPTIONT("Need to provide output file name.");
-    }
     if (varName==""){
       _EXCEPTIONT("Need to provide input variable name (--varname).");
     }
@@ -72,25 +70,27 @@ int main(int argc, char ** argv){
     }
     //axis lengths
     int latLen,lonLen,dLen;
-    latLen = readin.get_dim(latname.c_str())->size();
-    lonLen = readin.get_dim(lonname.c_str())->size();
-		dLen = readin.get_dim(tname.c_str())->size();
+  
+    NcDim *latDim = avgin.get_dim(latname.c_str());
+    latLen = latDim->size();
+    NcDim *lonDim = avgin.get_dim(lonname.c_str());
+    lonLen = lonDim->size();
+    NcDim *dDim = avgin.get_dim(tname.c_str());
+    dLen = dDim->size();
 		
-		//Read in the matrix of average Z500 values
-		NcVar *avgVar = avgin.get_var(avgName.c_str());
-		DataMatrix3D<double> avgMat(dLen,latLen,lonLen);
-		avgVar->set_cur(0,0,0);
-		avgVar->get(&(avgMat[0][0][0]),dLen,latLen,lonLen);
-		
-		
-		
+    //Read in the matrix of average Z500 values
+    NcVar *avgVar = avgin.get_var(avgName.c_str());
+    DataMatrix3D<double> avgMat(dLen,latLen,lonLen);
+    avgVar->set_cur(0,0,0);
+    avgVar->get(&(avgMat[0][0][0]),dLen,latLen,lonLen);
+				
     //Open up the first file
     NcFile readin(vecFiles[0].c_str());
     if (!readin.is_valid()){
       _EXCEPTION1("Unable to open file %s for reading",vecFiles[0].c_str());
     }
-		int tLen;
-		tLen = readin.get(dim(tname.c_str()))->size();
+    int tLen;
+    tLen = readin.get_dim(tname.c_str())->size();
     //Initialize storage array: day, lat, lon
     DataMatrix3D<double> storeMat(dLen,latLen,lonLen);
     //Initialize counts array: day, lat, lon
@@ -153,8 +153,8 @@ int main(int argc, char ** argv){
           //std::cout<<"Day index is "<<dayIndex<<std::endl;
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
-							avgValue = avgMat[dayIndex][a][b];
-							currDev = inputData[t][a][b]-avgValue;
+              avgValue = avgMat[dayIndex][a][b];
+              currDev = inputData[t][a][b]-avgValue;
               storeMat[dayIndex][a][b]+= (currDev*currDev);
               countsMat[dayIndex][a][b]+= 1.;
             }
@@ -163,18 +163,52 @@ int main(int argc, char ** argv){
       }
       readin.close();
     }
-		//Calculating 1.5*SD
-		for (int d=0;d<dLen;d++){
-			for (int a=0;a<latLen;a++){
-				for (int b=0;b<lonLen;b++){
-					storeMat[d][a][b]=(1.5*std::sqrt(storeMat[d][a][b]/countsMat[d][a][b]));
-				}
-			}
-		}
-		
-		//Check if the NetCDF variable already exists in the file
-		
-		
-		
+    //Calculating 1.5*SD
+    for (int d=0;d<dLen;d++){
+      for (int a=0;a<latLen;a++){
+        for (int b=0;b<lonLen;b++){
+          storeMat[d][a][b]=(1.5*std::sqrt(storeMat[d][a][b]/countsMat[d][a][b]));
 	}
+      }
+    }
+		
+    //Check if the NetCDF variable already exists in the file
+    NcVar *checkThresh = avgin.get_var("THRESHOLD_Z");
+    if (!checkThresh->is_valid()){
+      checkThresh = avgin.add_var("THRESHOLD_Z",ncDouble,dDim,latDim,lonDim);      
+    }
+    checkThresh->set_cur(0,0,0);
+    checkThresh->put(&(storeMat[0][0][0]),dLen,latLen,lonLen);		
+
+    //Just for fun... the DFT of the SDs
+    std::vector<double> inputDaily(dLen);
+    std::vector<std::complex<double> >FourierCoefs(dLen);
+    std::vector<double>outputDaily(dLen);
+    DataMatrix3D<double> outputMat(dLen,latLen,lonLen);
+
+    for (int a=0; a<latLen; a++){
+      for (int b=0; b<lonLen; b++){
+        for (int d=0; d<dLen; d++){
+          inputDaily[d] = storeMat[d][a][b];
+        }
+        FourierCoefs = DFT(inputDaily,6);
+        outputDaily = IDFT(FourierCoefs);
+        for (int d=0; d<dLen; d++){
+          outputMat[d][a][b] = outputDaily[d];
+        }
+      }
+    }
+
+    NcVar *checkDFTThresh = avgin.get_var("THRESHOLD_Z_DFT");
+    if (!checkDFTThresh->is_valid()){
+      checkDFTThresh = avgin.add_var("THRESHOLD_Z_DFT",ncDouble,dDim,latDim,lonDim);
+    }
+    checkDFTThresh->set_cur(0,0,0);
+    checkDFTThresh->put(&(outputMat[0][0][0]),dLen,latLen,lonLen);
+
+    avgin.close();
+  }
+  catch (Exception &e){
+    std::cout<<e.ToString()<<std::endl;
+  }
 }
