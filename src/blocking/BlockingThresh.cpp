@@ -34,10 +34,11 @@ the average file.
 
 int main(int argc, char ** argv){
   try{
-    std::string fileList,avgName,avgFile,varName,tname,latname,lonname;
+    std::string outFile,fileList,avgName,avgFile,varName,tname,latname,lonname;
     BeginCommandLine()
+      CommandLineString(outFile,"outfile","");
       CommandLineString(fileList,"inlist","");
-			CommandLineString(avgFile,"avgfile","");
+      CommandLineString(avgFile,"avgfile","");
       CommandLineString(avgName,"avgname","");
       CommandLineString(varName,"varname","");
       CommandLineString(tname,"tname","time");
@@ -59,12 +60,15 @@ int main(int argc, char ** argv){
     if (avgName == ""){
       _EXCEPTIONT("Need to provide input average variable name (--avgname).");
     }
+    if (outFile==""){
+      _EXCEPTIONT("Need to provide output file name.");
+    }
     std::vector<std::string> vecFiles;
     GetInputFileList(fileList,vecFiles);
     int nFiles = vecFiles.size();
 		
-		//Open up the averages file
-		NcFile avgin(avgFile.c_str());
+    //Open up the averages file
+    NcFile avgin(avgFile.c_str());
     if (!avgin.is_valid()){
       _EXCEPTION1("Unable to open file %s for reading",avgFile.c_str());
     }
@@ -173,10 +177,31 @@ int main(int argc, char ** argv){
     }
 		
     //Check if the NetCDF variable already exists in the file
-    NcVar *checkThresh = avgin.get_var("THRESHOLD_Z");
-    if (!checkThresh->is_valid()){
+ 
+    /*std::cout<<"About to write new variables"<<std::endl;
+    NcBool exists_var = avgin.get_var("THRESHOLD_Z")->is_valid();
+    std::cout<<"The status of the variable is "<<exists_var<<std::endl;
+    NcVar *checkThresh;
+    if (avgin.get_var("THRESHOLD_Z")->is_valid()==false){
+      std::cout<<"Adding new threshold variable."<<std::endl;
       checkThresh = avgin.add_var("THRESHOLD_Z",ncDouble,dDim,latDim,lonDim);      
-    }
+    }else{
+      checkThresh = avgin.get_var("THRESHOLD_Z");
+    }*/
+
+    NcFile fileout(outFile.c_str(),NcFile::Replace,NULL,0,NcFile::Offset64Bits);
+    NcDim *outTime = fileout.add_dim(tname.c_str(),dLen);
+    NcDim *outLat = fileout.add_dim(latname.c_str(),latLen);
+    NcDim *outLon = fileout.add_dim(lonname.c_str(),lonLen);
+    NcVar *outTvar = fileout.add_var(tname.c_str(),ncDouble,outTime);
+    NcVar *outLatvar = fileout.add_var(latname.c_str(),ncDouble,outLat);
+    NcVar *outLonvar = fileout.add_var(lonname.c_str(),ncDouble,outLon);
+
+    copy_dim_var(avgin.get_var(tname.c_str()),outTvar);
+    copy_dim_var(avgin.get_var(latname.c_str()),outLatvar);
+    copy_dim_var(avgin.get_var(lonname.c_str()),outLonvar);
+
+    NcVar *checkThresh = fileout.add_var("THRESHOLD",ncDouble,outTime,outLat,outLon);
     checkThresh->set_cur(0,0,0);
     checkThresh->put(&(storeMat[0][0][0]),dLen,latLen,lonLen);		
 
@@ -198,15 +223,20 @@ int main(int argc, char ** argv){
         }
       }
     }
-
-    NcVar *checkDFTThresh = avgin.get_var("THRESHOLD_Z_DFT");
-    if (!checkDFTThresh->is_valid()){
+    
+    NcVar *checkDFTThresh = fileout.add_var("THRESHOLD_DFT",ncDouble,outTime,outLat,outLon);
+  /*  if (avgin.get_var("THRESHOLD_Z_DFT")->is_valid()==false){
+      std::cout<<"Adding new DFT threshold variable."<<std::endl;
       checkDFTThresh = avgin.add_var("THRESHOLD_Z_DFT",ncDouble,dDim,latDim,lonDim);
     }
+    else{
+      checkDFTThresh = avgin.get_var("THRESHOLD_Z_DFT");
+    }*/
     checkDFTThresh->set_cur(0,0,0);
     checkDFTThresh->put(&(outputMat[0][0][0]),dLen,latLen,lonLen);
 
     avgin.close();
+    fileout.close();
   }
   catch (Exception &e){
     std::cout<<e.ToString()<<std::endl;
