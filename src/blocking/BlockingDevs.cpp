@@ -38,9 +38,12 @@ int main(int argc, char **argv){
     std::string avgName;
     std::string varName;
     std::string avgVarName;
+    std::string threshName;
+    std::string threshVarName;
     std::string tname,latname,lonname;
     bool PVCalc;
     bool GHCalc;
+    bool const_thresh;
 
 
     BeginCommandLine()
@@ -48,8 +51,11 @@ int main(int argc, char **argv){
       CommandLineString(varName,"varname","");
       CommandLineString(avgName, "avg", "");
       CommandLineString(avgVarName, "avgname","");
+      CommandLineString(threshName,"thresh","");
+      CommandLineString(threshVarName,"threshname","");
       CommandLineBool(PVCalc,"pv");
       CommandLineBool(GHCalc,"gh");
+      CommandLineBool(const_thresh,"const");
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
@@ -63,8 +69,12 @@ int main(int argc, char **argv){
   
 
    int nFiles,avgTime,nTime,nLat,nLon;
-   double anomVal = 1.3*std::pow(10,-6);
-   double GHVal = 170.;
+   double anomVal;
+   if (PVCalc){
+     anomVal = 1.3*std::pow(10,-6);
+   }else if (GHCalc){
+     anomVal = 170.;
+   }
    //Create list of input files
     std::vector<std::string> InputFiles;
     GetInputFileList(fileList, InputFiles);
@@ -81,19 +91,49 @@ int main(int argc, char **argv){
 	if (dimTime == NULL) {
 		_EXCEPTION1("\"%s\" is missing dimension \"time\"", avgName.c_str());
 	}
-
     avgTime = dimTime->size();
     NcVar *avgTimeVals = avgFile.get_var(tname.c_str());
    	if (avgTimeVals == NULL) {
 		_EXCEPTION1("\"%s\" is missing variable \"time\"", avgName.c_str());
 	}
-
+    
     //averaged var
     NcVar *AvarData = avgFile.get_var(avgVarName.c_str());
    	if (AvarData == NULL) {
 		_EXCEPTION2("\"%s\" is missing variable \"%s\"", avgName.c_str(), avgVarName.c_str());
 	}
+    int dim1 = AvarData->get_dim(0)->size();
+    int dim2 = AvarData->get_dim(1)->size();
+    int dim3 = AvarData->get_dim(2)->size();    
+    //Initialize a matrix. If constant, it will be filled with anom values, else it will hold the 
+    //threshold values
 
+    DataMatrix3D <double> threshMat(dim1,dim2,dim3);
+
+    if (!const_thresh){
+      //Open threshold values file
+
+      NcFile threshFile(threshName.c_str());
+      if (!threshFile.is_valid()){
+        _EXCEPTION1("Cannot open NetCDF file %s",threshName.c_str());
+      }
+
+      NcVar *threshVar = threshFile.get_var(threshVarName.c_str());
+      if (threshVar == NULL){
+        _EXCEPTION2("%s is missing variable %s",threshName.c_str(),threshVarName.c_str());
+      }
+      threshVar->set_cur(0,0,0);
+      threshVar->get(&(threshMat[0][0][0]),dim1,dim2,dim3);
+      threshfile.close();
+    }else{
+      for (int a=0; a<dim1; a++){
+        for (int b=0; b<dim2; b++){
+          for (int c=0; c<dim3; c++){
+            threshMat[a][b][c] = anomVal;
+          }
+        }
+      }
+    }
     //Open var files
 
     for (int x=0; x<nFiles; x++){
@@ -210,14 +250,14 @@ int main(int argc, char **argv){
         NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
 
         calcDevsPV(leap, startIndex, varData, devOut, aDevOut, devIntOut, AvarData, inTime,\
-        avgTimeVals, inLat, tVarOut, anomVal);
+        avgTimeVals, inLat, tVarOut, threshMat);
       }
       else if (GHCalc){
         NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);
         NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
-        calcDevsGH(leap,GHVal, startIndex, varData, devOut,aDevOut,devIntOut,AvarData,inTime,avgTimeVals,inLat,tVarOut,stdDevOut);
+        calcDevsGH(leap,threshMat, startIndex, varData, devOut,aDevOut,devIntOut,AvarData,inTime,avgTimeVals,inLat,tVarOut,stdDevOut);
         std::cout<<"Finished writing to file "<<strOutFile.c_str()<<std::endl;
       }
       else{

@@ -147,6 +147,16 @@ int main(int argc, char ** argv){
       }
     }
     //std::cout<<"Divided values to get average."<<std::endl;
+
+    DataMatrix <double> zonalAvgMat(yearLen,latLen);
+    for (int d=0; d<yearLen; d++){
+      for (int a=0; a<latLen; a++){
+        for (int b=0; b<lonLen; b++){
+          zonalAvgMat[d][a]+=storeMat[d][a][b]/lonLen;
+        }
+      }
+    }
+
     std::vector<double> inputDaily(yearLen);
     std::vector<std::complex <double> > FourierCoefs(yearLen);
     std::vector<double> outputDaily(yearLen);
@@ -154,13 +164,13 @@ int main(int argc, char ** argv){
     //Matrix for the transformed Fourier value
     //Calculate at each lat,lon
     for (int a=0; a<latLen; a++){
-      for (int b=0; b<lonLen; b++){
-        for (int d=0; d<yearLen; d++){
-          inputDaily[d] = storeMat[d][a][b];
-        }
-        FourierCoefs = DFT(inputDaily, nWaves);
-        outputDaily = IDFT(FourierCoefs);
-        for (int d=0; d<yearLen; d++){
+      for (int d=0; d<yearLen; d++){
+        inputDaily[d] = zonalAvgMat[d][a];
+      }
+      FourierCoefs = DFT(inputDaily, nWaves);
+      outputDaily = IDFT(FourierCoefs);
+      for (int d=0; d<yearLen; d++){
+        for (int b=0; b<lonLen; b++){
           outputMat[d][a][b] = outputDaily[d];
         }
       }

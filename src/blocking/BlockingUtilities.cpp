@@ -827,7 +827,7 @@ void calcDevsPV(bool leap,
               NcVar *avgTime,
               NcVar *lat,
               NcVar *outTime,
-              double PVAnom){
+              DataMatrix3D threshMat){
 
   int nTime,nLat,nLon,nSteps,avgDay,nOutTime;
   double tRes;
@@ -836,11 +836,11 @@ void calcDevsPV(bool leap,
   nLat = inIPV->get_dim(1)->size();
   nLon = inIPV->get_dim(2)->size();
 
-//keep sign consistent!
+/*//keep sign consistent!
   if (PVAnom<0){
     PVAnom = -PVAnom;
   }
-
+*/
 //input IPV
   DataMatrix3D<double> IPVMat(nTime,nLat,nLon);
   inIPV->set_cur(0,0,0);
@@ -963,11 +963,19 @@ void calcDevsPV(bool leap,
   lat->get(&(latVec[0]),nLat);
 
   DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
-  double invAnom = 1.0/PVAnom;
+  double invAnom;
   double divDev,pos,neg;
+  int threshIndex;
+  int nPastStart = 0;
+  int dPastStart = 0;
   for (int t=0; t<nOutTime; t++){
+    threshIndex = startAvgIndex + dPastStart;
+    if (threshIndex > 364){
+      threshIndex-=365;
+    }
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
+        invAnom = 1./threshMat[threshIndex][a][b];
         divDev = aDevMat[t][a][b]*invAnom;
         //SH: positive anomalies
         if (latVec[a]<0){
@@ -981,6 +989,8 @@ void calcDevsPV(bool leap,
         }
       }
     }
+    nPastStart+=1;
+    dPastStart = nPastStart/nSteps;;
   }
   outPosIntDev->set_cur(0,0,0);
   outPosIntDev->put(&(posIntDevs[0][0][0]),nOutTime,nLat,nLon);

@@ -198,7 +198,7 @@ void calcDevsPV(bool leap,
               NcVar *avgTime,
               NcVar *lat,
               NcVar *outTime,
-              double PVAnom);
+              DataMatrix3D threshMat);
 
 void stdDev(DataMatrix3D<double>inDevs,
               int nTime,
