@@ -124,7 +124,7 @@ int main(int argc, char **argv){
       }
       threshVar->set_cur(0,0,0);
       threshVar->get(&(threshMat[0][0][0]),dim1,dim2,dim3);
-      threshfile.close();
+      threshFile.close();
     }else{
       for (int a=0; a<dim1; a++){
         for (int b=0; b<dim2; b++){
@@ -249,15 +249,16 @@ int main(int argc, char **argv){
         NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
 
-        calcDevsPV(leap, startIndex, varData, devOut, aDevOut, devIntOut, AvarData, inTime,\
+        calcDevs(leap,true, startIndex, varData, devOut, aDevOut, devIntOut, AvarData, inTime,\
         avgTimeVals, inLat, tVarOut, threshMat);
       }
       else if (GHCalc){
         NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);
-        NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
-        calcDevsGH(leap,threshMat, startIndex, varData, devOut,aDevOut,devIntOut,AvarData,inTime,avgTimeVals,inLat,tVarOut,stdDevOut);
+//        NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
+        calcDevs(leap,false, startIndex, varData, devOut,aDevOut,devIntOut,AvarData,inTime,\
+          avgTimeVals,inLat,tVarOut,threshMat);
         std::cout<<"Finished writing to file "<<strOutFile.c_str()<<std::endl;
       }
       else{

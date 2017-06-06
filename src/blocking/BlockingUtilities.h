@@ -156,72 +156,12 @@ void rVort_calc(
         DataMatrix4D<double> & RVMat
 );
 
-//////////////////////////////////////////////////
-//    SECTION: FINAL VARIABLE CALCULATIONS      //
-//////////////////////////////////////////////////
 
-//Takes 4D variables for wind, potential temperature,
-//relative vorticity, etc and outputs both 4D (time,
-//lev, lat, lon) and 3D (time, lat, lon) vertically 
-//averaged potential vorticity variables
-void PV_calc(
-        NcVar *U,
-        NcVar *V,
-        DataMatrix4D<double> PTMat,
-        DataMatrix4D<double> RVMat,
-        NcVar *pVals,
-        DataVector<double> coriolis,
-        DataVector<double> cosphi,
-        double dphi,
-        double dlambda,
-        double lat_res,
-        double lon_res,
-        NcVar *PV,
-        NcVar *intPV);
-
-////////////////////////////////////////////////////
-//    SECTION: VARIABLE ANOMALY CALCULATIONS      //
-////////////////////////////////////////////////////
-
-//Takes vertically averaged instantaneous PV and long term 
-//daily average PV and outputs 3 variables: instantaneous 
-//anomalies, anomalies with 2-day smoothing, and a normalized
-//anomaly (all values below threshold or wrong sign set to 0)
-void calcDevsPV(bool leap,
-              int startAvgIndex,
-              NcVar *inIPV,
-              NcVar *outDev,
-              NcVar *outADev,
-              NcVar *outPosIntDev,
-              NcVar *avgIPV,
-              NcVar *inTime,
-              NcVar *avgTime,
-              NcVar *lat,
-              NcVar *outTime,
-              DataMatrix3D threshMat);
-
-void stdDev(DataMatrix3D<double>inDevs,
-              int nTime,
-              int nLat,
-              int nLon,
-              DataMatrix<double> & outStdDev);
+//////////////////////////////////////
+//    SECTION: VARIABLE CHECKS      //
+//////////////////////////////////////
 
 
-void calcDevsGH(bool leap,
-              double GHAnom,
-              int startAvgIndex,
-              NcVar *inGH,
-              NcVar *outDev,
-              NcVar *outADev,
-              NcVar *outIntDev,
-              NcVar *avgGH,
-              NcVar *inTime,
-              NcVar *avgTime,
-              NcVar *lat,
-              NcVar *outTime,
-              NcVar *stdDevVar);
-
-//Function that calculates TM blocking index
 double GHcheck(double z_0,
           double z_N,
           double z_S,
@@ -252,6 +192,73 @@ void MissingFill(
   DataMatrix3D<double> & currFillData
 );
 
+//////////////////////////////////////////////////
+//    SECTION: FINAL VARIABLE CALCULATIONS      //
+//////////////////////////////////////////////////
+
+//Takes 4D variables for wind, potential temperature,
+//relative vorticity, etc and outputs both 4D (time,
+//lev, lat, lon) and 3D (time, lat, lon) vertically 
+//averaged potential vorticity variables
+void PV_calc(
+        NcVar *U,
+        NcVar *V,
+        DataMatrix4D<double> PTMat,
+        DataMatrix4D<double> RVMat,
+        NcVar *pVals,
+        DataVector<double> coriolis,
+        DataVector<double> cosphi,
+        double dphi,
+        double dlambda,
+        double lat_res,
+        double lon_res,
+        NcVar *PV,
+        NcVar *intPV);
+
+////////////////////////////////////////////////////
+//    SECTION: VARIABLE ANOMALY CALCULATIONS      //
+////////////////////////////////////////////////////
+
+//Takes instantaneous variable (PV or Z) and long term 
+//daily average and outputs 3 variables: instantaneous 
+//anomalies, anomalies with 2-day smoothing, and a normalized
+//anomaly (all values below threshold or wrong sign set to 0)
+void calcDevs(bool leap,
+              bool inPV,
+              int startAvgIndex,
+              NcVar *inIPV,
+              NcVar *outDev,
+              NcVar *outADev,
+              NcVar *outPosIntDev,
+              NcVar *avgIPV,
+              NcVar *inTime,
+              NcVar *avgTime,
+              NcVar *lat,
+              NcVar *outTime,
+              DataMatrix3D<double> threshMat);
+
+/*void stdDev(DataMatrix3D<double>inDevs,
+              int nTime,
+              int nLat,
+              int nLon,
+              DataMatrix<double> & outStdDev);
+
+
+void calcDevsGH(bool leap,
+              double GHAnom,
+              int startAvgIndex,
+              NcVar *inGH,
+              NcVar *outDev,
+              NcVar *outADev,
+              NcVar *outIntDev,
+              NcVar *avgGH,
+              NcVar *inTime,
+              NcVar *avgTime,
+              NcVar *lat,
+              NcVar *outTime,
+              NcVar *stdDevVar);
+*/
+//Function that calculates TM blocking index
 
 
 

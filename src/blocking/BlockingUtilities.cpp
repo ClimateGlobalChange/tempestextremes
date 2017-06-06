@@ -610,6 +610,98 @@ void rVort_calc(
   std::cout<<"Finished calculating relative vorticity."<<std::endl;
 }
 
+//////////////////////////////////////
+//    SECTION: VARIABLE CHECKS      //
+//////////////////////////////////////
+
+
+double GHcheck(double z_0,
+          double z_N,
+          double z_S,
+          double lat_0,
+          double lat_N,
+          double lat_S,
+          std::string hemi ){
+  double GHGS;
+  double GHGN;
+  double gval;
+  //NH: GHGS>0, GHGN<-10m/deg lat
+  if (hemi =="N"){
+    GHGS = (z_0-z_S)/(lat_0-lat_S);
+    GHGN = (z_N-z_0)/(lat_N-lat_0);
+
+    if ((GHGS>0) && (GHGN < -10)){
+      gval=1.;
+    }
+    else gval=0.;
+  //SH: GHGN>0,GHGS<-10m/deg lat
+  }else if (hemi=="S"){
+    GHGS =-(z_S-z_0)/(lat_S-lat_0);
+    GHGN =-(z_0-z_N)/(lat_0-lat_N);
+
+    if ((GHGN>0) && (GHGS<-10)){
+      gval=1.;
+    }
+    else gval=0.;
+  }
+  else std::cout << "Error: invalid hemisphere specified."<<std::endl;
+  return(gval);
+}
+
+
+
+
+bool missingValCheck(
+  DataMatrix3D<double> fillData,
+  int nTime,
+  double missingNum
+){
+    bool isMissing = false;
+    for (int t=0; t<nTime; t++){
+      if (fillData[t][2][2] == missingNum){
+        isMissing = true;
+        break;
+      }
+    }
+    if (isMissing == false) std::cout << "Did not find missing values."<<std::endl;
+    return isMissing;
+}
+
+void MissingFill(
+  double missingValue,
+  double tRes,
+  double contCheck,
+  int nLat,
+  int nLon,
+  int arrLen,
+  int & currArrIndex,
+  int & dateIndex,
+  DataMatrix3D<double> & currFillData
+){
+
+  int nFill = contCheck/tRes-1;
+  int nDaysSkip = int(contCheck-tRes);
+  //std::cout<<"ContCheck is " << contCheck << " and tRes is "<<\
+   tRes <<" and nFill is "<<nFill << std::endl;
+  for (int n=0; n<nFill; n++){
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        currFillData[currArrIndex][a][b] = missingValue;
+      } 
+    }
+    currArrIndex +=1;
+    if (currArrIndex >= arrLen){
+      currArrIndex -= arrLen;
+    }
+  }
+  dateIndex += nDaysSkip;
+  if (dateIndex >= 365){
+    dateIndex-=365;
+  }
+  //std::cout<<"The new date index is "<<dateIndex<<" at the end of the missing fill."<<std::endl;
+}
+
+
 //////////////////////////////////////////////////
 //    SECTION: FINAL VARIABLE CALCULATIONS      //
 //////////////////////////////////////////////////
@@ -812,11 +904,12 @@ void PV_calc(
 //    SECTION: VARIABLE ANOMALY CALCULATIONS      //
 ////////////////////////////////////////////////////
 
-//Takes vertically averaged instantaneous PV and long term 
-//daily average PV and outputs 3 variables: instantaneous 
+//Takes vertically averaged variable (PV or Z) and long term 
+//daily average and outputs 3 variables: instantaneous 
 //anomalies, anomalies with 2-day smoothing, and a normalized
 //anomaly (all values below threshold or wrong sign set to 0)
-void calcDevsPV(bool leap,
+void calcDevs(bool leap,
+              bool isPV,
               int startAvgIndex,
               NcVar *inIPV,
               NcVar *outDev,
@@ -827,15 +920,20 @@ void calcDevsPV(bool leap,
               NcVar *avgTime,
               NcVar *lat,
               NcVar *outTime,
-              DataMatrix3D threshMat){
+              DataMatrix3D<double> threshMat){
 
   int nTime,nLat,nLon,nSteps,avgDay,nOutTime;
   double tRes;
+
+  double pi = std::atan(1.)*4.;
 
   nTime = inIPV->get_dim(0)->size();
   nLat = inIPV->get_dim(1)->size();
   nLon = inIPV->get_dim(2)->size();
 
+  DataVector<double> latVec(nLat);
+  lat->set_cur((long) 0);
+  lat->get(&(latVec[0]),nLat);
 /*//keep sign consistent!
   if (PVAnom<0){
     PVAnom = -PVAnom;
@@ -949,6 +1047,29 @@ void calcDevsPV(bool leap,
   }
 
  // std::cout<<"Finished smoothing."<<std::endl;
+
+  if (!isPV){
+    double num = std::sin(45*pi/180);
+    double denom, sineRatio;
+    //Multiply values by sine factor
+    for (int t=0; t<nOutTime; t++){
+      for (int a=0; a<nLat; a++){
+        if ((latVec[a] < 25. && latVec[a] > -25.)\
+          || latVec[a] > 75. || latVec[a] < -75.){
+          sineRatio = 0.;
+        }
+        else{
+          denom = std::fabs(std::sin(latVec[a]*pi/180.));
+          sineRatio = num/denom;
+        }
+        for (int b=0; b<nLon; b++){
+          devMat[t][a][b]*=sineRatio;
+          aDevMat[t][a][b]*=sineRatio;
+        }
+      }
+    }
+  }
+
   outDev->set_cur(0,0,0);
   outDev->put(&(devMat[0][0][0]),nOutTime,nLat,nLon);
   std::cout<<"Wrote devs to file."<<std::endl;
@@ -958,9 +1079,6 @@ void calcDevsPV(bool leap,
   std::cout<<"Wrote smoothed devs to file."<<std::endl;
 //Divide matrix by PV anomaly value 
 //We are looking for negative anomalies in NH and positive anomalies in SH
-  DataVector<double> latVec(nLat);
-  lat->set_cur((long) 0);
-  lat->get(&(latVec[0]),nLat);
 
   DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
   double invAnom;
@@ -968,36 +1086,55 @@ void calcDevsPV(bool leap,
   int threshIndex;
   int nPastStart = 0;
   int dPastStart = 0;
-  for (int t=0; t<nOutTime; t++){
-    threshIndex = startAvgIndex + dPastStart;
-    if (threshIndex > 364){
-      threshIndex-=365;
-    }
-    for (int a=0; a<nLat; a++){
-      for (int b=0; b<nLon; b++){
-        invAnom = 1./threshMat[threshIndex][a][b];
-        divDev = aDevMat[t][a][b]*invAnom;
+ 
+  if (isPV){
+    for (int t=0; t<nOutTime; t++){
+      threshIndex = startAvgIndex + dPastStart;
+      if (threshIndex > 364){
+        threshIndex-=365;
+      }
+      for (int a=0; a<nLat; a++){
+        for (int b=0; b<nLon; b++){
+          invAnom = 1./threshMat[threshIndex][a][b];
+          divDev = aDevMat[t][a][b]*invAnom;
         //SH: positive anomalies
-        if (latVec[a]<0){
-          pos = (divDev+std::fabs(divDev))*0.5;
-          posIntDevs[t][a][b] = int(pos);
-        }
+          if (latVec[a]<0){
+            pos = (divDev+std::fabs(divDev))*0.5;
+            posIntDevs[t][a][b] = int(pos);
+          }
         //NH: negative anomalies
-        else if (latVec[a]>=0){
-          neg = (divDev-std::fabs(divDev))*0.5;
-          posIntDevs[t][a][b] = -int(neg);
+          else if (latVec[a]>=0){
+            neg = (divDev-std::fabs(divDev))*0.5;
+            posIntDevs[t][a][b] = -int(neg);
+          }
+        }
+      }
+      nPastStart+=1;
+      dPastStart = nPastStart/nSteps;;
+    }
+  }
+  else{
+    for (int t=0; t<nOutTime; t++){
+      threshIndex = startAvgIndex + dPastStart;
+      if (threshIndex > 364){
+        threshIndex -= 365;
+      }
+      for (int a=0; a<nLat; a++){
+        for (int b=0; b<nLon; b++){
+          invAnom = 1./threshMat[threshIndex][a][b];
+          pos = aDevMat[t][a][b]*invAnom;
+          posIntDevs[t][a][b] = (int)((pos + std::fabs(pos))*0.5);
         }
       }
     }
-    nPastStart+=1;
-    dPastStart = nPastStart/nSteps;;
   }
+
   outPosIntDev->set_cur(0,0,0);
   outPosIntDev->put(&(posIntDevs[0][0][0]),nOutTime,nLat,nLon);
   std::cout<<"Wrote integer values to file."<<std::endl;
 }
 
-
+/*
 void stdDev(DataMatrix3D<double>inDevs,
               int nTime,
               int nLat,
@@ -1023,10 +1160,9 @@ void stdDev(DataMatrix3D<double>inDevs,
     }
   }
 }
-
-
+*/
+/*
 void calcDevsGH(bool leap,
-              double GHAnom,
               int startAvgIndex,
               NcVar *inGH,
               NcVar *outDev,
@@ -1037,7 +1173,7 @@ void calcDevsGH(bool leap,
               NcVar *avgTime,
               NcVar *lat,
               NcVar *outTime,
-              NcVar *stdDevVar){
+              DataMatrix3D threshmat){
 
   int nTime,nLat,nLon,nSteps,avgDay,nOutTime;
   double tRes;
@@ -1228,93 +1364,7 @@ void calcDevsGH(bool leap,
 
 
 
+*/
 
-
-
-double GHcheck(double z_0,
-          double z_N,
-          double z_S,
-          double lat_0,
-          double lat_N,
-          double lat_S,
-          std::string hemi ){
-  double GHGS;
-  double GHGN;
-  double gval;
-  //NH: GHGS>0, GHGN<-10m/deg lat
-  if (hemi =="N"){
-    GHGS = (z_0-z_S)/(lat_0-lat_S);
-    GHGN = (z_N-z_0)/(lat_N-lat_0);
-
-    if ((GHGS>0) && (GHGN < -10)){
-      gval=1.;
-    }
-    else gval=0.;
-  //SH: GHGN>0,GHGS<-10m/deg lat
-  }else if (hemi=="S"){
-    GHGS =-(z_S-z_0)/(lat_S-lat_0);
-    GHGN =-(z_0-z_N)/(lat_0-lat_N);
-
-    if ((GHGN>0) && (GHGS<-10)){
-      gval=1.;
-    }
-    else gval=0.;
-  }
-  else std::cout << "Error: invalid hemisphere specified."<<std::endl;
-  return(gval);
-}
-
-
-
-
-bool missingValCheck(
-  DataMatrix3D<double> fillData,
-  int nTime,
-  double missingNum
-){
-    bool isMissing = false;
-    for (int t=0; t<nTime; t++){
-      if (fillData[t][2][2] == missingNum){
-        isMissing = true;
-        break;
-      }
-    }
-    if (isMissing == false) std::cout << "Did not find missing values."<<std::endl;
-    return isMissing;
-}
-
-void MissingFill(
-  double missingValue,
-  double tRes,
-  double contCheck,
-  int nLat,
-  int nLon,
-  int arrLen,
-  int & currArrIndex,
-  int & dateIndex,
-  DataMatrix3D<double> & currFillData
-){
-
-  int nFill = contCheck/tRes-1;
-  int nDaysSkip = int(contCheck-tRes);
-  //std::cout<<"ContCheck is " << contCheck << " and tRes is "<<\
-   tRes <<" and nFill is "<<nFill << std::endl;
-  for (int n=0; n<nFill; n++){
-    for (int a=0; a<nLat; a++){
-      for (int b=0; b<nLon; b++){
-        currFillData[currArrIndex][a][b] = missingValue;
-      } 
-    }
-    currArrIndex +=1;
-    if (currArrIndex >= arrLen){
-      currArrIndex -= arrLen;
-    }
-  }
-  dateIndex += nDaysSkip;
-  if (dateIndex >= 365){
-    dateIndex-=365;
-  }
-  //std::cout<<"The new date index is "<<dateIndex<<" at the end of the missing fill."<<std::endl;
-}
 
 
