@@ -914,13 +914,11 @@ void calcDevs(bool leap,
               NcVar *inIPV,
               NcVar *outDev,
               NcVar *outADev,
-              NcVar *outPosIntDev,
               NcVar *avgIPV,
               NcVar *inTime,
               NcVar *avgTime,
               NcVar *lat,
-              NcVar *outTime,
-              DataMatrix3D<double> threshMat){
+              NcVar *outTime){
 
   int nTime,nLat,nLon,nSteps,avgDay,nOutTime;
   double tRes;
@@ -1077,13 +1075,34 @@ void calcDevs(bool leap,
   outADev->set_cur(0,0,0);
   outADev->put(&(aDevMat[0][0][0]),nOutTime,nLat,nLon);
   std::cout<<"Wrote smoothed devs to file."<<std::endl;
-//Divide matrix by PV anomaly value 
-//We are looking for negative anomalies in NH and positive anomalies in SH
 
+}
+void calcNormalizedDevs(bool isPV,
+                       NcVar * inDev,
+                       NcVar * outPosIntDev,
+                       NcVar * lat,
+                       double nSteps,
+                       DataMatrix3D<double>threshMat){
+
+  int nLat,nLon,nOutTime;
+
+  nOutTime = inDev->get_dim(0)->size();
+  nLat = inDev->get_dim(1)->size();
+  nLon = inDev->get_dim(2)->size();
+
+  DataVector<double> latVec(nLat);
+  lat->set_cur((long) 0);
+  lat->get(&(latVec[0]),nLat);
+ 
+  DataMatrix3D<double> aDevMat(nOutTime,nLat,nLon);
+  inDev->set_cur(0,0,0);
+  inDev->get(&(aDevMat[0][0][0]),nOutTime,nLat,nLon);
+ 
   DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
   double invAnom;
   double divDev,pos,neg;
-  int threshIndex;
+  int threshIndex = 0;
+  int startAvgIndex = 0;
   int nPastStart = 0;
   int dPastStart = 0;
  

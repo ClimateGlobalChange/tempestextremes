@@ -22,6 +22,7 @@ UTIL_FILES= BlockingUtilities.cpp \
 EXEC_FILES= BlockingAvg.cpp\
             BlockingDevs.cpp \
             BlockingGHG.cpp \
+	    BlockingNormDevs.cpp\
             BlockingPV.cpp \
 	    DensityCalculations.cpp \
             Var4Dto3D.cpp\

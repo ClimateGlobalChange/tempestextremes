@@ -229,14 +229,18 @@ void calcDevs(bool leap,
               NcVar *inIPV,
               NcVar *outDev,
               NcVar *outADev,
-              NcVar *outPosIntDev,
               NcVar *avgIPV,
               NcVar *inTime,
               NcVar *avgTime,
               NcVar *lat,
-              NcVar *outTime,
-              DataMatrix3D<double> threshMat);
+              NcVar *outTime);
 
+void calcNormalizedDevs(bool isPV,
+                       NcVar * inDev,
+                       NcVar * outPosIntDev,
+                       NcVar * lat,
+                       double nSteps,
+                       DataMatrix3D<double>threshMat);
 /*void stdDev(DataMatrix3D<double>inDevs,
               int nTime,
               int nLat,

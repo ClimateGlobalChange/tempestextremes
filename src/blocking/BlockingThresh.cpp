@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////
 ///
-///           \file BlockingZThresh.cpp
+///           \file BlockingThresh.cpp
 ///           \author Marielle Pinheiro
 ///           \date May 8, 2017
 ///
@@ -82,12 +82,13 @@ int main(int argc, char ** argv){
     NcDim *dDim = avgin.get_dim(tname.c_str());
     dLen = dDim->size();
 		
-    //Read in the matrix of average Z500 values
+    //Read in the matrix of average values
     NcVar *avgVar = avgin.get_var(avgName.c_str());
     DataMatrix3D<double> avgMat(dLen,latLen,lonLen);
     avgVar->set_cur(0,0,0);
     avgVar->get(&(avgMat[0][0][0]),dLen,latLen,lonLen);
-				
+    std::cout<<"Opening input files"<<std::endl;	
+
     //Open up the first file
     NcFile readin(vecFiles[0].c_str());
     if (!readin.is_valid()){
@@ -107,6 +108,7 @@ int main(int argc, char ** argv){
     readin.close();
 		
     //Loop through all available files and store values in appropriate day
+    //Part 1: Calculating the average
     for (int x=0; x<nFiles; x++){
       NcFile readin(vecFiles[x].c_str());
       if (!readin.is_valid()){
@@ -165,6 +167,30 @@ int main(int argc, char ** argv){
           }
         }
       }
+    /*  double zonalAvg,zonalVarAvg;
+
+      for (int t=0; t<tLen; t++){
+        ParseTimeDouble(strTimeUnits,strCalendar,timeVec[t],\
+         dateYear,dateMonth,dateDay,dateHour);
+        leap = checkFileLeap(strTimeUnits,strCalendar,dateYear,\
+          dateMonth,dateDay,dateHour,timeVec[t]);
+        if (leap==false){
+          dayIndex = DayInYear(dateMonth,dateDay)-1;
+          for (int a=0; a<latLen; a++){
+            zonalAvg = 0.;
+            zonalVarAvg = 0.;
+            for (int b=0; b<lonLen; b++){
+              zonalAvg+=avgMat[dayIndex][a][b]/((float)lonLen);
+              zonalVarAvg+=inputData[t][a][b]/((float)lonLen);
+            }
+            currDev = zonalVarAvg - zonalAvg;
+            for (int b=0; b<lonLen; b++){
+              storeMat[dayIndex][a][b]+=(currDev*currDev);
+              countsMat[dayIndex][a][b]+=1.;
+            }
+          }
+        }
+      }*/
       readin.close();
     }
     //Calculating 1.5*SD
@@ -204,7 +230,7 @@ int main(int argc, char ** argv){
     NcVar *checkThresh = fileout.add_var("THRESHOLD",ncDouble,outTime,outLat,outLon);
     checkThresh->set_cur(0,0,0);
     checkThresh->put(&(storeMat[0][0][0]),dLen,latLen,lonLen);		
-
+    std::cout<<"calculating DFT of threshold"<<std::endl;
     //Just for fun... the DFT of the SDs
     std::vector<double> inputDaily(dLen);
     std::vector<std::complex<double> >FourierCoefs(dLen);
@@ -235,7 +261,7 @@ int main(int argc, char ** argv){
     checkDFTThresh->set_cur(0,0,0);
     checkDFTThresh->put(&(outputMat[0][0][0]),dLen,latLen,lonLen);
 
-    avgin.close();
+ //   avgin.close();
     fileout.close();
   }
   catch (Exception &e){

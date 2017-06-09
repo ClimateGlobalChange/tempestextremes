@@ -148,6 +148,26 @@ int main(int argc, char ** argv){
     }
     //std::cout<<"Divided values to get average."<<std::endl;
 
+    //Output the Fourier transform of the dataset
+    std::vector<double> inputDaily(yearLen);
+    std::vector<std::complex <double> > FourierCoefs(yearLen);
+    std::vector<double> outputDaily(yearLen);
+    DataMatrix3D<double> outputMat(yearLen, latLen, lonLen);
+    for (int a=0; a<latLen; a++){
+      for (int b=0; b<lonLen; b++){
+        for (int d=0; d<yearLen; d++){
+          inputDaily[d] = storeMat[d][a][b];
+        }
+        FourierCoefs = DFT(inputDaily, nWaves);
+        outputDaily = IDFT(FourierCoefs);
+        for (int d=0; d<yearLen; d++){
+          outputMat[d][a][b] = outputDaily[d];
+        }
+      }
+    }
+
+
+    DataMatrix3D<double> outputMatZonal(yearLen,latLen,lonLen);
     DataMatrix <double> zonalAvgMat(yearLen,latLen);
     for (int d=0; d<yearLen; d++){
       for (int a=0; a<latLen; a++){
@@ -157,10 +177,6 @@ int main(int argc, char ** argv){
       }
     }
 
-    std::vector<double> inputDaily(yearLen);
-    std::vector<std::complex <double> > FourierCoefs(yearLen);
-    std::vector<double> outputDaily(yearLen);
-    DataMatrix3D<double> outputMat(yearLen, latLen, lonLen);
     //Matrix for the transformed Fourier value
     //Calculate at each lat,lon
     for (int a=0; a<latLen; a++){
@@ -171,7 +187,7 @@ int main(int argc, char ** argv){
       outputDaily = IDFT(FourierCoefs);
       for (int d=0; d<yearLen; d++){
         for (int b=0; b<lonLen; b++){
-          outputMat[d][a][b] = outputDaily[d];
+          outputMatZonal[d][a][b] = outputDaily[d];
         }
       }
     }
@@ -193,7 +209,7 @@ int main(int argc, char ** argv){
     outTimeVar->put(&(tVals[0]),yearLen);
 
     //Add time units
-    outTimeVar->add_att("units","days since 0001-12-31");
+    outTimeVar->add_att("units","days since 0001-01-01");
 
     NcDim *outLat = outfile.add_dim(latname.c_str(),latLen);
     NcDim *outLon = outfile.add_dim(lonname.c_str(),lonLen);
@@ -206,6 +222,11 @@ int main(int argc, char ** argv){
     NcVar *outAvgVar = outfile.add_var(avgName.c_str(), ncDouble, outTime, outLat, outLon);
     outAvgVar->set_cur(0,0,0);
     outAvgVar->put(&(outputMat[0][0][0]),yearLen,latLen,lonLen);
+
+    std::string zonalAvgName = avgName.append("_ZONAL_AVG");
+    NcVar *outZonalVar = outfile.add_var(zonalAvgName.c_str(),ncDouble,outTime,outLat,outLon);
+    outZonalVar->set_cur(0,0,0);
+    outZonalVar->put(&(outputMatZonal[0][0][0]),yearLen,latLen,lonLen);
 
     refFile.close();
     outfile.close();
