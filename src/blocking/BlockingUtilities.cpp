@@ -1052,14 +1052,16 @@ void calcDevs(bool leap,
     //Multiply values by sine factor
     for (int t=0; t<nOutTime; t++){
       for (int a=0; a<nLat; a++){
-        if ((latVec[a] < 25. && latVec[a] > -25.)\
-          || latVec[a] > 75. || latVec[a] < -75.){
-          sineRatio = 0.;
+        if (std::fabs(latVec[a]) < 5.){
+          denom = std::sin(5.*pi/180.);
+        }
+        else if (std::fabs(latVec[a])>85.){
+          denom = std::sin(85.*pi/180.);
         }
         else{
           denom = std::fabs(std::sin(latVec[a]*pi/180.));
-          sineRatio = num/denom;
         }
+        sineRatio = num/denom;
         for (int b=0; b<nLon; b++){
           devMat[t][a][b]*=sineRatio;
           aDevMat[t][a][b]*=sineRatio;

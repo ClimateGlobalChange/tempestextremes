@@ -154,45 +154,31 @@ int main(int argc, char ** argv){
           dateYear, dateMonth, dateDay, dateHour);
         leap = checkFileLeap(strTimeUnits, strCalendar, dateYear,\
           dateMonth, dateDay, dateHour, timeVec[t]);
+        std::cout<<"Date: "<<dateYear<<"/"<<dateMonth<<"/"<<dateDay<<std::endl;
         if (leap == false){
           dayIndex = DayInYear(dateMonth, dateDay)-1;
+          std::cout<<"Date index: "<<dayIndex<<std::endl;
           //std::cout<<"Day index is "<<dayIndex<<std::endl;
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
               avgValue = avgMat[dayIndex][a][b];
               currDev = inputData[t][a][b]-avgValue;
               storeMat[dayIndex][a][b]+= (currDev*currDev);
+/*              if (dateDay ==1 || dateDay ==2){
+                  if (a==30 && b==100){
+                std::cout<<"Month, day: "<<dateMonth<<", "<<dateDay<<std::endl;
+                std::cout<<"CHECK: currDev is "<<currDev<<std::endl;
+                }
+              }*/
               countsMat[dayIndex][a][b]+= 1.;
             }
           }
         }
       }
-    /*  double zonalAvg,zonalVarAvg;
-
-      for (int t=0; t<tLen; t++){
-        ParseTimeDouble(strTimeUnits,strCalendar,timeVec[t],\
-         dateYear,dateMonth,dateDay,dateHour);
-        leap = checkFileLeap(strTimeUnits,strCalendar,dateYear,\
-          dateMonth,dateDay,dateHour,timeVec[t]);
-        if (leap==false){
-          dayIndex = DayInYear(dateMonth,dateDay)-1;
-          for (int a=0; a<latLen; a++){
-            zonalAvg = 0.;
-            zonalVarAvg = 0.;
-            for (int b=0; b<lonLen; b++){
-              zonalAvg+=avgMat[dayIndex][a][b]/((float)lonLen);
-              zonalVarAvg+=inputData[t][a][b]/((float)lonLen);
-            }
-            currDev = zonalVarAvg - zonalAvg;
-            for (int b=0; b<lonLen; b++){
-              storeMat[dayIndex][a][b]+=(currDev*currDev);
-              countsMat[dayIndex][a][b]+=1.;
-            }
-          }
-        }
-      }*/
       readin.close();
     }
+
+    
     //Calculating 1.5*SD
     for (int d=0;d<dLen;d++){
       for (int a=0;a<latLen;a++){
@@ -226,21 +212,93 @@ int main(int argc, char ** argv){
     copy_dim_var(avgin.get_var(tname.c_str()),outTvar);
     copy_dim_var(avgin.get_var(latname.c_str()),outLatvar);
     copy_dim_var(avgin.get_var(lonname.c_str()),outLonvar);
-
+/*
+    NcVar *counts = fileout.add_var("COUNTS",ncDouble,outTime,outLat,outLon);
+    counts->set_cur(0,0,0);
+    counts->put(&(countsMat[0][0][0]),dLen,latLen,lonLen);
+*/
     NcVar *checkThresh = fileout.add_var("THRESHOLD",ncDouble,outTime,outLat,outLon);
     checkThresh->set_cur(0,0,0);
     checkThresh->put(&(storeMat[0][0][0]),dLen,latLen,lonLen);		
+
+
     std::cout<<"calculating DFT of threshold"<<std::endl;
+    //First, try zonal average
+    std::vector<double>zonalDaily(lonLen);
+    std::vector<std::complex<double> >FC(lonLen);
+    std::vector<double> zonalOut(lonLen);
+    DataMatrix3D<double> zonalMat(dLen,latLen,lonLen);
+
+    for (int d=0; d<dLen; d++){
+      for (int a=0; a<latLen; a++){
+        for (int b=0; b<lonLen; b++){
+          zonalDaily[b] = storeMat[d][a][b];
+        }
+        FC = DFT(zonalDaily,1);
+        zonalOut = IDFT(FC);
+        for (int b=0; b<lonLen; b++){
+          zonalMat[d][a][b] = zonalOut[b];
+        }
+      }
+    }
+/*
+    NcVar *zonalThresh = fileout.add_var("THRESHOLD_ZONAL",ncDouble,outTime,outLat,outLon);
+    zonalThresh->set_cur(0,0,0);
+    zonalThresh->put(&(zonalMat[0][0][0]),dLen,latLen,lonLen);
+*/
+    //Add on a lat average
+//    std::vector<double>meridDaily(latLen);
+    std::vector<double>m2(latLen);
+//    std::vector<std::complex<double> > FC2(latLen);
+    std::vector<std::complex<double> > FC3(latLen);
+//    std::vector<double> meridOut(latLen);
+    std::vector<double> m2out(latLen);
+
+//    DataMatrix3D<double>meridMat(dLen,latLen,lonLen);
+    DataMatrix3D<double>zmMat(dLen,latLen,lonLen);
+    for (int d=0; d<dLen; d++){
+      for (int b=0; b<lonLen; b++){
+        for (int a=0; a<latLen; a++){
+//          meridDaily[a] = storeMat[d][a][b];
+          m2[a] = zonalMat[d][a][b];
+        }
+//        FC2 = DFT(meridDaily,4);
+        FC3 = DFT(m2,4);
+//        meridOut = IDFT(FC2);
+        m2out = IDFT(FC3);
+        for (int a=0; a<latLen; a++){
+//          meridMat[d][a][b] = meridOut[a];
+          zmMat[d][a][b] = m2out[a];
+        }
+      }
+    }
+/*
+    NcVar * mThresh = fileout.add_var("THRESHOLD_MERID",ncDouble,outTime,outLat,outLon);
+    mThresh->set_cur(0,0,0);
+    mThresh->put(&(meridMat[0][0][0]),dLen,latLen,lonLen);
+*/
+
+    NcVar * zmThresh = fileout.add_var("THRESHOLD_AVG",ncDouble,outTime,outLat,outLon);
+    zmThresh->set_cur(0,0,0);
+    zmThresh->put(&(zmMat[0][0][0]),dLen,latLen,lonLen);
     //Just for fun... the DFT of the SDs
+
+    //Open the latitude vector
+    NcVar * inLat = avgin.get_var(latname.c_str());
+    DataVector<double> latVec(latLen);
+    inLat->set_cur((long) 0);
+    inLat->get(&(latVec[0]),latLen);
+
     std::vector<double> inputDaily(dLen);
     std::vector<std::complex<double> >FourierCoefs(dLen);
     std::vector<double>outputDaily(dLen);
     DataMatrix3D<double> outputMat(dLen,latLen,lonLen);
 
+
     for (int a=0; a<latLen; a++){
       for (int b=0; b<lonLen; b++){
         for (int d=0; d<dLen; d++){
-          inputDaily[d] = storeMat[d][a][b];
+          inputDaily[d] = zmMat[d][a][b];
         }
         FourierCoefs = DFT(inputDaily,6);
         outputDaily = IDFT(FourierCoefs);
@@ -249,19 +307,16 @@ int main(int argc, char ** argv){
         }
       }
     }
+
+    
     
     NcVar *checkDFTThresh = fileout.add_var("THRESHOLD_DFT",ncDouble,outTime,outLat,outLon);
-  /*  if (avgin.get_var("THRESHOLD_Z_DFT")->is_valid()==false){
-      std::cout<<"Adding new DFT threshold variable."<<std::endl;
-      checkDFTThresh = avgin.add_var("THRESHOLD_Z_DFT",ncDouble,dDim,latDim,lonDim);
-    }
-    else{
-      checkDFTThresh = avgin.get_var("THRESHOLD_Z_DFT");
-    }*/
+
+
     checkDFTThresh->set_cur(0,0,0);
     checkDFTThresh->put(&(outputMat[0][0][0]),dLen,latLen,lonLen);
 
- //   avgin.close();
+    avgin.close();
     fileout.close();
   }
   catch (Exception &e){
