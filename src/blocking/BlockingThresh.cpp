@@ -81,6 +81,12 @@ int main(int argc, char ** argv){
     lonLen = lonDim->size();
     NcDim *dDim = avgin.get_dim(tname.c_str());
     dLen = dDim->size();
+
+    //Open lats vector
+    NcVar *latRef = avgin.get_var(latname.c_str());
+    DataVector <double> latVec(latLen);
+    latRef->set_cur((long) 0);
+    latRef->get(&(latVec[0]),latLen);
 		
     //Read in the matrix of average values
     NcVar *avgVar = avgin.get_var(avgName.c_str());
@@ -154,22 +160,16 @@ int main(int argc, char ** argv){
           dateYear, dateMonth, dateDay, dateHour);
         leap = checkFileLeap(strTimeUnits, strCalendar, dateYear,\
           dateMonth, dateDay, dateHour, timeVec[t]);
-        std::cout<<"Date: "<<dateYear<<"/"<<dateMonth<<"/"<<dateDay<<std::endl;
+//        std::cout<<"Date: "<<dateYear<<"/"<<dateMonth<<"/"<<dateDay<<std::endl;
         if (leap == false){
           dayIndex = DayInYear(dateMonth, dateDay)-1;
-          std::cout<<"Date index: "<<dayIndex<<std::endl;
+        //  std::cout<<"Date index: "<<dayIndex<<std::endl;
           //std::cout<<"Day index is "<<dayIndex<<std::endl;
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
               avgValue = avgMat[dayIndex][a][b];
               currDev = inputData[t][a][b]-avgValue;
               storeMat[dayIndex][a][b]+= (currDev*currDev);
-/*              if (dateDay ==1 || dateDay ==2){
-                  if (a==30 && b==100){
-                std::cout<<"Month, day: "<<dateMonth<<", "<<dateDay<<std::endl;
-                std::cout<<"CHECK: currDev is "<<currDev<<std::endl;
-                }
-              }*/
               countsMat[dayIndex][a][b]+= 1.;
             }
           }
@@ -263,7 +263,7 @@ int main(int argc, char ** argv){
           m2[a] = zonalMat[d][a][b];
         }
 //        FC2 = DFT(meridDaily,4);
-        FC3 = DFT(m2,4);
+        FC3 = DFT(m2,6);
 //        meridOut = IDFT(FC2);
         m2out = IDFT(FC3);
         for (int a=0; a<latLen; a++){
@@ -282,13 +282,6 @@ int main(int argc, char ** argv){
     zmThresh->set_cur(0,0,0);
     zmThresh->put(&(zmMat[0][0][0]),dLen,latLen,lonLen);
     //Just for fun... the DFT of the SDs
-
-    //Open the latitude vector
-    NcVar * inLat = avgin.get_var(latname.c_str());
-    DataVector<double> latVec(latLen);
-    inLat->set_cur((long) 0);
-    inLat->get(&(latVec[0]),latLen);
-
     std::vector<double> inputDaily(dLen);
     std::vector<std::complex<double> >FourierCoefs(dLen);
     std::vector<double>outputDaily(dLen);
@@ -300,7 +293,7 @@ int main(int argc, char ** argv){
         for (int d=0; d<dLen; d++){
           inputDaily[d] = zmMat[d][a][b];
         }
-        FourierCoefs = DFT(inputDaily,6);
+        FourierCoefs = DFT(inputDaily,4);
         outputDaily = IDFT(FourierCoefs);
         for (int d=0; d<dLen; d++){
           outputMat[d][a][b] = outputDaily[d];

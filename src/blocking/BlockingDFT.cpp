@@ -84,7 +84,7 @@ int main(int argc, char ** argv){
       if (!readin.is_valid()){
         _EXCEPTION1("Unable to open file %s for reading",vecFiles[x].c_str());
       }
-
+      std::cout<<"Reading in "<<vecFiles[x].c_str()<<std::endl;
       tLen = readin.get_dim(tname.c_str()) ->size();
       //std::cout<<"Reading in file #"<<x<<", "<<vecFiles[x].c_str()<<std::endl;
       //Input data
@@ -167,7 +167,7 @@ int main(int argc, char ** argv){
     }
 
 
-    DataMatrix3D<double> outputMatZonal(yearLen,latLen,lonLen);
+/*    DataMatrix3D<double> outputMatZonal(yearLen,latLen,lonLen);
     DataMatrix <double> zonalAvgMat(yearLen,latLen);
     for (int d=0; d<yearLen; d++){
       for (int a=0; a<latLen; a++){
@@ -191,6 +191,7 @@ int main(int argc, char ** argv){
         }
       }
     }
+*/
     //Copy existing values from reference file to output file
     NcFile refFile(vecFiles[0].c_str());
     NcDim *inLatDim = refFile.get_dim(latname.c_str());
@@ -223,10 +224,10 @@ int main(int argc, char ** argv){
     outAvgVar->set_cur(0,0,0);
     outAvgVar->put(&(outputMat[0][0][0]),yearLen,latLen,lonLen);
 
-    std::string zonalAvgName = avgName.append("_ZONAL_AVG");
+    std::string zonalAvgName = avgName.append("_NO_SMOOTH");
     NcVar *outZonalVar = outfile.add_var(zonalAvgName.c_str(),ncDouble,outTime,outLat,outLon);
     outZonalVar->set_cur(0,0,0);
-    outZonalVar->put(&(outputMatZonal[0][0][0]),yearLen,latLen,lonLen);
+    outZonalVar->put(&(storeMat[0][0][0]),yearLen,latLen,lonLen);
 
     refFile.close();
     outfile.close();

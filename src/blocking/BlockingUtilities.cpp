@@ -1107,7 +1107,7 @@ void calcNormalizedDevs(bool isPV,
   int startAvgIndex = 0;
   int nPastStart = 0;
   int dPastStart = 0;
- 
+  
   if (isPV){
     for (int t=0; t<nOutTime; t++){
       threshIndex = startAvgIndex + dPastStart;
@@ -1116,17 +1116,22 @@ void calcNormalizedDevs(bool isPV,
       }
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
-          invAnom = 1./threshMat[threshIndex][a][b];
-          divDev = aDevMat[t][a][b]*invAnom;
-        //SH: positive anomalies
-          if (latVec[a]<0){
-            pos = (divDev+std::fabs(divDev))*0.5;
-            posIntDevs[t][a][b] = int(pos);
+          if (std::fabs(latVec[a])<25 || std::fabs(latVec[a])>75){
+            posIntDevs[t][a][b] = 0;
           }
-        //NH: negative anomalies
-          else if (latVec[a]>=0){
-            neg = (divDev-std::fabs(divDev))*0.5;
-            posIntDevs[t][a][b] = -int(neg);
+          else{
+            invAnom = 1./threshMat[threshIndex][a][b];
+            divDev = aDevMat[t][a][b]*invAnom;
+          //SH: positive anomalies
+            if (latVec[a]<0){
+              pos = (divDev+std::fabs(divDev))*0.5;
+              posIntDevs[t][a][b] = int(pos);
+            }
+          //NH: negative anomalies
+            else if (latVec[a]>=0){
+              neg = (divDev-std::fabs(divDev))*0.5;
+              posIntDevs[t][a][b] = -int(neg);
+            }
           }
         }
       }
@@ -1142,9 +1147,14 @@ void calcNormalizedDevs(bool isPV,
       }
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
-          invAnom = 1./threshMat[threshIndex][a][b];
-          pos = aDevMat[t][a][b]*invAnom;
-          posIntDevs[t][a][b] = (int)((pos + std::fabs(pos))*0.5);
+          if (std::fabs(latVec[a])<25. || std::fabs(latVec[a])>75.){
+            posIntDevs[t][a][b] = 0;
+          }
+          else{
+            invAnom = 1./threshMat[threshIndex][a][b];
+            pos = aDevMat[t][a][b]*invAnom;
+            posIntDevs[t][a][b] = (int)((pos + std::fabs(pos))*0.5);
+          }
         }
       }
     }
