@@ -11,10 +11,9 @@ This file calculates the threshold value at each (x,y)
 for the corresponding day in the year. The threshold is
 defined as 1.5 times the standard deviation of Z500 values.
 
-It takes an input list of instantaneous Z500 values, as well
+It takes an input list of instantaneous deviation  values, as well
 as the averaged file, and calculates the standard deviation 
-of the instantaneous values. The output threshold is saved to
-the average file.
+of the instantaneous deviation values.
 */
 #include "netcdfcpp.h"
 #include "DataVector.h"
@@ -160,11 +159,8 @@ int main(int argc, char ** argv){
           dateYear, dateMonth, dateDay, dateHour);
         leap = checkFileLeap(strTimeUnits, strCalendar, dateYear,\
           dateMonth, dateDay, dateHour, timeVec[t]);
-//        std::cout<<"Date: "<<dateYear<<"/"<<dateMonth<<"/"<<dateDay<<std::endl;
         if (leap == false){
           dayIndex = DayInYear(dateMonth, dateDay)-1;
-        //  std::cout<<"Date index: "<<dayIndex<<std::endl;
-          //std::cout<<"Day index is "<<dayIndex<<std::endl;
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
               avgValue = avgMat[dayIndex][a][b];
@@ -241,42 +237,62 @@ int main(int argc, char ** argv){
         }
       }
     }
-/*
-    NcVar *zonalThresh = fileout.add_var("THRESHOLD_ZONAL",ncDouble,outTime,outLat,outLon);
-    zonalThresh->set_cur(0,0,0);
-    zonalThresh->put(&(zonalMat[0][0][0]),dLen,latLen,lonLen);
-*/
     //Add on a lat average
-//    std::vector<double>meridDaily(latLen);
-    std::vector<double>m2(latLen);
-//    std::vector<std::complex<double> > FC2(latLen);
-    std::vector<std::complex<double> > FC3(latLen);
-//    std::vector<double> meridOut(latLen);
-    std::vector<double> m2out(latLen);
+    //Do separate averages for NH and SH
+    //Find index for equator
+    int eqIndex;
+    for (int e=0; e<latLen; e++){
+      if (std::fabs(latVec[e])<0.0001){
+        eqIndex = e;
+        break;
+      }
+    }
+    int lat1 = latVec[0];
+    //Case 1: lat vector goes from NH to SH
+    int NHLen,SHLen;
+    if (lat1>0){
+      NHLen = eqIndex;
+      SHLen = latLen - eqIndex;
+    }
+    else{
+      NHLen = latLen - eqIndex;
+      SHLen = eqIndex;
+    }
 
-//    DataMatrix3D<double>meridMat(dLen,latLen,lonLen);
+    std::vector<double>NH(NHLen);
+    std::vector<double>SH(SHLen);
+    std::vector<std::complex<double> > FCNH(NHLen);
+    std::vector<std::complex<double> > FCSH(SHLen);
+    std::vector<double> NHout(NHLen);
+    std::vector<double> SHout(SHLen);
+    int a1;
     DataMatrix3D<double>zmMat(dLen,latLen,lonLen);
     for (int d=0; d<dLen; d++){
       for (int b=0; b<lonLen; b++){
-        for (int a=0; a<latLen; a++){
-//          meridDaily[a] = storeMat[d][a][b];
-          m2[a] = zonalMat[d][a][b];
+        for (int a=0; a<eqIndex; a++){
+          NH[a] = zonalMat[d][a][b];
         }
-//        FC2 = DFT(meridDaily,4);
-        FC3 = DFT(m2,6);
-//        meridOut = IDFT(FC2);
-        m2out = IDFT(FC3);
-        for (int a=0; a<latLen; a++){
-//          meridMat[d][a][b] = meridOut[a];
-          zmMat[d][a][b] = m2out[a];
+        for (int a=eqIndex; a<latLen; a++){
+          a1 = a-eqIndex;
+          SH[a1] = zonalMat[d][a][b];
+        }
+        FCNH = DFT(NH,1);
+        NHout = IDFT(FCNH);
+        FCSH = DFT(SH,1);
+        SHout = IDFT(FCSH);
+        for (int a=0; a<eqIndex; a++){
+          zmMat[d][a][b] = NHout[a];
+        }
+        for (int a=eqIndex; a<latLen; a++){
+          a1 = a-eqIndex;
+          zmMat[d][a][b] = SHout[a1];
         }
       }
     }
-/*
-    NcVar * mThresh = fileout.add_var("THRESHOLD_MERID",ncDouble,outTime,outLat,outLon);
-    mThresh->set_cur(0,0,0);
-    mThresh->put(&(meridMat[0][0][0]),dLen,latLen,lonLen);
-*/
+
+    //Alternate attempt: moving average (if DFT not appropriate)
+
+
 
     NcVar * zmThresh = fileout.add_var("THRESHOLD_AVG",ncDouble,outTime,outLat,outLon);
     zmThresh->set_cur(0,0,0);
@@ -304,8 +320,6 @@ int main(int argc, char ** argv){
     
     
     NcVar *checkDFTThresh = fileout.add_var("THRESHOLD_DFT",ncDouble,outTime,outLat,outLon);
-
-
     checkDFTThresh->set_cur(0,0,0);
     checkDFTThresh->put(&(outputMat[0][0][0]),dLen,latLen,lonLen);
 

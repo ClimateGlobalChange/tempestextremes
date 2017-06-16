@@ -1084,7 +1084,8 @@ void calcNormalizedDevs(bool isPV,
                        NcVar * outPosIntDev,
                        NcVar * lat,
                        double nSteps,
-                       DataMatrix3D<double>threshMat){
+                       DataMatrix3D<double>threshMat,
+                       double minThresh){
 
   int nLat,nLon,nOutTime;
 
@@ -1107,7 +1108,7 @@ void calcNormalizedDevs(bool isPV,
   int startAvgIndex = 0;
   int nPastStart = 0;
   int dPastStart = 0;
-  
+  double threshVal;
   if (isPV){
     for (int t=0; t<nOutTime; t++){
       threshIndex = startAvgIndex + dPastStart;
@@ -1120,7 +1121,13 @@ void calcNormalizedDevs(bool isPV,
             posIntDevs[t][a][b] = 0;
           }
           else{
-            invAnom = 1./threshMat[threshIndex][a][b];
+            if (threshMat[threshIndex][a][b] < minThresh){
+              threshVal = minThresh;
+            }
+            else{
+              threshVal = threshMat[threshIndex][a][b];
+            }
+            invAnom = 1./threshVal;
             divDev = aDevMat[t][a][b]*invAnom;
           //SH: positive anomalies
             if (latVec[a]<0){
@@ -1151,7 +1158,13 @@ void calcNormalizedDevs(bool isPV,
             posIntDevs[t][a][b] = 0;
           }
           else{
-            invAnom = 1./threshMat[threshIndex][a][b];
+            if (threshMat[threshIndex][a][b] < minThresh){
+              threshVal = minThresh;
+            }
+            else{
+              threshVal = threshMat[threshIndex][a][b];
+            }
+            invAnom = 1./threshVal;
             pos = aDevMat[t][a][b]*invAnom;
             posIntDevs[t][a][b] = (int)((pos + std::fabs(pos))*0.5);
           }

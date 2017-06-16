@@ -240,7 +240,8 @@ void calcNormalizedDevs(bool isPV,
                        NcVar * outPosIntDev,
                        NcVar * lat,
                        double nSteps,
-                       DataMatrix3D<double>threshMat);
+                       DataMatrix3D<double>threshMat,
+                       double minThresh);
 /*void stdDev(DataMatrix3D<double>inDevs,
               int nTime,
               int nLat,
