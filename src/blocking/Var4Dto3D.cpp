@@ -51,7 +51,7 @@ int main(int argc, char** argv){
 
     if (fileOut == ""){
       std::string fileInCopy = fileIn;
-      fileOut = fileInCopy.replace(fileInCopy.end()-3,fileInCopy.end(),"_500.nc");
+      fileOut = fileInCopy.replace(fileInCopy.end()-3,fileInCopy.end(),"_z500.nc");
     }
     if (varlist == ""){
        _EXCEPTIONT("Need to provide variable names with --varlist flag.");

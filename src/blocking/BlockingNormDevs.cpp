@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////
 ///
-///           \file blockingDevs.cpp
+///           \file blockingNormDevs.cpp
 ///           \author Marielle Pinheiro
 ///           \version June 1, 2015
 
@@ -32,30 +32,27 @@ int main(int argc, char **argv){
 
   try{
 
-    //list of input files for which to calculate deviations
+    //list of input files for which to calculate normalized deviations
     std::string fileList;
-    //file that holds averages
-    std::string avgName;
     std::string varName;
-    std::string avgVarName;
-//    std::string threshName;
-//    std::string threshVarName;
+    std::string threshName;
+    std::string threshVarName;
     std::string tname,latname,lonname;
     bool PVCalc;
     bool GHCalc;
-//    bool const_thresh;
+    bool const_thresh;
 
 
     BeginCommandLine()
       CommandLineString(fileList, "inlist", "");
       CommandLineString(varName,"varname","");
-      CommandLineString(avgName, "avg", "");
-      CommandLineString(avgVarName, "avgname","");
-//      CommandLineString(threshName,"thresh","");
-//      CommandLineString(threshVarName,"threshname","");
+//      CommandLineString(avgName, "avg", "");
+//      CommandLineString(avgVarName, "avgname","");
+      CommandLineString(threshName,"thresh","");
+      CommandLineString(threshVarName,"threshname","");
       CommandLineBool(PVCalc,"pv");
       CommandLineBool(GHCalc,"gh");
-//      CommandLineBool(const_thresh,"const");
+      CommandLineBool(const_thresh,"const");
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
@@ -69,18 +66,22 @@ int main(int argc, char **argv){
   
 
    int nFiles,avgTime,nTime,nLat,nLon;
-   double anomVal;
+   double anomVal,minThresh;
    if (PVCalc){
      anomVal = 1.3*std::pow(10,-6);
+     minThresh = 1.1*std::pow(10,-6);
    }else if (GHCalc){
      anomVal = 170.;
+     minThresh = 100;
    }
+
+   std::cout<<"Opening file list."<<std::endl;
    //Create list of input files
     std::vector<std::string> InputFiles;
     GetInputFileList(fileList, InputFiles);
     nFiles = InputFiles.size();
 
-    //Open averages file
+/*    //Open averages file
     NcFile avgFile(avgName.c_str());
 	if (!avgFile.is_valid()) {
 		_EXCEPTION1("Cannot open NetCDF file \"%s\"", avgName.c_str());
@@ -105,14 +106,22 @@ int main(int argc, char **argv){
     int dim1 = AvarData->get_dim(0)->size();
     int dim2 = AvarData->get_dim(1)->size();
     int dim3 = AvarData->get_dim(2)->size();    
-/*    //Initialize a matrix. If constant, it will be filled with anom values, else it will hold the 
+*/
+    //Initialize a matrix. If constant, it will be filled with anom values, else it will hold the 
     //threshold values
+
+    std::cout<<"Opening reference file to load dimension variables."<<std::endl;
+    int dim1=365;
+    NcFile refFile(InputFiles[0].c_str());
+    int dim2 = refFile.get_dim(latname.c_str())->size();
+    int dim3 = refFile.get_dim(lonname.c_str())->size();
+    refFile.close();
 
     DataMatrix3D <double> threshMat(dim1,dim2,dim3);
 
     if (!const_thresh){
       //Open threshold values file
-
+      std::cout<<"Opening threshold file."<<std::endl;
       NcFile threshFile(threshName.c_str());
       if (!threshFile.is_valid()){
         _EXCEPTION1("Cannot open NetCDF file %s",threshName.c_str());
@@ -134,7 +143,6 @@ int main(int argc, char **argv){
         }
       }
     }
-*/
     //Open var files
 
     for (int x=0; x<nFiles; x++){
@@ -220,8 +228,13 @@ int main(int argc, char **argv){
       
 
       //Create output file that corresponds to IPV data
+
+  
       std::string strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
-        InputFiles[x].end(), "_devs.nc");
+        InputFiles[x].end(), "_norm.nc");
+      if (const_thresh){
+        strOutFile = strOutFile.replace(strOutFile.end()-3,strOutFile.end(),"_const.nc");
+      }
       std::cout<<"Writing variables to file "<<strOutFile.c_str()<<std::endl;
       NcFile outfile(strOutFile.c_str(), NcFile::Replace, NULL,0,NcFile::Offset64Bits);
       int nOutTime;
@@ -237,6 +250,8 @@ int main(int argc, char **argv){
 
       NcVar *tVarOut = outfile.add_var(tname.c_str(),ncDouble,tDimOut);
       CopyNcVarAttributes(inTime,tVarOut);      
+      copy_dim_var(inTime,tVarOut);
+
 
       NcVar *latVarOut = outfile.add_var(latname.c_str(),ncDouble,latDimOut);
       copy_dim_var(inLat,latVarOut);
@@ -246,20 +261,23 @@ int main(int argc, char **argv){
       //Create variables for Deviations
 
       if (PVCalc){
-        NcVar *devOut = outfile.add_var("DIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
-        NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
-  //      NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
+//        NcVar *devOut = outfile.add_var("DIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
+//        NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
+        NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
 
-        calcDevs(leap,true, startIndex, varData, devOut, aDevOut, AvarData, inTime,\
+//        calcDevs(leap,true, startIndex, varData, devOut, aDevOut, AvarData, inTime,\
         avgTimeVals, inLat, tVarOut);
+        calcNormalizedDevs(true,varData,devIntOut,inLat,nSteps,threshMat,minThresh);
+
       }
       else if (GHCalc){
-        NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
-        NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
-//        NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);
+//        NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
+//        NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
+        NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);
 //        NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
-        calcDevs(leap,false, startIndex, varData, devOut,aDevOut,AvarData,inTime,\
+//        calcDevs(leap,false, startIndex, varData, devOut,aDevOut,AvarData,inTime,\
           avgTimeVals,inLat,tVarOut);
+        calcNormalizedDevs(false,varData,devIntOut,inLat,nSteps,threshMat,minThresh);
         std::cout<<"Finished writing to file "<<strOutFile.c_str()<<std::endl;
       }
       else{

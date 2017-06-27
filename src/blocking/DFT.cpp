@@ -40,22 +40,46 @@ std::vector<std::complex<double> > DFT(std::vector<double> inputVals,
   std::complex <double> expCoef(0.,0.);
   std::complex <double> sumVals;
   //Begin calculating the coefficients
-  for (int k=0; k<N; k++){
-    double fk = float(k);
-    expCoef = -2.*compi*pi*fk*Ndiv;
-    sumVals = std::complex<double>(0.,0.);
-    for (int n=0; n<N; n++){
-      double fn = float(n);
-      sumVals += inputVals[n]*std::exp(fn*expCoef);
-    }
-    FourierCoefs[k] = sumVals;
-  }
   if (numCoefs<N){
+    for (int k=0; k<=numCoefs; k++){
+      double fk = float(k);
+      expCoef = -2.*compi*pi*fk*Ndiv;
+      sumVals = std::complex<double>(0.,0.);
+      for (int n=0; n<N; n++){
+        double fn = float(n);
+        sumVals += inputVals[n]*std::exp(fn*expCoef);
+      }
+      FourierCoefs[k] = sumVals;
+    }
+    for (int k=(N-numCoefs); k<N; k++){
+      double fk = float(k);
+      expCoef = -2.*compi*pi*fk*Ndiv;
+      sumVals = std::complex<double>(0.,0.);
+      for (int n=0; n<N; n++){
+        double fn = float(n);
+        sumVals += inputVals[n]*std::exp(fn*expCoef);
+      }
+      FourierCoefs[k] = sumVals;
+    }
+  }
+  else{
+    for (int k=0; k<N; k++){
+      double fk = float(k);
+      expCoef = -2.*compi*pi*fk*Ndiv;
+      sumVals = std::complex<double>(0.,0.);
+      for (int n=0; n<N; n++){
+        double fn = float(n);
+        sumVals += inputVals[n]*std::exp(fn*expCoef);
+      }
+      FourierCoefs[k] = sumVals;
+    }
+  }
+/*  if (numCoefs<N){
     //Zero out the higher wavenumbers
     for (int i=numCoefs; i<(N-numCoefs); i++){
       FourierCoefs[i] = std::complex<double>(0.,0.);
     }
-  }
+  }*/
   return(FourierCoefs);
 }
 

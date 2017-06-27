@@ -16,18 +16,20 @@ TEMPESTEXTREMESBASELIB= $(TEMPESTEXTREMESBASEDIR)/libextremesbase.a
 
 UTIL_FILES= BlockingUtilities.cpp \
             Interp_z500.cpp \
-            Interpolate.cpp\
+            Interpolate.cpp \
             DFT.cpp
 
-EXEC_FILES= AvgVar.cpp \
-            BlockingAvg.cpp \
+EXEC_FILES= BlockingAvg.cpp\
             BlockingDevs.cpp \
-            BlockingDFT.cpp\
             BlockingGHG.cpp \
+	    BlockingNormDevs.cpp\
             BlockingPV.cpp \
 	    DensityCalculations.cpp \
+            Var4Dto3D.cpp\
             split_file.cpp\
-            Var4Dto3D.cpp 
+            AvgVar.cpp\
+            BlockingDFT.cpp\
+            BlockingThresh.cpp 
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 

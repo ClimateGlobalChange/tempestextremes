@@ -547,7 +547,7 @@ int main(int argc, char **argv){
     outTimeVar->put(&(timeVals[0]),yearLen);
 
     //Add time units (necessary for time conversion)
-    outTimeVar->add_att("units","days since 0001-12-31"); 
+    outTimeVar->add_att("units","days since 0001-01-01"); 
 
     NcDim *outLat = outfile.add_dim(latname.c_str(), nLat);
     NcDim *outLon = outfile.add_dim(lonname.c_str(), nLon);
