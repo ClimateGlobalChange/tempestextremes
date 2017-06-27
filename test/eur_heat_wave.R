@@ -106,7 +106,7 @@ for (t in first_ind:length(time_format)){
   fname<-sprintf("~/Dropbox/eur_heat_wave/noT/eur_heat_%s_%02dZ_noT.png",time_format[t],time_hours[t])
   png(fname,height=600,width=800)
 
- map('world',xlim=c(-110,50),ylim=c(25,75),fill=TRUE,col=)
+ map('world',xlim=c(-110,50),ylim=c(25,75),fill=TRUE,col="grey")
  title(sprintf("Z500 %s %02dZ, PV* (green) Z* (blue) ZG (purple)",time_format[t],time_hours[t]))
  map.axes()
  contour(lon_seq,lat_seq,z_hgt_sub[,,t],levels=seq(4500,6100,50),drawlabels=FALSE,add=TRUE,col=hgt.cols,lwd=2)

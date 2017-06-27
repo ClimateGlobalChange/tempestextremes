@@ -7,7 +7,8 @@ ycalc=1987
 yend=2000
 DDIR=/Volumes/ExFAT_drive/ERA_files
 BDIR=$DDIR/ERA_blobs
-VAR="IPV"
+#VAR="IPV"
+VARVEC=("IPV" "Z" "GHGrad")
 
 #Addition of regional parameters
 SECTOR=("NA" "NC" "NP" "SA" "SI" "SP")
@@ -23,8 +24,9 @@ DENS_SUFF=""
 INVAR=""
 BLOB_VAR=""
 PLOT_TITLE=""
+for VAR in ${VARVEC[@]}; do
 if [ "$VAR" == "IPV" ]; then
-  SUFF="integ_devs.nc"
+  SUFF="integ_devs_norm.nc"
   BLOB_SUFF="blobs.nc"
   STAT_SUFF="stats.txt"
   DENS_SUFF="dens.nc"
@@ -32,7 +34,7 @@ if [ "$VAR" == "IPV" ]; then
   BLOB_VAR="PV_BLOB"
   PLOT_TITLE="PV blocking"
 elif [ "$VAR" == "Z" ]; then
-  SUFF="z500_devs.nc"
+  SUFF="z500_devs_norm.nc"
   BLOB_SUFF="Zblobs.nc"
   STAT_SUFF="Zstats.txt"
   DENS_SUFF="Zdens.nc"
@@ -115,16 +117,16 @@ for ((y=1980; y<=2005; y++)); do
       densname="$BDIR/ERA_"$y"_"$s"_""$secname""_"$DENS_SUFF
       vdensname="$BDIR/ERA_"$y"_"$s"_var_""$secname""_"$DENS_SUFF
 
-      ~/tempestextremes/bin/StitchBlobs --inlist bloblist --out $blobsname --var $INVAR --outvar $BLOB_VAR --mintime 20 --minsize 36  --minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]}
+      ~/tempestextremes/bin/StitchBlobs --inlist bloblist --out $blobsname --var $INVAR --outvar $BLOB_VAR --mintime 20 --thresholdcmd "minarea,1000000000000"  --minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]}
       ~/tempestextremes/bin/BlobStats --infile $blobsname --outfile $statsname --invar $BLOB_VAR --out minlat,maxlat,minlon,maxlon,centlat,centlon,area
-   #   ~/tempestextremes/bin/DensityCalculations --in $blobsname --var $BLOB_VAR --out $densname
+      ~/tempestextremes/bin/DensityCalculations --in $blobsname --var $BLOB_VAR --out $densname
    #   ~/tempestextremes/bin/DensityCalculations --inlist bloblist --var $INVAR --out $vdensname
       n=$((n+1))
     done
     i=$((i+1))
   done
 done
-
+done
 #cd $BDIR
 #for s in ${SEASONS[@]}; do
 #  lsname="ERA_"$s"_blobs"

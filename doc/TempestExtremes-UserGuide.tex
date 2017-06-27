@@ -63,7 +63,7 @@ Parameters:
 \subsubsection{File input and output}
 This program takes a list of files and, for the specified list of variables, averages quantities from all files together along the time axis. The program assumes that input variables are on a single vertical level and therefore have the axes \texttt{[time, latitude, longitude]}. 
 
-The output file contains time-averaged variables which have the same names as the original inputs and axes \texttt{[latitude, longitude]}. Unlike \texttt{BlockingAvg} (Section \ref{bavg}), this program does not check the time variable, so it is advisable to check the file list to ensure that only the desired files are included in the average.
+The output file contains time-averaged variables  with axes \texttt{[latitude, longitude]}, and have the same names as the original inputs . 
 
 \subsection{BlockingAvg}\label{bavg}
 \begin{verbatim}
