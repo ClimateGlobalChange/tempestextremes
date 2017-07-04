@@ -29,11 +29,16 @@ int main(int argc, char** argv) {
     CommandLineString(latDimName, "latDim", "lat");
     CommandLineString(lonDimName, "lonDim", "lon");
 
-    CommandLineString(blobVarName, "blobVar", "PV_BLOB");
+    CommandLineString(blobVarName, "blobVar", "");
     ParseCommandLine(argc, argv);
   }
   EndCommandLine(argv);
   AnnounceBanner();
+
+  if (blobVarName.length() == 0) {
+    std::cerr << "Error: no blob variable name provided!" << std::endl;
+    std::exit(-1);
+  }
 
   if (inFileNamesCS.length() == 0) {
     std::cerr << "Error: no input files provided!" << std::endl;
