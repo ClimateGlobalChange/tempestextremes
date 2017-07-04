@@ -24,6 +24,7 @@ EXEC_FILES= BlockingAvg.cpp\
             BlockingGHG.cpp \
 	    BlockingNormDevs.cpp\
             BlockingPV.cpp \
+            CombineBlobs.cpp \
 	    DensityCalculations.cpp \
             Var4Dto3D.cpp\
             split_file.cpp\
