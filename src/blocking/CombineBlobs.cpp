@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include "BlockingUtilities.h"
@@ -14,7 +15,7 @@
 #include "netcdfcpp.h"
 
 int main(int argc, char** argv) {
-  std::string inFileNamesCS;
+  std::string inListFileName;
   std::string outFileName;
 
   std::string timeDimName, latDimName, lonDimName;
@@ -22,7 +23,7 @@ int main(int argc, char** argv) {
   std::string blobVarName;
 
   BeginCommandLine() {
-    CommandLineString(inFileNamesCS, "inlist", "");
+    CommandLineString(inListFileName, "inlist", "");
     CommandLineString(outFileName, "out", "");
 
     CommandLineString(timeDimName, "timeDim", "time");
@@ -40,19 +41,17 @@ int main(int argc, char** argv) {
     std::exit(-1);
   }
 
-  if (inFileNamesCS.length() == 0) {
-    std::cerr << "Error: no input files provided!" << std::endl;
+  if (inListFileName.length() == 0) {
+    std::cerr << "Error: no input list provided!" << std::endl;
     std::exit(-1);
   }
 
   std::vector<std::string> inFileNames;
   {
-    char* cpybuf = new char[inFileNamesCS.length() + 1];
-    std::strcpy(cpybuf, inFileNamesCS.c_str());
-    char* nextTok = std::strtok(cpybuf, ",");
-    while (nextTok != nullptr) {
-      inFileNames.push_back(std::string(nextTok));
-      nextTok = std::strtok(nullptr, ",");
+    std::ifstream inListFile{inListFileName};
+    std::string fileNameBuf;
+    while (std::getline(inListFile, fileNameBuf)) {
+      inFileNames.push_back(fileNameBuf);
     }
   }
 
