@@ -9,7 +9,7 @@ DDIR=/Volumes/ExFAT_drive/ERA_files
 BDIR=$DDIR/ERA_detect
 #VAR="GHGrad"
 
-VARVEC=("GHGrad" "Z" "IPV")
+VARVEC=("Z" "IPV")
 
 #Addition of regional parameters
 SECTOR=("NA" "NC" "NP" "SA" "SI" "SP")
@@ -29,18 +29,18 @@ PLOT_TITLE=""
 for VAR in ${VARVEC[@]}; do
 
 if [ "$VAR" == "IPV" ]; then
-  SUFF="integ_devs.nc"
-  BLOB_SUFF="blobs_nostitch.nc"
-  STAT_SUFF="stats_nostitch.txt"
-  DENS_SUFF="dens_nostitch.nc"
+  SUFF="integ_devs_norm_const.nc"
+  BLOB_SUFF="blobs_nostitch_const.nc"
+  STAT_SUFF="stats_nostitch_const.txt"
+  DENS_SUFF="dens_nostitch_const.nc"
   INVAR="INT_ADIPV"
   BLOB_VAR="PV_BLOB"
   PLOT_TITLE="PV blocking"
 elif [ "$VAR" == "Z" ]; then
-  SUFF="z500_devs.nc"
-  BLOB_SUFF="Zblobs_nostitch.nc"
-  STAT_SUFF="Zstats_nostitch.txt"
-  DENS_SUFF="Zdens_nostitch.nc"
+  SUFF="z500_devs_norm_const.nc"
+  BLOB_SUFF="Zblobs_nostitch_const.nc"
+  STAT_SUFF="Zstats_nostitch_const.txt"
+  DENS_SUFF="Zdens_nostitch_const.nc"
   INVAR="INT_ADGH"
   BLOB_VAR="Z_BLOB"
   PLOT_TITLE="Z blocking"
@@ -60,7 +60,7 @@ if [ ! -e $BDIR ]; then
   mkdir -p $BDIR
 fi
 
-for ((y=ycalc; y<=ycalc; y++)); do
+for ((y=1980; y<=2005; y++)); do
   i=0
   SUBDIR=$DDIR/ERA_$y
   echo "Entering subdirectory $SUBDIR"
@@ -118,7 +118,7 @@ for ((y=ycalc; y<=ycalc; y++)); do
       densname="$BDIR/ERA_"$y"_"$s"_""$secname""_"$DENS_SUFF
       vdensname="$BDIR/ERA_"$y"_"$s"_var_""$secname""_"$DENS_SUFF
 
-      ~/tempestextremes/bin/DetectBlobs --inlist bloblist --out $blobsname --var $INVAR --outvar $BLOB_VAR --minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]}
+      ~/tempestextremes/bin/DetectBlobs --inlist bloblist --out $blobsname --var $INVAR --outvar $BLOB_VAR --minlat ${MIN_LAT[n]} --maxlat ${MAX_LAT[n]} --minlon ${LEFT_BOUND[n]} --maxlon ${RIGHT_BOUND[n]} --thresholdcmd "minarea,1000000000000"
       ~/tempestextremes/bin/BlobStats --infile $blobsname --outfile $statsname --invar $BLOB_VAR --out minlat,maxlat,minlon,maxlon,centlat,centlon,area
    #   ~/tempestextremes/bin/DensityCalculations --in $blobsname --var $BLOB_VAR --out $densname
    #   ~/tempestextremes/bin/DensityCalculations --inlist bloblist --var $INVAR --out $vdensname

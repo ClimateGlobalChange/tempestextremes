@@ -1,5 +1,5 @@
 #load("~/block_r_data/stats_cold_spell.RData")
-
+library(knitr)
 check_overlaps<-function(Alt,Alb,All,Alr,
                          Blt,Blb,Bll,Blr){
   #Note: lons must deal with periodic boundary
@@ -37,79 +37,12 @@ for (t in sort(unique(df_tot$tstep))){
     if (length(namevec)==2){
       v3<-NULL
       varC<-NULL
-      # #Compare the lengths of v1 and v2
-      # minlen<-min(l1,l2)
-      # #if v2<v1, swap, else keep the same
-      # if (minlen!=l1){
-      #   ###print("swapping 1 and 2")
-      #   vtemp<-v1
-      #   vartemp<-varA
-      #   v1<-v2
-      #   varA<-varB
-      #   v2<-vtemp
-      #   varB<-vartemp
-      # }
-      # l1<-dim(v1)[1]
-      # l2<-dim(v2)[1]
 
     }
     else{
       v3<-df_sub[df_sub$var==namevec[3],]
       l3<-dim(v3)[1]
       varC<-as.character(namevec[3])
-      
-      # minlen<-min(l1,l2,l3)
-      # if (minlen!=l1){
-      #   #is l2 or l3 smaller?
-      #   m2<-min(l2,l3)
-      #   #l3 is smallest, swap 1 and 3
-      #   if (m2!=l2){
-      #     ###print("Min: swapping 1 and 3")
-      #     vtemp<-v1
-      #     vartemp<-varA
-      #     v1<-v3
-      #     varA<-varC
-      #     v3<-vtemp
-      #     varC<-vartemp
-      #   }else{
-      #     ###print("Min: swapping 1 and 2")
-      #     vtemp<-v1
-      #     vartemp<-varA
-      #     v1<-v2
-      #     varA<-varB
-      #     v2<-vtemp
-      #     varB<-vartemp
-      #   }
-      # }
-      # l1<-dim(v1)[1]
-      # l2<-dim(v2)[1]
-      # l3<-dim(v3)[1]
-      # maxlen<-max(l1,l2,l3)
-      # if (maxlen!=l3){
-      #   #is l1 or l2 bigger?
-      #   m2<-max(l1,l2)
-      #   #l1 is biggest, swap 1 and 3
-      #   if (m2!=l2){
-      #     ###print("Max: swapping 1 and 3")
-      #     vtemp<-v1
-      #     vartemp<-varA
-      #     v1<-v3
-      #     varA<-varC
-      #     v3<-vtemp
-      #     varC<-vartemp
-      #   }else{
-      #     ###print("Min: swapping 2 and 3")
-      #     vtemp<-v3
-      #     vartemp<-varC
-      #     v3<-v2
-      #     varC<-varB
-      #     v2<-vtemp
-      #     varB<-vartemp
-      #   }
-      # }
-      # l1<-dim(v1)[1]
-      # l2<-dim(v2)[1]
-      # l3<-dim(v3)[1]
       
     }
     #holds the pairs
@@ -292,6 +225,38 @@ nPVoverlap<-sum(v_type$PV)
 nZoverlap<-sum(v_type$Z)
 nGHGoverlap<-sum(v_type$GHG)
 
+varvec<-c("PV*","Z*","ZG")
+varvec_f<-c("PV&ast;","Z&ast;","ZG")
+
+matnum<-matrix(1,nrow=2,ncol=4)
+colnames(matnum)<-c(varvec,"tot")
+rownames(matnum)<-c("number","percent")
+matnum[1,1]<-nPV
+matnum[1,2]<-nZ
+matnum[1,3]<-nGHG
+matnum[1,4]<-nTOT
+matnum[2,]<-round(matnum[1,]/nTOT,4)
+
+matnum[1,]<-format(matnum[1,],nsmall=0)
+
+cat("#### Number of instantaneous blocks by type\n")
+print(kable(matnum,format='markdown',align='c'))
+
+matint<-matrix(1,nrow=2,ncol=5)
+colnames(matint)<-c("PV&ast;$\\cap$Z&ast;","PV&ast;$\\cap$ZG","Z&ast;$\\cap$ZG","all","total")
+rownames(matint)<-c("number","percent")
+matint[1,1]<-nPVZ
+matint[1,2]<-nPVZG
+matint[1,3]<-nZZG
+matint[1,4]<-nall
+matint[1,5]<-tot_overlaps
+matint[2,]<-round(matint[1,]/tot_overlaps,4)
+matint[1,]<-format(matint[1,],nsmall=0)
+cat("#### Number of overlapping blocks\n")
+print(kable(matint,format='markdown',align='c'))
+
+
+cat("**Percent of blocks that have some sort of overlap:**",tot_overlaps/nTOT,"\n")
 
 matp<-matrix(1,nrow=3,ncol=3)
 
@@ -302,5 +267,18 @@ matp[2,3]<-nZZG/nGHG
 matp[3,1]<-nPVZG/nPV
 matp[3,2]<-nZZG/nZ
 
+mats<-matrix(1,nrow=3,ncol=3)
+rownames(mats)<-varvec
+colnames(mats)<-varvec
 
 
+for (a in 1:3){
+  v1<-varvec_f[a]
+  for (b in 1:3){
+    v2<-varvec_f[b]
+    mats[a,b]<-sprintf("P(%s|%s)=%.4f",v1,v2,matp[a,b])
+  }
+}
+cat("\n")
+cat("#### Probability of block type given presence of other block type\n")
+print(kable(mats,format='markdown',align='c'))

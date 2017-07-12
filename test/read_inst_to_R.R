@@ -9,12 +9,12 @@ MIN_LAT=c(25, 25, 25, -75, -75, -75)
 MAX_LAT=c(75, 75, 75, -25, -25, -25)
 
 #Axes
-f<-open.nc("/Volumes/ExFAT_drive/ERA_files/ERA_avg/ERA_1980_2005_Z500_avg.nc")
+f<-open.nc("/Volumes/ExFAT_drive/ERA_files/ERA_avg/ERA_1980_2005_z500_avgDFT.nc")
 lats<-read.nc(f)$lat
 lons<-read.nc(f)$lon
 close.nc(f)
 
-for (i in 3:6){
+for (i in c(2)){
   seci<-which(sectors==sectors[i])
   lb<-get_index(lons,LEFT_BOUND[seci])
   rb<-get_index(lons,RIGHT_BOUND[seci])
@@ -42,7 +42,7 @@ for (i in 3:6){
   pv_inst<-array(NA,c(lonsize,latsize,tsz))
   z_inst<-array(NA,c(lonsize,latsize,tsz))
   
-  hrs<-c()
+  hrs2<-c()
   start_t<-1
   #READ IN ALL DATA FOR WORKSPACE
   for (y in 1980:2005){
@@ -55,13 +55,15 @@ for (i in 3:6){
       fpv<-open.nc(fname_pvanom)
       #Add hours to time axis
       t<-read.nc(fpv)$time
-      hrs<-c(hrs,t)
+
       #Get end index for time axis
       end_t<-start_t+length(t)-1
       if (m==2){
         end_t<-end_t-4
+        hrs2<-c(hrs2,t[1:(length(t)-4)])
         pv_inst[,,start_t:end_t]<-read.nc(fpv)$IPV[lons_sub,lats_sub,1:(length(t)-4)]
       }else{
+        hrs2<-c(hrs2,t)
         pv_inst[,,start_t:end_t]<-read.nc(fpv)$IPV[lons_sub,lats_sub,]       
       }
       close.nc(fpv)
@@ -82,10 +84,10 @@ for (i in 3:6){
     }
   }
   image_name<-paste(sprintf("~/block_r_data/%s_pv_z_inst_data.RData",sectors[i]))
-  time_format<-as.Date(hrs/24, origin="1800-01-01")
-  time_hrs<-hrs%%24
-  save(list=c("pv_inst","z_inst","hrs","lats_sub",
-              "lons_sub","lats","lons","time_format","time_hrs"),file=image_name)
+  time_format2<-as.Date(hrs2/24, origin="1800-01-01")
+  time_hrs2<-hrs2%%24
+  save(list=c("pv_inst","z_inst","hrs2","lats_sub",
+              "lons_sub","lats","lons","time_format2","time_hrs2"),file=image_name)
 }
 
 
