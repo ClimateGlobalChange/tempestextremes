@@ -101,14 +101,14 @@ int main(int argc, char ** argv){
     std::string outFile;
     std::string varName;
     std::string inList;
-    bool calcStdDev;
+//    bool calcStdDev;
 
     BeginCommandLine()
       CommandLineString(inFile, "in", "");
       CommandLineString(inList, "inlist","");
       CommandLineString(varName, "var", "");
       CommandLineString(outFile, "out", "");
-      CommandLineBool(calcStdDev, "std");
+  //    CommandLineBool(calcStdDev, "std");
       ParseCommandLine(argc, argv);
     EndCommandLine(argv)
     AnnounceBanner();
@@ -152,17 +152,15 @@ int main(int argc, char ** argv){
     //Create output matrix
     DataMatrix<double> outMat(latLen,lonLen);
     densCalc(inVar,outMat);
-
-    DataMatrix3D<double> storeMat(vecFiles.size(),latLen,lonLen);
     //Option for calculating the yearly standard deviation 
-    if (calcStdDev){
+ /*   if (calcStdDev){
       for (int a=0; a<latLen; a++){
         for (int b=0; b<lonLen; b++){
           storeMat[0][a][b] = outMat[a][b];
         }
       }
     }
-
+*/
     //If multiple files, add these values to the output
     if (vecFiles.size()>1){
       DataMatrix<double> addMat(latLen,lonLen);
@@ -176,13 +174,13 @@ int main(int argc, char ** argv){
             outMat[a][b]+=addMat[a][b];
           }
         }
-        if (calcStdDev){
+/*        if (calcStdDev){
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
               storeMat[v][a][b] = addMat[a][b];
             }
           }
-        }
+        }*/
         addread.close(); 
       }
       //Divide output by number of files
@@ -209,7 +207,7 @@ int main(int argc, char ** argv){
     densVar->set_cur(0,0);
     densVar->put((&outMat[0][0]),latLen,lonLen);
 
-    if (calcStdDev){
+/*    if (calcStdDev){
       NcVar * stdDevVar = readout.add_var("stddev", ncDouble,outLat,outLon);
       DataMatrix<double> stdDevMat(latLen,lonLen);
       yearlyStdDev(storeMat,vecFiles.size(),latLen,lonLen,stdDevMat);
@@ -218,7 +216,7 @@ int main(int argc, char ** argv){
       std::cout<<" created sd variable"<<std::endl;
 
     }
-
+*/
     readout.close();
     readin.close();
   } 
