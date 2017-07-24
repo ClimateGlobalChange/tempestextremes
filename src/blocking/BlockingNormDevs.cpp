@@ -68,7 +68,7 @@ int main(int argc, char **argv){
   
 
    int nFiles,avgTime,nTime,nLat,nLon;
-   if (const_thresh & anomVal==0.){
+   if (const_thresh && anomVal==0.){
      if (PVCalc){
        anomVal = 1.2*std::pow(10,-6);
        minThresh = 1.1*std::pow(10,-6);
