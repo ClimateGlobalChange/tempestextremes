@@ -764,10 +764,6 @@ try {
 		// Loop through all points at the current time level
 		for (int i = 0; i < vecCandidates[t].size(); i++) {
 
-			if (vecCandidates[t+1].size() == 0) {
-				break;
-			}
-
 			double dX = vecNodes[t][i].x;
 			double dY = vecNodes[t][i].y;
 			double dZ = vecNodes[t][i].z;

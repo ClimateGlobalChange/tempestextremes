@@ -1,8 +1,8 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
-///	\file    JiangARs.cpp
+///	\file    SpineARs.cpp
 ///	\author  Paul Ullrich
-///	\version September 11th, 2016
+///	\version December 1st, 2016
 ///
 ///	<remarks>
 ///		Copyright 2000-2014 Paul Ullrich
@@ -43,6 +43,12 @@ try {
 	// Output variable name
 	std::string strOutputVariable;
 
+	// Size of the Laplacian
+	int iLaplacianSize;
+
+	// Minimum Laplacian
+	double dMinLaplacian;
+
 	// Minimum absolute latitude
 	double dMinAbsLat;
 
@@ -75,11 +81,13 @@ try {
 		CommandLineString(strInputFile, "in", "");
 		//CommandLineString(strInputFileList, "inlist", "");
 		CommandLineString(strOutputFile, "out", "");
-		CommandLineString(strIWVVariable, "iwvvar", "");
+		CommandLineString(strIWVVariable, "var", "");
 		CommandLineString(strOutputVariable, "outvar", "");
+		CommandLineInt(iLaplacianSize, "laplaciansize", 5);
+		CommandLineDouble(dMinLaplacian, "minlaplacian", 0.5e4);
 		CommandLineDouble(dMinAbsLat, "minabslat", 15.0);
 		CommandLineDouble(dEqBandMaxLat, "eqbandmaxlat", 15.0);
-		CommandLineDouble(dMinIWV, "miniwv", 20.0);
+		CommandLineDouble(dMinIWV, "minval", 20.0);
 		CommandLineDouble(dZonalMeanWeight, "zonalmeanwt", 0.7);
 		CommandLineDouble(dZonalMaxWeight, "zonalmaxwt", 0.3);
 		CommandLineDouble(dMeridMeanWeight, "meridmeanwt", 0.9);
@@ -196,6 +204,9 @@ try {
 		_EXCEPTIONT("Error copying variable \"lat\" to output file");
 	}
 
+	// Tagged cell array
+	DataMatrix<int> dIWVtag(dimLat->size(), dimLon->size());
+
 	NcVar * varIWVtag = NULL;
 	if (dimTime != NULL) {
 		varIWVtag = ncOutput.add_var(
@@ -213,20 +224,44 @@ try {
 			dimLonOut);
 	}
 
-	varIWVtag->add_att("description", "binary indicator of atmospheric river");
-	varIWVtag->add_att("scheme", "Jiang");
-	varIWVtag->add_att("version", "1.0");
+	// Laplacian
+	DataMatrix<double> dLaplacian(dimLat->size(), dimLon->size());
+
+	NcVar * varLaplacian = NULL;
+	if (dimTime != NULL) {
+		varLaplacian = ncOutput.add_var(
+			"ar_dx2",
+			ncDouble,
+			dimTimeOut,
+			dimLatOut,
+			dimLonOut);
+
+	} else {
+		varLaplacian = ncOutput.add_var(
+			"ar_dx2",
+			ncDouble,
+			dimLatOut,
+			dimLonOut);
+	}
 
 	AnnounceEndBlock("Done");
 
-	// Tagged cell array
-	DataMatrix<ncbyte> dIWVtag(dimLat->size(), dimLon->size());
+	// Delta longitude
+	double dDeltaLon = (dLonDeg[1] - dLonDeg[0]) / 180.0 * M_PI;
+	double dDeltaLat = (dLatDeg[1] - dLatDeg[0]) / 180.0 * M_PI;
+
+	double dX = dDeltaLon * static_cast<double>(iLaplacianSize);
+	double dY = dDeltaLat * static_cast<double>(iLaplacianSize);
+
+	double dX2 = dX * dX;
+	double dY2 = dY * dY;
 
 	// Loop through all times
 	int nTimes = 1;
 	if (dimTime != NULL) {
 		nTimes = dimTime->size();
 	}
+
 	for (int t = 0; t < nTimes; t++) {
 
 		char szBuffer[20];
@@ -242,7 +277,55 @@ try {
 			varIWV->get(&(dIWV[0][0]), dimLat->size(), dimLon->size());
 		}
 
-		AnnounceStartBlock("Compute zonal/meridional thresholds");
+		dIWVtag.Zero();
+/*
+		// Identify ridges
+		AnnounceStartBlock("Identify ridges");
+		for (int j = iLaplacianSize; j < dimLat->size() - iLaplacianSize; j++) {
+		for (int i = 0; i < dimLon->size(); i++) {
+			const int nPoints = 32;
+			for (int n = 0; n < nPoints; n++) {
+				double dLonPt = 
+			}
+		}
+		}
+		AnnounceEndBlock("Done");
+*/
+
+		AnnounceStartBlock("Compute Laplacian");
+
+		// Compute Laplacian
+		double dA = 1.0 / 12.0 * (1.0/dX2 + 1.0/dY2);
+		double dB = 5.0 / (6.0 * dX2) - 1.0 / (6.0 * dY2);
+		double dC = -1.0 / (6.0 * dX2) + 5.0 / (6.0 * dY2);
+		double dD = -5.0 / 3.0 * (1.0/dX2 + 1.0/dY2);
+
+		for (int j = iLaplacianSize; j < dimLat->size() - iLaplacianSize; j++) {
+		for (int i = 0; i < dimLon->size(); i++) {
+			int i0 = (i + dimLon->size() - iLaplacianSize) % (dimLon->size());
+			int i2 = (i + iLaplacianSize) % (dimLon->size());
+
+			int j0 = j - iLaplacianSize;
+			int j2 = j + iLaplacianSize;
+
+			dLaplacian[j][i] =
+				  dA * dIWV[j0][i0]
+				+ dB * dIWV[j ][i0]
+				+ dA * dIWV[j2][i0]
+				+ dC * dIWV[j0][i ]
+				+ dD * dIWV[j ][i ]
+				+ dC * dIWV[j2][i ]
+				+ dA * dIWV[j0][i2]
+				+ dB * dIWV[j ][i2]
+				+ dA * dIWV[j2][i2];
+
+			if (dLaplacian[j][i] > -dMinLaplacian) {
+				dLaplacian[j][i] = 0.0;
+			} else {
+				dLaplacian[j][i] = 1.0;
+			}
+		}
+		}
 
 		// Compute zonal threshold
 		DataVector<float> dZonalThreshold(dimLat->size());
@@ -284,8 +367,6 @@ try {
 		AnnounceStartBlock("Build tagged cell array");
 
 		// Build tagged cell array
-		dIWVtag.Zero();
-
 		for (int j = 0; j < dimLat->size(); j++) {
 		for (int i = 0; i < dimLon->size(); i++) {
 			if (fabs(dLatDeg[j]) < dMinAbsLat) {
@@ -301,10 +382,11 @@ try {
 				continue;
 			}
 
-			dIWVtag[j][i] = 1;
+			//dIWVtag[j][i] = 1 + static_cast<int>(dLaplacian[j][i]);
+			dIWVtag[j][i] = static_cast<int>(dLaplacian[j][i]);
 		}
 		}
-
+/*
 		// Remove points connected with equatorial moisture band
 		for (int i = 0; i < dimLon->size(); i++) {
 			bool fSouthDone = false;
@@ -337,16 +419,23 @@ try {
 				}
 			}
 		}
-
+*/
 		AnnounceEndBlock("Done");
 
 		AnnounceStartBlock("Writing results");
 
 		// Output tagged cell array
 		if (dimTime != NULL) {
+			varLaplacian->set_cur(t, 0, 0);
+			varLaplacian->put(&(dLaplacian[0][0]), 1, dimLatOut->size(), dimLonOut->size());
+
 			varIWVtag->set_cur(t, 0, 0);
 			varIWVtag->put(&(dIWVtag[0][0]), 1, dimLatOut->size(), dimLonOut->size());
+
 		} else {
+			varLaplacian->set_cur(0, 0);
+			varLaplacian->put(&(dLaplacian[0][0]), dimLatOut->size(), dimLonOut->size());
+
 			varIWVtag->set_cur(0, 0);
 			varIWVtag->put(&(dIWVtag[0][0]), dimLatOut->size(), dimLonOut->size());
 		}

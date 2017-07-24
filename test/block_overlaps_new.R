@@ -19,7 +19,7 @@ check_overlaps<-function(Alt,Alb,All,Alr,
   }
 }
 
-
+df_tot<-df_tot_nostitch
 v_type<-data.frame(PV=numeric(),Z=numeric(),GHG=numeric())
 for (t in sort(unique(df_tot$tstep))){
 #for (t in 129:129){
