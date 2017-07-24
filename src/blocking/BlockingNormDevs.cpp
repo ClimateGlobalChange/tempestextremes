@@ -43,7 +43,6 @@ int main(int argc, char **argv){
     bool const_thresh;
     double anomVal,minThresh;
 
-
     BeginCommandLine()
       CommandLineString(fileList, "inlist", "");
       CommandLineString(varName,"varname","");
@@ -71,12 +70,16 @@ int main(int argc, char **argv){
    if (const_thresh && anomVal==0.){
      if (PVCalc){
        anomVal = 1.2*std::pow(10,-6);
-       minThresh = 1.1*std::pow(10,-6);
      }else if (GHCalc){
        anomVal = 170.;
-       minThresh = 100.;
      }
    }
+   if (PVCalc){
+     minThresh = 1.1*std::pow(10,-6);
+   }else if (GHCalc){
+     minThresh = 100.;
+   }
+
 
    std::cout<<"Opening file list."<<std::endl;
    //Create list of input files
