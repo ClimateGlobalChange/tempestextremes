@@ -41,6 +41,7 @@ int main(int argc, char **argv){
     bool PVCalc;
     bool GHCalc;
     bool const_thresh;
+    double anomVal,minThresh;
 
 
     BeginCommandLine()
@@ -53,6 +54,7 @@ int main(int argc, char **argv){
       CommandLineBool(PVCalc,"pv");
       CommandLineBool(GHCalc,"gh");
       CommandLineBool(const_thresh,"const");
+      CommandLineDouble(anomVal,"threshold",0.);
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
@@ -66,13 +68,14 @@ int main(int argc, char **argv){
   
 
    int nFiles,avgTime,nTime,nLat,nLon;
-   double anomVal,minThresh;
-   if (PVCalc){
-     anomVal = 1.3*std::pow(10,-6);
-     minThresh = 1.1*std::pow(10,-6);
-   }else if (GHCalc){
-     anomVal = 170.;
-     minThresh = 100;
+   if (const_thresh & anomVal==0.){
+     if (PVCalc){
+       anomVal = 1.2*std::pow(10,-6);
+       minThresh = 1.1*std::pow(10,-6);
+     }else if (GHCalc){
+       anomVal = 170.;
+       minThresh = 100.;
+     }
    }
 
    std::cout<<"Opening file list."<<std::endl;
