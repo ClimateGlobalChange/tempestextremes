@@ -38,6 +38,126 @@
 \begin{document}
 
 {\Huge \textbf{TempestExtremes}}
+\section{Files contained in \texttt{src/blocking}}
+\subsection{AvgVar}
+\begin{verbatim}
+Usage: AvgVar <parameter list>
+Parameters:
+  --inlist <string>  [""]
+  --out <string> [""]
+  --varlist <string> [""]
+  --tname <string> ["time"]
+  --latname <string> ["lat"]
+  --lonname <string> ["lon"]
+\end{verbatim}
+
+\begin{itemize}
+\item[]\texttt{--inlist <string>} \\ A list of input datafiles (one file per line) in NetCDF format, with axes \texttt{[time, latitude, longitude]}. 
+\item[] \texttt{--out <string>}\\ The output filename.
+\item[] \texttt{--varlist <string>}\\ List of variable names, separated by commas (with no spaces). Example: \texttt{T,U,V}
+\item[] \texttt{--tname <string>}\\Name of the time axis (default \texttt{time}).
+\item[]\texttt{--latname <string>}\\Name of the latitude axis (default \texttt{lat}).
+\item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
+\end{itemize}
+
+\subsubsection{File input and output}
+This program takes a list of files and, for the specified list of variables, averages quantities from all files together along the time axis. The program assumes that input variables are on a single vertical level and therefore have the axes \texttt{[time, latitude, longitude]}. 
+
+The output file contains time-averaged variables  with axes \texttt{[latitude, longitude]}, and have the same names as the original inputs . 
+
+\subsection{BlockingAvg}\label{bavg}
+\begin{verbatim}
+Usage: BlockingAvg <parameter list>
+Parameters:
+  --inlist <string>  [""]
+  --out <string> [""]
+  --varname <string> [""]
+  --avgname <string> [""]
+  --missing
+  --tname <string> ["time"]
+  --latname <string> ["lat"]
+  --lonname <string> ["lon"]
+\end{verbatim}
+
+\begin{itemize}
+\item[]\texttt{--inlist <string>} \\ A list of input datafiles (one file per line) in NetCDF format. All files contained within the list will be averaged together along the time axis.
+\item[] \texttt{--out <string>}\\ The output filename.
+\item[] \texttt{--varname <string>}\\ Name of input variable which will be averaged.
+\item[]\texttt{--avgname <string>}\\Name of output long term daily average variable.
+\item[]\texttt{--missing}\\ Boolean in the case of files that are missing from the sequence (an exception will be raised if this flag is not included and files are not consecutive in time).
+\item[] \texttt{--tname <string>}\\Name of the time axis (default \texttt{time}).
+\item[]\texttt{--latname <string>}\\Name of the latitude axis (default \texttt{lat}).
+\item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
+\end{itemize}
+
+\subsubsection{Averaging method}
+The averaging method is essentially a smoothed long term daily average. Per year, each day is averaged with the 15 days preceding and succeeding that day; each smoothed day is averaged with the corresponding smoothed days from other years. 
+
+\subsubsection{File input and output}
+This program takes a list of files and produces a variable that is the long term daily average of variable specified by \texttt{--varname}. The program assumes that input variables are on a single vertical level and therefore have the axes \texttt{[time, latitude, longitude]}. 
+
+The input list must have the files in chronological order for this program to work. Because the program checks the length of time in between one file and the next, the \texttt{--missing} flag must be included if there are files that  are missing from the sequence, otherwise an exception will be raised and the program will terminate.
+
+The output file contains the long term daily average variable, with the name specified by \texttt{--avgname}. The averaged variable is 365 days (leap days are omitted) along the time axis and has time units of ``days since 0001-12-31''.
+
+
+
+
+
+\subsection{BlockingDevs}
+\begin{verbatim}
+Usage: BlockingDevs <parameter list>
+Parameters:
+  --inlist <string>  [""]
+  --avg <string> [""]
+  --varname <string> [""]
+  --avgname <string> [""]
+  --pv
+  --gh
+  --tname <string> ["time"]
+  --latname <string> ["lat"]
+  --lonname <string> ["lon"]
+\end{verbatim}
+
+\begin{itemize}
+\item[]\texttt{--inlist <string>} \\ A list of input datafiles in NetCDF format. 
+\item[] \texttt{--avg <string>}\\ The name of the long term daily average file 
+\item[] \texttt{--varname <string>}\\Name of input variable for which anomaly will be calculated.
+\item[]\texttt{--avgname <string>}\\Name of input long term daily average variable.
+\item[]\texttt{--pv} or \texttt{--gh}\\Boolean which specifies whether the vertically averaged potential anomaly (\texttt{--pv}) or 500 mb geopotential height (\texttt{--gh}) anomaly will be calculated. One or the other must be specified, not both.
+\item[] \texttt{--tname <string>}\\Name of the time axis (default \texttt{time}).
+\item[]\texttt{--latname <string>}\\Name of the latitude axis (default \texttt{lat}).
+\item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
+\end{itemize}
+
+\subsubsection{File input and output}
+This program takes a list of files and calculates anomalies from the long term daily mean (the file which was calculated in Section \ref{bavg}). There are two options for outputs, specified by the Boolean \texttt{--pv} (potential vorticity) and \texttt{--gh} (500 mb geopotential height) flags. 
+
+For each input file, the program produces a corresponding output file containing the calculated anomalies with the suffix \texttt{\_devs} appended to the original file name. There are 3 output variables: the unsmoothed anomaly (\texttt{DIPV/DGH}), the anomaly with 2-day smoothing (\texttt{ADIPV/ADGH}), and 
+the smoothed anomalies divided by the threshold value (\texttt{INT\_ADIPV/INT\_ADGH}).
+
+\subsection{BlockingGHG}
+\begin{verbatim}
+Usage: BlockingGHG <parameter list>
+Parameters:
+  --in<string>  [""]
+  --out <string> [""]
+  --varname <string> [""]
+  --tname <string> ["time"]
+  --latname <string> ["lat"]
+  --lonname <string> ["lon"]
+\end{verbatim}
+
+\begin{itemize}
+\item[]\texttt{--in <string>} \\ The name of the input NetCDF file (must contain variable with 500 mb geopotential height).
+\item[] \texttt{--out <string>}\\ The name of the output NetCDF file (if omitted, a file with the suffix \texttt{\_GHG} appended to the file name will be produced).
+\item[] \texttt{--varname <string>}\\Name of input 500 mb height variable.
+\item[] \texttt{--tname <string>}\\Name of the time axis (default \texttt{time}).
+\item[]\texttt{--latname <string>}\\Name of the latitude axis (default \texttt{lat}).
+\item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
+\end{itemize}
+
+\subsubsection{Brief algorithm description}
 
 \section{DetectCyclonesUnstructured}
 

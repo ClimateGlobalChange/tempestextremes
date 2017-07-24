@@ -30,3 +30,7 @@ test/*.nc4
 test/cfsr_tests
 
 test/*.eps
+
+test/*.png
+
+test/statfigs/*

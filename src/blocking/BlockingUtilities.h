@@ -24,15 +24,45 @@
 #include <cstring>
 #include <vector>
 
-//Copied from StitchBlobs
+//////////////////////////////////////
+//    SECTION: FILE OPERATIONS      //
+//////////////////////////////////////
+
+//Copied from StitchBlobs: This function
+//takes an input text file list and creates
+//a character string vector of the file names
 void GetInputFileList(
         const std::string & strInputFileList,
                 std::vector<std::string> & vecInputFiles
 );
 
+				
+//////////////////////////////////////
+//    SECTION: TIME OPERATIONS      //
+//////////////////////////////////////
+				
+//Used to determine if the input time value
+//is a leap day or not. Returns boolean for
+//that particular time value
+bool checkFileLeap(
+  std::string StrTimeUnits,
+  std::string strCalendar,
+  int dateYear,
+  int dateMonth,
+  int dateDay,
+  int dateHour,
+  double timeVal
+);
+
+//Function to get number of day in year
+//Returns an integer value in the range 1-365
 int DayInYear(int nMonth,
               int nDay);
 
+//Copied from DetectCyclones: This function
+//takes a time value (in units of hours or 
+//days since reference date) and returns 4
+//integer values: year, month, day, and hour
 void ParseTimeDouble(
         const std::string & strTimeUnits,
         const std::string & strTimeCalendar,
@@ -43,9 +73,31 @@ void ParseTimeDouble(
         int & nDateHour
 ); 
 
+//Takes the last time value of the previous file
+//and the first time value of the current file
+//and returns the difference in the amount of time 
+//between these two values. Used in BlockingAvg to 
+//check if this value exceeds the time axis resolution
+double tBetweenFiles(
+	std::string strTimeUnits,
+	double nextStartTime,
+	double prevEndTime
+);
 
+//////////////////////////////////////
+//    SECTION: AXIS OPERATIONS      //
+//////////////////////////////////////
+
+//Takes an input file's axis variable and copies
+//relevant attributes to output file's axis variable
+void copy_dim_var(
+        NcVar *inVar,
+        NcVar *outVar
+);
 
 //Function to interpolate variables from hybrid levels to pressure levels
+//Takes input variable and reference variables hyam,hybm and returns
+//variable with new pressure level axis (specified by pLev)
 void interpolate_lev(NcVar *var,
                      NcVar *hyam,
                      NcVar *hybm,
@@ -54,13 +106,31 @@ void interpolate_lev(NcVar *var,
                      NcVar *NewVar
 );
 
-//Function to copy dimension variables to outfile
-void copy_dim_var(
-        NcVar *inVar,
-        NcVar *outVar
+//Function that takes an input variable (with pressure axis as vertical)
+//and averages variable along the pressure dimension from 150-500 hPa. 
+//Returns variable with dimensions [time, lat, lon]
+void VarPressureAvg(
+    NcVar *invar,
+    NcVar * pVals,
+    NcVar * outvar
 );
 
-//Function that calculates dlat, don, etc for PV calculation
+/////////////////////////////////////////////////////////
+//    SECTION: INTERMEDIATE VARIABLE CALCULATIONS      //
+/////////////////////////////////////////////////////////
+
+//Takes temperature and pressure variables and returns
+//a 4D data matrix (time, lev, lat, lon) with potential 
+//temperature values
+void PT_calc(
+        NcVar *T, 
+        NcVar *pLev, 
+        DataMatrix4D<double> &PTMat
+);
+		
+//Used in BlockingPV. Input lat, lon, and pressure variables
+//and returns the variables necessary to calculate PV (dlat,
+//dlon, vector of coriolis parameter values,etc)
 void pv_vars_calc(
   NcVar *lat,
   NcVar *lon,
@@ -74,14 +144,9 @@ void pv_vars_calc(
   DataVector<double> & cosphi
 );
 
-//Function that calculates PT
-void PT_calc(
-        NcVar *T, 
-        NcVar *pLev, 
-        DataMatrix4D<double> &PTMat
-);
-
-//Function that calculates relative vorticity
+//Takes wind variables, phi/lambda resolution and coriolis values
+//and returns a 4D data matrix (time, lev, lat, lon) with relative 
+//vorticity values
 void rVort_calc(
         NcVar *U,
         NcVar *V,
@@ -91,56 +156,12 @@ void rVort_calc(
         DataMatrix4D<double> & RVMat
 );
 
-//Function that calculates PV
-void PV_calc(
-        NcVar *U,
-        NcVar *V,
-        DataMatrix4D<double> PTMat,
-        DataMatrix4D<double> RVMat,
-        NcVar *pVals,
-        DataVector<double> coriolis,
-        DataVector<double> cosphi,
-        double dphi,
-        double dlambda,
-        double lat_res,
-        double lon_res,
-        NcVar *PV,
-        NcVar *intPV);
 
-void calcDevsPV(bool leap,
-              int startAvgIndex,
-              NcVar *inIPV,
-              NcVar *outDev,
-              NcVar *outADev,
-              NcVar *outPosIntDev,
-              NcVar *avgIPV,
-              NcVar *inTime,
-              NcVar *avgTime,
-              NcVar *lat,
-              NcVar *outTime,
-              double PVAnom);
-
-void stdDev(DataMatrix3D<double>inDevs,
-              int nTime,
-              int nLat,
-              int nLon,
-              DataMatrix<double> & outStdDev);
+//////////////////////////////////////
+//    SECTION: VARIABLE CHECKS      //
+//////////////////////////////////////
 
 
-void calcDevsGH(bool leap,
-              int startAvgIndex,
-              NcVar *inGH,
-              NcVar *outDev,
-              NcVar *outADev,
-              NcVar *outIntDev,
-              NcVar *avgGH,
-              NcVar *inTime,
-              NcVar *avgTime,
-              NcVar *lat,
-              NcVar *outTime,
-              NcVar *stdDevVar);
-
-//Function that calculates TM blocking index
 double GHcheck(double z_0,
           double z_N,
           double z_S,
@@ -149,11 +170,7 @@ double GHcheck(double z_0,
           double lat_S,
           std::string hemi );
 
-double tBetweenFiles(
-  std::string strTimeUnits,
-  double nextStartTime,
-  double prevEndTime
-);
+
 
 
 bool missingValCheck(
@@ -175,15 +192,79 @@ void MissingFill(
   DataMatrix3D<double> & currFillData
 );
 
-bool checkFileLeap(
-  std::string StrTimeUnits,
-  std::string strCalendar,
-  int dateYear,
-  int dateMonth,
-  int dateDay,
-  int dateHour,
-  double timeVal
-);
+//////////////////////////////////////////////////
+//    SECTION: FINAL VARIABLE CALCULATIONS      //
+//////////////////////////////////////////////////
+
+//Takes 4D variables for wind, potential temperature,
+//relative vorticity, etc and outputs both 4D (time,
+//lev, lat, lon) and 3D (time, lat, lon) vertically 
+//averaged potential vorticity variables
+void PV_calc(
+        NcVar *U,
+        NcVar *V,
+        DataMatrix4D<double> PTMat,
+        DataMatrix4D<double> RVMat,
+        NcVar *pVals,
+        DataVector<double> coriolis,
+        DataVector<double> cosphi,
+        double dphi,
+        double dlambda,
+        double lat_res,
+        double lon_res,
+        NcVar *PV,
+        NcVar *intPV);
+
+////////////////////////////////////////////////////
+//    SECTION: VARIABLE ANOMALY CALCULATIONS      //
+////////////////////////////////////////////////////
+
+//Takes instantaneous variable (PV or Z) and long term 
+//daily average and outputs 3 variables: instantaneous 
+//anomalies, anomalies with 2-day smoothing, and a normalized
+//anomaly (all values below threshold or wrong sign set to 0)
+void calcDevs(bool leap,
+              bool inPV,
+              int startAvgIndex,
+              NcVar *inIPV,
+              NcVar *outDev,
+              NcVar *outADev,
+              NcVar *avgIPV,
+              NcVar *inTime,
+              NcVar *avgTime,
+              NcVar *lat,
+              NcVar *outTime);
+
+void calcNormalizedDevs(bool isPV,
+                       NcVar * inDev,
+                       NcVar * outPosIntDev,
+                       NcVar * lat,
+                       double nSteps,
+                       DataMatrix3D<double>threshMat,
+                       double minThresh);
+/*void stdDev(DataMatrix3D<double>inDevs,
+              int nTime,
+              int nLat,
+              int nLon,
+              DataMatrix<double> & outStdDev);
+
+
+void calcDevsGH(bool leap,
+              double GHAnom,
+              int startAvgIndex,
+              NcVar *inGH,
+              NcVar *outDev,
+              NcVar *outADev,
+              NcVar *outIntDev,
+              NcVar *avgGH,
+              NcVar *inTime,
+              NcVar *avgTime,
+              NcVar *lat,
+              NcVar *outTime,
+              NcVar *stdDevVar);
+*/
+//Function that calculates TM blocking index
+
 
 
 #endif

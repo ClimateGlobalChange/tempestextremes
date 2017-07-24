@@ -31,6 +31,7 @@
 # --listpv=[LIST OF INPUT FILES] ##MANDATORY IF NOT RUNNING PV
 # --varname=[NAME OF VARIABLE BEING AVERAGED] ##MANDATORY
 # --avgname=[NAME OF AVERAGE VARIABLE] ##MANDATORY
+# --avgfile=[NAME OF AVERAGING FILE] ##MANDATORY
 # FOR DEVIATION CALCULATIONS:
 # --listpv=[LIST OF INPUT FILES] ##MANDATORY IF NOT RUNNING PV
 # --avgfile=[NAME OF AVERAGED FILE] ##MANDATORY IF NOT RUNNING AVG
@@ -47,15 +48,21 @@ H4DIR=""
 LIST_4D=""
 LIST_2D=""
 LIST_PV=""
+LIST_BLOBS=""
 PV_BATCH_NAME="pvbatch"
 AVG_BATCH_NAME="avgbatch"
 DEV_BATCH_NAME="devbatch"
+BLOBS_BATCH_NAME="blobsbatch"
 PV_BOOL="FALSE"
 AVG_BOOL="FALSE"
 DEV_BOOL="FALSE"
+BLOBS_BOOL="FALSE"
 VARNAME=""
 AVGNAME=""
+DEVNAME=""
+BLOBSNAME=""
 AVGFILE=""
+BLOBSFILE=""
 MISSING_FILES="FALSE"
 
 for i in "$@"; do 
@@ -81,6 +88,9 @@ for i in "$@"; do
     --listpv=*)
     LIST_PV="${i#*=}"
     ;;
+    --listblobs=*)
+    LIST_BLOBS="${i#*=}"
+    ;;
     --pv)
     PV_BOOL="TRUE"
     ;;
@@ -90,14 +100,26 @@ for i in "$@"; do
     --dev)
     DEV_BOOL="TRUE"
     ;;
+    --blobs)
+    BLOBS_BOOL="TRUE"
+    ;;
     --varname=*)
     VARNAME="${i#*=}"
     ;;
     --avgname=*)
     AVGNAME="${i#*=}"
     ;;
+    --devname=*)
+    DEVNAME="${i#*=}"
+    ;;
+    --blobsname=*)
+    BLOBSNAME="${i#*=}"
+    ;;
     --avgfile=*)
     AVGFILE="${i#*=}"
+    ;;
+    --blobsfile=*)
+    BLOBSFILE="${i#*=}"
     ;;
     --missing)
     MISSING_FILES="TRUE"
@@ -142,6 +164,11 @@ if [ "$PV_BOOL" == "TRUE" ]; then
     LIST_2D=h2list.txt
     LIST_PV=integ_list.txt
 
+    if [ "$AVG_BOOL" == "TRUE" ] && [ "$AVGNAME" == "" ]; then
+      echo "Need to provide average file name (--avgname)."
+      exit
+    fi
+
     cd $DATA_DIR
     ls $H2DIR/*_sub.nc > $DATA_DIR/$LIST_2D
     ls $H4DIR/*_sub.nc > $DATA_DIR/$LIST_4D
@@ -176,7 +203,6 @@ if [ "$PV_BOOL" == "TRUE" ]; then
     LIST_PV=newinteg.txt
 #  fi
 
-  cd $DATA_DIR
   #Create a text file with all 3 lists
   paste $LIST_4D $LIST_2D $LIST_PV > combined_list.txt
 
@@ -184,8 +210,10 @@ if [ "$PV_BOOL" == "TRUE" ]; then
   echo "#!/bin/bash -l" > $PV_BATCH_NAME
   echo "" >> $PV_BATCH_NAME
   echo "#SBATCH -p shared" >> $PV_BATCH_NAME
+  echo "#SBATCH -o pv_batch.output" >> $PV_BATCH_NAME
   echo "#SBATCH -t 20:00:00" >> $PV_BATCH_NAME
   echo "#SBATCH --mem=20GB" >> $PV_BATCH_NAME
+  echo "#SBATCH -C haswell" >> $PV_BATCH_NAME
   echo "" >> $PV_BATCH_NAME
   echo "cd $DATA_DIR" >> $PV_BATCH_NAME
   echo "cat combined_list.txt | awk '{print \"$BINDIR/BlockingPV --ipl --in \"\$1 \" --in2d \"\$2\" --out \"\$3}'| sh" >> $PV_BATCH_NAME
@@ -219,15 +247,18 @@ if [ "$AVG_BOOL" == "TRUE" ]; then
     echo "Averaged file name is $AVGFILE"
   fi
 
+  cd $DATA_DIR
   #Create the averaging batch file
   echo "#!/bin/bash -l" > $AVG_BATCH_NAME
   echo "" >> $AVG_BATCH_NAME
   echo "#SBATCH -p shared" >> $AVG_BATCH_NAME
-  echo "#SBATCH -t 0:20:00" >> $AVG_BATCH_NAME
+  echo "#SBATCH -o avg_batch.output">> $AVG_BATCH_NAME
+  echo "#SBATCH -t 0:30:00" >> $AVG_BATCH_NAME
+  echo "#SBATCH -C haswell" >> $AVG_BATCH_NAME
   echo "" >> $AVG_BATCH_NAME
   echo "cd $DATA_DIR" >> $AVG_BATCH_NAME
   if [ "$MISSING_FILES" == "TRUE" ]; then
-    echo "$BINDIR/BlockingAvg --missing --inlist $LIST_PV --out $AVG_NAME --varname $VARNAME --avgname $AVGNAME" >> $AVG_BATCH_NAME
+    echo "$BINDIR/BlockingAvg --missing --inlist $LIST_PV --out $AVGFILE --varname $VARNAME --avgname $AVGNAME" >> $AVG_BATCH_NAME
   else
     echo "$BINDIR/BlockingAvg --missing --inlist $LIST_PV --out $AVGFILE --varname $VARNAME --avgname $AVGNAME" >> $AVG_BATCH_NAME
   fi
@@ -258,14 +289,18 @@ if [ "$DEV_BOOL" == "TRUE" ]; then
     echo "Need to specify average variable name (--avgname=)."
     exit
   fi
+
+  cd $DATA_DIR
   #Create the deviations batch file
   echo "#!/bin/bash -l" > $DEV_BATCH_NAME
   echo "" >> $DEV_BATCH_NAME
   echo "#SBATCH -p shared" >> $DEV_BATCH_NAME
+  echo "#SBATCH -o dev_batch.output">>$DEV_BATCH_NAME
   echo "#SBATCH -t 2:00:00" >> $DEV_BATCH_NAME
+  echo "#SBATCH -C haswell">> $DEV_BATCH_NAME
   echo "" >> $DEV_BATCH_NAME
   echo "cd $DATA_DIR" >> $DEV_BATCH_NAME
-  echo "$BINDIR/BlockingDevs --inlist $LIST_PV --avg $AVGFILE --varname $VARNAME --avgname $AVGNAME" >> $DEV_BATCH_NAME
+  echo "$BINDIR/BlockingDevs --pv --inlist $LIST_PV --avg $AVGFILE --varname $VARNAME --avgname $AVGNAME" >> $DEV_BATCH_NAME
 
   if [ "$AVG_BOOL" == "FALSE" ]; then 
     echo "Submitting deviations batch file."
@@ -273,3 +308,16 @@ if [ "$DEV_BOOL" == "TRUE" ]; then
   fi
 
 fi
+
+#if [ "$BLOBS_BOOL" == "TRUE" ]; then
+#  cd $DATA_DIR
+#  echo "#!/bin/bash -l" >> $BLOBS_BATCH_NAME
+#  echo "" >> $BLOBS_BATCH_NAME
+#  echo "#SBATCH -p shared" >> $BLOBS_BATCH_NAME
+ # echo "#SBATCH -o blobs_batch.output" >> $BLOBS_BATCH_NAME
+ # echo "#SBATCH -t 1:00:00" >> $BLOBS_BATCH_NAME
+  #echo "" >> $BLOBS_BATCH_NAME
+#  echo "cd $DATA_DIR" >> $BLOBS_BATCH_NAME
+#  echo "$BINDIR/StitchBlobs --inlist $LIST_BLOBS --out $BLOBSFILE --var $DEVNAME --outvar $BLOBSNAME --minsize 5 --mintime 40" 
+#  echo "$BINDIR/BlobStats --in $BLOBSFILE --outfile test --invar $BLOBSNAME --out minlat,maxlat,minlon,maxlon,centlat,centlon,area" >> $BLOBS_BATCH_NAME
+#fi

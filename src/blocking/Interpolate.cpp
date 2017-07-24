@@ -17,8 +17,9 @@
 
 //////////////////////////////////////////////////////////////////////// 
 
-void interp_util(NcFile & readin, 
+void interp_util(NcFile & readin,
                  const std::string & strname_2d, 
+                 const std::string & varlist,
                  NcFile & ifile_out) {
 
   //open 2D PS file
@@ -45,9 +46,10 @@ void interp_util(NcFile & readin,
   NcVar *lonvar = readin.get_var("lon");
 
   //Variables
-  NcVar *temp = readin.get_var("T");
+/*  NcVar *temp = readin.get_var("T");
   NcVar *uvar = readin.get_var("U");
   NcVar *vvar = readin.get_var("V");
+*/
   
   //2D variables
   NcVar *ps = readin_2d.get_var("PS");
@@ -64,7 +66,7 @@ void interp_util(NcFile & readin,
     pVals[i] = pNum;
   }
   
-  //Write information to outfile
+    //Write information to outfile
   NcDim *itime = ifile_out.add_dim("time", time_len);
   NcDim *ilev = ifile_out.add_dim("lev", plev_len);
   NcDim *ilat = ifile_out.add_dim("lat", lat_len);
@@ -75,21 +77,54 @@ void interp_util(NcFile & readin,
   NcVar *ilon_vals = ifile_out.add_var("lon", ncDouble, ilon);
   NcVar *ilev_vals = ifile_out.add_var("lev", ncDouble, ilev);
 
-  std::cout<<"Copying variable values."<<std::endl;
   copy_dim_var(timevar, itime_vals);
-  std::cout<<"Copied time."<<std::endl;
   copy_dim_var(latvar, ilat_vals);
   copy_dim_var(lonvar, ilon_vals);
 
   std::cout<<"writing new pressure level."<<std::endl;
-  //Give pressure dimension values
+    //Give pressure dimension values
   ilev_vals ->set_cur((long) 0);
   ilev_vals->put(&(pVals[0]), plev_len);
 
+  //Split var list  
+  std::string delim = ",";
+  size_t pos = 0;
+  std::string token;
+  std::vector<std::string> varVec;
+  std::string listcopy = varlist;
 
-  std::cout<<"Within interpolation file: about to call interpolate_lev"<<std::endl;
+  while ((pos = listcopy.find(delim)) != std::string::npos){
+    token = listcopy.substr(0,pos);
+    varVec.push_back(token);
+    listcopy.erase(0,pos + delim.length());
+  }
+  varVec.push_back(listcopy);
+
+/*
+  //reads the string (separated by the delimiter) into the vector
+  while((pos = varlist.find(delim)) != std::string::npos){
+//    token = varlist.substr(0,pos);
+    varVec.push_back(token);
+    varlist.erase(0,pos + delim.length());
+//    varlist.erase((std::string::size_type)0,(std::string::size_type)pos + delim.length());
+
+  }
+  varVec.push_back(varlist);
+*/
+
+  for (int v=0; v<varVec.size(); v++){
+    std::cout<<"Vector contains string "<<varVec[v].c_str()<<std::endl;
+  }
+
+  for (int v=0; v<varVec.size(); v++){
+    NcVar * oldvar = readin.get_var(varVec[v].c_str());
+    NcVar * newvar = ifile_out.add_var(varVec[v].c_str(), ncDouble,itime,ilev,ilat,ilon);
+    interpolate_lev(oldvar,hyam,hybm,ps,ilev_vals,newvar);
+  }
+
+  //std::cout<<"Within interpolation file: about to call interpolate_lev"<<std::endl;
   //Add interpolated variables to interpolated outfile
-  NcVar *itemp = ifile_out.add_var("T", ncDouble, itime, ilev, ilat, ilon);
+/*  NcVar *itemp = ifile_out.add_var("T", ncDouble, itime, ilev, ilat, ilon);
   interpolate_lev(temp, hyam, hybm, ps, ilev_vals, itemp);
 
   NcVar *iu = ifile_out.add_var("U", ncDouble, itime, ilev, ilat, ilon);
@@ -97,7 +132,7 @@ void interp_util(NcFile & readin,
 
   NcVar *iv = ifile_out.add_var("V", ncDouble, itime, ilev, ilat, ilon);
   interpolate_lev(vvar, hyam, hybm, ps, ilev_vals, iv); 
-
+*/
   readin_2d.close();  
   std::cout<<"Finished interpolating variables."<<std::endl;
 } 
