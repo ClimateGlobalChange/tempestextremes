@@ -1,24 +1,24 @@
 source("~/tempestextremes/test/sector_funcs.R")
 
 f_dir="/Volumes/ExFAT_drive/ERA_files/ERA_detect/"
-#search_patt="ERA_1986_DJF_NA_*stats_nostitch.txt"
 
-for (sector in c("NA","NC","NP","SA","SI","SP")){
+
+#for (sector in c("NA","NC","NP","SA","SI","SP")){
+for (sector in c("NA")){
   for (season in c("MAM","JJA","SON","DJF")){
-    # sector<-"NA"
-    # season<-"JJA"
     search_patt=sprintf("ERA_*_%s_%s_*stats_nostitch.txt",season,sector)
     files_masterlist=list.files(path=f_dir,pattern=glob2rx(search_patt))
     files_masterlist=paste(f_dir,files_masterlist,sep="")
     nFiles=length(files_masterlist)
     
-    df_tot<-data.frame(var=character(),bnum=numeric(),tstep=numeric(),date=character(),hr=numeric(),
+    df_tot_nostitch<-data.frame(var=character(),bnum=numeric(),tstep=numeric(),date=character(),hr=numeric(),
                        minlat=numeric(),maxlat=numeric(),
                        minlon=numeric(),maxlon=numeric(),
                        centlat=numeric(),centlon=numeric(),area=numeric())
     bnum=0
     for (a in files_masterlist){
       #gather the info from filename
+      print(sprintf("Opening file %s",a))
       finfo<-unlist(strsplit(a,split="_"))
       vartype=ifelse(finfo[length(finfo)-1]=="stats","PV",ifelse(
         finfo[length(finfo)-1]=="Zstats","Z","GHG"
@@ -27,10 +27,11 @@ for (sector in c("NA","NC","NP","SA","SI","SP")){
       mnum<-ifelse(season=="MAM","03",ifelse(
         season=="JJA","06",ifelse(
           season=="SON","09","12")
-        )
+      )
       )
       orig<-sprintf("%s-%s-01",ynum,mnum)
       lines<-readLines(a)
+      print(sprintf("There are %d lines in this file, type %s.",length(lines),vartype))
       for (l in lines){
         #print(l)
         if (!is.na(pmatch("Blob",l))){
@@ -53,16 +54,18 @@ for (sector in c("NA","NC","NP","SA","SI","SP")){
                              minlat=infoline[2],maxlat=infoline[3],
                              minlon=infoline[4],maxlon=infoline[5],
                              centlat=infoline[6],centlon=infoline[7],area=infoline[8])
-          df_tot<-rbind(df_tot,df_new)
+          df_tot_nostitch<-rbind(df_tot_nostitch,df_new)
         }
       }
+      print(sprintf("df is now %d long",nrow(df_tot_nostitch)))
     }
-    df_tot$minlon_c<-lon_convert(df_tot$minlon)
-    df_tot$maxlon_c<-lon_convert(df_tot$maxlon)
-    df_tot$centlon_c<-lon_convert(df_tot$centlon)
+    print(sprintf("There were %s blobs in %s %s",sector,season,bnum))
+    df_tot_nostitch$minlon_c<-lon_convert(df_tot_nostitch$minlon)
+    df_tot_nostitch$maxlon_c<-lon_convert(df_tot_nostitch$maxlon)
+    df_tot_nostitch$centlon_c<-lon_convert(df_tot_nostitch$centlon)
     #Save the dataframe
-    statsname<-sprintf("~/block_r_data/stats_%s_%s_table.RData",season,sector)
-    save(list=c("df_tot"),file=statsname)
+    statsname<-sprintf("~/block_r_data/stats_nostitch_%s_%s_table.RData",season,sector)
+    save(list=c("df_tot_nostitch"),file=statsname)
   }
 }
 
