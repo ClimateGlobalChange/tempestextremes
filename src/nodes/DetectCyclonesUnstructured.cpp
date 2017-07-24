@@ -343,7 +343,7 @@ public:
 
 public:
 	///	<summary>
-	///		Parse a threshold operator string.
+	///		Parse a output operator string.
 	///	</summary>
 	void Parse(
 		VariableRegistry & varreg,
@@ -2208,7 +2208,7 @@ try {
 	}
 	if (dcuparam.dMaxLongitude < 0.0) {
 		int iMaxLongitude =
-			static_cast<int>(-dcuparam.dMaxLatitude / 360.0);
+			static_cast<int>(-dcuparam.dMaxLongitude / 360.0);
 		dcuparam.dMaxLongitude +=
 			static_cast<double>(iMaxLongitude + 1) * 360.0;
 	}
