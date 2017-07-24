@@ -24,3 +24,9 @@ test/*.dat
 test/*.txt
 
 test/*.g
+
+test/*.nc4
+
+test/cfsr_tests
+
+test/*.eps
