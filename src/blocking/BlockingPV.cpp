@@ -56,10 +56,10 @@ int main(int argc, char **argv){
 //    CommandLineString(strfile_out, "out", "");
     CommandLineBool(interp_check, "ipl");
     CommandLineBool(is_hPa, "hpa");
-    CommandLineString(tname,"timevar","time");
-    CommandLineString(levname,"levvar","lev");
-    CommandLineString(latname,"latvar","lat");
-    CommandLineString(lonname,"lonvar","lon");
+    CommandLineString(tname,"tname","time");
+    CommandLineString(levname,"levname","lev");
+    CommandLineString(latname,"latname","lat");
+    CommandLineString(lonname,"lonname","lon");
     ParseCommandLine(argc, argv);
 
   EndCommandLine(argv)
