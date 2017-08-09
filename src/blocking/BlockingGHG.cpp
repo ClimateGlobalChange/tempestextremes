@@ -35,19 +35,23 @@ int main(int argc, char** argv){
   NcError error(NcError::verbose_nonfatal);
 
   try{
+    //file list
+    std::string fileList;
     //file which contains Z500
     std::string fileIn;
     //name of output file
-    std::string outFile;
+//    std::string outFile;
     //input variable
     std::string varName;
     //axis names
     std::string tname,latname,lonname;
 
+
     BeginCommandLine()
-      CommandLineString(fileIn, "in","")
-      CommandLineString(outFile,"out","")
-      CommandLineString(varName,"varname","")
+      CommandLineString(fileList,"inlist","");
+      CommandLineString(fileIn, "in","");
+//      CommandLineString(outFile,"out","");
+      CommandLineString(varName,"varname","");
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
@@ -55,107 +59,133 @@ int main(int argc, char** argv){
     EndCommandLine(argv);
     AnnounceBanner();
 
+    if (fileIn == "" && fileList == ""){
+    _EXCEPTIONT("Need to specify either input file (--in) or file list (--inlist).");
+
+    }
+    if (fileIn != "" && fileList != ""){
+      _EXCEPTIONT("Cannot specify both file name (--in) and file list (--inlist).");
+    }
+/*
     if (fileIn == ""){
       _EXCEPTIONT("No input file (--in) specified");
     }
+*/
     if (varName == ""){
       _EXCEPTIONT("No variable name (--varname) specified");
     }
 
-    if (outFile == ""){
+/*    if (outFile == ""){
       std::string fileInCopy = fileIn;
       outFile = fileInCopy.replace(fileInCopy.end()-3,fileInCopy.end(),"_GHG.nc");
     }
-    NcFile readin(fileIn.c_str());
-    if (!readin.is_valid()){
-      _EXCEPTION1("Invalid file \"%s\"", fileIn.c_str());
-    }
-    //Dimensions and associated variables
-    NcDim *time = readin.get_dim(tname.c_str());
-    int nTime = time->size();
-    NcVar *timevar = readin.get_var(tname.c_str());
-
-    NcDim *lat = readin.get_dim(latname.c_str());
-    int nLat = lat->size();
-    NcVar *latvar = readin.get_var(latname.c_str());
-
-    NcDim *lon = readin.get_dim(lonname.c_str());
-    int nLon = lon->size();
-    NcVar *lonvar = readin.get_var(lonname.c_str());
-
-    DataMatrix3D<double>ZData(nTime,nLat,nLon);
-    NcVar *zvar = readin.get_var(varName.c_str());
-    int nDims = zvar->num_dims();
-    if (nDims != 3){
-      _EXCEPTIONT("Error: variable does not have correct number of dimensions (3).");
+*/
+    //If there is a file list, read the files into a vector.
+    std::vector <std::string> InputFiles;
+    if (fileList != ""){
+      GetInputFileList(fileList,InputFiles);
+    }else{
+      InputFiles.push_back(fileIn);
     }
 
-    zvar->set_cur(0,0,0);
-    zvar->get(&(ZData[0][0][0]),nTime,nLat,nLon);
+    int nFiles = InputFiles.size();
 
-    //create output file
-    NcFile file_out(outFile.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
+    for (int x=0; x<nFiles; x++){
+
+      NcFile readin(InputFiles[x].c_str());
+      if (!readin.is_valid()){
+        _EXCEPTION1("Invalid file \"%s\"", InputFiles[x].c_str());
+      }
+      //Dimensions and associated variables
+      NcDim *time = readin.get_dim(tname.c_str());
+      int nTime = time->size();
+      NcVar *timevar = readin.get_var(tname.c_str());
+
+      NcDim *lat = readin.get_dim(latname.c_str());
+      int nLat = lat->size();
+      NcVar *latvar = readin.get_var(latname.c_str());
+
+      NcDim *lon = readin.get_dim(lonname.c_str());
+      int nLon = lon->size();
+      NcVar *lonvar = readin.get_var(lonname.c_str());
+
+      DataMatrix3D<double>ZData(nTime,nLat,nLon);
+      NcVar *zvar = readin.get_var(varName.c_str());
+      int nDims = zvar->num_dims();
+      if (nDims != 3){
+        _EXCEPTIONT("Error: variable does not have correct number of dimensions (3).");
+      }
+
+      zvar->set_cur(0,0,0);
+      zvar->get(&(ZData[0][0][0]),nTime,nLat,nLon);
+
+      //Create output file that corresponds to IPV data
+      std::string strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
+        InputFiles[x].end(), "_GHG.nc");
+
+      //create output file
+      NcFile file_out(strOutFile.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
 
     //Dimensions: time, lat, lon
-    NcDim *out_time = file_out.add_dim(tname.c_str(), nTime);
-    NcDim *out_lat = file_out.add_dim(latname.c_str(), nLat);
-    NcDim *out_lon = file_out.add_dim(lonname.c_str(), nLon);
+      NcDim *out_time = file_out.add_dim(tname.c_str(), nTime);
+      NcDim *out_lat = file_out.add_dim(latname.c_str(), nLat);
+      NcDim *out_lon = file_out.add_dim(lonname.c_str(), nLon);
 
     //COPY EXISTING DIMENSION VALUES
-    NcVar *time_vals = file_out.add_var(tname.c_str(), ncDouble, out_time);
-    NcVar *lat_vals = file_out.add_var(latname.c_str(), ncDouble, out_lat);
-    NcVar *lon_vals = file_out.add_var(lonname.c_str(), ncDouble, out_lon);
+      NcVar *time_vals = file_out.add_var(tname.c_str(), ncDouble, out_time);
+      NcVar *lat_vals = file_out.add_var(latname.c_str(), ncDouble, out_lat);
+      NcVar *lon_vals = file_out.add_var(lonname.c_str(), ncDouble, out_lon);
 
-    copy_dim_var(timevar, time_vals);
-    copy_dim_var(latvar, lat_vals);
-    copy_dim_var(lonvar, lon_vals);
+      copy_dim_var(timevar, time_vals);
+      copy_dim_var(latvar, lat_vals);
+      copy_dim_var(lonvar, lon_vals);
 
-    DataVector<double> latVec(nLat);
-    latvar->set_cur((long) 0);
-    latvar->get(&(latVec[0]),nLat);
+      DataVector<double> latVec(nLat);
+      latvar->set_cur((long) 0);
+      latvar->get(&(latVec[0]),nLat);
 
 
-    double latRes = latVec[0]-latVec[1];
-    std::cout<<"latres is "<<latRes<<std::endl;
-    double latDelta = 15./latRes;
-    int iDelta = (int) latDelta;
-    std::cout<<"delta is "<<iDelta<<std::endl;
+      double latRes = latVec[0]-latVec[1];
+      std::cout<<"latres is "<<latRes<<std::endl;
+      double latDelta = 15./latRes;
+      int iDelta = (int) latDelta;
+      std::cout<<"delta is "<<iDelta<<std::endl;
 
-    int NHLatStart;
-    int NHLatEnd;
-    int SHLatStart;
-    int SHLatEnd;
+      int NHLatStart;
+      int NHLatEnd;
+      int SHLatStart;
+      int SHLatEnd;
 
-    //Checking blocking for 
-    for (int x=0; x<nLat; x++){
-      if (std::fabs(75.-latVec[x])<0.0001){
-        NHLatStart = x;
+      //Checking blocking over lat range
+      for (int x=0; x<nLat; x++){
+        if (std::fabs(75.-latVec[x])<0.0001){
+          NHLatStart = x;
+        }
+        if (std::fabs(35.-latVec[x])<0.0001){
+          NHLatEnd = x;
+        }
+        if (std::fabs(-35-latVec[x])<0.0001){
+          SHLatStart = x;
+        }
+        if (std::fabs(-75.-latVec[x])<0.0001){
+          SHLatEnd = x;
+        }
       }
-      if (std::fabs(35.-latVec[x])<0.0001){
-        NHLatEnd = x;
-      }
-      if (std::fabs(-35-latVec[x])<0.0001){
-        SHLatStart = x;
-      }
-      if (std::fabs(-75.-latVec[x])<0.0001){
-        SHLatEnd = x;
-      }
-    }
 
-  //Make sure that the indices are in the correct order!
-    if (NHLatStart>NHLatEnd){
-      std::cout<<"Switching NH indices!"<<std::endl;
-      int Ntemp = NHLatStart;
-      NHLatStart = NHLatEnd;
-      NHLatEnd = Ntemp;
-    }
+    //Make sure that the indices are in the correct order!
+      if (NHLatStart>NHLatEnd){
+        std::cout<<"Switching NH indices!"<<std::endl;
+        int Ntemp = NHLatStart;
+        NHLatStart = NHLatEnd;
+        NHLatEnd = Ntemp;
+      }
 
-    if (SHLatStart>SHLatEnd){
-      std::cout<<"Switching SH indices!"<<std::endl;
-      int Stemp = SHLatStart;
-      SHLatStart = SHLatEnd;
-      SHLatEnd = Stemp;
-   }
+      if (SHLatStart>SHLatEnd){
+        std::cout<<"Switching SH indices!"<<std::endl;
+        int Stemp = SHLatStart;
+        SHLatStart = SHLatEnd;
+        SHLatEnd = Stemp;
+     }
 
     double z_N, z_S, z_C;
     double lat_N, lat_S, lat_C;
@@ -205,7 +235,8 @@ int main(int argc, char** argv){
     blocking_vals->put(&(outIndex[0][0][0]),nTime,nLat,nLon);
 
     file_out.close();
-
+    readin.close();
+    }
   }catch (Exception & e){
     std::cout<<e.ToString() <<std::endl;
   }
