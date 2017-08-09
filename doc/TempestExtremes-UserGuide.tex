@@ -39,6 +39,37 @@
 
 {\Huge \textbf{TempestExtremes}}
 \section{Files contained in \texttt{src/blocking}}
+
+\subsection{Explanation of blocking methods}
+
+There are two main methods for block detection: the Z500 gradient method of Tibaldi and Molteni 1990 (hereafter referred to as TM90), and anomaly-based methods such as that of Dole and Gordon 1983 (Z500 anomaly, DG83) or Schwierz et al 2004 (potential vorticity anomaly, S04). Because TM90 is based on an instantaneous field, the calculations are done in a single step with the \texttt{BlockingGHG} program, as explained in Section \ref{ghg}. The anomaly methods involve a multi-step process that will be outlined in section \ref{anom}.
+
+\subsection{BlockingGHG}\label{ghg}
+
+\begin{verbatim}
+Usage: BlockingGHG <parameter list>
+Parameters:
+  --in <string> [""]
+  --inlist <string>  [""]
+  --varname <string> [""]
+  --tname <string> ["time"]
+  --latname <string> ["lat"]
+  --lonname <string> ["lon"]
+\end{verbatim}
+
+\begin{itemize}
+\item[]\texttt{--in <string>} \\ input file in NetCDF format, with axes \texttt{[time, latitude, longitude]}. 
+\item[]\texttt{--inlist <string>}\\ list of input datafiles (one file per line) in NetCDF format, with axes \texttt{[time, latitude, longitude]}. 
+\item[] \texttt{--varname <string>}\\ name of Z500 variable
+\item[] \texttt{--tname <string>}\\Name of the time axis (default \texttt{time}).
+\item[]\texttt{--latname <string>}\\Name of the latitude axis (default \texttt{lat}).
+\item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
+\end{itemize}
+
+\subsubsection{File input and output}
+This program takes each input file containing the Z500 variable (specified by the \texttt{--varname} flag) and performs calculations for all gridpoints in the 35-75$^\circ$ latitude range (both hemispheres). The output file contains the variable \texttt{GHGrad}, which has a value of either 1 (gridpoint is instantaneously blocked) or 0 (not blocked).
+
+\subsection{Anomaly Method}\label{anom}
 \subsection{AvgVar}
 \begin{verbatim}
 Usage: AvgVar <parameter list>

@@ -31,8 +31,16 @@ int main(int argc, char **argv){
   std::string strfile_in;
   //Input file with PS
   std::string strfile_2d;
+  //Input file list
+  std::string fileList;
+  //Input filelist with PS
+  std::string fileList_PS;
+  //axis names
+  std::string tname,latname,lonname,levname;
+
+
   //Output file to be written
-  std::string strfile_out;
+//  std::string strfile_out;
   //Interpolate, yes or no?
   bool interp_check;
   //If Pressure is in hPa, need to create new pressure axis
@@ -43,170 +51,221 @@ int main(int argc, char **argv){
 
     CommandLineString(strfile_in, "in", "");
     CommandLineString(strfile_2d, "in2d", "");
-    CommandLineString(strfile_out, "out", "");
+    CommandLineString(fileList, "inlist","");
+    CommandLineString(fileList_PS, "inlist2d","");
+//    CommandLineString(strfile_out, "out", "");
     CommandLineBool(interp_check, "ipl");
     CommandLineBool(is_hPa, "hpa");
+    CommandLineString(tname,"timevar","time");
+    CommandLineString(levname,"levvar","lev");
+    CommandLineString(latname,"latvar","lat");
+    CommandLineString(lonname,"lonvar","lon");
     ParseCommandLine(argc, argv);
 
   EndCommandLine(argv)
   AnnounceBanner();
 
   // Check input
-  if (strfile_in == "") {
+/*  if (strfile_in == "") {
      _EXCEPTIONT("No input file (--in) specified");
-  }
+  }*/
+      if (strfile_in == "" && fileList == ""){
+    _EXCEPTIONT("Need to specify either input file (--in) or file list (--inlist).");
+
+    }
+    if (strfile_in != "" && fileList != ""){
+      _EXCEPTIONT("Cannot specify both file name (--in) and file list (--inlist).");
+    }
+
+
+/*
   if (strfile_out == "") {
      strfile_out = strfile_in;
      strfile_out = strfile_out.replace(strfile_out.end()-3,strfile_out.end(),"_integ.nc");
+  }*/
+
+  //Make list of files
+  std::vector <std::string> InputFiles;
+  if (fileList != ""){
+    GetInputFileList(fileList,InputFiles);
+  }else{
+    InputFiles.push_back(strfile_in);
   }
+  int nfiles = InputFiles.size();
 
   //If variables need interpolating, do this first!  
   if (interp_check) {
-    if (strfile_2d == "") {
+
+    if (strfile_2d == "" && fileList_PS == ""){
+    _EXCEPTIONT("Need to specify either input file (--in2d) or file list (--inlist2d).");
+
+    }
+    if (strfile_2d != "" && fileList_PS != ""){
+      _EXCEPTIONT("Cannot specify both file name (--in2d) and file list (--inlist2d).");
+    }
+    std::vector <std::string> PSFiles;
+    if (fileList_PS != ""){
+      GetInputFileList(fileList_PS,PSFiles);
+    }else{
+      PSFiles.push_back(strfile_2d);
+    }
+    
+/*    if (strfile_2d == "") {
        _EXCEPTIONT("No input file (--in2d) specified");
+    }*/
+
+    int nfiles_PS = PSFiles.size();
+    if (nfiles != nfiles_PS){
+      _EXCEPTIONT("Number of files to be interpolated doesn't match 2D files.");
     }
-    NcFile readin_int(strfile_in.c_str());
-    if (!readin_int.is_valid()) {
-      _EXCEPTION1("Unable to open file \"%s\" for reading",
-        strfile_in.c_str());
-    }
-    //Check that time dimension is non-zero
-    NcDim *time_int = readin_int.get_dim("time");
-    int time_len_int = time_int->size();
-    if (time_len_int < 1){
-      _EXCEPTIONT("This file has a time dimension length of 0.");
-    }
+
+    for (int x=0; x<nfiles_PS; x++){
+      NcFile readin_int(InputFiles[x].c_str());
+      if (!readin_int.is_valid()) {
+        _EXCEPTION1("Unable to open file \"%s\" for reading",
+          InputFiles[x].c_str());
+      }
+      //Check that time dimension is non-zero
+      NcDim *time_int = readin_int.get_dim(tname.c_str());
+      int time_len_int = time_int->size();
+      if (time_len_int < 1){
+        _EXCEPTIONT("This file has a time dimension length of 0.");
+      }
 
     //Interpolated file name
-    std::string interp_file = strfile_in.replace(strfile_in.end()-3,strfile_in.end(),"_ipl.nc");
-    std::cout<< "Interpolated file name is "<<interp_file<<std::endl;
+      std::string strfile_copy = InputFiles[x];
+      std::string interp_file = strfile_copy.replace(strfile_copy.end()-3,strfile_copy.end(),"_ipl.nc");
+      std::cout<< "Interpolated file name is "<<interp_file<<std::endl;
 
     //open file that interpolated variables will be written to
-    NcFile readin_out(interp_file.c_str(), NcFile::Replace, NULL,\
-      0, NcFile::Offset64Bits);
-    if (!readin_out.is_valid()) {
-      _EXCEPTION1("Unable to open file \"%s\" for writing",
-        interp_file.c_str());
-    }
+      NcFile readin_out(interp_file.c_str(), NcFile::Replace, NULL,\
+        0, NcFile::Offset64Bits);
+      if (!readin_out.is_valid()) {
+        _EXCEPTION1("Unable to open file \"%s\" for writing",
+          interp_file.c_str());
+      }
 
     //Interpolate variables and write to new file
-    std::cout << "About to interpolate files. Entering interp util."<<std::endl;
+      std::cout << "About to interpolate files. Entering interp util."<<std::endl;
 //    interp_util(readin_int, strfile_2d, readin_out);
-    std::string varlist="T,U,V";
+      std::string varlist="T,U,V";
 
-    interp_util(readin_int,strfile_2d,varlist,readin_out);
-    readin_out.close();
-    strfile_in = interp_file;
+      interp_util(readin_int,strfile_2d,varlist,readin_out);
+      readin_out.close();
+      InputFiles[x] = interp_file;
+    }
   }
 
-  NcFile readin(strfile_in.c_str());
-  if (!readin.is_valid()) {
-    _EXCEPTION1("Invalid file \"%s\"", strfile_in.c_str());
-  }
+  for (int x=0; x<nfiles; x++){
+    NcFile readin(InputFiles[x].c_str());
+    if (!readin.is_valid()) {
+      _EXCEPTION1("Invalid file \"%s\"", InputFiles[x].c_str());
+    }
 
   //Dimensions and associated variables
-  NcDim *time = readin.get_dim("time");
-  int time_len = time->size();
-  NcVar *timevar = readin.get_var("time");
+    NcDim *time = readin.get_dim(tname.c_str());
+    int time_len = time->size();
+    NcVar *timevar = readin.get_var(tname.c_str());
 
-  NcDim *lev = readin.get_dim("lev");
-  int lev_len = lev->size();
-  NcVar *levvar = readin.get_var("lev");
+    NcDim *lev = readin.get_dim(levname.c_str());
+    int lev_len = lev->size();
+    NcVar *levvar = readin.get_var(levname.c_str());
 
-  NcDim *lat = readin.get_dim("lat");
-  int lat_len = lat->size();
-  NcVar *latvar = readin.get_var("lat");
+    NcDim *lat = readin.get_dim(latname.c_str());
+    int lat_len = lat->size();
+    NcVar *latvar = readin.get_var(latname.c_str());
 
-  NcDim *lon = readin.get_dim("lon");
-  int lon_len = lon->size();
-  NcVar *lonvar = readin.get_var("lon");
+    NcDim *lon = readin.get_dim(lonname.c_str());
+    int lon_len = lon->size();
+    NcVar *lonvar = readin.get_var(lonname.c_str());
     
   //Variables for calculations
-  NcVar *temp = readin.get_var("T");
-  NcVar *uvar = readin.get_var("U");
-  NcVar *vvar = readin.get_var("V");
+    NcVar *temp = readin.get_var("T");
+    NcVar *uvar = readin.get_var("U");
+    NcVar *vvar = readin.get_var("V");
 
   //Create output file
-  NcFile file_out(strfile_out.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
+    std::string strfile_out = InputFiles[x].replace(InputFiles[x].end()-3,InputFiles[x].end(),"_integ.nc");
+    NcFile file_out(strfile_out.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
 
   //Dimensions: time, pressure, lat, lon
-  NcDim *out_time = file_out.add_dim("time", time_len);
-  NcDim *out_plev = file_out.add_dim("lev", lev_len);
-  NcDim *out_lat = file_out.add_dim("lat", lat_len);
-  NcDim *out_lon = file_out.add_dim("lon", lon_len);
+    NcDim *out_time = file_out.add_dim(tname.c_str(), time_len);
+    NcDim *out_plev = file_out.add_dim(levname.c_str(), lev_len);
+    NcDim *out_lat = file_out.add_dim(latname.c_str(), lat_len);
+    NcDim *out_lon = file_out.add_dim(lonname.c_str(), lon_len);
  
   //COPY EXISTING DIMENSION VALUES
-  NcVar *time_vals = file_out.add_var("time", ncDouble, out_time);
-  NcVar *lev_vals = file_out.add_var("lev", ncDouble, out_plev);
-  NcVar *lat_vals = file_out.add_var("lat", ncDouble, out_lat);
-  NcVar *lon_vals = file_out.add_var("lon", ncDouble, out_lon); 
+    NcVar *time_vals = file_out.add_var(tname.c_str(), ncDouble, out_time);
+    NcVar *lev_vals = file_out.add_var(levname.c_str(), ncDouble, out_plev);
+    NcVar *lat_vals = file_out.add_var(latname.c_str(), ncDouble, out_lat);
+    NcVar *lon_vals = file_out.add_var(lonname.c_str(), ncDouble, out_lon); 
 
 
   //if Pressure axis is in hPa, need to change to Pa
-  if (is_hPa){
-    DataVector<double> levhPa(lev_len);
-    levvar->set_cur((long) 0);
-    levvar->get(&(levhPa[0]),lev_len);
+    if (is_hPa){
+      DataVector<double> levhPa(lev_len);
+      levvar->set_cur((long) 0);
+      levvar->get(&(levhPa[0]),lev_len);
 
-    DataVector<double> levPa(lev_len);
-    for (int p=0; p<lev_len; p++){
-      levPa[p] = levhPa[p]*100.0;
+      DataVector<double> levPa(lev_len);
+      for (int p=0; p<lev_len; p++){
+        levPa[p] = levhPa[p]*100.0;
+      }
+        lev_vals->set_cur((long) 0);
+        lev_vals->put(&(levPa[0]),lev_len);
+      }
+      else if (!is_hPa){
+        copy_dim_var(levvar, lev_vals);
+      }
+
+    copy_dim_var(timevar, time_vals);
+    if (time_vals->get_att("calendar") == NULL){
+      time_vals->add_att("calendar","standard");
     }
-    lev_vals->set_cur((long) 0);
-    lev_vals->put(&(levPa[0]),lev_len);
-  }
-  else if (!is_hPa){
-    copy_dim_var(levvar, lev_vals);
-  }
-
-  copy_dim_var(timevar, time_vals);
-  if (time_vals->get_att("calendar") == NULL){
-    time_vals->add_att("calendar","standard");
-  }
-  copy_dim_var(latvar, lat_vals);
-  copy_dim_var(lonvar, lon_vals);
+    copy_dim_var(latvar, lat_vals);
+    copy_dim_var(lonvar, lon_vals);
 
   //Data for PT, RV, PV calculations
-  DataVector<double> coriolis(lat_len);
-  DataVector<double> cosphi(lat_len);
+    DataVector<double> coriolis(lat_len);
+    DataVector<double> cosphi(lat_len);
 
-  double lat_res;
-  double lon_res;
+    double lat_res;
+    double lon_res;
 
-  double dphi;
-  double dlambda;
-  double dp;
+    double dphi;
+    double dlambda;
+    double dp;
 
-  pv_vars_calc(lat_vals, lon_vals, lev_vals, lat_res, lon_res,\
-    dphi, dlambda, dp, coriolis, cosphi);
+    pv_vars_calc(lat_vals, lon_vals, lev_vals, lat_res, lon_res,\
+      dphi, dlambda, dp, coriolis, cosphi);
 
-//Calculate PT
-  DataMatrix4D<double> PTVar(time_len,lev_len,lat_len,lon_len);
-  PT_calc(temp, lev_vals, PTVar);
+  //Calculate PT
+    DataMatrix4D<double> PTVar(time_len,lev_len,lat_len,lon_len);
+    PT_calc(temp, lev_vals, PTVar);
 
   //Calculate relative vorticity and add to outfile
-  DataMatrix4D<double>RVVar(time_len,lev_len,lat_len,lon_len);
-  rVort_calc(uvar, vvar, dphi, dlambda, cosphi, RVVar);
+    DataMatrix4D<double>RVVar(time_len,lev_len,lat_len,lon_len);
+    rVort_calc(uvar, vvar, dphi, dlambda, cosphi, RVVar);
 
-  NcVar *pv_var = file_out.add_var("PV", ncDouble, out_time, out_plev, out_lat, out_lon);
-  NcVar *intpv_var = file_out.add_var("IPV", ncDouble, out_time, out_lat, out_lon);
-  NcVar *avgt_var = file_out.add_var("AVGT", ncDouble, out_time, out_lat, out_lon);
-  NcVar *avgu_var = file_out.add_var("AVGU", ncDouble, out_time, out_lat, out_lon);
-  NcVar *avgv_var = file_out.add_var("AVGV", ncDouble, out_time, out_lat, out_lon);
+    NcVar *pv_var = file_out.add_var("PV", ncDouble, out_time, out_plev, out_lat, out_lon);
+    NcVar *intpv_var = file_out.add_var("IPV", ncDouble, out_time, out_lat, out_lon);
+    NcVar *avgt_var = file_out.add_var("AVGT", ncDouble, out_time, out_lat, out_lon);
+    NcVar *avgu_var = file_out.add_var("AVGU", ncDouble, out_time, out_lat, out_lon);
+    NcVar *avgv_var = file_out.add_var("AVGV", ncDouble, out_time, out_lat, out_lon);
   
-  VarPressureAvg(temp,lev_vals,avgt_var);
-  VarPressureAvg(uvar,lev_vals,avgu_var);
-  VarPressureAvg(vvar,lev_vals,avgv_var);
-  PV_calc(uvar, vvar, PTVar, RVVar, lev_vals, coriolis,cosphi, dphi, dlambda,\
-    lat_res, lon_res, pv_var, intpv_var);
+    VarPressureAvg(temp,lev_vals,avgt_var);
+    VarPressureAvg(uvar,lev_vals,avgu_var);
+    VarPressureAvg(vvar,lev_vals,avgv_var);
+    PV_calc(uvar, vvar, PTVar, RVVar, lev_vals, coriolis,cosphi, dphi, dlambda,\
+      lat_res, lon_res, pv_var, intpv_var);
 
-  std::cout<<"About to close files."<<std::endl;
+    std::cout<<"About to close files."<<std::endl;
  //Close input files
-  readin.close();
+    readin.close();
 
   //Close output file
-  file_out.close();
-
+    file_out.close();
+  }
   } catch (Exception & e) {
     std::cout << e.ToString() << std::endl;
   }
