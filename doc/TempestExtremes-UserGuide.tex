@@ -38,13 +38,13 @@
 \begin{document}
 
 {\Huge \textbf{TempestExtremes}}
-\section{Files contained in \texttt{src/blocking}}
 
-\subsection{Explanation of blocking methods}
+
+\section{Explanation of blocking methods}
 
 There are two main methods for block detection: the Z500 gradient method of Tibaldi and Molteni 1990 (hereafter referred to as TM90), and anomaly-based methods such as that of Dole and Gordon 1983 (Z500 anomaly, DG83) or Schwierz et al 2004 (potential vorticity anomaly, S04). Because TM90 is based on an instantaneous field, the calculations are done in a single step with the \texttt{BlockingGHG} program, as explained in Section \ref{ghg}. The anomaly methods involve a multi-step process that will be outlined in section \ref{anom}.
 
-\subsection{BlockingGHG}\label{ghg}
+\section{BlockingGHG)}\label{ghg}
 
 \begin{verbatim}
 Usage: BlockingGHG <parameter list>
@@ -66,11 +66,107 @@ Parameters:
 \item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
 \end{itemize}
 
-\subsubsection{File input and output}
-This program takes each input file containing the Z500 variable (specified by the \texttt{--varname} flag) and performs calculations for all gridpoints in the 35-75$^\circ$ latitude range (both hemispheres). The output file contains the variable \texttt{GHGrad}, which has a value of either 1 (gridpoint is instantaneously blocked) or 0 (not blocked).
+\textbf{Note: do not use both \texttt{--in} and \texttt{--inlist} flags simultaneously.}
 
-\subsection{Anomaly Method}\label{anom}
-\subsection{AvgVar}
+\subsection{Algorithm explanation}
+
+Two slopes are calculated around a single gridpoint:
+
+\begin{eqnarray}
+GHGN=\frac{Z(\phi_n)-Z(\phi_0)}{\phi_n-\phi_0}\\
+GHGS=\frac{Z(\phi_0)-Z(\phi_s)}{\phi_0-\phi_s}
+\end{eqnarray}
+
+\noindent where $\phi_0$, $\phi_n$, and $\phi_s$ are the reference latitude and the latitudes 15$^\circ$ poleward and equatorward of $\phi_0$, respectively, and $GHGN$ and $GHGS$ are the height gradients. For $GHGN<-10$ m/deg lat and $GHGS>0$ m/deg lat, the point is considered instantaneously blocked.
+
+This is a modification of the original TM90 algorithm, which was calculated about a single predetermined latitude. Scherrer et al 2006 and others expanded the definition to encompass all latitudes 35-75 degrees in both hemispheres.
+
+
+\subsection{File input and output}
+
+
+This program takes each input file containing the Z500 variable (specified by the \texttt{--varname} flag) and outputs a file containing the variable \texttt{GHGrad}, which has a value of either 1 (gridpoint is instantaneously blocked) or 0 (not blocked).
+
+\section{Anomaly Method}\label{anom}
+
+Each anomaly method has a general workflow that can be described as follows:
+
+\begin{enumerate}
+\item Generate the input files, using either \texttt{BlockingPV} for vertically averaged potential vorticity (Section \ref{PV}) or \texttt{Var4Dto3D} for Z500 (Section , optional if already have files with Z500)
+\item Calculate the long term daily average, using \texttt{BlockingDFT} (Section )
+\item Calculate the anomalies from the long term daily average, using \texttt{BlockingDevs} (Section \ref{dev})
+\item (Optional) Calculate the long term daily average of the anomalies using \texttt{BlockingDFT} in order to use in the threshold calculations
+\item (Optional) Calculate a spatiotemporally varying threshold variable using \texttt{BlockingThresh}
+\item Calculate the normalized anomalies using \texttt{BlockingNormDevs}
+\end{enumerate}
+
+\subsection{BlockingPV}\label{PV}
+\begin{verbatim}
+Usage: BlockingPV <parameter list>
+Parameters:
+  --in <string> [""]
+  --in2d <string> [""]
+  --inlist <string>  [""]
+  --inlist2d <string> [""]
+  --ipl
+  --hpa
+  --tname <string> ["time"]
+  --levname <string> ["lev"]
+  --latname <string> ["lat"]
+  --lonname <string> ["lon"]
+\end{verbatim}
+
+\begin{itemize}
+\item[]\texttt{--in <string>} \\ Input file in NetCDF format containing temperature and wind variables, with axes \texttt{[time, lev, lat, lon]}
+\item[]\texttt{--in2d <string>} \\ Optional input file in NetCDF format containing surface pressure, with axes \texttt{[time, lat, lon]}. Only necessary if input file's vertical axis is on model levels.
+\item[]\texttt{--inlist <string>} \\ A list of input datafiles in NetCDF format containing temperature and wind variables, with axes \texttt{[time, lev, lat, lon]}
+\item[]\texttt{--inlist2d <string>} \\ Optional list of input datafiles in NetCDF format containing surface pressure, with axes \texttt{[time, lat, lon]}. Only necessary if input files' vertical axis is on model levels.
+\item[]\texttt{--ipl}\\ Optional bool directing program to create new input file with vertical pressure axis (using input file with vertical model level axis and surface pressure file)
+\item[]\texttt{--hpa} \\ Optional bool that tells program that pressure levels have units of hPa rather than Pa.
+\item[] \texttt{--tname <string>}\\Name of the time axis (default \texttt{time}).
+\item[] \texttt{--levname <string>}\\Name of the time axis (default \texttt{lev}).
+\item[]\texttt{--latname <string>}\\Name of the latitude axis (default \texttt{lat}).
+\item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
+\end{itemize}
+
+\subsubsection{File input and output}
+
+
+
+\subsection{BlockingDevs}\label{dev}
+\begin{verbatim}
+Usage: BlockingDevs <parameter list>
+Parameters:
+  --inlist <string>  [""]
+  --avg <string> [""]
+  --varname <string> [""]
+  --avgname <string> [""]
+  --pv
+  --gh
+  --tname <string> ["time"]
+  --latname <string> ["lat"]
+  --lonname <string> ["lon"]
+\end{verbatim}
+
+\begin{itemize}
+\item[]\texttt{--inlist <string>} \\ A list of input datafiles in NetCDF format. 
+\item[] \texttt{--avg <string>}\\ The name of the long term daily average file 
+\item[] \texttt{--varname <string>}\\Name of input variable for which anomaly will be calculated.
+\item[]\texttt{--avgname <string>}\\Name of input long term daily average variable.
+\item[]\texttt{--pv} or \texttt{--gh}\\Boolean which specifies whether the vertically averaged potential anomaly (\texttt{--pv}) or 500 mb geopotential height (\texttt{--gh}) anomaly will be calculated. One or the other must be specified, not both.
+\item[] \texttt{--tname <string>}\\Name of the time axis (default \texttt{time}).
+\item[]\texttt{--latname <string>}\\Name of the latitude axis (default \texttt{lat}).
+\item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
+\end{itemize}
+
+\subsubsection{File input and output}
+This program takes a list of files and calculates anomalies from the long term daily mean (the file which was calculated in Section \ref{bavg}). There are two options for outputs, specified by the Boolean \texttt{--pv} (potential vorticity) and \texttt{--gh} (500 mb geopotential height) flags. 
+
+For each input file, the program produces a corresponding output file containing the calculated anomalies with the suffix \texttt{\_devs} appended to the original file name. There are 3 output variables: the unsmoothed anomaly (\texttt{DIPV/DGH}), the anomaly with 2-day smoothing (\texttt{ADIPV/ADGH}), and 
+the smoothed anomalies divided by the threshold value (\texttt{INT\_ADIPV/INT\_ADGH}).
+
+
+\subsection{Other Tools: AvgVar}
 \begin{verbatim}
 Usage: AvgVar <parameter list>
 Parameters:
@@ -96,7 +192,9 @@ This program takes a list of files and, for the specified list of variables, ave
 
 The output file contains time-averaged variables  with axes \texttt{[latitude, longitude]}, and have the same names as the original inputs . 
 
-\subsection{BlockingAvg}\label{bavg}
+
+
+\subsubsection{Other Tools: BlockingAvg}\label{bavg}
 \begin{verbatim}
 Usage: BlockingAvg <parameter list>
 Parameters:
@@ -135,60 +233,9 @@ The output file contains the long term daily average variable, with the name spe
 
 
 
-\subsection{BlockingDevs}
-\begin{verbatim}
-Usage: BlockingDevs <parameter list>
-Parameters:
-  --inlist <string>  [""]
-  --avg <string> [""]
-  --varname <string> [""]
-  --avgname <string> [""]
-  --pv
-  --gh
-  --tname <string> ["time"]
-  --latname <string> ["lat"]
-  --lonname <string> ["lon"]
-\end{verbatim}
 
-\begin{itemize}
-\item[]\texttt{--inlist <string>} \\ A list of input datafiles in NetCDF format. 
-\item[] \texttt{--avg <string>}\\ The name of the long term daily average file 
-\item[] \texttt{--varname <string>}\\Name of input variable for which anomaly will be calculated.
-\item[]\texttt{--avgname <string>}\\Name of input long term daily average variable.
-\item[]\texttt{--pv} or \texttt{--gh}\\Boolean which specifies whether the vertically averaged potential anomaly (\texttt{--pv}) or 500 mb geopotential height (\texttt{--gh}) anomaly will be calculated. One or the other must be specified, not both.
-\item[] \texttt{--tname <string>}\\Name of the time axis (default \texttt{time}).
-\item[]\texttt{--latname <string>}\\Name of the latitude axis (default \texttt{lat}).
-\item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
-\end{itemize}
 
-\subsubsection{File input and output}
-This program takes a list of files and calculates anomalies from the long term daily mean (the file which was calculated in Section \ref{bavg}). There are two options for outputs, specified by the Boolean \texttt{--pv} (potential vorticity) and \texttt{--gh} (500 mb geopotential height) flags. 
 
-For each input file, the program produces a corresponding output file containing the calculated anomalies with the suffix \texttt{\_devs} appended to the original file name. There are 3 output variables: the unsmoothed anomaly (\texttt{DIPV/DGH}), the anomaly with 2-day smoothing (\texttt{ADIPV/ADGH}), and 
-the smoothed anomalies divided by the threshold value (\texttt{INT\_ADIPV/INT\_ADGH}).
-
-\subsection{BlockingGHG}
-\begin{verbatim}
-Usage: BlockingGHG <parameter list>
-Parameters:
-  --in<string>  [""]
-  --out <string> [""]
-  --varname <string> [""]
-  --tname <string> ["time"]
-  --latname <string> ["lat"]
-  --lonname <string> ["lon"]
-\end{verbatim}
-
-\begin{itemize}
-\item[]\texttt{--in <string>} \\ The name of the input NetCDF file (must contain variable with 500 mb geopotential height).
-\item[] \texttt{--out <string>}\\ The name of the output NetCDF file (if omitted, a file with the suffix \texttt{\_GHG} appended to the file name will be produced).
-\item[] \texttt{--varname <string>}\\Name of input 500 mb height variable.
-\item[] \texttt{--tname <string>}\\Name of the time axis (default \texttt{time}).
-\item[]\texttt{--latname <string>}\\Name of the latitude axis (default \texttt{lat}).
-\item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
-\end{itemize}
-
-\subsubsection{Brief algorithm description}
 
 \section{DetectCyclonesUnstructured}
 

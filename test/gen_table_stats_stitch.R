@@ -3,8 +3,8 @@ source("~/tempestextremes/test/sector_funcs.R")
 f_dir="/Volumes/ExFAT_drive/ERA_files/ERA_blobs/"
 
 
-#for (sector in c("NA","NC","NP","SA","SI","SP")){
-for (sector in c("NA")){
+for (sector in c("NA","NC","NP","SA","SI","SP")){
+#for (sector in c("NA")){
   for (season in c("MAM","JJA","SON","DJF")){
     search_patt=sprintf("ERA_*_%s_%s_*stats.txt",season,sector)
     files_masterlist=list.files(path=f_dir,pattern=glob2rx(search_patt))
@@ -64,6 +64,7 @@ for (sector in c("NA")){
     df_tot_stitch$maxlon_c<-lon_convert(df_tot_stitch$maxlon)
     df_tot_stitch$centlon_c<-lon_convert(df_tot_stitch$centlon)
     #Save the dataframe
+    df_tot_stitch<-df_tot_stitch[format(df_tot_stitch$date,"%m_%d")!="02_29",]
     statsname<-sprintf("~/block_r_data/stats_stitch_%s_%s_table.RData",season,sector)
     save(list=c("df_tot_stitch"),file=statsname)
   }
