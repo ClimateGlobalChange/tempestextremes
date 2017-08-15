@@ -44,7 +44,7 @@
 
 There are two main methods for block detection: the Z500 gradient method of Tibaldi and Molteni 1990 (hereafter referred to as TM90), and anomaly-based methods such as that of Dole and Gordon 1983 (Z500 anomaly, DG83) or Schwierz et al 2004 (potential vorticity anomaly, S04). Because TM90 is based on an instantaneous field, the calculations are done in a single step with the \texttt{BlockingGHG} program, as explained in Section \ref{ghg}. The anomaly methods involve a multi-step process that will be outlined in section \ref{anom}.
 
-\section{BlockingGHG)}\label{ghg}
+\section{BlockingGHG}\label{ghg}
 
 \begin{verbatim}
 Usage: BlockingGHG <parameter list>
@@ -79,7 +79,7 @@ GHGS=\frac{Z(\phi_0)-Z(\phi_s)}{\phi_0-\phi_s}
 
 \noindent where $\phi_0$, $\phi_n$, and $\phi_s$ are the reference latitude and the latitudes 15$^\circ$ poleward and equatorward of $\phi_0$, respectively, and $GHGN$ and $GHGS$ are the height gradients. For $GHGN<-10$ m/deg lat and $GHGS>0$ m/deg lat, the point is considered instantaneously blocked.
 
-This is a modification of the original TM90 algorithm, which was calculated about a single predetermined latitude. Scherrer et al 2006 and others expanded the definition to encompass all latitudes 35-75 degrees in both hemispheres.
+This is a modification of the original TM90 algorithm, which was calculated for all longitude values about a single predetermined latitude. Scherrer et al 2006 and others expanded the definition to encompass all latitudes 35-75 degrees in both hemispheres.
 
 
 \subsection{File input and output}
@@ -100,6 +100,12 @@ Each anomaly method has a general workflow that can be described as follows:
 \item Calculate the normalized anomalies using \texttt{BlockingNormDevs}
 \end{enumerate}
 
+\subsection{Potential Vorticity Anomaly}
+
+Schwierz et al 2004 uses vertically averaged (150-500 hPa) potential vorticity as the variable of choice for block detection. The presence of negative (positive) anomalies in the Northern (Southern) Hemisphere denotes either a slowing or reversal of the flow with respect to the climatological mean. 
+
+\subsection{Z500 Anomaly}
+
 \subsection{BlockingPV}\label{PV}
 \begin{verbatim}
 Usage: BlockingPV <parameter list>
@@ -116,6 +122,8 @@ Parameters:
   --lonname <string> ["lon"]
 \end{verbatim}
 
+
+
 \begin{itemize}
 \item[]\texttt{--in <string>} \\ Input file in NetCDF format containing temperature and wind variables, with axes \texttt{[time, lev, lat, lon]}
 \item[]\texttt{--in2d <string>} \\ Optional input file in NetCDF format containing surface pressure, with axes \texttt{[time, lat, lon]}. Only necessary if input file's vertical axis is on model levels.
@@ -129,9 +137,13 @@ Parameters:
 \item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
 \end{itemize}
 
+\textbf{Note: do not use both \texttt{--in} and \texttt{--inlist} flags simultaneously. Also, do not use both \texttt{--in2d} and \texttt{--inlist2d} flags simultaneously.}
+
+
+
 \subsubsection{File input and output}
 
-
+This program takes input files containing temperature (\texttt{T}) and zonal (\texttt{U}) and meridional (\texttt{V}) winds and outputs files with both potential vorticity (\texttt{PV}) and vertically averaged potential vorticity (\texttt{IPV}). Input files should have a vertical axis 
 
 \subsection{BlockingDevs}\label{dev}
 \begin{verbatim}
@@ -160,10 +172,9 @@ Parameters:
 \end{itemize}
 
 \subsubsection{File input and output}
-This program takes a list of files and calculates anomalies from the long term daily mean (the file which was calculated in Section \ref{bavg}). There are two options for outputs, specified by the Boolean \texttt{--pv} (potential vorticity) and \texttt{--gh} (500 mb geopotential height) flags. 
+This program takes a list of files and calculates anomalies from the long term daily mean (the file which was calculated in Section \ref{bavg}). There are two options for calculations, specified by the Boolean \texttt{--pv} (potential vorticity) and \texttt{--gh} (500 mb geopotential height) flags. 
 
-For each input file, the program produces a corresponding output file containing the calculated anomalies with the suffix \texttt{\_devs} appended to the original file name. There are 3 output variables: the unsmoothed anomaly (\texttt{DIPV/DGH}), the anomaly with 2-day smoothing (\texttt{ADIPV/ADGH}), and 
-the smoothed anomalies divided by the threshold value (\texttt{INT\_ADIPV/INT\_ADGH}).
+For each input file, the program produces a corresponding output file containing the calculated anomalies with the suffix \texttt{\_devs} appended to the original file name. There are 2 output variables: the unsmoothed anomaly (\texttt{DIPV/DGH}) and  the anomaly with 2-day smoothing (\texttt{ADIPV/ADGH}).
 
 
 \subsection{Other Tools: AvgVar}

@@ -98,19 +98,42 @@ int main(int argc, char** argv){
       }
       //Dimensions and associated variables
       NcDim *time = readin.get_dim(tname.c_str());
+      if (time == NULL){
+        _EXCEPTION1("Cannot find dimension \"%s\"", tname.c_str());
+      }
       int nTime = time->size();
       NcVar *timevar = readin.get_var(tname.c_str());
+      if (timevar == NULL){
+        _EXCEPTION1("Cannot find variable \"%s\"", tname.c_str());
+      }
 
       NcDim *lat = readin.get_dim(latname.c_str());
+      if (lat == NULL){
+        _EXCEPTION1("Cannot find dimension \"%s\"", latname.c_str());
+      }
       int nLat = lat->size();
       NcVar *latvar = readin.get_var(latname.c_str());
+      if (latvar == NULL){
+        _EXCEPTION1("Cannot find variable \"%s\"", latname.c_str());
+      }
 
       NcDim *lon = readin.get_dim(lonname.c_str());
+      if (lon == NULL){
+        _EXCEPTION1("Cannot find dimension \"%s\"", lonname.c_str());
+      }
       int nLon = lon->size();
       NcVar *lonvar = readin.get_var(lonname.c_str());
+      if (lonvar == NULL){
+        _EXCEPTION1("Cannot find variable \"%s\"", lonname.c_str());
+      }
+
 
       DataMatrix3D<double>ZData(nTime,nLat,nLon);
+      std::cout << "Initializing data matrix.";
       NcVar *zvar = readin.get_var(varName.c_str());
+      if (zvar == NULL){
+        _EXCEPTION1("Cannot find variable \"%s\"", varName.c_str());
+      }
       int nDims = zvar->num_dims();
       if (nDims != 3){
         _EXCEPTIONT("Error: variable does not have correct number of dimensions (3).");
@@ -118,6 +141,7 @@ int main(int argc, char** argv){
 
       zvar->set_cur(0,0,0);
       zvar->get(&(ZData[0][0][0]),nTime,nLat,nLon);
+      std::cout << "...Read in data."<<std::endl;
 
       //Create output file that corresponds to IPV data
       std::string strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
