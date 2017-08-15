@@ -128,8 +128,6 @@ int main(int argc, char** argv){
       }
 
 
-      DataMatrix3D<double>ZData(nTime,nLat,nLon);
-      std::cout << "Initializing data matrix.";
       NcVar *zvar = readin.get_var(varName.c_str());
       if (zvar == NULL){
         _EXCEPTION1("Cannot find variable \"%s\"", varName.c_str());
@@ -139,6 +137,8 @@ int main(int argc, char** argv){
         _EXCEPTIONT("Error: variable does not have correct number of dimensions (3).");
       }
 
+      DataMatrix3D<double>ZData(nTime,nLat,nLon);
+      std::cout << "Initializing data matrix.";
       zvar->set_cur(0,0,0);
       zvar->get(&(ZData[0][0][0]),nTime,nLat,nLon);
       std::cout << "...Read in data."<<std::endl;
