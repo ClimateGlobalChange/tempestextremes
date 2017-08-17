@@ -225,6 +225,9 @@ int main(int argc, char **argv){
     copy_dim_var(latvar, lat_vals);
     copy_dim_var(lonvar, lon_vals);
 
+  //Add the PV and IPV variables to the file
+    NcVar *pv_var = file_out.add_var("PV", ncDouble, out_time, out_plev, out_lat, out_lon);
+    NcVar *intpv_var = file_out.add_var("IPV", ncDouble, out_time, out_lat, out_lon);
   //Data for PT, RV, PV calculations
     DataVector<double> coriolis(lat_len);
     DataVector<double> cosphi(lat_len);
@@ -239,16 +242,45 @@ int main(int argc, char **argv){
     pv_vars_calc(lat_vals, lon_vals, lev_vals, lat_res, lon_res,\
       dphi, dlambda, dp, coriolis, cosphi);
 
-  //Calculate PT
-    DataMatrix4D<double> PTVar(time_len,lev_len,lat_len,lon_len);
-    PT_calc(temp, lev_vals, PTVar);
+    DataVector<double>pVec(lev_len);
+    lev_vals->set_cur((long)0);
+    lev_vals->get(&(pVec[0]),lev_len);
+   //CALCULATE PV AND IPV PER TIME STEP
+    for (int t=0; t<time_len; t++){
+ 
 
-  //Calculate relative vorticity and add to outfile
-    DataMatrix4D<double>RVVar(time_len,lev_len,lat_len,lon_len);
-    rVort_calc(uvar, vvar, dphi, dlambda, cosphi, RVVar);
+    //Calculate PT
+    DataMatrix3D<double> PTVar(lev_len,lat_len,lon_len);
+    DataMatrix3D<double> TVar(lev_len,lat_len,lon_len);
+    temp->set_cur(t,0,0,0);
+    temp->get(&(TVar[0][0][0]),1,lev_len,lat_len,lon_len);
+    PT_calc(lev_len,lat_len,lon_len,TVar, lev_vals, PTVar);
 
-    NcVar *pv_var = file_out.add_var("PV", ncDouble, out_time, out_plev, out_lat, out_lon);
-    NcVar *intpv_var = file_out.add_var("IPV", ncDouble, out_time, out_lat, out_lon);
+  //Calculate relative vorticity 
+    DataMatrix3D<double>RVVar(lev_len,lat_len,lon_len);
+    DataMatrix3D<double>UMat(lev_len,lat_len,lon_len);
+    DataMatrix3D<double>VMat(lev_len,lat_len,lon_len);
+
+    uvar->set_cur(t,0,0,0);
+    uvar->get(&(UMat[0][0][0]),1,lev_len,lat_len,lon_len);
+
+    vvar->set_cur(t,0,0,0);
+    vvar->get(&(VMat[0][0][0]),1,lev_len,lat_len,lon_len);
+    rVort_calc(lev_len,lat_len,lon_len,UMat,VMat, dphi, dlambda, cosphi, RVVar);
+
+    DataMatrix3D<double> PVMat(lev_len,lat_len,lon_len);
+    DataMatrix<double>IPVMat(lat_len,lon_len);
+    PV_calc(lev_len,lat_len,lon_len, UMat, VMat, PTVar, RVVar, pVec, coriolis,cosphi, dphi, dlambda,\
+      lat_res, lon_res, PVMat);
+    IPV_calc(lev_len,lat_len,lon_len,lat_res,pVec,PVMat,IPVMat);
+
+    pv_var->set_cur(t,0,0,0);
+    pv_var->put(&(PVMat[0][0][0]),1,lev_len,lat_len,lon_len);
+    intpv_var->set_cur(t,0,0);
+    intpv_var->put(&(IPVMat[0][0]),1,lat_len,lon_len);
+
+    }
+/*
     NcVar *avgt_var = file_out.add_var("AVGT", ncDouble, out_time, out_lat, out_lon);
     NcVar *avgu_var = file_out.add_var("AVGU", ncDouble, out_time, out_lat, out_lon);
     NcVar *avgv_var = file_out.add_var("AVGV", ncDouble, out_time, out_lat, out_lon);
@@ -256,8 +288,8 @@ int main(int argc, char **argv){
     VarPressureAvg(temp,lev_vals,avgt_var);
     VarPressureAvg(uvar,lev_vals,avgu_var);
     VarPressureAvg(vvar,lev_vals,avgv_var);
-    PV_calc(uvar, vvar, PTVar, RVVar, lev_vals, coriolis,cosphi, dphi, dlambda,\
-      lat_res, lon_res, pv_var, intpv_var);
+*/
+
 
     std::cout<<"About to close files."<<std::endl;
  //Close input files

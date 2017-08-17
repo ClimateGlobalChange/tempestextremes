@@ -123,9 +123,12 @@ void VarPressureAvg(
 //a 4D data matrix (time, lev, lat, lon) with potential 
 //temperature values
 void PT_calc(
-        NcVar *T, 
+        int nPlev,
+        int nLat,
+        int nLon,
+        DataMatrix3D<double> TMat, 
         NcVar *pLev, 
-        DataMatrix4D<double> &PTMat
+        DataMatrix3D<double> &PTMat
 );
 		
 //Used in BlockingPV. Input lat, lon, and pressure variables
@@ -144,18 +147,21 @@ void pv_vars_calc(
   DataVector<double> & cosphi
 );
 
+
 //Takes wind variables, phi/lambda resolution and coriolis values
 //and returns a 4D data matrix (time, lev, lat, lon) with relative 
 //vorticity values
 void rVort_calc(
-        NcVar *U,
-        NcVar *V,
+        int nPlev,
+        int nLat,
+        int nLon,
+        DataMatrix3D<double>UMat,
+        DataMatrix3D<double>VMat,
         double dphi,
         double dlambda,
         DataVector<double> cosphi,
-        DataMatrix4D<double> & RVMat
+        DataMatrix3D<double> & RVMat
 );
-
 
 //////////////////////////////////////
 //    SECTION: VARIABLE CHECKS      //
@@ -196,24 +202,39 @@ void MissingFill(
 //    SECTION: FINAL VARIABLE CALCULATIONS      //
 //////////////////////////////////////////////////
 
-//Takes 4D variables for wind, potential temperature,
-//relative vorticity, etc and outputs both 4D (time,
-//lev, lat, lon) and 3D (time, lat, lon) vertically 
-//averaged potential vorticity variables
+//Takes  variables for wind, potential temperature,
+//relative vorticity, etc and outputs both 3D 
+//(lev, lat, lon) and 2D (lat, lon) vertically 
+//averaged potential vorticity variables per time slice
+
 void PV_calc(
-        NcVar *U,
-        NcVar *V,
-        DataMatrix4D<double> PTMat,
-        DataMatrix4D<double> RVMat,
-        NcVar *pVals,
+        int nPlev,
+        int nLat,
+        int nLon,
+        DataMatrix3D<double>UMat,
+        DataMatrix3D<double>VMat,
+        DataMatrix3D<double> PTMat,
+        DataMatrix3D<double> RVMat,
+        DataVector<double>pVec,
         DataVector<double> coriolis,
-        DataVector<double> cosphi,
+        DataVector<double>cosphi,
         double dphi,
         double dlambda,
         double lat_res,
         double lon_res,
-        NcVar *PV,
-        NcVar *intPV);
+        DataMatrix3D<double> & PVMat
+);
+
+
+void IPV_calc(
+       int nPlev,
+       int nLat,
+       int nLon,
+       double lat_res,
+       DataVector<double> pVec,
+       DataMatrix3D<double> PVMat,
+       DataMatrix<double> & IPVMat
+);
 
 ////////////////////////////////////////////////////
 //    SECTION: VARIABLE ANOMALY CALCULATIONS      //
