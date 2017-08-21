@@ -34,9 +34,14 @@ int main(int argc, char **argv){
 
     //list of input files for which to calculate deviations
     std::string fileList;
+    //name of single input file
+    std::string fileName;
+
     //file that holds averages
     std::string avgName;
+    //Name of input variable
     std::string varName;
+    //name of averaged input variable
     std::string avgVarName;
 //    std::string threshName;
 //    std::string threshVarName;
@@ -47,6 +52,7 @@ int main(int argc, char **argv){
 
 
     BeginCommandLine()
+      CommandLineString(fileName, "in","");
       CommandLineString(fileList, "inlist", "");
       CommandLineString(varName,"varname","");
       CommandLineString(avgName, "avg", "");
@@ -66,7 +72,12 @@ int main(int argc, char **argv){
     if ((!PVCalc) && (!GHCalc)){
       _EXCEPTIONT("Need to specify either PV (--pv) or GH (--gh) calculations.");
     }
-  
+    if (fileName == "" && fileList == ""){
+      _EXCEPTIONT("Need to specify either input file (--in) or file list (--inlist).");
+    }
+    if (fileName != "" && fileList != ""){
+      _EXCEPTIONT("Cannot specify both file name (--in) and file list (--inlist).");
+    }
 
    int nFiles,avgTime,nTime,nLat,nLon;
    double anomVal;
