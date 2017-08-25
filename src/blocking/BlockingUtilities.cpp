@@ -877,15 +877,20 @@ void calcDevs(bool leap,
     PVAnom = -PVAnom;
   }
 */
-//input IPV
-  DataMatrix3D<double> IPVMat(nTime,nLat,nLon);
-  inIPV->set_cur(0,0,0);
-  inIPV->get(&(IPVMat[0][0][0]),nTime,nLat,nLon);
+//length of average time axis
+//  avgDay = avgIPV->get_dim(0)->size();
 
+/*  //Vector of average time axis
+  DataVector<int> avgDayVec(avgDay);
+  avgTime->set_cur((long) 0);
+  avgTime->get(&(avgDayVec[0]),avgDay);
+*/
+  //Vector of instantaneous time axis
   DataVector<double> timeVec(nTime);
   inTime->set_cur((long) 0);
   inTime->get(&(timeVec[0]),nTime);
 
+  //time units of instantaneous time axis
   std::string strTimeUnits = inTime->get_att("units")->as_string(0);
   std::string strCalendar = inTime->get_att("calendar")->as_string(0);
 
@@ -898,15 +903,6 @@ void calcDevs(bool leap,
   }
   nSteps = 1/tRes;
 
-//avg IPV
-  avgDay = avgIPV->get_dim(0)->size();
-  DataMatrix3D<double> avgMat(avgDay,nLat,nLon);
-  avgIPV->set_cur(0,0,0);
-  avgIPV->get(&(avgMat[0][0][0]),avgDay,nLat,nLon);
-
-  DataVector<int> avgDayVec(avgDay);
-  avgTime->set_cur((long) 0);
-  avgTime->get(&(avgDayVec[0]),avgDay);
 
 
 //Matrix for output data
@@ -917,10 +913,10 @@ void calcDevs(bool leap,
   else{
     nOutTime = nTime;
   }
-
+/*
   DataMatrix3D<double> devMat(nOutTime,nLat,nLon);
   DataMatrix3D<double> aDevMat(nOutTime,nLat,nLon);
-
+*/
 //Number of days in IPV
   int nDays = nTime*tRes;
  // std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
@@ -934,13 +930,20 @@ void calcDevs(bool leap,
   int leapMonth=0;
   int leapDay=0;
   int leapHour=0;
-
+//input instantaneous and average data 
+  DataMatrix<double> IPVMat(nLat,nLon);
+  DataMatrix<double> avgMat(nLat,nLon);
+  DataMatrix<double> devMat(nLat,nLon);
+  double num = std::sin(45*pi/180);
+  double denom, sineRatio;
   for (int t=0; t<nTime; t++){
+    inIPV->set_cur(t,0,0);
+    inIPV->get(&(IPVMat[0][0]),1,nLat,nLon);
     if (leap){
       ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
         leapMonth, leapDay, leapHour);
       if (leapMonth==2 && leapDay == 29){
-      //  std::cout<<"Leap day! Skipping day."<<std::endl;
+        std::cout<<"Leap day! Skipping day."<<std::endl;
         t+=nSteps;
       }
     }
@@ -949,75 +952,76 @@ void calcDevs(bool leap,
     }
     int nDayIncrease = d/nSteps;
     int currAvgIndex = startAvgIndex + nDayIncrease;
+
     if (currAvgIndex>364){
       currAvgIndex-=365;
     }
+    avgIPV->set_cur(currAvgIndex,0,0);
+    avgIPV->get(&(avgMat[0][0]),1,nLat,nLon);
     for (int a=0; a<nLat; a++){
+      //Denominator for Z500 anomaly lat normalization
+      if (std::fabs(latVec[a])< 5.){
+        denom = std::sin(5.*pi/180.);
+      }
+      else if (std::fabs(latVec[a])>85.){
+        denom = std::sin(85. *pi/180.);
+      }
+      else{
+        denom = std::fabs(std::sin(latVec[a]*pi/180.));
+      }
+      sineRatio = num/denom;
       for (int b=0; b<nLon; b++){
-        devMat[t][a][b] = IPVMat[t][a][b]-avgMat[currAvgIndex][a][b];
+        devMat[a][b] = IPVMat[a][b]-avgMat[a][b];
+        if (!isPV){
+          devMat[a][b]*=sineRatio;
+        }
       }
     }
     newTime[d] = timeVec[t];
+    outDev->set_cur(d,0,0);
+    outDev->put(&(devMat[0][0]),1,nLat,nLon);
     d++;
   }
   outTime->set_cur((long) 0);
   outTime->put(&(newTime[0]),nOutTime);
 
+
  // std::cout<<"About to implement smoothing."<<std::endl;
   double div = (double) 2*nSteps;
   double invDiv = 1.0/div;
 
+  DataMatrix<double> aDevMat(nLat,nLon);
   //implement 2-day smoothing
-  for (int t=0; t<nOutTime; t++){
+  for (int t=0; t<2*nSteps; t++){
+    outDev->set_cur(t,0,0);
+    outDev->get(&(devMat[0][0]),1,nLat,nLon);
+    outADev->set_cur(t,0,0);
+    outADev->put(&(devMat[0][0]),1,nLat,nLon);
+  }
+ 
+  for (int t=2*nSteps; t<nOutTime; t++){  
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
-        if (t<2*nSteps){
-          aDevMat[t][a][b] = devMat[t][a][b];
-        }
-        else{
-          for (int n=0; n<2*nSteps; n++){
-            aDevMat[t][a][b]+=devMat[t-n][a][b];
-          }
-          aDevMat[t][a][b] = aDevMat[t][a][b]*invDiv;
+        aDevMat[a][b] = 0.0;
+      }
+    }
+    for (int n=0; n<2*nSteps; n++){
+      outDev->set_cur(t-n,0,0);
+      outDev->get(&(devMat[0][0]),1,nLat,nLon);
+      for (int a=0; a<nLat; a++){
+        for (int b=0; b<nLon; b++){
+          aDevMat[a][b]+=devMat[a][b]*invDiv;
         }
       }
     }
+    outADev->set_cur(t,0,0);
+    outADev->put(&(aDevMat[0][0]),1,nLat,nLon);
   }
 
  // std::cout<<"Finished smoothing."<<std::endl;
 
-  if (!isPV){
-    double num = std::sin(45*pi/180);
-    double denom, sineRatio;
-    //Multiply values by sine factor
-    for (int t=0; t<nOutTime; t++){
-      for (int a=0; a<nLat; a++){
-        if (std::fabs(latVec[a]) < 5.){
-          denom = std::sin(5.*pi/180.);
-        }
-        else if (std::fabs(latVec[a])>85.){
-          denom = std::sin(85.*pi/180.);
-        }
-        else{
-          denom = std::fabs(std::sin(latVec[a]*pi/180.));
-        }
-        sineRatio = num/denom;
-        for (int b=0; b<nLon; b++){
-          devMat[t][a][b]*=sineRatio;
-          aDevMat[t][a][b]*=sineRatio;
-        }
-      }
-    }
-  }
 
-  outDev->set_cur(0,0,0);
-  outDev->put(&(devMat[0][0][0]),nOutTime,nLat,nLon);
   std::cout<<"Wrote devs to file."<<std::endl;
-
-  outADev->set_cur(0,0,0);
-  outADev->put(&(aDevMat[0][0][0]),nOutTime,nLat,nLon);
-  std::cout<<"Wrote smoothed devs to file."<<std::endl;
-
 }
 void calcNormalizedDevs(bool isPV,
                        NcVar * inDev,

@@ -88,7 +88,13 @@ int main(int argc, char **argv){
    }
    //Create list of input files
     std::vector<std::string> InputFiles;
-    GetInputFileList(fileList, InputFiles);
+
+    if (fileList != ""){
+      GetInputFileList(fileList, InputFiles);
+    }
+    else{
+      InputFiles.push_back(fileName);
+    }
     nFiles = InputFiles.size();
 
     //Open averages file
