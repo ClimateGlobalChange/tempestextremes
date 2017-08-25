@@ -158,8 +158,13 @@ int main(int argc, char **argv){
     //Interpolate variables and write to new file
       std::cout << "About to interpolate files. Entering interp util."<<std::endl;
 //    interp_util(readin_int, strfile_2d, readin_out);
-      std::string varlist=tempName+","+uName+","+vName;
-
+     
+      std::string varlist;
+      if (has_PV){
+        varlist=PVname;
+      }else{
+        varlist=tempName+","+uName+","+vName;
+      }
       interp_util(readin_int,strfile_2d,varlist,readin_out);
       readin_out.close();
       InputFiles[x] = interp_file;

@@ -1289,13 +1289,13 @@ try {
 		Tag tagMinimum = *iterTag;
 
 		// Check if this tag is already part of an explored clique
-		if (mapEquivalentTags.find(*iterTag) != mapEquivalentTags.end()) {
-			continue;
-		}
+		//if (mapEquivalentTags.find(*iterTag) != mapEquivalentTags.end()) {
+		//	continue;
+		//}
 
 		// New blob
 		nTotalBlobCount++;
-
+/*
 		// All time values associated with this blob
 		std::set<int> setBlobTimes;
 
@@ -1334,23 +1334,23 @@ try {
 				setTagsToVisit.insert(iter->second);
 			}
 		}
-
+*/
 		// Set global id
-		if (setBlobTimes.size() >= nMinTime) {
+		//if (setBlobTimes.size() >= nMinTime) {
 			tagMinimum.global_id = nTotalBlobCount;
-		} else {
-			tagMinimum.global_id = 0;
-			nTotalBlobCount--;
-		}
+		//} else {
+		//	tagMinimum.global_id = 0;
+		//	nTotalBlobCount--;
+		//}
 
 		// Refer all tags in clique to minimum tag
 		std::set<Tag>::const_iterator iterTagsVisited = setTagsVisited.begin();
 		for (; iterTagsVisited != setTagsVisited.end(); iterTagsVisited++) {
-			mapEquivalentTags.insert(
-				std::pair<Tag,Tag>(*iterTagsVisited, tagMinimum));
+			//mapEquivalentTags.insert(
+			//	std::pair<Tag,Tag>(*iterTagsVisited, tagMinimum));
 		}
 	}
-
+/*
 	// Merge blobs at each time step with equivalent tags
 	for (int t = 0; t < nTime; t++) {
 
@@ -1361,15 +1361,12 @@ try {
 				mapEquivalentTags.find(vecBlobTags[p]);
 
 			if (iterTagPair != mapEquivalentTags.end()) {
-//				vecBlobTags[p] = iterTagPair->second;
-				vecBlobTags[p] = iterTagPair->first;
-				vecBlobTags[p].global_id = vecBlobTags[p].id;
+				vecBlobTags[p] = iterTagPair->second;
 			}
 		}
 	}
-
+*/
 	Announce("Blobs found: %i", nTotalBlobCount);
-
 /*
 	// Apply threshold operators
 	std::vector<bool> fRejectedBlob;
@@ -1545,6 +1542,7 @@ try {
 	DataMatrix<int> dataBlobTag;
 	dataBlobTag.Initialize(nLat, nLon);
 
+	int b = 0;
 	for (int t = 0; t < nTime; t++) {
 
 		dataBlobTag.Zero();
@@ -1557,9 +1555,11 @@ try {
 		// Put blob information into matrix
 		for (int p = 0; p < vecBlobTags.size(); p++) {
 
-			if (vecBlobTags[p].global_id == 0) {
-				continue;
-			}
+			//if (vecBlobTags[p].global_id == 0) {
+			//	continue;
+			//}
+
+			b++;
 /*
 			if (fRejectedBlob[vecBlobTags[p].global_id]) {
 				continue;
@@ -1567,8 +1567,8 @@ try {
 */
 			IndicatorSetConstIterator iter = vecBlobs[p].begin();
 			for (; iter != vecBlobs[p].end(); iter++) {
-				dataBlobTag[iter->lat][iter->lon] =
-					vecBlobTags[p].global_id;
+				dataBlobTag[iter->lat][iter->lon] = b;
+					//vecBlobTags[p].global_id;
 			}
 		}
 

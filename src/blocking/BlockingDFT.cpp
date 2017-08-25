@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////
 ///
-///           \file avgDFT.cpp
+///           \file BlockingDFT.cpp
 ///           \author Marielle Pinheiro
 ///           \date May 8, 2017
 ///
@@ -31,7 +31,7 @@ int main(int argc, char ** argv){
       CommandLineString(outFile,"out","");
       CommandLineString(avgName,"avgname","");
       CommandLineString(varName,"varname","");
-      CommandLineInt(nWaves, "nwaves",6);
+      CommandLineInt(nWaves, "ncoef",12);
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
