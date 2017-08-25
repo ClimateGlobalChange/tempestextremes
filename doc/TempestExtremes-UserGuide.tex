@@ -85,14 +85,14 @@ This is a modification of the original TM90 algorithm, which was calculated for 
 \subsection{File input and output}
 
 
-This program takes each input file containing the Z500 variable (specified by the \texttt{--varname} flag) and outputs a file containing the variable \texttt{GHGrad}, which has a value of either 1 (gridpoint is instantaneously blocked) or 0 (not blocked).
+This program takes each input file containing the Z500 variable (specified by the \texttt{--varname} flag) and outputs a file (original file name plus suffix \texttt{\_GHG.nc}), containing the variable \texttt{GHGrad}, which has a value of either 1 (gridpoint is instantaneously blocked) or 0 (not blocked).
 
 \section{Anomaly Method}\label{anom}
 
 Each anomaly method has a general workflow that can be described as follows:
 
 \begin{enumerate}
-\item Generate the input files, using either \texttt{BlockingPV} for vertically averaged potential vorticity (Section \ref{PV}) or \texttt{Var4Dto3D} for Z500 (Section , optional if already have files with Z500)
+\item Generate the input files, using either \texttt{Var4Dto3D} for vertically averaged potential vorticity (Section \ref{PV}) or Z500 (Section (STILL TO COME], optional if already have files with Z500) or \texttt{BlockingPV}.
 \item Calculate the long term daily average, using \texttt{BlockingDFT} (Section )
 \item Calculate the anomalies from the long term daily average, using \texttt{BlockingDevs} (Section \ref{dev})
 \item (Optional) Calculate the long term daily average of the anomalies using \texttt{BlockingDFT} in order to use in the threshold calculations
@@ -116,6 +116,11 @@ Parameters:
   --inlist2d <string> [""]
   --ipl
   --hpa
+  --hasPV
+  --PVname <string> ["PV"]
+  --uname <string> ["U"]
+  --vname <string> ["V"]
+  --tempname <string> ["T"]
   --tname <string> ["time"]
   --levname <string> ["lev"]
   --latname <string> ["lat"]
@@ -131,6 +136,11 @@ Parameters:
 \item[]\texttt{--inlist2d <string>} \\ Optional list of input datafiles in NetCDF format containing surface pressure, with axes \texttt{[time, lat, lon]}. Only necessary if input files' vertical axis is on model levels.
 \item[]\texttt{--ipl}\\ Optional bool directing program to create new input file with vertical pressure axis (using input file with vertical model level axis and surface pressure file)
 \item[]\texttt{--hpa} \\ Optional bool that tells program that pressure levels have units of hPa rather than Pa.
+\item[]\texttt{--hasPV} \\ Optional bool that tells program that PV variable is already present, and only vertically averaged PV needs to be calculated.
+\item[] \texttt{--PVname <string>}\\Name of the potential vorticity variable (default \texttt{PV}).
+\item[] \texttt{--uname <string>}\\Name of the zonal wind variable (default \texttt{U}).
+\item[] \texttt{--vname <string>}\\Name of the meridional wind variable (default \texttt{V}).
+\item[] \texttt{--tempname <string>}\\Name of the temperature variable (default \texttt{T}).
 \item[] \texttt{--tname <string>}\\Name of the time axis (default \texttt{time}).
 \item[] \texttt{--levname <string>}\\Name of the time axis (default \texttt{lev}).
 \item[]\texttt{--latname <string>}\\Name of the latitude axis (default \texttt{lat}).
@@ -139,11 +149,15 @@ Parameters:
 
 \textbf{Note: do not use both \texttt{--in} and \texttt{--inlist} flags simultaneously. Also, do not use both \texttt{--in2d} and \texttt{--inlist2d} flags simultaneously.}
 
-
-
 \subsubsection{File input and output}
 
-This program takes input files containing temperature (\texttt{T}) and zonal (\texttt{U}) and meridional (\texttt{V}) winds and outputs files with both potential vorticity (\texttt{PV}) and vertically averaged potential vorticity (\texttt{IPV}). Input files should have a vertical axis 
+
+Without the \texttt{--hasPV flag}, this program takes input files containing temperature (\texttt{T}) and zonal (\texttt{U}) and meridional (\texttt{V}) winds and outputs files  (original file name plus suffix \texttt{\_integ.nc}) with both potential vorticity (\texttt{PV}) and vertically averaged potential vorticity (\texttt{IPV}). 
+
+
+If potential vorticity variable is already present,  use the \texttt{--hasPV} flag (with optional \texttt{--PVname} flag if name of variable differs from the default) and the program will output new files (original file name plus suffix \texttt{\_integ.nc}) containing the vertically averaged \texttt{IPV} variable.
+
+Input files should have a vertical axis on pressure levels with units of Pa (must contain pressure levels from 15000-50000 Pa for the code to work). If the vertical axis is on model levels, use the \texttt{--ipl} flag, as well as input surface pressure files (\texttt{--in2d} or \texttt{--inlist2d}) to first interpolate variables to pressure levels. If the pressure levels are in units of hPa (or mb), use the \texttt{--hpa} flag to inform the program that the units need to be converted.
 
 \subsection{BlockingDevs}\label{dev}
 \begin{verbatim}
