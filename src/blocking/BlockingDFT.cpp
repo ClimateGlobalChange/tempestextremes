@@ -24,6 +24,7 @@
 
 int main(int argc, char ** argv){
   try{
+    NcError error(NcError::silent_nonfatal);
     std::string fileList, outFile,avgName,varName,  tname, latname, lonname;
     int nWaves;
     BeginCommandLine()
