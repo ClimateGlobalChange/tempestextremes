@@ -156,7 +156,7 @@ int main(int argc, char ** argv){
       //std::cout<<"Storing values."<<std::endl;
       //Store the values and counts in the matrices at the appropriate day index
       for (int t=0; t<tLen; t++){
-        inputData.initialize(latLen,lonLen);
+        inputData.Initialize(latLen,lonLen);
         inputVar->set_cur(t,0,0);
         inputVar->get(&(inputData[0][0]),1,latLen,lonLen);
         ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t],\

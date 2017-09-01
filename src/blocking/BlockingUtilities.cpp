@@ -222,7 +222,22 @@ void ParseTimeDouble(
 		nDateMonth = time.GetMonth();
 		nDateDay = time.GetDay();
 		nDateHour = time.GetSecond() / 3600;
-                //std::cout<<"Debug: Y/M/D:"<<nDateYear<<"/"<<nDateMonth<<"/"<<nDateDay<<std::endl;
+		//printf("%s\n", strSubStr.c_str());
+
+	// Time format is "minutes since ..."
+	} else if (
+	    (strTimeUnits.length() >= 14) &&
+	    (strncmp(strTimeUnits.c_str(), "minutes since ", 14) == 0)
+	) {
+		std::string strSubStr = strTimeUnits.substr(14);
+		Time time(cal);
+		time.FromFormattedString(strSubStr);
+		time.AddMinutes(static_cast<int>(dTime));
+
+		nDateYear = time.GetYear();
+		nDateMonth = time.GetMonth();
+		nDateDay = time.GetDay();
+		nDateHour = time.GetSecond() / 3600;
 		//printf("%s\n", strSubStr.c_str());
 
 	} else {
