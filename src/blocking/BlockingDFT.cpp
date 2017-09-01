@@ -98,12 +98,13 @@ int main(int argc, char ** argv){
         _EXCEPTIONT("Time variable has no units attribute.");
       }
       std::string strTimeUnits = attTime->as_string(0);
-
+      std::string strCalendar;
       NcAtt *attCal = timeVar->get_att("calendar");
       if (attCal==NULL){
-        _EXCEPTIONT("Time variable has no calendar attribute.");
+        strCalendar = "standard";
+      }else{
+        strCalendar = attCal->as_string(0);
       }
-      std::string strCalendar = attCal->as_string(0);
       if (strncmp(strCalendar.c_str(),"gregorian",9)==0){
         strCalendar = "standard";
       }
