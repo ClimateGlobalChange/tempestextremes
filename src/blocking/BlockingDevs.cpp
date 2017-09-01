@@ -180,13 +180,13 @@ int main(int argc, char **argv){
       }
 
       std::string strTimeUnits = attTime->as_string(0);
-
+      std::string strCalendar;
       NcAtt *attCal = inTime->get_att("calendar");
       if(attCal==NULL){
-        _EXCEPTIONT("Time variable has no calendar attribute.");
+        strCalendar = "standard";
+      }else{
+        strCalendar = attCal->as_string(0);
       }
-      std::string strCalendar = attCal->as_string(0);
-
    //   std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
 
 

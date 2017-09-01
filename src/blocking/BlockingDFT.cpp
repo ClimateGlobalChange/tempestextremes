@@ -224,11 +224,11 @@ int main(int argc, char ** argv){
     outAvgVar->set_cur(0,0,0);
     outAvgVar->put(&(outputMat[0][0][0]),yearLen,latLen,lonLen);
 
-    std::string zonalAvgName = avgName.append("_NO_SMOOTH");
+/*    std::string zonalAvgName = avgName.append("_NO_SMOOTH");
     NcVar *outZonalVar = outfile.add_var(zonalAvgName.c_str(),ncDouble,outTime,outLat,outLon);
     outZonalVar->set_cur(0,0,0);
     outZonalVar->put(&(storeMat[0][0][0]),yearLen,latLen,lonLen);
-
+*/
     refFile.close();
     outfile.close();
 
