@@ -32,6 +32,7 @@ of the instantaneous deviation values.
 #include <complex>
 
 int main(int argc, char ** argv){
+  NcError error(NcError::silent_nonfatal);
   try{
     std::string outFile,fileList,avgName,avgFile,varName,tname,latname,lonname;
     BeginCommandLine()

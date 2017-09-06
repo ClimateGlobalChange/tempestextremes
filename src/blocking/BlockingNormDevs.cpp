@@ -28,8 +28,8 @@ and outputs integer values (INT_ADIPV) which can then be used by StitchBlobs
 
 
 int main(int argc, char **argv){
-  NcError error(NcError::verbose_nonfatal);
-
+//  NcError error(NcError::verbose_nonfatal);
+  NcError error(NcError::silent_nonfatal);
   try{
 
     //list of input files for which to calculate normalized deviations
@@ -187,9 +187,6 @@ int main(int argc, char **argv){
    //   std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
 
 
-
-      //check if file is leap year file
-      bool leap = false;
       DataVector<double> timeVals(nTime);
       inTime->set_cur((long) 0);
       inTime->get(&(timeVals[0]),nTime);
@@ -213,25 +210,16 @@ int main(int argc, char **argv){
         (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
         tRes = timeVals[1]-timeVals[0];
       }
-      else{
+      else if((strTimeUnits.length() >= 12) && \
+      (strncmp(strTimeUnits.c_str(), "hours since ",12)==0)) {
         tRes = (timeVals[1]-timeVals[0])/24.0;
+      }else if (strTimeUnits.length() >= 14 && \
+        (strncmp(strTimeUnits.c_str(),"minutes since ",14)== 0) ){
+        tRes = (timeVals[1]-timeVals[0])/(24. * 60.);
+      }else{
+       _EXCEPTIONT("Cannot determine time resolution (unknown time units).");
       }
-      int nSteps = 1/tRes;
-     
-      int leapYear = 0;
-      int leapMonth = 0;
-      int leapDay = 0;
-      int leapHour = 0;
-
-      if (strCalendar!="noleap" && dateMonth <=2){
-        ParseTimeDouble(strTimeUnits, strCalendar, timeVals[nTime-1], leapYear,\
-          leapMonth, leapDay, leapHour);
-        if ((leapMonth==2 && leapDay == 29) || (dateMonth ==2 && leapMonth == 3)){
-          leap = true;
-        }     
-
-      }
-      
+      int nSteps = 1/tRes; 
 
       //Create output file that corresponds to IPV data
 
@@ -243,13 +231,7 @@ int main(int argc, char **argv){
       }
       std::cout<<"Writing variables to file "<<strOutFile.c_str()<<std::endl;
       NcFile outfile(strOutFile.c_str(), NcFile::Replace, NULL,0,NcFile::Offset64Bits);
-      int nOutTime;
-      if (leap){
-        nOutTime = nTime-nSteps;
-      }
-      else{
-        nOutTime = nTime;
-      }
+      int nOutTime = nTime;
       NcDim *tDimOut = outfile.add_dim(tname.c_str(),nOutTime);
       NcDim *latDimOut = outfile.add_dim(latname.c_str(),nLat);
       NcDim *lonDimOut = outfile.add_dim(lonname.c_str(),nLon);

@@ -866,6 +866,9 @@ void IPV_calc(
 void calcDevs(bool leap,
               bool isPV,
               int startAvgIndex,
+              double tRes,
+              std::string strTimeUnits,
+              std::string strCalendar,
               NcVar *inIPV,
               NcVar *outDev,
               NcVar *outADev,
@@ -876,7 +879,6 @@ void calcDevs(bool leap,
               NcVar *outTime){
 
   int nTime,nLat,nLon,nSteps,avgDay,nOutTime;
-  double tRes;
 
   double pi = std::atan(1.)*4.;
 
@@ -904,18 +906,25 @@ void calcDevs(bool leap,
   DataVector<double> timeVec(nTime);
   inTime->set_cur((long) 0);
   inTime->get(&(timeVec[0]),nTime);
-
+/*
   //time units of instantaneous time axis
   std::string strTimeUnits = inTime->get_att("units")->as_string(0);
   std::string strCalendar = inTime->get_att("calendar")->as_string(0);
 
-  if ((strTimeUnits.length() >= 11) && \
-    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
-    tRes = timeVec[1]-timeVec[0];
-  }
-  else{
-    tRes = (timeVec[1]-timeVec[0])/24.0;
-  }
+      if ((strTimeUnits.length() >= 11) && \
+        (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
+        tRes = timeVals[1]-timeVals[0];
+      }
+      else if((strTimeUnits.length() >= 12) && \
+      (strncmp(strTimeUnits.c_str(), "hours since ",12)==0)) {
+        tRes = (timeVals[1]-timeVals[0])/24.0;
+      }else if (strTimeUnits.length() >= 14 && \
+        (strncmp(strTimeUnits.c_str(),"minutes since ",14)== 0) ){
+        tRes = (timeVals[1]-timeVals[0])/(24. * 60.);
+      }else{
+       _EXCEPTIONT("Cannot determine time resolution (unknown time units).");
+      }
+*/
   nSteps = 1/tRes;
 
 

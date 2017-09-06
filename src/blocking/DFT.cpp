@@ -41,6 +41,7 @@ std::vector<std::complex<double> > DFT(std::vector<double> inputVals,
   std::complex <double> sumVals;
   int firstHalfNum = numCoefs/2;
   int secHalfNum = numCoefs-firstHalfNum;
+ 
   //Begin calculating the coefficients
   if (numCoefs<N){
     for (int k=0; k<=secHalfNum; k++){

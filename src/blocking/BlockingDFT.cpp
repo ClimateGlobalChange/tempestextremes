@@ -26,13 +26,15 @@ int main(int argc, char ** argv){
   try{
     NcError error(NcError::silent_nonfatal);
     std::string fileList, outFile,avgName,varName,  tname, latname, lonname;
-    int nWaves;
+    int nWaves,startday,endday;
     BeginCommandLine()
       CommandLineString(fileList,"inlist","");
       CommandLineString(outFile,"out","");
       CommandLineString(avgName,"avgname","");
       CommandLineString(varName,"varname","");
       CommandLineInt(nWaves, "ncoef",12);
+      CommandLineInt(startday,"startday",1);
+      CommandLineInt(endday,"endday",365);
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
@@ -68,7 +70,7 @@ int main(int argc, char ** argv){
     lonLen = readin.get_dim(lonname.c_str())->size();
 
     //Initialize storage array: day, lat, lon
-    int yearLen = 365;
+    int yearLen = (endday-startday)+1;
     DataMatrix3D<double> storeMat(yearLen,latLen,lonLen);
     //Initialize counts array: day, lat, lon
     DataMatrix3D<double> countsMat(yearLen, latLen, lonLen);
@@ -126,16 +128,19 @@ int main(int argc, char ** argv){
           dateMonth, dateDay, dateHour, timeVec[t]);
         if (leap == false){
           dayIndex = DayInYear(dateMonth, dateDay)-1;
-          //std::cout<<"Day index is "<<dayIndex<<std::endl;
+          std::cout<<"Day index is "<<dayIndex<<std::endl;
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
               storeMat[dayIndex][a][b]+= inputData[a][b];
               countsMat[dayIndex][a][b]+= 1.;
+              if (a==50 && b==20){
+                std::cout<<"Store: "<<storeMat[dayIndex][a][b]<< " count: "<< countsMat[dayIndex][a][b]<<std::endl;
+              }
             }
           }
         }
       }
-      //std::cout<<"Closing file."<<std::endl;
+      std::cout<<"Closing file."<<std::endl;
       readin.close();
 
     }
@@ -143,7 +148,11 @@ int main(int argc, char ** argv){
     for (int d=0; d<yearLen; d++){
       for (int a=0; a<latLen; a++){
         for (int b=0; b<lonLen; b++){
-          storeMat[d][a][b] = storeMat[d][a][b]/countsMat[d][a][b];
+          if (countsMat[d][a][b] < 1){
+            storeMat[d][a][b] = 0.;
+          }else{
+            storeMat[d][a][b] = storeMat[d][a][b]/countsMat[d][a][b];
+          }
         }
       }
     }
@@ -158,6 +167,7 @@ int main(int argc, char ** argv){
       for (int b=0; b<lonLen; b++){
         for (int d=0; d<yearLen; d++){
           inputDaily[d] = storeMat[d][a][b];
+          //std::cout<<"daily input for d="<<d<<" is "<<inputDaily[d]<<std::endl;
         }
         FourierCoefs = DFT(inputDaily, nWaves);
         outputDaily = IDFT(FourierCoefs);
@@ -203,7 +213,7 @@ int main(int argc, char ** argv){
     NcFile outfile(outFile.c_str(),NcFile::Replace,NULL,0,NcFile::Offset64Bits);
     NcDim *outTime = outfile.add_dim(tname.c_str(),yearLen);
     DataVector<int> tVals(yearLen);
-    for (int t=1; t<=yearLen; t++){
+    for (int t=startday; t<=endday; t++){
       tVals[t] = t;
     }
     NcVar *outTimeVar = outfile.add_var(tname.c_str(),ncInt,outTime);
@@ -224,8 +234,8 @@ int main(int argc, char ** argv){
     NcVar *outAvgVar = outfile.add_var(avgName.c_str(), ncDouble, outTime, outLat, outLon);
     outAvgVar->set_cur(0,0,0);
     outAvgVar->put(&(outputMat[0][0][0]),yearLen,latLen,lonLen);
-
-/*    std::string zonalAvgName = avgName.append("_NO_SMOOTH");
+/*
+    std::string zonalAvgName = avgName.append("_NO_SMOOTH");
     NcVar *outZonalVar = outfile.add_var(zonalAvgName.c_str(),ncDouble,outTime,outLat,outLon);
     outZonalVar->set_cur(0,0,0);
     outZonalVar->put(&(storeMat[0][0][0]),yearLen,latLen,lonLen);
