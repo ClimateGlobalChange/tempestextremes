@@ -128,14 +128,14 @@ int main(int argc, char ** argv){
           dateMonth, dateDay, dateHour, timeVec[t]);
         if (leap == false){
           dayIndex = DayInYear(dateMonth, dateDay)-1;
-          std::cout<<"Day index is "<<dayIndex<<std::endl;
+          //std::cout<<"Day index is "<<dayIndex<<std::endl;
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
               storeMat[dayIndex][a][b]+= inputData[a][b];
               countsMat[dayIndex][a][b]+= 1.;
-              if (a==50 && b==20){
-                std::cout<<"Store: "<<storeMat[dayIndex][a][b]<< " count: "<< countsMat[dayIndex][a][b]<<std::endl;
-              }
+             // if (a==50 && b==20){
+             //   std::cout<<"Store: "<<storeMat[dayIndex][a][b]<< " count: "<< countsMat[dayIndex][a][b]<<std::endl;
+            //  }
             }
           }
         }
