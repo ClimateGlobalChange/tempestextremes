@@ -863,10 +863,9 @@ void IPV_calc(
 //daily average and outputs 3 variables: instantaneous 
 //anomalies, anomalies with 2-day smoothing, and a normalized
 //anomaly (all values below threshold or wrong sign set to 0)
-void calcDevs(bool leap,
-              bool isPV,
-              int startAvgIndex,
-              double tRes,
+void calcDevs( bool isPV,
+              int nSteps,
+              int nOutTime,
               std::string strTimeUnits,
               std::string strCalendar,
               NcVar *inIPV,
@@ -875,10 +874,9 @@ void calcDevs(bool leap,
               NcVar *avgIPV,
               NcVar *inTime,
               NcVar *avgTime,
-              NcVar *lat,
-              NcVar *outTime){
+              NcVar *lat){
 
-  int nTime,nLat,nLon,nSteps,avgDay,nOutTime;
+  int nTime,nLat,nLon,avgDay;
 
   double pi = std::atan(1.)*4.;
 
@@ -889,19 +887,7 @@ void calcDevs(bool leap,
   DataVector<double> latVec(nLat);
   lat->set_cur((long) 0);
   lat->get(&(latVec[0]),nLat);
-/*//keep sign consistent!
-  if (PVAnom<0){
-    PVAnom = -PVAnom;
-  }
-*/
-//length of average time axis
-//  avgDay = avgIPV->get_dim(0)->size();
 
-/*  //Vector of average time axis
-  DataVector<int> avgDayVec(avgDay);
-  avgTime->set_cur((long) 0);
-  avgTime->get(&(avgDayVec[0]),avgDay);
-*/
   //Vector of instantaneous time axis
   DataVector<double> timeVec(nTime);
   inTime->set_cur((long) 0);
@@ -925,35 +911,29 @@ void calcDevs(bool leap,
        _EXCEPTIONT("Cannot determine time resolution (unknown time units).");
       }
 */
-  nSteps = 1/tRes;
 
 
 
 //Matrix for output data
 //Eliminate one day if contains Feb 29
-  if (leap){
-    nOutTime = nTime-nSteps;
-  }
-  else{
-    nOutTime = nTime;
-  }
 /*
   DataMatrix3D<double> devMat(nOutTime,nLat,nLon);
   DataMatrix3D<double> aDevMat(nOutTime,nLat,nLon);
 */
 //Number of days in IPV
-  int nDays = nTime*tRes;
+//  int nDays = nTime*tRes;
  // std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
 
 
 //Deal with skipped days          
   int d=0;
-  DataVector<double> newTime(nOutTime);
+//  DataVector<double> newTime(nOutTime);
 
   int leapYear=0;
   int leapMonth=0;
   int leapDay=0;
   int leapHour=0;
+  int currAvgIndex=0;
 //input instantaneous and average data 
   DataMatrix<double> IPVMat(nLat,nLon);
   DataMatrix<double> avgMat(nLat,nLon);
@@ -963,52 +943,40 @@ void calcDevs(bool leap,
   for (int t=0; t<nTime; t++){
     inIPV->set_cur(t,0,0);
     inIPV->get(&(IPVMat[0][0]),1,nLat,nLon);
-    if (leap){
-      ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
-        leapMonth, leapDay, leapHour);
-      if (leapMonth==2 && leapDay == 29){
-        std::cout<<"Leap day! Skipping day."<<std::endl;
-        t+=nSteps;
-      }
+    //check if this time step is a leap day
+    ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
+      leapMonth, leapDay, leapHour);
+    if (leapMonth==2 && leapDay == 29){
+      std::cout<<"Leap day! Skipping time step."<<std::endl;
     }
-    if (t>=nTime){
-      break;
-    }
-    int nDayIncrease = d/nSteps;
-    int currAvgIndex = startAvgIndex + nDayIncrease;
-
-    if (currAvgIndex>364){
-      currAvgIndex-=365;
-    }
-    avgIPV->set_cur(currAvgIndex,0,0);
-    avgIPV->get(&(avgMat[0][0]),1,nLat,nLon);
-    for (int a=0; a<nLat; a++){
-      //Denominator for Z500 anomaly lat normalization
-      if (std::fabs(latVec[a])< 5.){
-        denom = std::sin(5.*pi/180.);
-      }
-      else if (std::fabs(latVec[a])>85.){
-        denom = std::sin(85. *pi/180.);
-      }
-      else{
-        denom = std::fabs(std::sin(latVec[a]*pi/180.));
-      }
-      sineRatio = num/denom;
-      for (int b=0; b<nLon; b++){
-        devMat[a][b] = IPVMat[a][b]-avgMat[a][b];
-        if (!isPV){
-          devMat[a][b]*=sineRatio;
+    else{
+      currAvgIndex = DayInYear(leapMonth,leapDay)-1;
+      avgIPV->set_cur(currAvgIndex,0,0);
+      avgIPV->get(&(avgMat[0][0]),1,nLat,nLon);
+      for (int a=0; a<nLat; a++){
+        //Denominator for Z500 anomaly lat normalization
+        if (std::fabs(latVec[a])< 5.){
+          denom = std::sin(5.*pi/180.);
+        }
+        else if (std::fabs(latVec[a])>85.){
+          denom = std::sin(85. *pi/180.);
+        }
+        else{
+          denom = std::fabs(std::sin(latVec[a]*pi/180.));
+        }
+        sineRatio = num/denom;
+        for (int b=0; b<nLon; b++){
+          devMat[a][b] = IPVMat[a][b]-avgMat[a][b];
+          if (!isPV){
+            devMat[a][b]*=sineRatio;
+          }
         }
       }
-    }
-    newTime[d] = timeVec[t];
-    outDev->set_cur(d,0,0);
-    outDev->put(&(devMat[0][0]),1,nLat,nLon);
-    d++;
+      outDev->set_cur(d,0,0);
+      outDev->put(&(devMat[0][0]),1,nLat,nLon);
+      d++;
+    }    
   }
-  outTime->set_cur((long) 0);
-  outTime->put(&(newTime[0]),nOutTime);
-
 
  // std::cout<<"About to implement smoothing."<<std::endl;
   double div = (double) 2*nSteps;
@@ -1051,7 +1019,9 @@ void calcNormalizedDevs(bool isPV,
                        NcVar * inDev,
                        NcVar * outPosIntDev,
                        NcVar * lat,
-                       double nSteps,
+                       NcVar * inTime,
+                       std::string strTimeUnits,
+                       std::string strCalendar,
                        DataMatrix3D<double>threshMat,
                        double minThresh){
 
@@ -1060,33 +1030,37 @@ void calcNormalizedDevs(bool isPV,
   nOutTime = inDev->get_dim(0)->size();
   nLat = inDev->get_dim(1)->size();
   nLon = inDev->get_dim(2)->size();
-
+  //lat values
   DataVector<double> latVec(nLat);
   lat->set_cur((long) 0);
   lat->get(&(latVec[0]),nLat);
- 
-  DataMatrix3D<double> aDevMat(nOutTime,nLat,nLon);
-  inDev->set_cur(0,0,0);
-  inDev->get(&(aDevMat[0][0][0]),nOutTime,nLat,nLon);
- 
-  DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
+  //time values
+  DataVector<double> timeVals(nOutTime);
+  inTime->set_cur((long) 0);
+  inTime->get(&(timeVals[0]),nOutTime);
+
+  DataMatrix<double> aDevMat(nLat,nLon);
+  DataMatrix<int> posIntDevs(nLat,nLon);
   double invAnom;
   double divDev,pos,neg;
   int threshIndex = 0;
-  int startAvgIndex = 0;
-  int nPastStart = 0;
-  int dPastStart = 0;
+  int dateYear, dateMonth, dateDay, dateHour;
+//  int startAvgIndex = 0;
+//  int nPastStart = 0;
+//  int dPastStart = 0;
   double threshVal;
   if (isPV){
     for (int t=0; t<nOutTime; t++){
-      threshIndex = startAvgIndex + dPastStart;
-      if (threshIndex > 364){
-        threshIndex-=365;
-      }
+      ParseTimeDouble(strTimeUnits,strCalendar,timeVals[t],dateYear,\
+         dateMonth,dateDay,dateHour);
+
+      threshIndex = DayInYear(dateMonth,dateDay)-1;
+      inDev->set_cur(t,0,0);
+      inDev->get(&(aDevMat[0][0]),1,nLat,nLon);
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
           if (std::fabs(latVec[a])<25 || std::fabs(latVec[a])>75){
-            posIntDevs[t][a][b] = 0;
+            posIntDevs[a][b] = 0;
           }
           else{
             if (threshMat[threshIndex][a][b] < minThresh){
@@ -1096,53 +1070,55 @@ void calcNormalizedDevs(bool isPV,
               threshVal = threshMat[threshIndex][a][b];
             }
             invAnom = 1./threshVal;
-            divDev = aDevMat[t][a][b]*invAnom;
-          //SH: positive anomalies
+            divDev = aDevMat[a][b]*invAnom;
+            //SH: positive anomalies
             if (latVec[a]<0){
               pos = (divDev+std::fabs(divDev))*0.5;
-              posIntDevs[t][a][b] = int(pos);
+              posIntDevs[a][b] = int(pos);
             }
-          //NH: negative anomalies
+            //NH: negative anomalies
             else if (latVec[a]>=0){
               neg = (divDev-std::fabs(divDev))*0.5;
-              posIntDevs[t][a][b] = -int(neg);
+              posIntDevs[a][b] = -int(neg);
             }
           }
         }
       }
-      nPastStart+=1;
-      dPastStart = nPastStart/nSteps;;
+      outPosIntDev->set_cur(t,0,0);
+      outPosIntDev->put(&(posIntDevs[0][0]),1,nLat,nLon);
     }
   }
   else{
     for (int t=0; t<nOutTime; t++){
-      threshIndex = startAvgIndex + dPastStart;
-      if (threshIndex > 364){
-        threshIndex -= 365;
-      }
-      for (int a=0; a<nLat; a++){
-        for (int b=0; b<nLon; b++){
-          if (std::fabs(latVec[a])<25. || std::fabs(latVec[a])>75.){
-            posIntDevs[t][a][b] = 0;
-          }
-          else{
-            if (threshMat[threshIndex][a][b] < minThresh){
-              threshVal = minThresh;
-            }
-            else{
-              threshVal = threshMat[threshIndex][a][b];
-            }
-            invAnom = 1./threshVal;
-            pos = aDevMat[t][a][b]*invAnom;
-            posIntDevs[t][a][b] = (int)((pos + std::fabs(pos))*0.5);
+      ParseTimeDouble(strTimeUnits,strCalendar,timeVals[t],dateYear,\
+         dateMonth,dateDay,dateHour);
+
+      threshIndex = DayInYear(dateMonth,dateDay)-1; 
+      inDev->set_cur(t,0,0);
+      inDev->get(&(aDevMat[0][0]),1,nLat,nLon);
+       for (int a=0; a<nLat; a++){
+         for (int b=0; b<nLon; b++){
+           if (std::fabs(latVec[a])<25. || std::fabs(latVec[a])>75.){
+             posIntDevs[a][b] = 0;
+           }
+           else{
+             if (threshMat[threshIndex][a][b] < minThresh){
+               threshVal = minThresh;
+             }
+             else{
+               threshVal = threshMat[threshIndex][a][b];
+             }
+             invAnom = 1./threshVal;
+             pos = aDevMat[a][b]*invAnom;
+             posIntDevs[a][b] = (int)((pos + std::fabs(pos))*0.5);
           }
         }
       }
+      outPosIntDev->set_cur(t,0,0);
+      outPosIntDev->put(&(posIntDevs[0][0]),1,nLat,nLon);
     }
   }
 
-  outPosIntDev->set_cur(0,0,0);
-  outPosIntDev->put(&(posIntDevs[0][0][0]),nOutTime,nLat,nLon);
   std::cout<<"Wrote integer values to file."<<std::endl;
 }
 

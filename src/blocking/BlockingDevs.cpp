@@ -192,30 +192,26 @@ int main(int argc, char **argv){
       }else{
         strCalendar = attCal->as_string(0);
       }
-   //   std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
+  //    std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
 
 
 
-      //Get the day index of the first time step
       DataVector<double> timeVals(nTime);
       inTime->set_cur((long) 0);
       inTime->get(&(timeVals[0]),nTime);
-
+/*
       int dateYear; 
       int dateMonth;
       int dateDay;
       int dateHour;
-      //std::cout<<"time units and calendar: "<<strTimeUnits<<","<<strCalendar<<std::endl;
-      //std::cout<<"first value of time variable:"<<timeVals[0]<<std::endl;
       ParseTimeDouble(strTimeUnits, strCalendar, timeVals[0], dateYear,\
         dateMonth, dateDay, dateHour);
-      //std::cout<<"D/M/Y:"<<dateDay<<"/"<<dateMonth<<"/"<<dateYear<<std::endl;
       int day = DayInYear(dateMonth,dateDay);
-      //std::cout<<"For month "<<dateMonth<<" and day "<<dateDay<<" day is "<<day<<std::endl;
+      std::cout<<"For month "<<dateMonth<<" and day "<<dateDay<<" day is "<<day<<std::endl;
       int startIndex = day-1;
-
+*/
     //  int nSteps = int(1.0/(timeVals[1]-timeVals[0]));
-      double tRes;
+   /*   double tRes;
       if ((strTimeUnits.length() >= 11) && \
         (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
         tRes = timeVals[1]-timeVals[0];
@@ -230,26 +226,56 @@ int main(int argc, char **argv){
        _EXCEPTIONT("Cannot determine time resolution (unknown time units).");
       }
       int nSteps = 1/tRes;
-
+*/
     //check if the file contains leap days 
-      bool leap = false;
+  //    bool leap = false;
       int leapYear = 0;
       int leapMonth = 0;
       int leapDay = 0;
       int leapHour = 0;
 
+      DataVector <double> outputTime(nTime);
+
       int nLeapSteps = 0;
+      int z=0;
+
+      //How many leap day times step are there?
       if (strCalendar!="noleap"){
         for (int t=0; t<nTime; t++){
           ParseTimeDouble(strTimeUnits, strCalendar, timeVals[t], leapYear,\
             leapMonth, leapDay, leapHour);
           if ((leapMonth==2 && leapDay == 29)){
-            leap = true;
+    //        leap = true;
             nLeapSteps +=1;
           }     
+          else{
+            outputTime[z] = timeVals[t];
+            z++;
+          }
         }
       }
       
+      //Number of time steps per day?
+      int nSteps = 1;
+      ParseTimeDouble(strTimeUnits, strCalendar, timeVals[0], leapYear,\
+         leapMonth, leapDay, leapHour);
+      int d1 = DayInYear(leapMonth,leapDay);
+
+      int d2;
+      for (int t=1; t<nTime; t++){
+        ParseTimeDouble(strTimeUnits, strCalendar, timeVals[t], leapYear,\
+            leapMonth, leapDay, leapHour);
+        d2 = DayInYear(leapMonth,leapDay);
+        if (d1 != d2){
+          break;
+        }else{
+          nSteps ++;
+        }
+      }
+      if (d1 == d2){
+        _EXCEPTIONT("Need to know the number of time steps per day.");
+      }
+      std::cout<<"There are "<<nSteps<<" steps per day."<<std::endl;
 
       //Create output file that corresponds to IPV data
       std::string strOutFile;
@@ -269,6 +295,9 @@ int main(int argc, char **argv){
 
       NcVar *tVarOut = outfile.add_var(tname.c_str(),ncDouble,tDimOut);
       CopyNcVarAttributes(inTime,tVarOut);      
+      tVarOut->set_cur((long) 0);
+      tVarOut->put(&(outputTime[0]),nOutTime);
+
 
       NcVar *latVarOut = outfile.add_var(latname.c_str(),ncDouble,latDimOut);
       copy_dim_var(inLat,latVarOut);
@@ -282,16 +311,16 @@ int main(int argc, char **argv){
         NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
   //      NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
 
-        calcDevs(leap,true, startIndex, tRes, strTimeUnits, strCalendar, varData, devOut, aDevOut, AvarData, inTime,\
-        avgTimeVals, inLat, tVarOut);
+        calcDevs(true, nSteps, nOutTime, strTimeUnits, strCalendar, varData, devOut, aDevOut, AvarData, inTime,\
+        avgTimeVals, inLat);
       }
       else if (GHCalc){
         NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
 //        NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);
 //        NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
-        calcDevs(leap,false, startIndex, tRes, strTimeUnits, strCalendar, varData, devOut,aDevOut,AvarData,inTime,\
-          avgTimeVals,inLat,tVarOut);
+        calcDevs(false, nSteps, nOutTime, strTimeUnits, strCalendar, varData, devOut,aDevOut,AvarData,inTime,\
+          avgTimeVals,inLat);
         std::cout<<"Finished writing to file "<<strOutFile.c_str()<<std::endl;
       }
       else{
