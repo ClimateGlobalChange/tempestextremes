@@ -91,7 +91,7 @@ int main(int argc, char** argv){
     int nFiles = InputFiles.size();
 
     for (int x=0; x<nFiles; x++){
-
+      std::cout <<"Opening file # "<<x+1<<std::endl;
       NcFile readin(InputFiles[x].c_str());
       if (!readin.is_valid()){
         _EXCEPTION1("Invalid file \"%s\"", InputFiles[x].c_str());
@@ -127,22 +127,26 @@ int main(int argc, char** argv){
         _EXCEPTION1("Cannot find variable \"%s\"", lonname.c_str());
       }
 
-
-      DataMatrix3D<double>ZData(nTime,nLat,nLon);
-      std::cout << "Initializing data matrix.";
+      std::cout<<"Read in dimension variables."<<std::endl;
       NcVar *zvar = readin.get_var(varName.c_str());
       if (zvar == NULL){
         _EXCEPTION1("Cannot find variable \"%s\"", varName.c_str());
       }
+      std::cout<<"Read in data for variable "<<varName.c_str()<<std::endl;
       int nDims = zvar->num_dims();
       if (nDims != 3){
         _EXCEPTIONT("Error: variable does not have correct number of dimensions (3).");
       }
-
+/*      DataMatrix3D<double>ZData(nTime,nLat,nLon);
+      std::cout << "Initializing data matrix.";
       zvar->set_cur(0,0,0);
       zvar->get(&(ZData[0][0][0]),nTime,nLat,nLon);
       std::cout << "...Read in data."<<std::endl;
+*/
 
+      //Create a DataMatrix to hold the timestep's data
+      DataMatrix<double>ZData(nLat,nLon);
+      DataMatrix<double>outIndex(nLat,nLon);
       //Create output file that corresponds to IPV data
       std::string strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
         InputFiles[x].end(), "_GHG.nc");
@@ -164,16 +168,19 @@ int main(int argc, char** argv){
       copy_dim_var(latvar, lat_vals);
       copy_dim_var(lonvar, lon_vals);
 
+    //Create variable to hold blocking Y/N
+      NcVar *blocking_vals = file_out.add_var("GHGrad", ncDouble, out_time, out_lat, out_lon);
+
       DataVector<double> latVec(nLat);
       latvar->set_cur((long) 0);
       latvar->get(&(latVec[0]),nLat);
 
 
       double latRes = latVec[0]-latVec[1];
-      std::cout<<"latres is "<<latRes<<std::endl;
+   //   std::cout<<"latres is "<<latRes<<std::endl;
       double latDelta = 15./latRes;
       int iDelta = (int) latDelta;
-      std::cout<<"delta is "<<iDelta<<std::endl;
+  //    std::cout<<"delta is "<<std::fabs(iDelta)<<std::endl;
 
       int NHLatStart;
       int NHLatEnd;
@@ -198,14 +205,14 @@ int main(int argc, char** argv){
 
     //Make sure that the indices are in the correct order!
       if (NHLatStart>NHLatEnd){
-        std::cout<<"Switching NH indices!"<<std::endl;
+    //    std::cout<<"Switching NH indices!"<<std::endl;
         int Ntemp = NHLatStart;
         NHLatStart = NHLatEnd;
         NHLatEnd = Ntemp;
       }
 
       if (SHLatStart>SHLatEnd){
-        std::cout<<"Switching SH indices!"<<std::endl;
+     //   std::cout<<"Switching SH indices!"<<std::endl;
         int Stemp = SHLatStart;
         SHLatStart = SHLatEnd;
         SHLatEnd = Stemp;
@@ -216,8 +223,11 @@ int main(int argc, char** argv){
     int i_N, i_S;
 
   //NEW VARIABLE: TM BLOCKING INDEX
-    DataMatrix3D<double> outIndex(nTime,nLat,nLon);
+//    DataMatrix3D<double> outIndex(nTime,nLat,nLon);
     for (int t=0; t<nTime; t++){
+      std::cout<<"Calculating blocking for timestep "<<t<<std::endl;
+      zvar->set_cur(t,0,0);
+      zvar->get(&(ZData[0][0]),1,nLat,nLon);
       for (int b=0; b<nLon; b++){
         //Calculate blocking index for NH
         for (int a=NHLatStart; a<=NHLatEnd; a++){
@@ -225,38 +235,37 @@ int main(int argc, char** argv){
           i_S = a+iDelta;
           //center values
           lat_C = latVec[a];
-          z_C = ZData[t][a][b];
+          z_C = ZData[a][b];
           //upper values
           lat_N = latVec[i_N];
-          z_N = ZData[t][i_N][b];
+          z_N = ZData[i_N][b];
           //lower values
           lat_S = latVec[i_S];
-          z_S = ZData[t][i_S][b];
+          z_S = ZData[i_S][b];
 
-          outIndex[t][a][b] = GHcheck(z_C,z_N,z_S,lat_C,lat_N,lat_S,"N");
+          outIndex[a][b] = GHcheck(z_C,z_N,z_S,lat_C,lat_N,lat_S,"N");
         }
         for (int a=SHLatStart; a<=SHLatEnd; a++){
           i_N = a-iDelta;
           i_S = a+iDelta;
           //center values
           lat_C = latVec[a];
-          z_C = ZData[t][a][b];
+          z_C = ZData[a][b];
           //upper values
           lat_N = latVec[i_N];
-          z_N = ZData[t][i_N][b];
+          z_N = ZData[i_N][b];
           //lower values
           lat_S = latVec[i_S];
-          z_S = ZData[t][i_S][b];
+          z_S = ZData[i_S][b];
 
-          outIndex[t][a][b] = GHcheck(z_C,z_N,z_S,lat_C,lat_N,lat_S,"S");
+          outIndex[a][b] = GHcheck(z_C,z_N,z_S,lat_C,lat_N,lat_S,"S");
         }
       }
+      //ADD NEW BLOCKING INDEX
+      blocking_vals->set_cur(t,0,0);
+      blocking_vals->put(&(outIndex[0][0]),1,nLat,nLon);
     }
 
-  //ADD NEW BLOCKING INDEX
-    NcVar *blocking_vals = file_out.add_var("GHGrad", ncDouble, out_time, out_lat, out_lon);
-    blocking_vals->set_cur(0,0,0);
-    blocking_vals->put(&(outIndex[0][0][0]),nTime,nLat,nLon);
 
     file_out.close();
     readin.close();

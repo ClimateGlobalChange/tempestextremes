@@ -154,23 +154,23 @@ int main(int argc, char** argv){
       std::cout<<"Vector contains string "<<varVec[v].c_str()<<std::endl;
 
       NcVar *vvar = readin.get_var(varVec[v].c_str());
-      DataMatrix3D<double> VData(nTime, nLat, nLon);
+      NcVar *outvar = file_out.add_var(varVec[v].c_str(),ncDouble,out_time,out_lat,out_lon);
+      DataMatrix<double> VData(nLat, nLon);
 
-      vvar->set_cur(0,pIndex,0,0);
-      vvar->get(&(VData[0][0][0]),nTime,1,nLat,nLon);
-      if (varVec[v]=="Z" && ZtoGH){
-        for (int t=0; t<nTime; t++){
+      for (int t=0; t<nTime; t++){
+        vvar->set_cur(t,pIndex,0,0);
+        vvar->get(&(VData[0][0]),1,1,nLat,nLon);
+        if (varVec[v]=="Z" && ZtoGH){
           for (int a=0; a<nLat; a++){
             for (int b=0; b<nLon; b++){
-              VData[t][a][b]/=9.8;
+              VData[a][b]/=9.8;
             }
           }
         }
+        outvar->set_cur(t,0,0);
+        outvar->put(&(VData[0][0]),1,nLat,nLon);
       }
 
-      NcVar *outvar = file_out.add_var(varVec[v].c_str(),ncDouble,out_time,out_lat,out_lon);
-      outvar->set_cur(0,0,0);
-      outvar->put(&(VData[0][0][0]),nTime,nLat,nLon);
     }
 
 

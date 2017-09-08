@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////
 ///
-///           \file avgDFT.cpp
+///           \file BlockingDFT.cpp
 ///           \author Marielle Pinheiro
 ///           \date May 8, 2017
 ///
@@ -24,14 +24,17 @@
 
 int main(int argc, char ** argv){
   try{
+    NcError error(NcError::silent_nonfatal);
     std::string fileList, outFile,avgName,varName,  tname, latname, lonname;
-    int nWaves;
+    int nWaves,startday,endday;
     BeginCommandLine()
       CommandLineString(fileList,"inlist","");
       CommandLineString(outFile,"out","");
       CommandLineString(avgName,"avgname","");
       CommandLineString(varName,"varname","");
-      CommandLineInt(nWaves, "nwaves",6);
+      CommandLineInt(nWaves, "ncoef",12);
+      CommandLineInt(startday,"startday",1);
+      CommandLineInt(endday,"endday",365);
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
@@ -67,12 +70,12 @@ int main(int argc, char ** argv){
     lonLen = readin.get_dim(lonname.c_str())->size();
 
     //Initialize storage array: day, lat, lon
-    int yearLen = 365;
+    int yearLen = (endday-startday)+1;
     DataMatrix3D<double> storeMat(yearLen,latLen,lonLen);
     //Initialize counts array: day, lat, lon
     DataMatrix3D<double> countsMat(yearLen, latLen, lonLen);
-    //Initialize input data: time, lat, lon
-    DataMatrix3D<double> inputData(tLen,latLen,lonLen);
+    //Initialize input datan array: lat, lon
+    DataMatrix<double> inputData(latLen,lonLen);
     DataVector<double> timeVec(tLen);
 
     //Close file (then re-open in loop)
@@ -87,13 +90,7 @@ int main(int argc, char ** argv){
       std::cout<<"Reading in "<<vecFiles[x].c_str()<<std::endl;
       tLen = readin.get_dim(tname.c_str()) ->size();
       //std::cout<<"Reading in file #"<<x<<", "<<vecFiles[x].c_str()<<std::endl;
-      //Input data
-      inputData.Initialize(tLen, latLen, lonLen);
       NcVar *inputVar = readin.get_var(varName.c_str());
-      inputVar->set_cur(0,0,0);
-      inputVar->get(&(inputData[0][0][0]),tLen,latLen,lonLen);
-
-      //Time and calendar
       timeVec.Initialize(tLen);
       NcVar *timeVar = readin.get_var(tname.c_str());
       timeVar->set_cur((long)0);
@@ -104,21 +101,27 @@ int main(int argc, char ** argv){
         _EXCEPTIONT("Time variable has no units attribute.");
       }
       std::string strTimeUnits = attTime->as_string(0);
-
+      std::string strCalendar;
       NcAtt *attCal = timeVar->get_att("calendar");
       if (attCal==NULL){
-        _EXCEPTIONT("Time variable has no calendar attribute.");
+        strCalendar = "standard";
+      }else{
+        strCalendar = attCal->as_string(0);
       }
-      std::string strCalendar = attCal->as_string(0);
       if (strncmp(strCalendar.c_str(),"gregorian",9)==0){
         strCalendar = "standard";
       }
-
+      //Time and calendar
       int dateYear, dateMonth, dateDay, dateHour, dayIndex;
       bool leap;
       //std::cout<<"Storing values."<<std::endl;
       //Store the values and counts in the matrices at the appropriate day index
+
+      //Input data
       for (int t=0; t<tLen; t++){
+        inputData.Initialize(latLen, lonLen);
+        inputVar->set_cur(t,0,0);
+        inputVar->get(&(inputData[0][0]),1,latLen,lonLen);
         ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t],\
           dateYear, dateMonth, dateDay, dateHour);
         leap = checkFileLeap(strTimeUnits, strCalendar, dateYear,\
@@ -128,13 +131,16 @@ int main(int argc, char ** argv){
           //std::cout<<"Day index is "<<dayIndex<<std::endl;
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
-              storeMat[dayIndex][a][b]+= inputData[t][a][b];
+              storeMat[dayIndex][a][b]+= inputData[a][b];
               countsMat[dayIndex][a][b]+= 1.;
+             // if (a==50 && b==20){
+             //   std::cout<<"Store: "<<storeMat[dayIndex][a][b]<< " count: "<< countsMat[dayIndex][a][b]<<std::endl;
+            //  }
             }
           }
         }
       }
-      //std::cout<<"Closing file."<<std::endl;
+      std::cout<<"Closing file."<<std::endl;
       readin.close();
 
     }
@@ -142,7 +148,11 @@ int main(int argc, char ** argv){
     for (int d=0; d<yearLen; d++){
       for (int a=0; a<latLen; a++){
         for (int b=0; b<lonLen; b++){
-          storeMat[d][a][b] = storeMat[d][a][b]/countsMat[d][a][b];
+          if (countsMat[d][a][b] < 1){
+            storeMat[d][a][b] = 0.;
+          }else{
+            storeMat[d][a][b] = storeMat[d][a][b]/countsMat[d][a][b];
+          }
         }
       }
     }
@@ -157,6 +167,7 @@ int main(int argc, char ** argv){
       for (int b=0; b<lonLen; b++){
         for (int d=0; d<yearLen; d++){
           inputDaily[d] = storeMat[d][a][b];
+          //std::cout<<"daily input for d="<<d<<" is "<<inputDaily[d]<<std::endl;
         }
         FourierCoefs = DFT(inputDaily, nWaves);
         outputDaily = IDFT(FourierCoefs);
@@ -202,7 +213,7 @@ int main(int argc, char ** argv){
     NcFile outfile(outFile.c_str(),NcFile::Replace,NULL,0,NcFile::Offset64Bits);
     NcDim *outTime = outfile.add_dim(tname.c_str(),yearLen);
     DataVector<int> tVals(yearLen);
-    for (int t=1; t<=yearLen; t++){
+    for (int t=startday; t<=endday; t++){
       tVals[t] = t;
     }
     NcVar *outTimeVar = outfile.add_var(tname.c_str(),ncInt,outTime);
@@ -223,12 +234,12 @@ int main(int argc, char ** argv){
     NcVar *outAvgVar = outfile.add_var(avgName.c_str(), ncDouble, outTime, outLat, outLon);
     outAvgVar->set_cur(0,0,0);
     outAvgVar->put(&(outputMat[0][0][0]),yearLen,latLen,lonLen);
-
+/*
     std::string zonalAvgName = avgName.append("_NO_SMOOTH");
     NcVar *outZonalVar = outfile.add_var(zonalAvgName.c_str(),ncDouble,outTime,outLat,outLon);
     outZonalVar->set_cur(0,0,0);
     outZonalVar->put(&(storeMat[0][0][0]),yearLen,latLen,lonLen);
-
+*/
     refFile.close();
     outfile.close();
 

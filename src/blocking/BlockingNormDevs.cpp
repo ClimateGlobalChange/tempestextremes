@@ -28,12 +28,14 @@ and outputs integer values (INT_ADIPV) which can then be used by StitchBlobs
 
 
 int main(int argc, char **argv){
-  NcError error(NcError::verbose_nonfatal);
-
+//  NcError error(NcError::verbose_nonfatal);
+  NcError error(NcError::silent_nonfatal);
   try{
 
     //list of input files for which to calculate normalized deviations
     std::string fileList;
+    std::string fileName;
+    std::string outputName;
     std::string varName;
     std::string threshName;
     std::string threshVarName;
@@ -42,8 +44,11 @@ int main(int argc, char **argv){
     bool GHCalc;
     bool const_thresh;
     double anomVal,minThresh;
+    int startday, endday;
 
     BeginCommandLine()
+      CommandLineString(fileName,"in","");
+      CommandLineString(outputName,"out","");
       CommandLineString(fileList, "inlist", "");
       CommandLineString(varName,"varname","");
 //      CommandLineString(avgName, "avg", "");
@@ -57,6 +62,8 @@ int main(int argc, char **argv){
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
+      CommandLineInt(startday,"startday",1);
+      CommandLineInt(endday,"endday",365);
       ParseCommandLine(argc, argv);
     EndCommandLine(argv);
     AnnounceBanner();
@@ -64,7 +71,15 @@ int main(int argc, char **argv){
     if ((!PVCalc) && (!GHCalc)){
       _EXCEPTIONT("Need to specify either PV (--pv) or GH (--gh) calculations.");
     }
-  
+    if (fileName == "" && fileList == ""){
+      _EXCEPTIONT("Need to specify either input file (--in) or file list (--inlist).");
+    }
+    if (fileName != "" && fileList != ""){
+      _EXCEPTIONT("Cannot specify both file name (--in) and file list (--inlist).");
+    }
+    if (outputName != "" && fileList != ""){
+      _EXCEPTIONT("Currently cannot specify output name for list of files. This will only work with a single file (--in).");
+    }
 
    int nFiles,avgTime,nTime,nLat,nLon;
    if (const_thresh && anomVal==0.){
@@ -84,40 +99,19 @@ int main(int argc, char **argv){
    std::cout<<"Opening file list."<<std::endl;
    //Create list of input files
     std::vector<std::string> InputFiles;
-    GetInputFileList(fileList, InputFiles);
+  
+    if (fileList != ""){
+      GetInputFileList(fileList, InputFiles);
+    }else{
+      InputFiles.push_back(fileName);
+    }
     nFiles = InputFiles.size();
 
-/*    //Open averages file
-    NcFile avgFile(avgName.c_str());
-	if (!avgFile.is_valid()) {
-		_EXCEPTION1("Cannot open NetCDF file \"%s\"", avgName.c_str());
-	}
-
-    //time data (average)
-	NcDim *dimTime = avgFile.get_dim(tname.c_str());
-	if (dimTime == NULL) {
-		_EXCEPTION1("\"%s\" is missing dimension \"time\"", avgName.c_str());
-	}
-    avgTime = dimTime->size();
-    NcVar *avgTimeVals = avgFile.get_var(tname.c_str());
-   	if (avgTimeVals == NULL) {
-		_EXCEPTION1("\"%s\" is missing variable \"time\"", avgName.c_str());
-	}
-    
-    //averaged var
-    NcVar *AvarData = avgFile.get_var(avgVarName.c_str());
-   	if (AvarData == NULL) {
-		_EXCEPTION2("\"%s\" is missing variable \"%s\"", avgName.c_str(), avgVarName.c_str());
-	}
-    int dim1 = AvarData->get_dim(0)->size();
-    int dim2 = AvarData->get_dim(1)->size();
-    int dim3 = AvarData->get_dim(2)->size();    
-*/
-    //Initialize a matrix. If constant, it will be filled with anom values, else it will hold the 
+    //Initialize a matrix. If constant, it will be filled with anom threshold values, else it will hold the 
     //threshold values
 
     std::cout<<"Opening reference file to load dimension variables."<<std::endl;
-    int dim1=365;
+    int dim1= (endday-startday)+1;
     NcFile refFile(InputFiles[0].c_str());
     int dim2 = refFile.get_dim(latname.c_str())->size();
     int dim3 = refFile.get_dim(lonname.c_str())->size();
@@ -165,7 +159,6 @@ int main(int argc, char **argv){
       nTime = tDim->size();
       nLat = latDim->size();
       nLon = lonDim->size();
-
       NcVar *inTime = infile.get_var(tname.c_str());
       NcVar *inLat = infile.get_var(latname.c_str());
       NcVar *inLon = infile.get_var(lonname.c_str());
@@ -177,79 +170,68 @@ int main(int argc, char **argv){
       }
 
       std::string strTimeUnits = attTime->as_string(0);
-
+      std::string strCalendar;
       NcAtt *attCal = inTime->get_att("calendar");
       if(attCal==NULL){
-        _EXCEPTIONT("Time variable has no calendar attribute.");
+        strCalendar = "standard";
+      }else{
+        strCalendar = attCal->as_string(0);
       }
-      std::string strCalendar = attCal->as_string(0);
-
-   //   std::cout<<"Time units: "<< strTimeUnits<<" Calendar: "<<strCalendar<<std::endl;
 
 
-
-      //check if file is leap year file
-      bool leap = false;
       DataVector<double> timeVals(nTime);
       inTime->set_cur((long) 0);
       inTime->get(&(timeVals[0]),nTime);
 
-      int dateYear; 
-      int dateMonth;
-      int dateDay;
-      int dateHour;
+//      int dateYear; 
+  //    int dateMonth;
+    //  int dateDay;
+   //   int dateHour;
       //std::cout<<"time units and calendar: "<<strTimeUnits<<","<<strCalendar<<std::endl;
       //std::cout<<"first value of time variable:"<<timeVals[0]<<std::endl;
-      ParseTimeDouble(strTimeUnits, strCalendar, timeVals[0], dateYear,\
+  //    ParseTimeDouble(strTimeUnits, strCalendar, timeVals[0], dateYear,\
         dateMonth, dateDay, dateHour);
       //std::cout<<"D/M/Y:"<<dateDay<<"/"<<dateMonth<<"/"<<dateYear<<std::endl;
-      int day = DayInYear(dateMonth,dateDay);
+ //     int day = DayInYear(dateMonth,dateDay);
       //std::cout<<"For month "<<dateMonth<<" and day "<<dateDay<<" day is "<<day<<std::endl;
-      int startIndex = day-1;
+ //     int startIndex = day-1;
 
     //  int nSteps = int(1.0/(timeVals[1]-timeVals[0]));
-      double tRes;
+/*      double tRes;
       if ((strTimeUnits.length() >= 11) && \
         (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
         tRes = timeVals[1]-timeVals[0];
       }
-      else{
+      else if((strTimeUnits.length() >= 12) && \
+      (strncmp(strTimeUnits.c_str(), "hours since ",12)==0)) {
         tRes = (timeVals[1]-timeVals[0])/24.0;
+      }else if (strTimeUnits.length() >= 14 && \
+        (strncmp(strTimeUnits.c_str(),"minutes since ",14)== 0) ){
+        tRes = (timeVals[1]-timeVals[0])/(24. * 60.);
+      }else{
+       _EXCEPTIONT("Cannot determine time resolution (unknown time units).");
       }
-      int nSteps = 1/tRes;
-     
-      int leapYear = 0;
-      int leapMonth = 0;
-      int leapDay = 0;
-      int leapHour = 0;
-
-      if (strCalendar!="noleap" && dateMonth <=2){
-        ParseTimeDouble(strTimeUnits, strCalendar, timeVals[nTime-1], leapYear,\
-          leapMonth, leapDay, leapHour);
-        if ((leapMonth==2 && leapDay == 29) || (dateMonth ==2 && leapMonth == 3)){
-          leap = true;
-        }     
-
-      }
-      
-
+      int nSteps = 1/tRes; 
+*/
       //Create output file that corresponds to IPV data
 
   
-      std::string strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
-        InputFiles[x].end(), "_norm.nc");
+      std::string strOutFile;
+      if (outputName != ""){
+        strOutFile = outputName;
+      }      
+      else{
+
+        strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
+          InputFiles[x].end(), "_norm.nc");
+      }
+
       if (const_thresh){
         strOutFile = strOutFile.replace(strOutFile.end()-3,strOutFile.end(),"_const.nc");
       }
       std::cout<<"Writing variables to file "<<strOutFile.c_str()<<std::endl;
       NcFile outfile(strOutFile.c_str(), NcFile::Replace, NULL,0,NcFile::Offset64Bits);
-      int nOutTime;
-      if (leap){
-        nOutTime = nTime-nSteps;
-      }
-      else{
-        nOutTime = nTime;
-      }
+      int nOutTime = nTime;
       NcDim *tDimOut = outfile.add_dim(tname.c_str(),nOutTime);
       NcDim *latDimOut = outfile.add_dim(latname.c_str(),nLat);
       NcDim *lonDimOut = outfile.add_dim(lonname.c_str(),nLon);
@@ -273,7 +255,7 @@ int main(int argc, char **argv){
 
 //        calcDevs(leap,true, startIndex, varData, devOut, aDevOut, AvarData, inTime,\
         avgTimeVals, inLat, tVarOut);
-        calcNormalizedDevs(true,varData,devIntOut,inLat,nSteps,threshMat,minThresh);
+        calcNormalizedDevs(true,varData,devIntOut,inLat,tVarOut,strTimeUnits,strCalendar,threshMat,minThresh);
 
       }
       else if (GHCalc){
@@ -283,7 +265,7 @@ int main(int argc, char **argv){
 //        NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
 //        calcDevs(leap,false, startIndex, varData, devOut,aDevOut,AvarData,inTime,\
           avgTimeVals,inLat,tVarOut);
-        calcNormalizedDevs(false,varData,devIntOut,inLat,nSteps,threshMat,minThresh);
+        calcNormalizedDevs(false,varData,devIntOut,inLat,tVarOut,strTimeUnits,strCalendar,threshMat,minThresh);
         std::cout<<"Finished writing to file "<<strOutFile.c_str()<<std::endl;
       }
       else{

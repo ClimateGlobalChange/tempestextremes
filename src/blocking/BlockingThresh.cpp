@@ -32,6 +32,7 @@ of the instantaneous deviation values.
 #include <complex>
 
 int main(int argc, char ** argv){
+  NcError error(NcError::silent_nonfatal);
   try{
     std::string outFile,fileList,avgName,avgFile,varName,tname,latname,lonname;
     BeginCommandLine()
@@ -106,7 +107,7 @@ int main(int argc, char ** argv){
     //Initialize counts array: day, lat, lon
     DataMatrix3D<double> countsMat(dLen, latLen, lonLen);
     //Initialize input data: time, lat, lon
-    DataMatrix3D<double> inputData(tLen,latLen,lonLen);
+    DataMatrix<double> inputData(latLen,lonLen);
     DataVector<double> timeVec(tLen);
 
     //Close file (then re-open in loop)
@@ -123,10 +124,10 @@ int main(int argc, char ** argv){
       tLen = readin.get_dim(tname.c_str()) ->size();
       //std::cout<<"Reading in file #"<<x<<", "<<vecFiles[x].c_str()<<std::endl;
       //Input data
-      inputData.Initialize(tLen, latLen, lonLen);
+    //  inputData.Initialize(tLen, latLen, lonLen);
       NcVar *inputVar = readin.get_var(varName.c_str());
-      inputVar->set_cur(0,0,0);
-      inputVar->get(&(inputData[0][0][0]),tLen,latLen,lonLen);
+    //  inputVar->set_cur(0,0,0);
+    //  inputVar->get(&(inputData[0][0][0]),tLen,latLen,lonLen);
 
       //Time and calendar
       timeVec.Initialize(tLen);
@@ -139,12 +140,13 @@ int main(int argc, char ** argv){
         _EXCEPTIONT("Time variable has no units attribute.");
       }
       std::string strTimeUnits = attTime->as_string(0);
-
+      std::string strCalendar;
       NcAtt *attCal = timeVar->get_att("calendar");
       if (attCal==NULL){
-        _EXCEPTIONT("Time variable has no calendar attribute.");
+        strCalendar = "standard";
+      }else{
+        strCalendar = attCal->as_string(0);
       }
-      std::string strCalendar = attCal->as_string(0);
       if (strncmp(strCalendar.c_str(),"gregorian",9)==0){
         strCalendar = "standard";
       }
@@ -155,6 +157,9 @@ int main(int argc, char ** argv){
       //std::cout<<"Storing values."<<std::endl;
       //Store the values and counts in the matrices at the appropriate day index
       for (int t=0; t<tLen; t++){
+        inputData.Initialize(latLen,lonLen);
+        inputVar->set_cur(t,0,0);
+        inputVar->get(&(inputData[0][0]),1,latLen,lonLen);
         ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t],\
           dateYear, dateMonth, dateDay, dateHour);
         leap = checkFileLeap(strTimeUnits, strCalendar, dateYear,\
@@ -164,7 +169,7 @@ int main(int argc, char ** argv){
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
               avgValue = avgMat[dayIndex][a][b];
-              currDev = inputData[t][a][b]-avgValue;
+              currDev = inputData[a][b]-avgValue;
               storeMat[dayIndex][a][b]+= (currDev*currDev);
               countsMat[dayIndex][a][b]+= 1.;
             }
@@ -213,10 +218,10 @@ int main(int argc, char ** argv){
     counts->set_cur(0,0,0);
     counts->put(&(countsMat[0][0][0]),dLen,latLen,lonLen);
 */
-    NcVar *checkThresh = fileout.add_var("THRESHOLD",ncDouble,outTime,outLat,outLon);
+ /*   NcVar *checkThresh = fileout.add_var("THRESHOLD",ncDouble,outTime,outLat,outLon);
     checkThresh->set_cur(0,0,0);
     checkThresh->put(&(storeMat[0][0][0]),dLen,latLen,lonLen);		
-
+*/
 
     std::cout<<"calculating DFT of threshold"<<std::endl;
     //First, try zonal average
@@ -293,11 +298,13 @@ int main(int argc, char ** argv){
     //Alternate attempt: moving average (if DFT not appropriate)
 
 
-
+/*
     NcVar * zmThresh = fileout.add_var("THRESHOLD_AVG",ncDouble,outTime,outLat,outLon);
     zmThresh->set_cur(0,0,0);
     zmThresh->put(&(zmMat[0][0][0]),dLen,latLen,lonLen);
-    //Just for fun... the DFT of the SDs
+  */
+
+  //Just for fun... the DFT of the SDs
     std::vector<double> inputDaily(dLen);
     std::vector<std::complex<double> >FourierCoefs(dLen);
     std::vector<double>outputDaily(dLen);

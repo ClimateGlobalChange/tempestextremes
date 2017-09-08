@@ -734,6 +734,30 @@ void ParseTimeDouble(
 
 		//printf("%s\n", strSubStr.c_str());
 
+	// Time format is "minutes since ..."
+	} else if (
+	    (strTimeUnits.length() >= 14) &&
+	    (strncmp(strTimeUnits.c_str(), "minutes since ", 14) == 0)
+	) {
+		std::string strSubStr = strTimeUnits.substr(14);
+		Time time(cal);
+		time.FromFormattedString(strSubStr);
+
+		time.AddMinutes(static_cast<int>(dTime));
+
+		Announce("Time (YMDS): %i %i %i %i",
+				time.GetYear(),
+				time.GetMonth(),
+				time.GetDay(),
+				time.GetSecond());
+
+		nDateYear = time.GetYear();
+		nDateMonth = time.GetMonth();
+		nDateDay = time.GetDay();
+		nDateHour = time.GetSecond() / 3600;
+
+		//printf("%s\n", strSubStr.c_str());
+
 	} else {
 		_EXCEPTIONT("Unknown \"time::units\" format");
 	}

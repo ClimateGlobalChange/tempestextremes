@@ -45,7 +45,12 @@ int main(int argc, char **argv){
   bool interp_check;
   //If Pressure is in hPa, need to create new pressure axis
   bool is_hPa;
-  
+  //PV already calculated?
+  bool has_PV;
+  //If have PV,what is the name?
+  std::string PVname;
+  //Name of U, V, T
+  std::string uName, vName, tempName;
   //Parse command line
   BeginCommandLine()
 
@@ -56,6 +61,11 @@ int main(int argc, char **argv){
 //    CommandLineString(strfile_out, "out", "");
     CommandLineBool(interp_check, "ipl");
     CommandLineBool(is_hPa, "hpa");
+    CommandLineBool(has_PV, "hasPV");
+    CommandLineString(PVname,"PVname","PV");
+    CommandLineString(uName,"uname","U");
+    CommandLineString(vName,"vname","V");
+    CommandLineString(tempName,"tempname","T");
     CommandLineString(tname,"tname","time");
     CommandLineString(levname,"levname","lev");
     CommandLineString(latname,"latname","lat");
@@ -148,8 +158,13 @@ int main(int argc, char **argv){
     //Interpolate variables and write to new file
       std::cout << "About to interpolate files. Entering interp util."<<std::endl;
 //    interp_util(readin_int, strfile_2d, readin_out);
-      std::string varlist="T,U,V";
-
+     
+      std::string varlist;
+      if (has_PV){
+        varlist=PVname;
+      }else{
+        varlist=tempName+","+uName+","+vName;
+      }
       interp_util(readin_int,strfile_2d,varlist,readin_out);
       readin_out.close();
       InputFiles[x] = interp_file;
@@ -179,12 +194,7 @@ int main(int argc, char **argv){
     int lon_len = lon->size();
     NcVar *lonvar = readin.get_var(lonname.c_str());
     
-  //Variables for calculations
-    NcVar *temp = readin.get_var("T");
-    NcVar *uvar = readin.get_var("U");
-    NcVar *vvar = readin.get_var("V");
-
-  //Create output file
+   //output file
     std::string strfile_out = InputFiles[x].replace(InputFiles[x].end()-3,InputFiles[x].end(),"_integ.nc");
     NcFile file_out(strfile_out.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
 
@@ -224,31 +234,84 @@ int main(int argc, char **argv){
     }
     copy_dim_var(latvar, lat_vals);
     copy_dim_var(lonvar, lon_vals);
-
-  //Data for PT, RV, PV calculations
+    double lat_res,lon_res,dphi,dlambda,dp;;
     DataVector<double> coriolis(lat_len);
     DataVector<double> cosphi(lat_len);
 
-    double lat_res;
-    double lon_res;
-
-    double dphi;
-    double dlambda;
-    double dp;
 
     pv_vars_calc(lat_vals, lon_vals, lev_vals, lat_res, lon_res,\
       dphi, dlambda, dp, coriolis, cosphi);
 
-  //Calculate PT
-    DataMatrix4D<double> PTVar(time_len,lev_len,lat_len,lon_len);
-    PT_calc(temp, lev_vals, PTVar);
+    DataVector<double>pVec(lev_len);
+    lev_vals->set_cur((long)0);
+    lev_vals->get(&(pVec[0]),lev_len);
 
-  //Calculate relative vorticity and add to outfile
-    DataMatrix4D<double>RVVar(time_len,lev_len,lat_len,lon_len);
-    rVort_calc(uvar, vvar, dphi, dlambda, cosphi, RVVar);
+    DataMatrix3D<double> PVMat(lev_len,lat_len,lon_len);
+    DataMatrix<double>IPVMat(lat_len,lon_len);
+    NcVar * pv_var = NULL;
+  //if PV hasn't already been calculated, calculate it!
+   if (!has_PV){
+    //Variables for calculations
+      NcVar *temp = readin.get_var(tempName.c_str());
+      if (temp == NULL){
+        _EXCEPTION1("Could not find variable %s",tempName.c_str());
+      }
+      NcVar *uvar = readin.get_var(uName.c_str());
+      if (uvar == NULL){
+        _EXCEPTION1("Could not find variable %s",uName.c_str());
+      } 
+      NcVar *vvar = readin.get_var(vName.c_str());
+      if (vvar == NULL){
+        _EXCEPTION1("Could not find variable %s",vName.c_str());
+      }
 
-    NcVar *pv_var = file_out.add_var("PV", ncDouble, out_time, out_plev, out_lat, out_lon);
+    //Add the PV variable to the file
+      pv_var = file_out.add_var("PV", ncDouble, out_time, out_plev, out_lat, out_lon);
+    
+
+
+      DataMatrix3D<double> PTVar(lev_len,lat_len,lon_len);
+      DataMatrix3D<double> TVar(lev_len,lat_len,lon_len);
+      DataMatrix3D<double>RVVar(lev_len,lat_len,lon_len);
+      DataMatrix3D<double>UMat(lev_len,lat_len,lon_len);
+      DataMatrix3D<double>VMat(lev_len,lat_len,lon_len);
+   //CALCULATE PV AND IPV PER TIME STEP
+      for (int t=0; t<time_len; t++){
+      //Calculate PT
+        temp->set_cur(t,0,0,0);
+        temp->get(&(TVar[0][0][0]),1,lev_len,lat_len,lon_len);
+        PT_calc(lev_len,lat_len,lon_len,TVar, lev_vals, PTVar);
+
+      //Calculate relative vorticity 
+
+        uvar->set_cur(t,0,0,0);
+        uvar->get(&(UMat[0][0][0]),1,lev_len,lat_len,lon_len);
+
+        vvar->set_cur(t,0,0,0);
+        vvar->get(&(VMat[0][0][0]),1,lev_len,lat_len,lon_len);
+        rVort_calc(lev_len,lat_len,lon_len,UMat,VMat, dphi, dlambda, cosphi, RVVar);
+
+        PV_calc(lev_len,lat_len,lon_len, UMat, VMat, PTVar, RVVar, pVec, coriolis,cosphi, dphi, dlambda,\
+          lat_res, lon_res, PVMat);
+
+        pv_var->set_cur(t,0,0,0);
+        pv_var->put(&(PVMat[0][0][0]),1,lev_len,lat_len,lon_len);
+      }
+    }
+    if (has_PV){
+      pv_var = readin.get_var(PVname.c_str());
+    }
+    
     NcVar *intpv_var = file_out.add_var("IPV", ncDouble, out_time, out_lat, out_lon);
+    for (int t=0; t<time_len; t++){
+      pv_var->set_cur(t,0,0,0);
+      pv_var->get(&(PVMat[0][0][0]),1,lev_len,lat_len,lon_len);
+      IPV_calc(lev_len,lat_len,lon_len,lat_res,pVec,PVMat,IPVMat);
+      intpv_var->set_cur(t,0,0);
+      intpv_var->put(&(IPVMat[0][0]),1,lat_len,lon_len);
+
+    }
+/*
     NcVar *avgt_var = file_out.add_var("AVGT", ncDouble, out_time, out_lat, out_lon);
     NcVar *avgu_var = file_out.add_var("AVGU", ncDouble, out_time, out_lat, out_lon);
     NcVar *avgv_var = file_out.add_var("AVGV", ncDouble, out_time, out_lat, out_lon);
@@ -256,8 +319,8 @@ int main(int argc, char **argv){
     VarPressureAvg(temp,lev_vals,avgt_var);
     VarPressureAvg(uvar,lev_vals,avgu_var);
     VarPressureAvg(vvar,lev_vals,avgv_var);
-    PV_calc(uvar, vvar, PTVar, RVVar, lev_vals, coriolis,cosphi, dphi, dlambda,\
-      lat_res, lon_res, pv_var, intpv_var);
+*/
+
 
     std::cout<<"About to close files."<<std::endl;
  //Close input files

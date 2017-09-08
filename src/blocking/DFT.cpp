@@ -39,9 +39,12 @@ std::vector<std::complex<double> > DFT(std::vector<double> inputVals,
   double Ndiv = 1./N;
   std::complex <double> expCoef(0.,0.);
   std::complex <double> sumVals;
+  int firstHalfNum = numCoefs/2;
+  int secHalfNum = numCoefs-firstHalfNum;
+ 
   //Begin calculating the coefficients
   if (numCoefs<N){
-    for (int k=0; k<=numCoefs; k++){
+    for (int k=0; k<=secHalfNum; k++){
       double fk = float(k);
       expCoef = -2.*compi*pi*fk*Ndiv;
       sumVals = std::complex<double>(0.,0.);
@@ -51,7 +54,7 @@ std::vector<std::complex<double> > DFT(std::vector<double> inputVals,
       }
       FourierCoefs[k] = sumVals;
     }
-    for (int k=(N-numCoefs); k<N; k++){
+    for (int k=(N-firstHalfNum); k<N; k++){
       double fk = float(k);
       expCoef = -2.*compi*pi*fk*Ndiv;
       sumVals = std::complex<double>(0.,0.);
