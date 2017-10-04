@@ -24,6 +24,12 @@
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
 
+#include <set>
+
+///////////////////////////////////////////////////////////////////////////////
+
+typedef std::pair<int, int> Point;
+
 ///////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char** argv) {
@@ -76,6 +82,18 @@ try {
 	// Meridional max weight
 	double dMeridMaxWeight;
 
+	// Minimum area (steradians)
+	int nMinArea;
+
+	// Add a time dimension if absent
+	int nAddTimeDim;
+
+	// Time dimension units
+	std::string strAddTimeDimUnits;
+
+	// Output Laplacian
+	bool fOutputLaplacian;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -92,7 +110,10 @@ try {
 		CommandLineDouble(dZonalMaxWeight, "zonalmaxwt", 0.3);
 		CommandLineDouble(dMeridMeanWeight, "meridmeanwt", 0.9);
 		CommandLineDouble(dMeridMaxWeight, "meridmaxwt", 0.1);
-		//CommandLineBool(fRegional, "regional");
+		CommandLineInt(nMinArea, "minarea", 0);
+		CommandLineInt(nAddTimeDim, "addtimedim", -1);
+		CommandLineString(strAddTimeDimUnits, "addtimedimunits", "");
+		CommandLineBool(fOutputLaplacian, "laplacianout");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -190,6 +211,28 @@ try {
 		if (dimTimeOut == NULL) {
 			_EXCEPTIONT("Error copying variable \"time\" to output file");
 		}
+
+	} else if (nAddTimeDim != -1) {
+		dimTimeOut = ncOutput.add_dim("time", 0);
+		if (dimTimeOut == NULL) {
+			_EXCEPTIONT("Error creating dimension \"time\" in output file");
+		}
+
+		NcVar * varTimeOut = ncOutput.add_var("time", ncDouble, dimTimeOut);
+		if (varTimeOut == NULL) {
+			_EXCEPTIONT("Error copying variable \"time\" to output file");
+		}
+
+		double dTime = static_cast<double>(nAddTimeDim);
+		varTimeOut->set_cur((long)0);
+		varTimeOut->put(&dTime, 1);
+
+		if (strAddTimeDimUnits != "") {
+			varTimeOut->add_att("units", strAddTimeDimUnits.c_str());
+		}
+		varTimeOut->add_att("long_name", "time");
+		varTimeOut->add_att("calendar", "standard");
+		varTimeOut->add_att("standard_name", "time");
 	}
 
 	CopyNcVar(ncInput, ncOutput, "lat", true);
@@ -208,7 +251,7 @@ try {
 	DataMatrix<int> dIWVtag(dimLat->size(), dimLon->size());
 
 	NcVar * varIWVtag = NULL;
-	if (dimTime != NULL) {
+	if (dimTimeOut != NULL) {
 		varIWVtag = ncOutput.add_var(
 			"ar_binary_tag",
 			ncByte,
@@ -228,20 +271,22 @@ try {
 	DataMatrix<double> dLaplacian(dimLat->size(), dimLon->size());
 
 	NcVar * varLaplacian = NULL;
-	if (dimTime != NULL) {
-		varLaplacian = ncOutput.add_var(
-			"ar_dx2",
-			ncDouble,
-			dimTimeOut,
-			dimLatOut,
-			dimLonOut);
+	if (fOutputLaplacian) {
+		if (dimTimeOut != NULL) {
+			varLaplacian = ncOutput.add_var(
+				"ar_dx2",
+				ncDouble,
+				dimTimeOut,
+				dimLatOut,
+				dimLonOut);
 
-	} else {
-		varLaplacian = ncOutput.add_var(
-			"ar_dx2",
-			ncDouble,
-			dimLatOut,
-			dimLonOut);
+		} else {
+			varLaplacian = ncOutput.add_var(
+				"ar_dx2",
+				ncDouble,
+				dimLatOut,
+				dimLonOut);
+		}
 	}
 
 	AnnounceEndBlock("Done");
@@ -318,12 +363,13 @@ try {
 				+ dA * dIWV[j0][i2]
 				+ dB * dIWV[j ][i2]
 				+ dA * dIWV[j2][i2];
-
+/*
 			if (dLaplacian[j][i] > -dMinLaplacian) {
 				dLaplacian[j][i] = 0.0;
 			} else {
 				dLaplacian[j][i] = 1.0;
 			}
+*/
 		}
 		}
 
@@ -383,9 +429,80 @@ try {
 			}
 
 			//dIWVtag[j][i] = 1 + static_cast<int>(dLaplacian[j][i]);
-			dIWVtag[j][i] = static_cast<int>(dLaplacian[j][i]);
+			if (dLaplacian[j][i] > -dMinLaplacian) {
+				dIWVtag[j][i] = 0;
+			} else {
+				dIWVtag[j][i] = 1;
+			}
 		}
 		}
+
+		// Only retain blobs with minimum area
+		if (nMinArea > 0) {
+			std::set<Point> setBlobs;
+
+			for (int j = 0; j < dimLat->size(); j++) {
+			for (int i = 0; i < dimLon->size(); i++) {
+				if (dIWVtag[j][i] != 0) {
+					setBlobs.insert(std::pair<int,int>(j,i));
+				}
+			}
+			}
+
+			for (;;) {
+				if (setBlobs.size() == 0) {
+					break;
+				}
+
+				std::set<Point> setThisBlob;
+				std::set<Point> setPointsToExplore;
+
+				Point pt = *(setBlobs.begin());
+				setBlobs.erase(setBlobs.begin());
+				setPointsToExplore.insert(pt);
+
+				for (;;) {
+					if (setPointsToExplore.size() == 0) {
+						break;
+					}
+					pt = *(setPointsToExplore.begin());
+					setThisBlob.insert(pt);
+					setPointsToExplore.erase(setPointsToExplore.begin());
+
+					for (int j = -1; j <= 1; j++) {
+					for (int i = -1; i <= 1; i++) {
+						Point pt2(pt.first + j, pt.second + i);
+						if (pt2.first < 0) {
+							continue;
+						}
+						if (pt2.first >= dimLat->size()) {
+							continue;
+						}
+						if (pt2.second < 0) {
+							pt2.second += dimLon->size();
+						}
+						if (pt2.second >= dimLon->size()) {
+							pt2.second -= dimLon->size();
+						}
+
+						std::set<Point>::iterator iter = setBlobs.find(pt2);
+						if (iter != setBlobs.end()) {
+							setPointsToExplore.insert(*iter);
+							setBlobs.erase(iter);
+						}
+					}
+					}
+				}
+
+				if (setThisBlob.size() < nMinArea) {
+					std::set<Point>::iterator iter = setThisBlob.begin();
+					for (; iter != setThisBlob.end(); iter++) {
+						dIWVtag[iter->first][iter->second] = 0;
+					}
+				}
+			}
+		}
+
 /*
 		// Remove points connected with equatorial moisture band
 		for (int i = 0; i < dimLon->size(); i++) {
@@ -425,16 +542,20 @@ try {
 		AnnounceStartBlock("Writing results");
 
 		// Output tagged cell array
-		if (dimTime != NULL) {
-			varLaplacian->set_cur(t, 0, 0);
-			varLaplacian->put(&(dLaplacian[0][0]), 1, dimLatOut->size(), dimLonOut->size());
+		if (dimTimeOut != NULL) {
+			if (varLaplacian != NULL) {
+				varLaplacian->set_cur(t, 0, 0);
+				varLaplacian->put(&(dLaplacian[0][0]), 1, dimLatOut->size(), dimLonOut->size());
+			}
 
 			varIWVtag->set_cur(t, 0, 0);
 			varIWVtag->put(&(dIWVtag[0][0]), 1, dimLatOut->size(), dimLonOut->size());
 
 		} else {
-			varLaplacian->set_cur(0, 0);
-			varLaplacian->put(&(dLaplacian[0][0]), dimLatOut->size(), dimLonOut->size());
+			if (varLaplacian != NULL) {
+				varLaplacian->set_cur(0, 0);
+				varLaplacian->put(&(dLaplacian[0][0]), dimLatOut->size(), dimLonOut->size());
+			}
 
 			varIWVtag->set_cur(0, 0);
 			varIWVtag->put(&(dIWVtag[0][0]), dimLatOut->size(), dimLonOut->size());
