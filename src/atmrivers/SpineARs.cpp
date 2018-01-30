@@ -94,6 +94,9 @@ try {
 	// Output Laplacian
 	bool fOutputLaplacian;
 
+	// Regional data
+	bool fRegional;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -114,6 +117,7 @@ try {
 		CommandLineInt(nAddTimeDim, "addtimedim", -1);
 		CommandLineString(strAddTimeDimUnits, "addtimedimunits", "");
 		CommandLineBool(fOutputLaplacian, "laplacianout");
+		CommandLineBool(fRegional, "regional");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -345,8 +349,19 @@ try {
 		double dC = -1.0 / (6.0 * dX2) + 5.0 / (6.0 * dY2);
 		double dD = -5.0 / 3.0 * (1.0/dX2 + 1.0/dY2);
 
-		for (int j = iLaplacianSize; j < dimLat->size() - iLaplacianSize; j++) {
-		for (int i = 0; i < dimLon->size(); i++) {
+		int j_begin = iLaplacianSize;
+		int j_end = dimLat->size() - iLaplacianSize;
+
+		int i_begin = 0;
+		int i_end = dimLon->size();
+
+		if (fRegional) {
+			i_begin = iLaplacianSize;
+			i_end = dimLon->size() - iLaplacianSize;
+		}
+
+		for (int j = j_begin; j < j_end; j++) {
+		for (int i = i_begin; i < i_end; i++) {
 			int i0 = (i + dimLon->size() - iLaplacianSize) % (dimLon->size());
 			int i2 = (i + iLaplacianSize) % (dimLon->size());
 
