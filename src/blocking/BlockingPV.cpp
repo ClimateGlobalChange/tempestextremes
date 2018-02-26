@@ -195,7 +195,14 @@ int main(int argc, char **argv){
     NcVar *lonvar = readin.get_var(lonname.c_str());
     
    //output file
-    std::string strfile_out = InputFiles[x].replace(InputFiles[x].end()-3,InputFiles[x].end(),"_integ.nc");
+    std::string delim = ".";
+    size_t pos = InputFiles[x].find(delim);
+    size_t len = InputFiles[x].length();
+    std::cout << "Found delim at "<< pos<<" and string is "<<len<<" long"<<std::endl;
+
+    //std::string strfile_out = "foo.nc"; 
+    std::string strfile_out = InputFiles[x].replace(pos,len,"_integ.nc");
+//    std::string strfile_out = InputFiles[x].replace(InputFiles[x].end()-3,InputFiles[x].end(),"_integ.nc");
     NcFile file_out(strfile_out.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
 
   //Dimensions: time, pressure, lat, lon
