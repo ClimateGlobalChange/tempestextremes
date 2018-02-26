@@ -48,7 +48,7 @@ int main(int argc, char **argv){
   //PV already calculated?
   bool has_PV;
   //If have PV,what is the name?
-  std::string PVname;
+  std::string PVname, VPVname;
   //Name of U, V, T
   std::string uName, vName, tempName;
   //Parse command line
@@ -63,6 +63,7 @@ int main(int argc, char **argv){
     CommandLineBool(is_hPa, "hpa");
     CommandLineBool(has_PV, "hasPV");
     CommandLineString(PVname,"PVname","PV");
+    CommandLineString(VPVname,"VPVname","VPV");
     CommandLineString(uName,"uname","U");
     CommandLineString(vName,"vname","V");
     CommandLineString(tempName,"tempname","T");
@@ -102,6 +103,8 @@ int main(int argc, char **argv){
     InputFiles.push_back(strfile_in);
   }
   int nfiles = InputFiles.size();
+  size_t pos, len;
+  std::string delim = ".";
 
   //If variables need interpolating, do this first!  
   if (interp_check) {
@@ -144,7 +147,9 @@ int main(int argc, char **argv){
 
     //Interpolated file name
       std::string strfile_copy = InputFiles[x];
-      std::string interp_file = strfile_copy.replace(strfile_copy.end()-3,strfile_copy.end(),"_ipl.nc");
+      pos = strfile_copy.find(delim);
+      len = strfile_copy.length();
+      std::string interp_file = strfile_copy.replace(pos,len,"_ipl.nc");
       std::cout<< "Interpolated file name is "<<interp_file<<std::endl;
 
     //open file that interpolated variables will be written to
@@ -195,10 +200,8 @@ int main(int argc, char **argv){
     NcVar *lonvar = readin.get_var(lonname.c_str());
     
    //output file
-    std::string delim = ".";
-    size_t pos = InputFiles[x].find(delim);
-    size_t len = InputFiles[x].length();
-    std::cout << "Found delim at "<< pos<<" and string is "<<len<<" long"<<std::endl;
+    pos = InputFiles[x].find(delim);
+    len = InputFiles[x].length();
 
     //std::string strfile_out = "foo.nc"; 
     std::string strfile_out = InputFiles[x].replace(pos,len,"_integ.nc");
@@ -309,7 +312,7 @@ int main(int argc, char **argv){
       pv_var = readin.get_var(PVname.c_str());
     }
     
-    NcVar *intpv_var = file_out.add_var("IPV", ncDouble, out_time, out_lat, out_lon);
+    NcVar *intpv_var = file_out.add_var(VPVname, ncDouble, out_time, out_lat, out_lon);
     for (int t=0; t<time_len; t++){
       pv_var->set_cur(t,0,0,0);
       pv_var->get(&(PVMat[0][0][0]),1,lev_len,lat_len,lon_len);

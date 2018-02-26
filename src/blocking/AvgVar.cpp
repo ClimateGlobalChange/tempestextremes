@@ -173,7 +173,6 @@ int main(int argc, char ** argv){
 		for (int v=0; v<varLen; v++){
 			NcVar * outvar = readout.add_var(varVec[v].c_str(),ncDouble,outLat,outLon);
 			outvar->set_cur(0,0);
-			std::cout<<"Value being put in at v="<<v<<" is "<<storeMat[5][10][v]<<std::endl;
 			for (int a=0; a<latLen;a++){
 				for (int b=0; b<lonLen;b++){
 					putMat[a][b]=storeMat[a][b][v];

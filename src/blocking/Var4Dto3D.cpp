@@ -32,7 +32,7 @@ int main(int argc, char** argv){
     bool is_hPa;
     bool interp_check;
     bool ZtoGH;
-    std::string varlist;
+    std::string varlist,tname,levname,latname,lonname,zname;
 
     BeginCommandLine()
       CommandLineString(fileIn,"in","");
@@ -42,16 +42,26 @@ int main(int argc, char** argv){
       CommandLineBool(interp_check,"ipl");
       CommandLineBool(ZtoGH,"gh");
       CommandLineString(varlist,"varlist","");
+      CommandLineString(tname,"tname","time");
+      CommandLineString(levname,"levname","lev");
+      CommandLineString(latname,"latname","lat");
+      CommandLineString(lonname,"lonname","lon");
+      CommandLineString(zname,"zname","Z");
       ParseCommandLine(argc,argv);
     EndCommandLine(argv);
 
     if (fileIn == ""){
       _EXCEPTIONT("No input file (--in) specified");
     }
+    size_t pos, len;
+    std::string delim = ".";
+
 
     if (fileOut == ""){
       std::string fileInCopy = fileIn;
-      fileOut = fileInCopy.replace(fileInCopy.end()-3,fileInCopy.end(),"_z500.nc");
+      pos = fileInCopy.find(delim);
+      len = fileInCopy.length();
+      fileOut = fileInCopy.replace(pos,len,"_3D.nc");
     }
     if (varlist == ""){
        _EXCEPTIONT("Need to provide variable names with --varlist flag.");
@@ -65,7 +75,9 @@ int main(int argc, char** argv){
         _EXCEPTIONT("Need to provide at least 1 variable name with the --varlist flag");
       }
       NcFile interp_in(fileIn.c_str());
-      std::string interp_outname = fileIn.replace(fileIn.end()-3,fileIn.end(),"_ipl_3D.nc");
+      pos = fileIn.find(delim);
+      len = fileIn.length();
+      std::string interp_outname = fileIn.replace(pos,len,"_ipl_3D.nc");
       //open output file for interpolated variable
       NcFile interp_out(interp_outname.c_str(),NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
       if (!interp_out.is_valid()){
@@ -83,26 +95,26 @@ int main(int argc, char** argv){
     NcFile readin(fileIn.c_str());
 
     //Dimensions and associated variables
-    NcDim *time = readin.get_dim("time");
+    NcDim *time = readin.get_dim(tname);
     int nTime = time->size();
-    NcVar *timevar = readin.get_var("time");
+    NcVar *timevar = readin.get_var(tname);
 
-    NcDim *lev = readin.get_dim("lev");
+    NcDim *lev = readin.get_dim(levname);
     int nLev = lev->size();
-    NcVar *levvar = readin.get_var("lev");
+    NcVar *levvar = readin.get_var(levname);
 
     //Create a data vector with the associated pressure values 
     DataVector<double> pVec(nLev);
     levvar->set_cur((long) 0);
     levvar->get(&(pVec[0]),nLev);
 
-    NcDim *lat = readin.get_dim("lat");
+    NcDim *lat = readin.get_dim(latname);
     int nLat = lat->size();
-    NcVar *latvar = readin.get_var("lat");
+    NcVar *latvar = readin.get_var(latname);
 
-    NcDim *lon = readin.get_dim("lon");
+    NcDim *lon = readin.get_dim(lonname);
     int nLon = lon->size();
-    NcVar *lonvar = readin.get_var("lon");
+    NcVar *lonvar = readin.get_var(lonname);
 
     //Find the index of the 500 mb level
     double pval = 50000.0;
@@ -116,7 +128,6 @@ int main(int argc, char** argv){
         break;
       }
     }
-    std::cout<<"pIndex: "<<pIndex<<std::endl;
 
     //Open output file
     NcFile file_out(fileOut.c_str(),NcFile::Replace,NULL,0,NcFile::Offset64Bits);
@@ -160,7 +171,7 @@ int main(int argc, char** argv){
       for (int t=0; t<nTime; t++){
         vvar->set_cur(t,pIndex,0,0);
         vvar->get(&(VData[0][0]),1,1,nLat,nLon);
-        if (varVec[v]=="Z" && ZtoGH){
+        if (varVec[v]==zname && ZtoGH){
           for (int a=0; a<nLat; a++){
             for (int b=0; b<nLon; b++){
               VData[a][b]/=9.8;

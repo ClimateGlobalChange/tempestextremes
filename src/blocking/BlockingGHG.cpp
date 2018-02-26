@@ -147,9 +147,12 @@ int main(int argc, char** argv){
       //Create a DataMatrix to hold the timestep's data
       DataMatrix<double>ZData(nLat,nLon);
       DataMatrix<double>outIndex(nLat,nLon);
+      std::string delim = ".";
+      size_t pos,len;
+      pos = InputFiles[x].find(delim);
+      len = InputFiles[x].length();
       //Create output file that corresponds to IPV data
-      std::string strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
-        InputFiles[x].end(), "_GHG.nc");
+      std::string strOutFile = InputFiles[x].replace(pos,len, "_ZG.nc");
 
       //create output file
       NcFile file_out(strOutFile.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
@@ -169,7 +172,7 @@ int main(int argc, char** argv){
       copy_dim_var(lonvar, lon_vals);
 
     //Create variable to hold blocking Y/N
-      NcVar *blocking_vals = file_out.add_var("GHGrad", ncDouble, out_time, out_lat, out_lon);
+      NcVar *blocking_vals = file_out.add_var("ZG", ncDouble, out_time, out_lat, out_lon);
 
       DataVector<double> latVec(nLat);
       latvar->set_cur((long) 0);
@@ -225,7 +228,6 @@ int main(int argc, char** argv){
   //NEW VARIABLE: TM BLOCKING INDEX
 //    DataMatrix3D<double> outIndex(nTime,nLat,nLon);
     for (int t=0; t<nTime; t++){
-      std::cout<<"Calculating blocking for timestep "<<t<<std::endl;
       zvar->set_cur(t,0,0);
       zvar->get(&(ZData[0][0]),1,nLat,nLon);
       for (int b=0; b<nLon; b++){

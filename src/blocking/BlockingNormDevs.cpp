@@ -217,13 +217,16 @@ int main(int argc, char **argv){
 
   
       std::string strOutFile;
+      std::string delim = ".";
+      size_t pos,len;
+
       if (outputName != ""){
         strOutFile = outputName;
       }      
       else{
-
-        strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
-          InputFiles[x].end(), "_norm.nc");
+        pos = InputFiles[x].find(delim);
+        len = InputFiles[x].length();
+        strOutFile = InputFiles[x].replace(pos,len, "_norm.nc");
       }
 
       if (const_thresh){
@@ -251,7 +254,7 @@ int main(int argc, char **argv){
       if (PVCalc){
 //        NcVar *devOut = outfile.add_var("DIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
 //        NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
-        NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
+        NcVar *devIntOut = outfile.add_var("INT_ADVPV",ncInt,tDimOut,latDimOut,lonDimOut);
 
 //        calcDevs(leap,true, startIndex, varData, devOut, aDevOut, AvarData, inTime,\
         avgTimeVals, inLat, tVarOut);

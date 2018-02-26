@@ -50,7 +50,8 @@ int main(int argc, char **argv){
     bool PVCalc;
     bool GHCalc;
 //    bool const_thresh;
-
+    size_t pos,len;
+    std::string delim = ".";
 
     BeginCommandLine()
       CommandLineString(fileName, "in","");
@@ -282,8 +283,10 @@ int main(int argc, char **argv){
       if (outName != ""){
         strOutFile = outName;
       }else{
-        strOutFile = InputFiles[x].replace(InputFiles[x].end()-3,\
-          InputFiles[x].end(), "_devs.nc");
+        pos = InputFiles[x].find(delim);
+        len = InputFiles[x].length();
+
+        strOutFile = InputFiles[x].replace(pos,len, "_devs.nc");
       }
       std::cout<<"Writing variables to file "<<strOutFile.c_str()<<std::endl;
       NcFile outfile(strOutFile.c_str(), NcFile::Replace, NULL,0,NcFile::Offset64Bits);
@@ -307,8 +310,8 @@ int main(int argc, char **argv){
       //Create variables for Deviations
 
       if (PVCalc){
-        NcVar *devOut = outfile.add_var("DIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
-        NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
+        NcVar *devOut = outfile.add_var("DVPV",ncDouble,tDimOut,latDimOut,lonDimOut);
+        NcVar *aDevOut = outfile.add_var("ADVPV",ncDouble,tDimOut,latDimOut,lonDimOut);
   //      NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
 
         calcDevs(true, nSteps, nOutTime, strTimeUnits, strCalendar, varData, devOut, aDevOut, AvarData, inTime,\
