@@ -30,7 +30,7 @@ else ifeq ($(UNAME),Linux)
   endif   
 endif
 
-include $(TEMPESTREMAPDIR)/mk/system/$(SYSTEM_MAKEFILE)
+include $(TEMPESTEXTREMESDIR)/mk/system/$(SYSTEM_MAKEFILE)
 
 # Build identifier
 BUILDID:= $(SYSTEM)
