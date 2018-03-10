@@ -44,17 +44,19 @@ int main(int argc, char** argv){
     //input variable
     std::string varName;
     //axis names
-    std::string tname,latname,lonname;
+    std::string tname,latname,lonname,insuff,outsuff;
 
 
     BeginCommandLine()
       CommandLineString(fileList,"inlist","");
       CommandLineString(fileIn, "in","");
 //      CommandLineString(outFile,"out","");
-      CommandLineString(varName,"varname","");
+      CommandLineString(varName,"varname","Z");
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
+      CommandLineString(insuff,"insuff",".nc");
+      CommandLineString(outsuff,"outsuff","_GHG.nc");
     ParseCommandLine(argc,argv);
     EndCommandLine(argv);
     AnnounceBanner();
@@ -70,12 +72,12 @@ int main(int argc, char** argv){
     if (fileIn == ""){
       _EXCEPTIONT("No input file (--in) specified");
     }
-*/
+
     if (varName == ""){
       _EXCEPTIONT("No variable name (--varname) specified");
     }
 
-/*    if (outFile == ""){
+    if (outFile == ""){
       std::string fileInCopy = fileIn;
       outFile = fileInCopy.replace(fileInCopy.end()-3,fileInCopy.end(),"_GHG.nc");
     }
@@ -147,16 +149,18 @@ int main(int argc, char** argv){
       //Create a DataMatrix to hold the timestep's data
       DataMatrix<double>ZData(nLat,nLon);
       DataMatrix<double>outIndex(nLat,nLon);
-      std::string delim = ".";
+     // std::string delim = ".";
       size_t pos,len;
-      pos = InputFiles[x].find(delim);
+      pos = InputFiles[x].find(insuff);
+   //   if (pos != std::string::npos) std::cout<<"found input suffix at "<<pos<<std::endl;
+     // pos = InputFiles[x].find(delim);
       len = InputFiles[x].length();
       //Create output file that corresponds to IPV data
-      std::string strOutFile = InputFiles[x].replace(pos,len, "_ZG.nc");
-
+      std::string strOutFile = InputFiles[x].replace(pos,len, outsuff.c_str());
+      
       //create output file
       NcFile file_out(strOutFile.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
-
+      std::cout<<"Writing variable to file "<<file_out<<std::endl;
     //Dimensions: time, lat, lon
       NcDim *out_time = file_out.add_dim(tname.c_str(), nTime);
       NcDim *out_lat = file_out.add_dim(latname.c_str(), nLat);

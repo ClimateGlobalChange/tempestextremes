@@ -32,7 +32,7 @@ int main(int argc, char** argv){
     bool is_hPa;
     bool interp_check;
     bool ZtoGH;
-    std::string varlist,tname,levname,latname,lonname,zname;
+    std::string varlist,tname,levname,latname,lonname,zname,insuff,outsuff,insuff2d,outsuff2d;
 
     BeginCommandLine()
       CommandLineString(fileIn,"in","");
@@ -47,6 +47,10 @@ int main(int argc, char** argv){
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
       CommandLineString(zname,"zname","Z");
+      CommandLineString(insuff,"insuff",".nc");
+      CommandLineString(outsuff,"outsuff","_3D.nc");
+      CommandLineString(insuff2d,"insuff2d",".nc");
+      CommandLineString(outsuff2d,"outsuffipl","_ipl_3D.nc");
       ParseCommandLine(argc,argv);
     EndCommandLine(argv);
 
@@ -54,14 +58,14 @@ int main(int argc, char** argv){
       _EXCEPTIONT("No input file (--in) specified");
     }
     size_t pos, len;
-    std::string delim = ".";
+    //std::string delim = ".";
 
 
     if (fileOut == ""){
       std::string fileInCopy = fileIn;
-      pos = fileInCopy.find(delim);
+      pos = fileInCopy.find(insuff);
       len = fileInCopy.length();
-      fileOut = fileInCopy.replace(pos,len,"_3D.nc");
+      fileOut = fileInCopy.replace(pos,len,outsuff.c_str());
     }
     if (varlist == ""){
        _EXCEPTIONT("Need to provide variable names with --varlist flag.");
@@ -75,9 +79,9 @@ int main(int argc, char** argv){
         _EXCEPTIONT("Need to provide at least 1 variable name with the --varlist flag");
       }
       NcFile interp_in(fileIn.c_str());
-      pos = fileIn.find(delim);
+      pos = fileIn.find(insuff2d);
       len = fileIn.length();
-      std::string interp_outname = fileIn.replace(pos,len,"_ipl_3D.nc");
+      std::string interp_outname = fileIn.replace(pos,len,outsuff2d.c_str());
       //open output file for interpolated variable
       NcFile interp_out(interp_outname.c_str(),NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
       if (!interp_out.is_valid()){
@@ -95,26 +99,26 @@ int main(int argc, char** argv){
     NcFile readin(fileIn.c_str());
 
     //Dimensions and associated variables
-    NcDim *time = readin.get_dim(tname);
+    NcDim *time = readin.get_dim(tname.c_str());
     int nTime = time->size();
-    NcVar *timevar = readin.get_var(tname);
+    NcVar *timevar = readin.get_var(tname.c_str());
 
-    NcDim *lev = readin.get_dim(levname);
+    NcDim *lev = readin.get_dim(levname.c_str());
     int nLev = lev->size();
-    NcVar *levvar = readin.get_var(levname);
+    NcVar *levvar = readin.get_var(levname.c_str());
 
     //Create a data vector with the associated pressure values 
     DataVector<double> pVec(nLev);
     levvar->set_cur((long) 0);
     levvar->get(&(pVec[0]),nLev);
 
-    NcDim *lat = readin.get_dim(latname);
+    NcDim *lat = readin.get_dim(latname.c_str());
     int nLat = lat->size();
-    NcVar *latvar = readin.get_var(latname);
+    NcVar *latvar = readin.get_var(latname.c_str());
 
-    NcDim *lon = readin.get_dim(lonname);
+    NcDim *lon = readin.get_dim(lonname.c_str());
     int nLon = lon->size();
-    NcVar *lonvar = readin.get_var(lonname);
+    NcVar *lonvar = readin.get_var(lonname.c_str());
 
     //Find the index of the 500 mb level
     double pval = 50000.0;
@@ -151,7 +155,7 @@ int main(int argc, char** argv){
 
     //Split var list  
     std::string delim = ",";
-    size_t pos = 0;
+    pos = 0;
     std::string token;
     std::vector<std::string> varVec;
 

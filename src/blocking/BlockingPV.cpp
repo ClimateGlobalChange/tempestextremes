@@ -51,6 +51,8 @@ int main(int argc, char **argv){
   std::string PVname, VPVname;
   //Name of U, V, T
   std::string uName, vName, tempName;
+  //FIle name conventions
+  std::string insuff,outsuff,insuff2d,outsuff2d;
   //Parse command line
   BeginCommandLine()
 
@@ -71,6 +73,10 @@ int main(int argc, char **argv){
     CommandLineString(levname,"levname","lev");
     CommandLineString(latname,"latname","lat");
     CommandLineString(lonname,"lonname","lon");
+    CommandLineString(insuff,"insuff",".nc");
+    CommandLineString(outsuff,"outsuff","_integ.nc");
+    CommandLineString(insuff2d,"insuff2d",".nc");
+    CommandLineString(outsuff2d,"outsuff2d","_ipl.nc");
     ParseCommandLine(argc, argv);
 
   EndCommandLine(argv)
@@ -104,7 +110,6 @@ int main(int argc, char **argv){
   }
   int nfiles = InputFiles.size();
   size_t pos, len;
-  std::string delim = ".";
 
   //If variables need interpolating, do this first!  
   if (interp_check) {
@@ -147,9 +152,9 @@ int main(int argc, char **argv){
 
     //Interpolated file name
       std::string strfile_copy = InputFiles[x];
-      pos = strfile_copy.find(delim);
+      pos = strfile_copy.find(insuff2d);
       len = strfile_copy.length();
-      std::string interp_file = strfile_copy.replace(pos,len,"_ipl.nc");
+      std::string interp_file = strfile_copy.replace(pos,len,outsuff2d.c_str());
       std::cout<< "Interpolated file name is "<<interp_file<<std::endl;
 
     //open file that interpolated variables will be written to
@@ -200,11 +205,11 @@ int main(int argc, char **argv){
     NcVar *lonvar = readin.get_var(lonname.c_str());
     
    //output file
-    pos = InputFiles[x].find(delim);
+    pos = InputFiles[x].find(insuff);
     len = InputFiles[x].length();
 
     //std::string strfile_out = "foo.nc"; 
-    std::string strfile_out = InputFiles[x].replace(pos,len,"_integ.nc");
+    std::string strfile_out = InputFiles[x].replace(pos,len,outsuff.c_str());
 //    std::string strfile_out = InputFiles[x].replace(InputFiles[x].end()-3,InputFiles[x].end(),"_integ.nc");
     NcFile file_out(strfile_out.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
 
@@ -312,7 +317,7 @@ int main(int argc, char **argv){
       pv_var = readin.get_var(PVname.c_str());
     }
     
-    NcVar *intpv_var = file_out.add_var(VPVname, ncDouble, out_time, out_lat, out_lon);
+    NcVar *intpv_var = file_out.add_var(VPVname.c_str(), ncDouble, out_time, out_lat, out_lon);
     for (int t=0; t<time_len; t++){
       pv_var->set_cur(t,0,0,0);
       pv_var->get(&(PVMat[0][0][0]),1,lev_len,lat_len,lon_len);
