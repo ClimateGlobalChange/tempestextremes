@@ -160,7 +160,7 @@ int main(int argc, char** argv){
       
       //create output file
       NcFile file_out(strOutFile.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
-      std::cout<<"Writing variable to file "<<file_out<<std::endl;
+      std::cout<<"Writing variable to file "<<strOutFile.c_str()<<std::endl;
     //Dimensions: time, lat, lon
       NcDim *out_time = file_out.add_dim(tname.c_str(), nTime);
       NcDim *out_lat = file_out.add_dim(latname.c_str(), nLat);
