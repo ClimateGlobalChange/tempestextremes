@@ -44,12 +44,14 @@ int main(int argc, char **argv){
     std::string varName;
     //name of averaged input variable
     std::string avgVarName;
-//    std::string threshName;
-//    std::string threshVarName;
-    std::string tname,latname,lonname;
+    std::string tname,latname,lonname,levname;
+    std::string insuff,outsuff;
+    bool is4D,ZtoGH,isHpa;
+    std::string fourDval="F";
+    std::string ZGHval="F";
+    std::string Hpaval="F";
     bool PVCalc;
     bool GHCalc;
-//    bool const_thresh;
     size_t pos,len;
     std::string delim = ".";
 
@@ -60,14 +62,17 @@ int main(int argc, char **argv){
       CommandLineString(varName,"varname","");
       CommandLineString(avgName, "avg", "");
       CommandLineString(avgVarName, "avgname","");
-//      CommandLineString(threshName,"thresh","");
-//      CommandLineString(threshVarName,"threshname","");
       CommandLineBool(PVCalc,"pv");
-      CommandLineBool(GHCalc,"gh");
-//      CommandLineBool(const_thresh,"const");
+      CommandLineBool(GHCalc,"z500");
+      CommandLineBool(is4D,"is4D");
+      CommandLineBool(ZtoGH,"gh");
+      CommandLineBool(isHpa,"hpa");
       CommandLineString(tname,"tname","time");
+      CommandLineString(levname,"levname","lev");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
+      CommandLineString(insuff,"insuff",".nc");
+      CommandLineString(outsuff,"outsuff","_devs.nc");
       ParseCommandLine(argc, argv);
     EndCommandLine(argv);
     AnnounceBanner();
@@ -83,6 +88,10 @@ int main(int argc, char **argv){
     }
     if (outName != "" && fileList != ""){
       _EXCEPTIONT("Currently cannot specify output name for list of files. This will only work with a single file (--in).");
+    }
+
+    if (ZtoGH){
+      ZGHval="T";
     }
 
    int nFiles,avgTime,nTime,nLat,nLon;
@@ -180,6 +189,37 @@ int main(int argc, char **argv){
       NcVar *inLon = infile.get_var(lonname.c_str());
       NcVar *varData = infile.get_var(varName.c_str());
 
+      int pIndex = 10000000;
+      if (is4D){
+        fourDval="T";
+        NcDim * lev = infile.get_dim(levname.c_str());
+        int nLev = lev->size();
+        NcVar *levvar = infile.get_var(levname.c_str());
+        DataVector<double> pVec(nLev);
+        levvar->get(&(pVec[0]),nLev);
+
+        //Find the 500 mb level
+        double pval = 50000.0;
+        if (isHpa){
+          Hpaval="T";
+          pval = 500.0;
+        }
+        for (int x=0; x<nLev; x++){
+          if (std::fabs(pVec[x]-pval)<0.0001){
+            pIndex = x;
+            break;
+          }
+        }
+        if (pIndex > 999999){
+          _EXCEPTIONT("Could not identify correct pressure level. Check file.");
+        }
+      }
+
+      int nDims = varData->num_dims();
+      if (nDims > 3 && !is4D){
+        _EXCEPTIONT("Error: variable has more than 3 dimensions, must use --is4D.");
+      }
+
       NcAtt *attTime = inTime->get_att("units");
       if (attTime == NULL){
         _EXCEPTIONT("Time variable has no units attribute.");
@@ -273,7 +313,7 @@ int main(int argc, char **argv){
           nSteps ++;
         }
       }
-      if (d1 == d2){
+      if (d1 == d2 && nSteps < 1){
         _EXCEPTIONT("Need to know the number of time steps per day.");
       }
       std::cout<<"There are "<<nSteps<<" steps per day."<<std::endl;
@@ -283,10 +323,10 @@ int main(int argc, char **argv){
       if (outName != ""){
         strOutFile = outName;
       }else{
-        pos = InputFiles[x].find(delim);
+        pos = InputFiles[x].find(insuff);
         len = InputFiles[x].length();
 
-        strOutFile = InputFiles[x].replace(pos,len, "_devs.nc");
+        strOutFile = InputFiles[x].replace(pos,len,outsuff.c_str());
       }
       std::cout<<"Writing variables to file "<<strOutFile.c_str()<<std::endl;
       NcFile outfile(strOutFile.c_str(), NcFile::Replace, NULL,0,NcFile::Offset64Bits);
@@ -314,16 +354,16 @@ int main(int argc, char **argv){
         NcVar *aDevOut = outfile.add_var("ADVPV",ncDouble,tDimOut,latDimOut,lonDimOut);
   //      NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
 
-        calcDevs(true, nSteps, nOutTime, strTimeUnits, strCalendar, varData, devOut, aDevOut, AvarData, inTime,\
-        avgTimeVals, inLat);
+        calcDevs(true,ZGHval,fourDval,pIndex, nSteps, nOutTime, strTimeUnits, strCalendar, \
+         varData, devOut, aDevOut, AvarData, inTime,avgTimeVals, inLat);
       }
       else if (GHCalc){
         NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
         NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
 //        NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);
 //        NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
-        calcDevs(false, nSteps, nOutTime, strTimeUnits, strCalendar, varData, devOut,aDevOut,AvarData,inTime,\
-          avgTimeVals,inLat);
+        calcDevs(false,ZGHval,fourDval,pIndex,nSteps, nOutTime, strTimeUnits, strCalendar,\
+          varData, devOut,aDevOut,AvarData,inTime, avgTimeVals,inLat);
         std::cout<<"Finished writing to file "<<strOutFile.c_str()<<std::endl;
       }
       else{

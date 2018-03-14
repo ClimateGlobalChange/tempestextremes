@@ -25,8 +25,9 @@
 int main(int argc, char ** argv){
   try{
     NcError error(NcError::silent_nonfatal);
-    std::string fileList, outFile,avgName,varName,  tname, latname, lonname;
+    std::string fileList, outFile,avgName,varName,  tname, levname, latname, lonname;
     int nWaves,startday,endday;
+    bool is4D, ZtoGH, isHpa;
     BeginCommandLine()
       CommandLineString(fileList,"inlist","");
       CommandLineString(outFile,"out","");
@@ -36,8 +37,12 @@ int main(int argc, char ** argv){
       CommandLineInt(startday,"startday",1);
       CommandLineInt(endday,"endday",365);
       CommandLineString(tname,"tname","time");
+      CommandLineString(levname, "levname", "lev");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
+      CommandLineBool(is4D, "is4D");
+      CommandLineBool(ZtoGH, "gh");
+      CommandLineBool(isHpa,"hpa");
       ParseCommandLine(argc,argv);
     EndCommandLine(argv)
     AnnounceBanner();
@@ -69,6 +74,32 @@ int main(int argc, char ** argv){
     latLen = readin.get_dim(latname.c_str())->size();
     lonLen = readin.get_dim(lonname.c_str())->size();
 
+    //if the file contains multiple pressure levels, only grab the 500 hPa data
+      int pIndex = 10000000;
+      if (is4D){
+        NcDim * lev = readin.get_dim(levname.c_str());
+        int nLev = lev->size();
+        NcVar *levvar = readin.get_var(levname.c_str());
+        DataVector<double> pVec(nLev);
+        levvar->get(&(pVec[0]),nLev);
+
+        //Find the 500 mb level
+        double pval = 50000.0;
+        if (isHpa){
+          pval = 500.0;
+        }
+        for (int x=0; x<nLev; x++){
+          if (std::fabs(pVec[x]-pval)<0.0001){
+            pIndex = x;
+            break;
+          }
+        }
+        if (pIndex > 999999){
+          _EXCEPTIONT("Could not identify correct pressure level. Check file.");
+        }
+      }
+
+
     //Initialize storage array: day, lat, lon
     int yearLen = (endday-startday)+1;
     DataMatrix3D<double> storeMat(yearLen,latLen,lonLen);
@@ -91,6 +122,11 @@ int main(int argc, char ** argv){
       tLen = readin.get_dim(tname.c_str()) ->size();
       //std::cout<<"Reading in file #"<<x<<", "<<vecFiles[x].c_str()<<std::endl;
       NcVar *inputVar = readin.get_var(varName.c_str());
+
+      int nDims = inputVar->num_dims();
+      if (nDims > 3 && !is4D){
+        _EXCEPTIONT("Error: variable has more than 3 dimensions, must use --is4D.");
+      }
       timeVec.Initialize(tLen);
       NcVar *timeVar = readin.get_var(tname.c_str());
       timeVar->set_cur((long)0);
@@ -114,14 +150,21 @@ int main(int argc, char ** argv){
       //Time and calendar
       int dateYear, dateMonth, dateDay, dateHour, dayIndex;
       bool leap;
+      double inputVal;
       //std::cout<<"Storing values."<<std::endl;
       //Store the values and counts in the matrices at the appropriate day index
 
       //Input data
       for (int t=0; t<tLen; t++){
         inputData.Initialize(latLen, lonLen);
-        inputVar->set_cur(t,0,0);
-        inputVar->get(&(inputData[0][0]),1,latLen,lonLen);
+      
+        if (is4D){
+          inputVar->set_cur(t,pIndex,0,0);
+          inputVar->get(&(inputData[0][0]),1,1,latLen,lonLen);
+        }else{
+          inputVar->set_cur(t,0,0);
+          inputVar->get(&(inputData[0][0]),1,latLen,lonLen);
+        }
         ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t],\
           dateYear, dateMonth, dateDay, dateHour);
         leap = checkFileLeap(strTimeUnits, strCalendar, dateYear,\
@@ -131,7 +174,11 @@ int main(int argc, char ** argv){
           //std::cout<<"Day index is "<<dayIndex<<std::endl;
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
-              storeMat[dayIndex][a][b]+= inputData[a][b];
+              inputVal = inputData[a][b];
+              if (ZtoGH){
+                inputVal /= 9.8;
+              }
+              storeMat[dayIndex][a][b]+= inputVal;
               countsMat[dayIndex][a][b]+= 1.;
              // if (a==50 && b==20){
              //   std::cout<<"Store: "<<storeMat[dayIndex][a][b]<< " count: "<< countsMat[dayIndex][a][b]<<std::endl;

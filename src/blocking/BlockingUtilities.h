@@ -245,6 +245,9 @@ void IPV_calc(
 //anomalies, anomalies with 2-day smoothing, and a normalized
 //anomaly (all values below threshold or wrong sign set to 0)
 void calcDevs(bool isPV,
+              std::string ZtoGH,
+              std::string is4D,
+              int pIndex,
               int nSteps,
               int nOutTime,
               std::string strTimeUnits,

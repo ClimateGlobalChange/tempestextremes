@@ -867,6 +867,9 @@ void IPV_calc(
 //anomalies, anomalies with 2-day smoothing, and a normalized
 //anomaly (all values below threshold or wrong sign set to 0)
 void calcDevs( bool isPV,
+              std::string ZtoGH,
+              std::string is4D,
+              int pIndex,
               int nSteps,
               int nOutTime,
               std::string strTimeUnits,
@@ -884,8 +887,13 @@ void calcDevs( bool isPV,
   double pi = std::atan(1.)*4.;
 
   nTime = inIPV->get_dim(0)->size();
-  nLat = inIPV->get_dim(1)->size();
-  nLon = inIPV->get_dim(2)->size();
+  if (is4D=="T"){
+    nLat = inIPV->get_dim(2)->size();
+    nLon = inIPV->get_dim(3)->size();
+  }else{
+    nLat = inIPV->get_dim(1)->size();
+    nLon = inIPV->get_dim(2)->size();
+  }
 
   DataVector<double> latVec(nLat);
   lat->set_cur((long) 0);
@@ -895,38 +903,6 @@ void calcDevs( bool isPV,
   DataVector<double> timeVec(nTime);
   inTime->set_cur((long) 0);
   inTime->get(&(timeVec[0]),nTime);
-/*
-  //time units of instantaneous time axis
-  std::string strTimeUnits = inTime->get_att("units")->as_string(0);
-  std::string strCalendar = inTime->get_att("calendar")->as_string(0);
-
-      if ((strTimeUnits.length() >= 11) && \
-        (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
-        tRes = timeVals[1]-timeVals[0];
-      }
-      else if((strTimeUnits.length() >= 12) && \
-      (strncmp(strTimeUnits.c_str(), "hours since ",12)==0)) {
-        tRes = (timeVals[1]-timeVals[0])/24.0;
-      }else if (strTimeUnits.length() >= 14 && \
-        (strncmp(strTimeUnits.c_str(),"minutes since ",14)== 0) ){
-        tRes = (timeVals[1]-timeVals[0])/(24. * 60.);
-      }else{
-       _EXCEPTIONT("Cannot determine time resolution (unknown time units).");
-      }
-*/
-
-
-
-//Matrix for output data
-//Eliminate one day if contains Feb 29
-/*
-  DataMatrix3D<double> devMat(nOutTime,nLat,nLon);
-  DataMatrix3D<double> aDevMat(nOutTime,nLat,nLon);
-*/
-//Number of days in IPV
-//  int nDays = nTime*tRes;
- // std::cout<<"There are "<<nDays<<" days in file."<<std::endl;
-
 
 //Deal with skipped days          
   int d=0;
@@ -942,10 +918,15 @@ void calcDevs( bool isPV,
   DataMatrix<double> avgMat(nLat,nLon);
   DataMatrix<double> devMat(nLat,nLon);
   double num = std::sin(45*pi/180);
-  double denom, sineRatio;
+  double denom, sineRatio, inputVal;
   for (int t=0; t<nTime; t++){
-    inIPV->set_cur(t,0,0);
-    inIPV->get(&(IPVMat[0][0]),1,nLat,nLon);
+    if (is4D=="T"){
+      inIPV->set_cur(t,pIndex,0,0);
+      inIPV->get(&(IPVMat[0][0]),1,1,nLat,nLon);  
+    }else{
+      inIPV->set_cur(t,0,0);
+      inIPV->get(&(IPVMat[0][0]),1,nLat,nLon);
+    }
     //check if this time step is a leap day
     ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
       leapMonth, leapDay, leapHour);
@@ -969,7 +950,11 @@ void calcDevs( bool isPV,
         }
         sineRatio = num/denom;
         for (int b=0; b<nLon; b++){
-          devMat[a][b] = IPVMat[a][b]-avgMat[a][b];
+          inputVal = IPVMat[a][b];
+          if (ZtoGH=="T"){
+            inputVal /= 9.8;
+          }
+          devMat[a][b] = inputVal-avgMat[a][b];
           if (!isPV){
             devMat[a][b]*=sineRatio;
           }
