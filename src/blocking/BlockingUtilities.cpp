@@ -719,6 +719,7 @@ void PV_calc(
   double radius = 6371000.0;
   double coef1,coef2,corvar;
 
+
   //Matrices for the partials
   //PT, U, V WRT P
   DataMatrix3D<double> dpt_dp(nPlev, nLat, nLon);
@@ -776,6 +777,7 @@ void PV_calc(
         }
       }
     }
+
   coef2 = 1.0/radius;
   //PV Calculation!
     for (int p=0; p<nPlev; p++){
@@ -789,6 +791,7 @@ void PV_calc(
         }
       }
     }
+
 } 
 
 void IPV_calc(

@@ -44,8 +44,9 @@ int main(int argc, char** argv){
     //input variable
     std::string varName;
     //axis names
-    std::string tname,latname,lonname,insuff,outsuff;
-
+    std::string tname,latname,lonname,insuff,outsuff, levname;
+    //Does the variable contain multiple pressure levels?
+    bool ZtoGH, is4D, isHpa;
 
     BeginCommandLine()
       CommandLineString(fileList,"inlist","");
@@ -55,8 +56,12 @@ int main(int argc, char** argv){
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
+      CommandLineString(levname, "levname", "lev");
       CommandLineString(insuff,"insuff",".nc");
       CommandLineString(outsuff,"outsuff","_GHG.nc");
+      CommandLineBool(ZtoGH, "gh");
+      CommandLineBool(isHpa, "hpa");
+      CommandLineBool(is4D, "is4D");
     ParseCommandLine(argc,argv);
     EndCommandLine(argv);
     AnnounceBanner();
@@ -135,16 +140,34 @@ int main(int argc, char** argv){
         _EXCEPTION1("Cannot find variable \"%s\"", varName.c_str());
       }
       std::cout<<"Read in data for variable "<<varName.c_str()<<std::endl;
-      int nDims = zvar->num_dims();
-      if (nDims != 3){
-        _EXCEPTIONT("Error: variable does not have correct number of dimensions (3).");
+      int pIndex = 10000000;
+      if (is4D){
+        NcDim * lev = readin.get_dim(levname.c_str());
+        int nLev = lev->size();
+        NcVar *levvar = readin.get_var(levname.c_str());
+        DataVector<double> pVec(nLev);
+        levvar->get(&(pVec[0]),nLev);
+
+        //Find the 500 mb level
+        double pval = 50000.0;
+        if (isHpa){
+          pval = 500.0;
+        }
+        for (int x=0; x<nLev; x++){
+          if (std::fabs(pVec[x]-pval)<0.0001){
+            pIndex = x;
+            break;
+          }
+        }
+        if (pIndex > 999999){
+          _EXCEPTIONT("Could not identify correct pressure level. Check file.");
+        }
       }
-/*      DataMatrix3D<double>ZData(nTime,nLat,nLon);
-      std::cout << "Initializing data matrix.";
-      zvar->set_cur(0,0,0);
-      zvar->get(&(ZData[0][0][0]),nTime,nLat,nLon);
-      std::cout << "...Read in data."<<std::endl;
-*/
+
+      int nDims = zvar->num_dims();
+      if (nDims > 3 && !is4D){
+        _EXCEPTIONT("Error: variable has more than 3 dimensions, must use --is4D.");
+      }
 
       //Create a DataMatrix to hold the timestep's data
       DataMatrix<double>ZData(nLat,nLon);
@@ -152,8 +175,6 @@ int main(int argc, char** argv){
      // std::string delim = ".";
       size_t pos,len;
       pos = InputFiles[x].find(insuff);
-   //   if (pos != std::string::npos) std::cout<<"found input suffix at "<<pos<<std::endl;
-     // pos = InputFiles[x].find(delim);
       len = InputFiles[x].length();
       //Create output file that corresponds to IPV data
       std::string strOutFile = InputFiles[x].replace(pos,len, outsuff.c_str());
@@ -232,8 +253,14 @@ int main(int argc, char** argv){
   //NEW VARIABLE: TM BLOCKING INDEX
 //    DataMatrix3D<double> outIndex(nTime,nLat,nLon);
     for (int t=0; t<nTime; t++){
-      zvar->set_cur(t,0,0);
-      zvar->get(&(ZData[0][0]),1,nLat,nLon);
+      if (is4D){
+        zvar->set_cur(t,pIndex,0,0);
+        zvar->get(&(ZData[0][0]),1,1,nLat,nLon);
+      }else{
+        zvar->set_cur(t,0,0);
+        zvar->get(&(ZData[0][0]),1,nLat,nLon);
+      }     
+
       for (int b=0; b<nLon; b++){
         //Calculate blocking index for NH
         for (int a=NHLatStart; a<=NHLatEnd; a++){
@@ -249,6 +276,12 @@ int main(int argc, char** argv){
           lat_S = latVec[i_S];
           z_S = ZData[i_S][b];
 
+          if (ZtoGH){
+            z_C /= 9.8;
+            z_N /= 9.8;
+            z_S /= 9.8;
+          }
+
           outIndex[a][b] = GHcheck(z_C,z_N,z_S,lat_C,lat_N,lat_S,"N");
         }
         for (int a=SHLatStart; a<=SHLatEnd; a++){
@@ -263,6 +296,12 @@ int main(int argc, char** argv){
           //lower values
           lat_S = latVec[i_S];
           z_S = ZData[i_S][b];
+
+          if (ZtoGH){
+            z_C /= 9.8;
+            z_N /= 9.8;
+            z_S /= 9.8;
+          }
 
           outIndex[a][b] = GHcheck(z_C,z_N,z_S,lat_C,lat_N,lat_S,"S");
         }
