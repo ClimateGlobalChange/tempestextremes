@@ -130,6 +130,16 @@ void PT_calc(
         NcVar *pLev, 
         DataMatrix3D<double> &PTMat
 );
+
+//Replaces a missing value with one interpolated in the longitudinal direction
+double replaceMissingFloat(int currA,
+                           int currB,
+                           int currP,
+                           double valThresh,
+                           DataMatrix3D<double> VarMat,
+                           int aLen,
+                           int bLen
+);
 		
 //Used in BlockingPV. Input lat, lon, and pressure variables
 //and returns the variables necessary to calculate PV (dlat,

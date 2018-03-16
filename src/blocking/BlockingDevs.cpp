@@ -358,8 +358,8 @@ int main(int argc, char **argv){
          varData, devOut, aDevOut, AvarData, inTime,avgTimeVals, inLat);
       }
       else if (GHCalc){
-        NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
-        NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
+        NcVar *devOut = outfile.add_var("DZ",ncDouble,tDimOut,latDimOut,lonDimOut);
+        NcVar *aDevOut = outfile.add_var("ADZ",ncDouble,tDimOut,latDimOut,lonDimOut);
 //        NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);
 //        NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
         calcDevs(false,ZGHval,fourDval,pIndex,nSteps, nOutTime, strTimeUnits, strCalendar,\

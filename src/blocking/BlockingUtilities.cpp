@@ -462,18 +462,66 @@ void PT_calc(
 
   pLev->set_cur((long) 0);
   pLev->get(&(pVec[0]), nPlev);
+  
 
+    int currA = 0;
+    int prevA = 0;
+    int nextA = 0;
+    int currB = 0;
+    int prevB = 0;
+    int nextB = 0;
+    double currT;
   //OUTPUT: PT
 //  DataMatrix4D<double> PTMat(nTime, nPlev, nLat, nLon);
     for (int p=0; p<nPlev; p++){
       pFrac = 100000.0/pVec[p];
       for (int a=0; a<nLat; a++){
         for (int b=0; b<nLon; b++){
-          PTMat[p][a][b] = TMat[p][a][b]*std::pow(pFrac, exp);
+          currT = TMat[p][a][b];
+          if (std::fabs(currT)>1000.0){
+            currT = replaceMissingFloat(a,b,p,1000.0,TMat,nLat,nLon);
+          }
+          PTMat[p][a][b] = currT*std::pow(pFrac, exp);
         }
       }
     }
-//  std::cout<<"Finished calculating PT."<<std::endl;
+}
+
+
+double replaceMissingFloat(int currA,
+                           int currB,
+                           int currP,
+                           double valThresh,
+                           DataMatrix3D<double> VarMat,
+                           int aLen,
+                           int bLen
+){
+  double currVal = VarMat[currP][currA][currB];
+  //Point left
+  int leftB = currB-1;
+  double leftVal = VarMat[currP][currA][leftB];
+  while (std::fabs(leftVal) > valThresh){
+    leftB-=1;
+    if (leftB < 1){
+      break;
+    }
+    leftVal = VarMat[currP][currA][leftB];
+  }
+  //Point right
+  int rightB = currB+1;
+  double rightVal = VarMat[currP][currA][rightB];
+  while (std::fabs(rightVal)>valThresh){
+    rightB+=1;
+    if (rightB > (bLen-1)){
+      break;
+    }
+    rightVal = VarMat[currP][currA][rightB];
+  }
+
+  //Interpolate!
+  double newCurrVal = ((double)(rightB-currB)/(double)(rightB-leftB))*leftVal + \
+     ((double)(currB-leftB)/(double)(rightB-leftB))*rightVal;
+  return(newCurrVal);
 }
 
 //Used in BlockingPV. Input lat, lon, and pressure variables
@@ -548,18 +596,53 @@ void rVort_calc(
 
 //OUTPUT: Partial derivatives
 //U WRT PHI
+  double U1,U2,U3,V1,V2,V3;
+
   DataMatrix3D<double> dUdphi(nPlev, nLat, nLon);
     for (int p=0; p<nPlev; p++){
       for (int b=0; b<nLon; b++){
-        dUdphi[p][0][b]=(-UMat[p][2][b]*cosphi[2]\
-          +4.0*UMat[p][1][b]*cosphi[1]\
-          -3.0*UMat[p][0][b]*cosphi[0])*invDphi;
-        dUdphi[p][nLat-1][b]=(3.0*UMat[p][nLat-1][b]*cosphi[nLat-1]\
-          -4.0*UMat[p][nLat-2][b]*cosphi[nLat-2]\
-          +UMat[p][nLat-3][b]*cosphi[nLat-3])*invDphi;
+        U1=UMat[p][2][b];
+        if (std::fabs(U1)>1000.0){
+          U1=replaceMissingFloat(2,b,p,1000.0,UMat,nLat,nLon);
+        }
+        U2=UMat[p][1][b];
+        if (std::fabs(U2)>1000.0){
+          U2=replaceMissingFloat(1,b,p,1000.0,UMat,nLat,nLon);
+        }
+        U3=UMat[p][0][b];
+        if (std::fabs(U3)>1000.0){
+          U3=replaceMissingFloat(0,b,p,1000.0,UMat,nLat,nLon);
+        }
+
+        dUdphi[p][0][b]=(-U1*cosphi[2]+4.0*U2*cosphi[1]\
+          -3.0*U3*cosphi[0])*invDphi;
+
+
+        U1=UMat[p][nLat-1][b];
+        if (std::fabs(U1)>1000.0){
+          U1=replaceMissingFloat((nLat-1),b,p,1000.0,UMat,nLat,nLon);
+        }
+        U2=UMat[p][nLat-2][b];
+        if (std::fabs(U2)>1000.0){
+          U2=replaceMissingFloat((nLat-2),b,p,1000.0,UMat,nLat,nLon);
+        }
+        U3=UMat[p][nLat-3][b];
+        if (std::fabs(U3)>1000.0){
+          U3=replaceMissingFloat((nLat-3),b,p,1000.0,UMat,nLat,nLon);
+        }
+        dUdphi[p][nLat-1][b]=(3.0*U1*cosphi[nLat-1]-4.0*U2*cosphi[nLat-2]\
+          +U3*cosphi[nLat-3])*invDphi;
         for (int a=1; a<(nLat-1); a++){
-          dUdphi[p][a][b]=(UMat[p][a+1][b]*cosphi[a+1]\
-           -UMat[p][a-1][b]*cosphi[a-1])*invDphi;
+          U1=UMat[p][a+1][b];
+          if (std::fabs(U1)>1000.0){
+            U1=replaceMissingFloat((a+1),b,p,1000.0,UMat,nLat,nLon);
+          }
+          U2=UMat[p][a-1][b];
+          if (std::fabs(U2)>1000.0){
+            U2=replaceMissingFloat((a-1),b,p,1000.0,UMat,nLat,nLon);
+          }
+          dUdphi[p][a][b]=(U1*cosphi[a+1]\
+           -U2*cosphi[a-1])*invDphi;
         }
       }
     }
@@ -568,10 +651,35 @@ void rVort_calc(
   DataMatrix3D<double> dVdl(nPlev, nLat, nLon);
     for (int p=0; p<nPlev; p++){
       for (int a=0; a<nLat; a++){
-        dVdl[p][a][0]=(VMat[p][a][1]-VMat[p][a][nLon-1])*invDlambda;
-        dVdl[p][a][nLon-1]=(VMat[p][a][0]-VMat[p][a][nLon-2])*invDlambda;
+        V1=VMat[p][a][1];
+        if (std::fabs(V1)>1000.0){
+          V1=replaceMissingFloat(a,1,p,1000.0,VMat,nLat,nLon);
+        }
+        V2=VMat[p][a][nLon-1];
+        if (std::fabs(V2)>1000.0){
+          V2=replaceMissingFloat(a,(nLon-1),p,1000.0,VMat,nLat,nLon);
+        }
+        dVdl[p][a][0]=(V2-V2)*invDlambda;
+        V1=VMat[p][a][0];
+        if (std::fabs(V1)>1000.0){
+          V1=replaceMissingFloat(a,0,p,1000.0,VMat,nLat,nLon);
+        }
+        V2=VMat[p][a][nLon-2];
+        if (std::fabs(V2)>1000.0){
+          V2=replaceMissingFloat(a,(nLon-2),p,1000.0,VMat,nLat,nLon);
+        }
+        dVdl[p][a][nLon-1]=(V1-V2)*invDlambda;
         for (int b=1; b<(nLon-1); b++){
-          dVdl[p][a][b]=(VMat[p][a][b+1]-VMat[p][a][b-1])*invDlambda;
+          V1=VMat[p][a][b+1];
+          if (std::fabs(V1)>1000.0){
+            V1=replaceMissingFloat(a,(b+1),p,1000.0,VMat,nLat,nLon);
+          }
+          V2=VMat[p][a][b-1];
+          if (std::fabs(V2)>1000.0){
+            V2=replaceMissingFloat(a,(b-1),p,1000.0,VMat,nLat,nLon);
+          }
+
+          dVdl[p][a][b]=(V1-V2)*invDlambda;
         }
       }
     }
@@ -718,7 +826,7 @@ void PV_calc(
   double invdlambda = 1.0/(2.0*dlambda);
   double radius = 6371000.0;
   double coef1,coef2,corvar;
-
+  double U1,U2,U3,V1,V2,V3;
 
   //Matrices for the partials
   //PT, U, V WRT P
@@ -731,21 +839,87 @@ void PV_calc(
 
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
+        U1=UMat[2][a][b];
+        if (std::fabs(U1)>1000.0){
+          U1 = replaceMissingFloat(a,b,2,1000.0,UMat,nLat,nLon);
+        }
+        U2=UMat[1][a][b];
+        if (std::fabs(U2)>1000.0){
+          U2 = replaceMissingFloat(a,b,1,1000.0,UMat,nLat,nLon);
+        }
+        U3=UMat[0][a][b];
+        if (std::fabs(U3)>1000.0){
+          U3 = replaceMissingFloat(a,b,0,1000.0,UMat,nLat,nLon);
+        }
+       
+        V1=VMat[2][a][b];
+        if (std::fabs(V1)>1000.0){
+          V1 = replaceMissingFloat(a,b,2,1000.0,VMat,nLat,nLon);
+        }
+        V2=VMat[1][a][b];
+        if (std::fabs(V2)>1000.0){
+          V2 = replaceMissingFloat(a,b,1,1000.0,VMat,nLat,nLon);
+        }
+        V3=VMat[0][a][b];
+        if (std::fabs(V3)>1000.0){
+          V3 = replaceMissingFloat(a,b,0,1000.0,VMat,nLat,nLon);
+        }
       //0 case
         dpt_dp[0][a][b] = (-PTMat[2][a][b]+4.0*PTMat[1][a][b]-3.0*PTMat[0][a][b])*invdp1;
-        du_dp[0][a][b] = (-UMat[2][a][b]+4.0*UMat[1][a][b]-3.0*UMat[0][a][b])*invdp1;
-        dv_dp[0][a][b] = (-VMat[2][a][b]+4.0*VMat[1][a][b]-3.0*VMat[0][a][b])*invdp1;           //end case
+        du_dp[0][a][b] = (-U1+4.0*U2-3.0*U3)*invdp1;
+        dv_dp[0][a][b] = (-V1+4.0*V2-3.0*V3)*invdp1;          
+      //end case
+        U1=UMat[nPlev-1][a][b];
+        if (std::fabs(U1)>1000.0){
+          U1 = replaceMissingFloat(a,b,(nPlev-1),1000.0,UMat,nLat,nLon);
+        }
+        U2=UMat[nPlev-2][a][b];
+        if (std::fabs(U2)>1000.0){
+          U2 = replaceMissingFloat(a,b,(nPlev-2),1000.0,UMat,nLat,nLon);
+        }
+        U3=UMat[nPlev-3][a][b];
+        if (std::fabs(U3)>1000.0){
+          U3 = replaceMissingFloat(a,b,(nPlev-3),1000.0,UMat,nLat,nLon);
+        }
+       
+        V1=VMat[nPlev-1][a][b];
+        if (std::fabs(V1)>1000.0){
+          V1 = replaceMissingFloat(a,b,(nPlev-1),1000.0,VMat,nLat,nLon);
+        }
+        V2=VMat[nPlev-2][a][b];
+        if (std::fabs(V2)>1000.0){
+          V2 = replaceMissingFloat(a,b,nPlev-2,1000.0,VMat,nLat,nLon);
+        }
+        V3=VMat[nPlev-3][a][b];
+        if (std::fabs(V3)>1000.0){
+          V3 = replaceMissingFloat(a,b,nPlev-3,1000.0,VMat,nLat,nLon);
+        }
         dpt_dp[nPlev-1][a][b] = (3.0*PTMat[nPlev-1][a][b]-4.0*PTMat[nPlev-2][a][b]\
           +PTMat[nPlev-3][a][b])*invdp2;
-        du_dp[nPlev-1][a][b] = (3.0*UMat[nPlev-1][a][b]-4.0*UMat[nPlev-2][a][b]\
-          +UMat[nPlev-3][a][b])*invdp2;
-        dv_dp[nPlev-1][a][b] = (3.0*VMat[nPlev-1][a][b]-4.0*VMat[nPlev-2][a][b]\
-          +VMat[nPlev-3][a][b])*invdp2;
+        du_dp[nPlev-1][a][b] = (3.0*U1-4.0*U2+U3)*invdp2;
+        dv_dp[nPlev-1][a][b] = (3.0*V2-4.0*V2+V3)*invdp2;
         for (int p=1; p<(nPlev-1); p++){
+          U1=UMat[p+1][a][b];
+          if (std::fabs(U1)>1000.0){
+            U1 = replaceMissingFloat(a,b,(p+1),1000.0,UMat,nLat,nLon);
+          }
+          U2=UMat[p-1][a][b];
+          if (std::fabs(U2)>1000.0){
+            U2 = replaceMissingFloat(a,b,(p-1),1000.0,UMat,nLat,nLon);
+          }
+       
+          V1=VMat[p+1][a][b];
+          if (std::fabs(V1)>1000.0){
+            V1 = replaceMissingFloat(a,b,(p-1),1000.0,VMat,nLat,nLon);
+          }
+          V2=VMat[p-1][a][b];
+          if (std::fabs(V2)>1000.0){
+            V2 = replaceMissingFloat(a,b,(p-1),1000.0,VMat,nLat,nLon);
+          }
           invdp = 1.0/(2.0*std::fabs(pVec[p+1]-pVec[p]));
           dpt_dp[p][a][b] = (PTMat[p+1][a][b]-PTMat[p-1][a][b])*invdp;
-          du_dp[p][a][b] = (UMat[p+1][a][b]-UMat[p-1][a][b])*invdp;
-          dv_dp[p][a][b] = (VMat[p+1][a][b]-VMat[p-1][a][b])*invdp;
+          du_dp[p][a][b] = (U1-U2)*invdp;
+          dv_dp[p][a][b] = (V1-V2)*invdp;
         }
       }
     }
@@ -777,7 +951,6 @@ void PV_calc(
         }
       }
     }
-
   coef2 = 1.0/radius;
   //PV Calculation!
     for (int p=0; p<nPlev; p++){
@@ -788,10 +961,12 @@ void PV_calc(
           PVMat[p][a][b] = 9.80616*(coef1*dv_dp[p][a][b]*dpt_dl[p][a][b]\
            -coef2*du_dp[p][a][b]*dpt_dphi[p][a][b]\
            -(corvar+RVMat[p][a][b])*dpt_dp[p][a][b]);
+           if (std::fabs(PVMat[p][a][b])>10){
+             std::cout<<"Questionable value at p="<<p<<", a="<<a<<", b="<<b<<std::endl;
+           }
         }
       }
     }
-
 } 
 
 void IPV_calc(
