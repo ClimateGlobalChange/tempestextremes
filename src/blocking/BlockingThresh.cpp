@@ -172,6 +172,11 @@ int main(int argc, char ** argv){
               currDev = inputData[a][b]-avgValue;
               storeMat[dayIndex][a][b]+= (currDev*currDev);
               countsMat[dayIndex][a][b]+= 1.;
+           /*   if (a==70 && b==300){
+              std::cout<<"DEBUG: t is "<<t<<" and dayIndex is "<<dayIndex<<", avg value is "\
+                <<avgValue<<", dev is "<<currDev<<", just added "<<currDev*currDev<<\
+                ", countsMat is now "<<countsMat[dayIndex][a][b]<<std::endl;
+              }*/
             }
           }
         }
@@ -185,6 +190,9 @@ int main(int argc, char ** argv){
       for (int a=0;a<latLen;a++){
         for (int b=0;b<lonLen;b++){
           storeMat[d][a][b]=(1.5*std::sqrt(storeMat[d][a][b]/countsMat[d][a][b]));
+        /*  if (a==70 && b==300){
+          std::cout<<"DEBUG: for d="<<d<<", storeMat is "<<storeMat[d][a][b]<<std::endl;
+          }*/
 	}
       }
     }
@@ -235,7 +243,7 @@ int main(int argc, char ** argv){
         for (int b=0; b<lonLen; b++){
           zonalDaily[b] = storeMat[d][a][b];
         }
-        FC = DFT(zonalDaily,1);
+        FC = DFT(zonalDaily,2);
         zonalOut = IDFT(FC);
         for (int b=0; b<lonLen; b++){
           zonalMat[d][a][b] = zonalOut[b];
@@ -281,9 +289,9 @@ int main(int argc, char ** argv){
           a1 = a-eqIndex;
           SH[a1] = zonalMat[d][a][b];
         }
-        FCNH = DFT(NH,1);
+        FCNH = DFT(NH,2);
         NHout = IDFT(FCNH);
-        FCSH = DFT(SH,1);
+        FCSH = DFT(SH,2);
         SHout = IDFT(FCSH);
         for (int a=0; a<eqIndex; a++){
           zmMat[d][a][b] = NHout[a];
@@ -316,7 +324,7 @@ int main(int argc, char ** argv){
         for (int d=0; d<dLen; d++){
           inputDaily[d] = zmMat[d][a][b];
         }
-        FourierCoefs = DFT(inputDaily,4);
+        FourierCoefs = DFT(inputDaily,8);
         outputDaily = IDFT(FourierCoefs);
         for (int d=0; d<dLen; d++){
           outputMat[d][a][b] = outputDaily[d];
