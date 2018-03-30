@@ -35,6 +35,7 @@ int main(int argc, char ** argv){
   NcError error(NcError::silent_nonfatal);
   try{
     std::string outFile,fileList,avgName,avgFile,varName,tname,latname,lonname;
+    int nWavesLat,nWavesLon,nWavesTime;
     BeginCommandLine()
       CommandLineString(outFile,"outfile","");
       CommandLineString(fileList,"inlist","");
@@ -44,6 +45,9 @@ int main(int argc, char ** argv){
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
+      CommandLineInt(nWavesLat,"nLat",4);
+      CommandLineInt(nWavesLon,"nLon",8);
+      CommandLineInt(nWavesTime,"nTime",12);
       ParseCommandLine(argc,argv);
     EndCommandLine(argv)
     AnnounceBanner();
@@ -243,7 +247,7 @@ int main(int argc, char ** argv){
         for (int b=0; b<lonLen; b++){
           zonalDaily[b] = storeMat[d][a][b];
         }
-        FC = DFT(zonalDaily,2);
+        FC = DFT(zonalDaily,nWavesLon);
         zonalOut = IDFT(FC);
         for (int b=0; b<lonLen; b++){
           zonalMat[d][a][b] = zonalOut[b];
@@ -289,9 +293,9 @@ int main(int argc, char ** argv){
           a1 = a-eqIndex;
           SH[a1] = zonalMat[d][a][b];
         }
-        FCNH = DFT(NH,2);
+        FCNH = DFT(NH,nWavesLat);
         NHout = IDFT(FCNH);
-        FCSH = DFT(SH,2);
+        FCSH = DFT(SH,nWavesLat);
         SHout = IDFT(FCSH);
         for (int a=0; a<eqIndex; a++){
           zmMat[d][a][b] = NHout[a];
@@ -324,7 +328,7 @@ int main(int argc, char ** argv){
         for (int d=0; d<dLen; d++){
           inputDaily[d] = zmMat[d][a][b];
         }
-        FourierCoefs = DFT(inputDaily,8);
+        FourierCoefs = DFT(inputDaily,nWavesTime);
         outputDaily = IDFT(FourierCoefs);
         for (int d=0; d<dLen; d++){
           outputMat[d][a][b] = outputDaily[d];
