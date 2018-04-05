@@ -1051,14 +1051,12 @@ void calcDevs( bool isPV,
               std::string strCalendar,
               NcVar *inIPV,
               NcVar *outDev,
-              NcVar *outADev,
               NcVar *avgIPV,
               NcVar *inTime,
               NcVar *avgTime,
               NcVar *lat){
 
   int nTime,nLat,nLon,avgDay;
-
   double pi = std::atan(1.)*4.;
 
   nTime = inIPV->get_dim(0)->size();
@@ -1141,43 +1139,11 @@ void calcDevs( bool isPV,
     }    
   }
 
- // std::cout<<"About to implement smoothing."<<std::endl;
-  double div = (double) 2*nSteps;
-  double invDiv = 1.0/div;
-
-  DataMatrix<double> aDevMat(nLat,nLon);
-  //implement 2-day smoothing
-  for (int t=0; t<2*nSteps; t++){
-    outDev->set_cur(t,0,0);
-    outDev->get(&(devMat[0][0]),1,nLat,nLon);
-    outADev->set_cur(t,0,0);
-    outADev->put(&(devMat[0][0]),1,nLat,nLon);
-  }
- 
-  for (int t=2*nSteps; t<nOutTime; t++){  
-    for (int a=0; a<nLat; a++){
-      for (int b=0; b<nLon; b++){
-        aDevMat[a][b] = 0.0;
-      }
-    }
-    for (int n=0; n<2*nSteps; n++){
-      outDev->set_cur(t-n,0,0);
-      outDev->get(&(devMat[0][0]),1,nLat,nLon);
-      for (int a=0; a<nLat; a++){
-        for (int b=0; b<nLon; b++){
-          aDevMat[a][b]+=devMat[a][b]*invDiv;
-        }
-      }
-    }
-    outADev->set_cur(t,0,0);
-    outADev->put(&(aDevMat[0][0]),1,nLat,nLon);
-  }
-
- // std::cout<<"Finished smoothing."<<std::endl;
-
 
   std::cout<<"Wrote devs to file."<<std::endl;
 }
+
+
 void calcNormalizedDevs(bool isPV,
                        NcVar * inDev,
                        NcVar * outPosIntDev,

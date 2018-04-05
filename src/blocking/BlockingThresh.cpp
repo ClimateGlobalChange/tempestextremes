@@ -45,9 +45,9 @@ int main(int argc, char ** argv){
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
-      CommandLineInt(nWavesLat,"nLat",4);
-      CommandLineInt(nWavesLon,"nLon",8);
-      CommandLineInt(nWavesTime,"nTime",12);
+      CommandLineInt(nWavesLat,"nLat",2);
+      CommandLineInt(nWavesLon,"nLon",2);
+      CommandLineInt(nWavesTime,"nTime",8);
       ParseCommandLine(argc,argv);
     EndCommandLine(argv)
     AnnounceBanner();

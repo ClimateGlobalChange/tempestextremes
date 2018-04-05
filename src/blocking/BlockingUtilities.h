@@ -254,7 +254,7 @@ void IPV_calc(
 //daily average and outputs 3 variables: instantaneous 
 //anomalies, anomalies with 2-day smoothing, and a normalized
 //anomaly (all values below threshold or wrong sign set to 0)
-void calcDevs(bool isPV,
+/*void calcDevs(bool isPV,
               std::string ZtoGH,
               std::string is4D,
               int pIndex,
@@ -269,7 +269,32 @@ void calcDevs(bool isPV,
               NcVar *inTime,
               NcVar *avgTime,
               NcVar *lat);
+*/
 
+void calcDevs(bool isPV,
+              std::string ZtoGH,
+              std::string is4D,
+              int pIndex,
+              int nSteps,
+              int nOutTime,
+              std::string strTimeUnits,
+              std::string strCalendar,
+              NcVar *inIPV,
+              NcVar *outDev,
+              NcVar *avgIPV,
+              NcVar *inTime,
+              NcVar *avgTime,
+              NcVar *lat);
+							
+/*void calcSmoothedDevs( NcVar *outADev,
+											int nTime,
+											int nLat,
+											int nLon,
+											int nSteps,
+						          int & currMatIndex,
+						          int & currTindex,
+						          DataMatrix3D<double> &twoDayMat);
+*/
 void calcNormalizedDevs(bool isPV,
                        NcVar * inDev,
                        NcVar * outPosIntDev,
