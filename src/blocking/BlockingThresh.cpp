@@ -12,7 +12,7 @@ for the corresponding day in the year. The threshold is
 defined as 1.5 times the standard deviation of Z500 values.
 
 It takes an input list of instantaneous deviation  values, as well
-as the averaged file, and calculates the standard deviation 
+as the average of the deviations file, and calculates the standard deviation 
 of the instantaneous deviation values.
 */
 #include "netcdfcpp.h"
@@ -39,9 +39,9 @@ int main(int argc, char ** argv){
     BeginCommandLine()
       CommandLineString(outFile,"outfile","");
       CommandLineString(fileList,"inlist","");
-      CommandLineString(avgFile,"avgfile","");
-      CommandLineString(avgName,"avgname","");
-      CommandLineString(varName,"varname","");
+      CommandLineString(avgFile,"davgfile","");
+      CommandLineString(avgName,"davgname","");
+      CommandLineString(varName,"dvarname","");
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");

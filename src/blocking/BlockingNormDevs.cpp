@@ -56,7 +56,7 @@ int main(int argc, char **argv){
       CommandLineString(threshName,"thresh","");
       CommandLineString(threshVarName,"threshname","");
       CommandLineBool(PVCalc,"pv");
-      CommandLineBool(GHCalc,"gh");
+      CommandLineBool(GHCalc,"z500");
       CommandLineBool(const_thresh,"const");
       CommandLineDouble(anomVal,"threshold",0.);
       CommandLineString(tname,"tname","time");
@@ -264,7 +264,7 @@ int main(int argc, char **argv){
       else if (GHCalc){
 //        NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
 //        NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
-        NcVar *devIntOut = outfile.add_var("INT_ADGH",ncInt,tDimOut,latDimOut,lonDimOut);
+        NcVar *devIntOut = outfile.add_var("INT_ADZ",ncInt,tDimOut,latDimOut,lonDimOut);
 //        NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
 //        calcDevs(leap,false, startIndex, varData, devOut,aDevOut,AvarData,inTime,\
           avgTimeVals,inLat,tVarOut);
