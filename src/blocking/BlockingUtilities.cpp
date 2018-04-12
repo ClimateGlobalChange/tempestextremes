@@ -659,7 +659,7 @@ void rVort_calc(
         if (std::fabs(V2)>1000.0){
           V2=replaceMissingFloat(a,(nLon-1),p,1000.0,VMat,nLat,nLon);
         }
-        dVdl[p][a][0]=(V2-V2)*invDlambda;
+        dVdl[p][a][0]=(V1-V2)*invDlambda;
         V1=VMat[p][a][0];
         if (std::fabs(V1)>1000.0){
           V1=replaceMissingFloat(a,0,p,1000.0,VMat,nLat,nLon);
@@ -828,14 +828,15 @@ void PV_calc(
   double coef1,coef2,corvar;
   double U1,U2,U3,V1,V2,V3;
 
+
   //Matrices for the partials
   //PT, U, V WRT P
   DataMatrix3D<double> dpt_dp(nPlev, nLat, nLon);
   DataMatrix3D<double> du_dp(nPlev, nLat, nLon);
   DataMatrix3D<double> dv_dp(nPlev, nLat, nLon);
 
-  invdp1 = 1.0/(2.0*std::fabs(pVec[1]-pVec[0]));
-  invdp2 = 1.0/(2.0*std::fabs(pVec[nPlev-1]-pVec[nPlev-2]));
+  invdp1 = 1.0/(2.0*(pVec[1]-pVec[0]));
+  invdp2 = 1.0/(2.0*(pVec[nPlev-1]-pVec[nPlev-2]));
 
     for (int a=0; a<nLat; a++){
       for (int b=0; b<nLon; b++){
@@ -916,7 +917,7 @@ void PV_calc(
           if (std::fabs(V2)>1000.0){
             V2 = replaceMissingFloat(a,b,(p-1),1000.0,VMat,nLat,nLon);
           }
-          invdp = 1.0/(2.0*std::fabs(pVec[p+1]-pVec[p]));
+          invdp = 1.0/(2.0*(pVec[p+1]-pVec[p]));
           dpt_dp[p][a][b] = (PTMat[p+1][a][b]-PTMat[p-1][a][b])*invdp;
           du_dp[p][a][b] = (U1-U2)*invdp;
           dv_dp[p][a][b] = (V1-V2)*invdp;
