@@ -4,7 +4,7 @@
 # Distributed under the Boost Software License, Version 1.0. (See accompanying 
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-BUILD_TARGETS= src/base src/blobs src/blocking src/nodes src/atmrivers
+BUILD_TARGETS= src/netcdf-cxx-4.2 src/base src/blobs src/blocking src/nodes src/atmrivers
 CLEAN_TARGETS= $(addsuffix .clean,$(BUILD_TARGETS))
 
 .PHONY: all clean $(BUILD_TARGETS) $(CLEAN_TARGETS)

@@ -18,6 +18,11 @@ endif
 # Add the source directories to the include path
 CXXFLAGS+= -I$(TEMPESTEXTREMESDIR)/src/base
 
+ifeq ($(NETCDF),TRUE)
+  CXXFLAGS+= -I$(TEMPESTEXTREMESDIR)/src/netcdf-cxx-4.2
+  LDFLAGS+= -L$(TEMPESTEXTREMESDIR)/src/netcdf-cxx-4.2
+endif
+
 ###############################################################################
 # Configuration-dependent configuration.
 
