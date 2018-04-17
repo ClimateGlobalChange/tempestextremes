@@ -47,16 +47,24 @@ int main(int argc, char** argv) {
   }
 
   std::vector<std::string> inFileNames;
-  {
+  GetInputFileList(inListFileName,inFileNames);
+/*  {
     std::ifstream inListFile{inListFileName};
     std::string fileNameBuf;
     while (std::getline(inListFile, fileNameBuf)) {
       inFileNames.push_back(fileNameBuf);
     }
   }
+*/
 
+  int nFiles = inFileNames.size();
+
+/*
   std::vector<std::unique_ptr<NcFile>> inFiles;
-  for (auto& fileName : inFileNames) {
+  std::string fileName;
+//  for (auto& fileName : inFileNames) {
+  for (int x=0; x<nFiles; x++){
+    fileName = inFileNames[x];
     try {
       inFiles.emplace_back(new NcFile(fileName.c_str()));
     } catch (...) {
@@ -68,10 +76,12 @@ int main(int argc, char** argv) {
     std::cerr << "Error: no output filename provided!" << std::endl;
     std::exit(-1);
   }
+*/
 
-  size_t timeDimSize = inFiles[0]->get_dim(timeDimName.c_str())->size();
-  size_t latDimSize = inFiles[0]->get_dim(latDimName.c_str())->size();
-  size_t lonDimSize = inFiles[0]->get_dim(lonDimName.c_str())->size();
+  NcFile refFile(inFileNames[0].c_str());
+  size_t timeDimSize = refFile.get_dim(timeDimName.c_str())->size();
+  size_t latDimSize = refFile.get_dim(latDimName.c_str())->size();
+  size_t lonDimSize = refFile.get_dim(lonDimName.c_str())->size();
 
   NcFile outFile{outFileName.c_str(), NcFile::Replace};
   NcDim* outTimeDim = outFile.add_dim(timeDimName.c_str(), timeDimSize);
@@ -84,32 +94,35 @@ int main(int argc, char** argv) {
     NcVar* outLatVar = outFile.add_var(latDimName.c_str(), ncDouble, outLatDim);
     NcVar* outLonVar = outFile.add_var(lonDimName.c_str(), ncDouble, outLonDim);
 
-    NcVar* inTimeVar = inFiles[0]->get_var(timeDimName.c_str());
-    NcVar* inLatVar = inFiles[0]->get_var(latDimName.c_str());
-    NcVar* inLonVar = inFiles[0]->get_var(lonDimName.c_str());
+    NcVar* inTimeVar = refFile.get_var(timeDimName.c_str());
+    NcVar* inLatVar = refFile.get_var(latDimName.c_str());
+    NcVar* inLonVar = refFile.get_var(lonDimName.c_str());
 
     copy_dim_var(inTimeVar, outTimeVar);
     copy_dim_var(inLatVar, outLatVar);
     copy_dim_var(inLonVar, outLonVar);
   }
 
+  refFile.close();
   NcVar* outBlobVar = outFile.add_var(blobVarName.c_str(), ncInt, outTimeDim,
                                       outLatDim, outLonDim);
 
   DataMatrix3D<int> outData(timeDimSize, latDimSize, lonDimSize);
   DataMatrix3D<int> inData(timeDimSize, latDimSize, lonDimSize);
 
-  for (auto& inFile : inFiles) {
-    NcDim* timeDim = inFile->get_dim(timeDimName.c_str());
+//  for (auto& inFile : inFiles) {
+  for (int x=0; x<nFiles; x++){
+    NcFile inFile(inFileNames[x].c_str());
+    NcDim* timeDim = inFile.get_dim(timeDimName.c_str());
     assert(timeDimSize == timeDim->size());
 
-    NcDim* latDim = inFile->get_dim(latDimName.c_str());
+    NcDim* latDim = inFile.get_dim(latDimName.c_str());
     assert(latDimSize == latDim->size());
 
-    NcDim* lonDim = inFile->get_dim(lonDimName.c_str());
+    NcDim* lonDim = inFile.get_dim(lonDimName.c_str());
     assert(lonDimSize == lonDim->size());
 
-    NcVar* blobVar = inFile->get_var(blobVarName.c_str());
+    NcVar* blobVar = inFile.get_var(blobVarName.c_str());
     blobVar->set_cur(0, 0, 0);
     blobVar->get(&(inData[0][0][0]), timeDimSize, latDimSize, lonDimSize);
 
@@ -120,7 +133,7 @@ int main(int argc, char** argv) {
         }
       }
     }
-    inFile->close();
+    inFile.close();
   }
 
   outBlobVar->put(&(outData[0][0][0]), timeDimSize, latDimSize, lonDimSize);
