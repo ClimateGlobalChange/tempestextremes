@@ -665,6 +665,12 @@ void ParseTimeDouble(
 	) {
 		cal = Time::CalendarStandard;
 
+	} else if (
+		(strTimeCalendar.length() >= 7) &&
+		(strncmp(strTimeCalendar.c_str(), "360_day", 8) == 0)
+	) {
+		cal = Time::Calendar360Day;
+
 	} else {
 		_EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
 	}

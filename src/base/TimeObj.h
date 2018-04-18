@@ -2,10 +2,10 @@
 ///
 ///	\file    TimeObj.h
 ///	\author  Paul Ullrich
-///	\version October 31, 2013
+///	\version April 18, 2018
 ///
 ///	<remarks>
-///		Copyright 2000-2010 Paul Ullrich
+///		Copyright 2000- Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -35,9 +35,12 @@ public:
 	///		Type of calendar.
 	///	</summary>
 	enum CalendarType {
+		CalendarUnknown,
 		CalendarNone,
 		CalendarNoLeap,
-		CalendarStandard
+		CalendarStandard,
+		CalendarGregorian,
+		Calendar360Day,
 	};
 
 	///	<summary>
@@ -63,7 +66,11 @@ public:
 		m_iMicroSecond(0),
 		m_eCalendarType(eCalendarType),
 		m_eTimeType(eTimeType)
-	{ }
+	{
+		if (m_eCalendarType == CalendarUnknown) {
+			_EXCEPTIONT("Invalid CalendarType");
+		}
+	}
 
 	///	<summary>
 	///		Constructor.
@@ -85,6 +92,9 @@ public:
 		m_eCalendarType(eCalendarType),
 		m_eTimeType(eTimeType)
 	{
+		if (m_eCalendarType == CalendarUnknown) {
+			_EXCEPTIONT("Invalid CalendarType");
+		}
 		NormalizeTime();
 	}
 
@@ -104,7 +114,34 @@ public:
 		m_eCalendarType(eCalendarType),
 		m_eTimeType(eTimeType)
 	{
+		if (m_eCalendarType == CalendarUnknown) {
+			_EXCEPTIONT("Invalid CalendarType");
+		}
 		FromLongString(strTime);
+	}
+
+public:
+	///	<summary>
+	///		Returns the CalendarType associated with the given string.
+	///	</summary>
+	static CalendarType CalendarTypeFromString(
+		const std::string & strCalendar
+	) {
+		if (strCalendar == "none") {
+			return CalendarNone;
+		} else if (strCalendar == "noleap") {
+			return CalendarNoLeap;
+		} else if (strCalendar == "standard") {
+			return CalendarStandard;
+		} else if (strCalendar == "gregorian") {
+			return CalendarGregorian;
+		} else if (strCalendar == "proleptic_gregorian") {
+			return CalendarGregorian;
+		} else if (strCalendar == "360_day") {
+			return Calendar360Day;
+		} else {
+			return CalendarUnknown;
+		}
 	}
 
 public:
@@ -132,6 +169,13 @@ public:
 	///		Equality between Times.
 	///	</summary>
 	bool operator==(const Time & time) const;
+
+	///	<summary>
+	///		Inequality between Times.
+	///	</summary>
+	bool operator!=(const Time & time) const {
+		return !((*this) == time);
+	}
 
 	///	<summary>
 	///		Less-than between Times.
@@ -250,14 +294,34 @@ public:
 	Time operator+(double dSeconds) const;
 */
 	///	<summary>
+	///		Calculate the day number for this Time.
+	///	</summary>
+	int DayNumber() const;
+
+	///	<summary>
 	///		Determine the number of seconds between two Times.
 	///	</summary>
 	double operator-(const Time & time) const;
 
 	///	<summary>
-	///		Determine the number of seconds between this time and 0.
+	///		Determine the number of seconds from this time to the given Time.
 	///	</summary>
-	double GetSeconds() const;
+	double DeltaSeconds(const Time & time) const;
+
+	///	<summary>
+	///		Determine the number of minutes from this time to the given Time.
+	///	</summary>
+	double DeltaMinutes(const Time & time) const;
+
+	///	<summary>
+	///		Determine the number of hours from this time to the given Time.
+	///	</summary>
+	double DeltaHours(const Time & time) const;
+
+	///	<summary>
+	///		Determine the number of days from this time to the given Time.
+	///	</summary>
+	double DeltaDays(const Time & time) const;
 
 public:
 	///	<summary>
@@ -422,6 +486,35 @@ public:
 	///		- HH:MM:SS.UUUU
 	///	</summary>
 	void FromFormattedString(const std::string & strFormattedTime);
+
+	///	<summary>
+	///		Set the Time using a CF-compliant time unit string.
+	///		- "hours since ..."
+	///		- "seconds since ..."
+	///	</summary>
+	void FromCFCompliantUnitsOffsetInt(
+		const std::string & strFormattedTime,
+		int nOffset
+	);
+
+	///	<summary>
+	///		Set the Time using a CF-compliant time unit string.
+	///		- "hours since ..."
+	///		- "seconds since ..."
+	///	</summary>
+	void FromCFCompliantUnitsOffsetDouble(
+		const std::string & strFormattedTime,
+		double dOffset
+	);
+
+	///	<summary>
+	///		Get the Time using a CF-compliant time unit string.
+	///		- "hours since ..."
+	///		- "seconds since ..."
+	///	</summary>
+	double GetCFCompliantUnitsOffsetDouble(
+		const std::string & strFormattedTime
+	);
 
 	///	<summary>
 	///		Get the name of the calendar.
