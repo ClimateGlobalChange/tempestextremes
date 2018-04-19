@@ -2,10 +2,10 @@
 ///
 ///	\file    TimeObj.cpp
 ///	\author  Paul Ullrich
-///	\version October 31, 2013
+///	\version April 18, 2018
 ///
 ///	<remarks>
-///		Copyright 2000-2010 Paul Ullrich
+///		Copyright 2000- Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -18,6 +18,7 @@
 #include "Exception.h"
 
 #include <iostream>
+#include <cstring>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -129,17 +130,26 @@ void Time::VerifyTime() {
 
 	// Calendar with no leap years
 	if ((m_eCalendarType == CalendarNoLeap) || 
-		(m_eCalendarType == CalendarStandard)
+		(m_eCalendarType == CalendarStandard) ||
+		(m_eCalendarType == CalendarGregorian) ||
+		(m_eCalendarType == Calendar360Day)
 	) {
 		int nDaysPerMonth[]
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-		if (m_eCalendarType == CalendarStandard) {
+		if ((m_eCalendarType == CalendarStandard) ||
+			(m_eCalendarType == CalendarGregorian)
+		) {
 			if ((m_iYear % 4) == 0) {
 				nDaysPerMonth[1] = 29;
 				if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
 					nDaysPerMonth[1] = 28;
 				}
+			}
+		}
+		if (m_eCalendarType == Calendar360Day) {
+			for (int i = 0; i < 12; i++) {
+				nDaysPerMonth[i] = 30;
 			}
 		}
 
@@ -171,17 +181,26 @@ void Time::NormalizeTime() {
 
 	// Calendar with no leap years
 	if ((m_eCalendarType == CalendarNoLeap) || 
-		(m_eCalendarType == CalendarStandard)
+		(m_eCalendarType == CalendarStandard) ||
+		(m_eCalendarType == CalendarGregorian) ||
+		(m_eCalendarType == Calendar360Day)
 	) {
 		int nDaysPerMonth[]
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-		if (m_eCalendarType == CalendarStandard) {
+		if ((m_eCalendarType == CalendarStandard) ||
+			(m_eCalendarType == CalendarGregorian)
+		) {
 			if ((m_iYear % 4) == 0) {
 				nDaysPerMonth[1] = 29;
 				if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
 					nDaysPerMonth[1] = 28;
 				}
+			}
+		}
+		if (m_eCalendarType == Calendar360Day) {
+			for (int i = 0; i < 12; i++) {
+				nDaysPerMonth[i] = 30;
 			}
 		}
 
@@ -230,7 +249,9 @@ void Time::NormalizeTime() {
 				m_iYear--;
 
 				// Adjust number of days per month
-				if (m_eCalendarType == CalendarStandard) {
+				if ((m_eCalendarType == CalendarStandard) ||
+					(m_eCalendarType == CalendarGregorian)
+				) {
 					nDaysPerMonth[1] = 28;
 					if ((m_iYear % 4) == 0) {
 						nDaysPerMonth[1] = 29;
@@ -252,7 +273,9 @@ void Time::NormalizeTime() {
 				m_iYear++;
 
 				// Adjust number of days per month
-				if (m_eCalendarType == CalendarStandard) {
+				if ((m_eCalendarType == CalendarStandard) ||
+					(m_eCalendarType == CalendarGregorian)
+				) {
 					nDaysPerMonth[1] = 28;
 					if ((m_iYear % 4) == 0) {
 						nDaysPerMonth[1] = 29;
@@ -298,100 +321,89 @@ void Time::AddTime(const Time & timeDelta) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/*
-Time Time::operator+(double dSeconds) const {
-	Time timeNew = (*this);
-	timeNew += dSeconds;
-	return timeNew;
+
+int Time::DayNumber() const {
+
+	// Based on https://alcor.concordia.ca/~gpkatch/gdate-algorithm.html
+	// but modified since m_iMonth and m_iDay are zero-indexed
+	if (m_eCalendarType == CalendarNoLeap) {
+		int nM = (m_iMonth + 10) % 12;
+		int nY = m_iYear - nM/10;
+		int nDay = 365 * nY + (nM * 306 + 5) / 10 + m_iDay;
+
+		return nDay;
+
+	} else if (
+		(m_eCalendarType == CalendarStandard) ||
+		(m_eCalendarType == CalendarGregorian)
+	) {
+		int nM = (m_iMonth + 10) % 12;
+		int nY = m_iYear - nM/10;
+		int nDay = 365 * nY + nY / 4 - nY / 100 + nY / 400
+			+ (nM * 306 + 5) / 10 + m_iDay;
+
+		return nDay;
+
+	} else if (m_eCalendarType == Calendar360Day) {
+		return (360 * m_iYear + 30 * m_iMonth + m_iDay);
+
+	} else {
+		_EXCEPTIONT("Not implemented");
+	}
 }
-*/
+
 ///////////////////////////////////////////////////////////////////////////////
 
 double Time::operator-(const Time & time) const {
-
-	double dDeltaSeconds = 0;
-
-	// Calendar with no leap years
-	if (m_eCalendarType == CalendarNoLeap) {
-
-		const int nDaysPerMonth[]
-			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
-		dDeltaSeconds =
-			+ static_cast<double>(m_iYear - time.m_iYear) * 31536000.0
-			+ static_cast<double>(m_iSecond - time.m_iSecond)
-			+ static_cast<double>(m_iMicroSecond - time.m_iMicroSecond)
-				* 1.0e-6;
-
-		// Remove intervening months
-		if (m_iMonth > time.m_iMonth) {
-			dDeltaSeconds +=
-				+ 86400.0 * static_cast<double>(
-					nDaysPerMonth[time.m_iMonth] - time.m_iDay)
-				+ 86400.0 * static_cast<double>(m_iDay);
-
-			for (int i = time.m_iMonth+1; i < m_iMonth; i++) {
-				dDeltaSeconds +=
-					static_cast<double>(nDaysPerMonth[i]) * 86400.0;
-			}
-
-		// Remove intervening months
-		} else if (m_iMonth < time.m_iMonth) {
-			dDeltaSeconds -=
-				+ 86400.0 * static_cast<double>(
-					nDaysPerMonth[m_iMonth] - m_iDay)
-				+ 86400.0 * static_cast<double>(time.m_iDay);
-
-			for (int i = m_iMonth+1; i < time.m_iMonth; i++) {
-				dDeltaSeconds -=
-					86400.0 * static_cast<double>(nDaysPerMonth[i]);
-			}
-
-		// Same month, just take the difference in days
-		} else {
-			dDeltaSeconds +=
-				86400.0 * static_cast<double>(m_iDay - time.m_iDay);
-		}
-
-	// Operation not permitted on this CalendarType
-	} else {
-		_EXCEPTIONT("Invalid CalendarType");
-	}
-	
-	return dDeltaSeconds;
+	return -DeltaSeconds(time);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-double Time::GetSeconds() const {
+double Time::DeltaSeconds(const Time & time) const {
 
-	double dDeltaSeconds = 0;
+	int nDayNumber1 = DayNumber();
+	int nDayNumber2 = time.DayNumber();
 
-	// Calendar with no leap years
-	if (m_eCalendarType == CalendarNoLeap) {
+	return static_cast<double>(nDayNumber2 - nDayNumber1) * 86400.0
+		+ static_cast<double>(time.m_iSecond - m_iSecond)
+		+ static_cast<double>(time.m_iMicroSecond - m_iMicroSecond) / 1.0e6;
+}
 
-		const int nDaysPerMonth[]
-			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+///////////////////////////////////////////////////////////////////////////////
 
-		// Basic number of seconds
-		dDeltaSeconds =
-			+ static_cast<double>(m_iYear) * 31536000.0
-			+ static_cast<double>(m_iDay) * 86400.0
-			+ static_cast<double>(m_iSecond)
-			+ static_cast<double>(m_iMicroSecond) * 1.0e-6;
+double Time::DeltaMinutes(const Time & time) const {
 
-		// Number of seconds from month
-		for (int i = 0; i < m_iMonth; i++) {
-			dDeltaSeconds +=
-				static_cast<double>(nDaysPerMonth[i]) * 86400.0;
-		}
+	int nDayNumber1 = DayNumber();
+	int nDayNumber2 = time.DayNumber();
 
-	// Operation not permitted on this CalendarType
-	} else {
-		_EXCEPTIONT("Invalid CalendarType");
-	}
-	
-	return dDeltaSeconds;
+	return static_cast<double>(nDayNumber2 - nDayNumber1) * 1440.0
+		+ static_cast<double>(time.m_iSecond - m_iSecond) / 60.0
+		+ static_cast<double>(time.m_iMicroSecond - m_iMicroSecond) / 6.0e7;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+double Time::DeltaHours(const Time & time) const {
+
+	int nDayNumber1 = DayNumber();
+	int nDayNumber2 = time.DayNumber();
+
+	return static_cast<double>(nDayNumber2 - nDayNumber1) * 24.0
+		+ static_cast<double>(time.m_iSecond - m_iSecond) / 3600.0
+		+ static_cast<double>(time.m_iMicroSecond - m_iMicroSecond) / 3.6e9;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+double Time::DeltaDays(const Time & time) const {
+
+	int nDayNumber1 = DayNumber();
+	int nDayNumber2 = time.DayNumber();
+
+	return static_cast<double>(nDayNumber2 - nDayNumber1)
+		+ static_cast<double>(time.m_iSecond - m_iSecond) / 86400.0
+		+ static_cast<double>(time.m_iMicroSecond - m_iMicroSecond) / 8.64e10;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -824,6 +836,140 @@ void Time::FromFormattedString(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void Time::FromCFCompliantUnitsOffsetInt(
+	const std::string & strFormattedTime,
+	int nOffset
+) {
+	// Time format is "days since ..."
+	if ((strFormattedTime.length() >= 11) &&
+	    (strncmp(strFormattedTime.c_str(), "days since ", 11) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(11);
+		FromFormattedString(strSubStr);
+
+		AddDays(nOffset);
+
+	// Time format is "hours since ..."
+	} else if (
+	    (strFormattedTime.length() >= 12) &&
+	    (strncmp(strFormattedTime.c_str(), "hours since ", 12) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(12);
+		FromFormattedString(strSubStr);
+
+		AddHours(nOffset);
+
+	// Time format is "minutes since ..."
+	} else if (
+	    (strFormattedTime.length() >= 14) &&
+	    (strncmp(strFormattedTime.c_str(), "minutes since ", 14) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(14);
+		FromFormattedString(strSubStr);
+
+		AddMinutes(nOffset);
+
+	} else {
+		_EXCEPTIONT("Unknown \"time::units\" format");
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Time::FromCFCompliantUnitsOffsetDouble(
+	const std::string & strFormattedTime,
+	double dOffset
+) {
+	// Time format is "days since ..."
+	if ((strFormattedTime.length() >= 11) &&
+	    (strncmp(strFormattedTime.c_str(), "days since ", 11) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(11);
+		FromFormattedString(strSubStr);
+
+		int nDays = static_cast<int>(dOffset);
+		AddDays(nDays);
+
+		int nSeconds = static_cast<int>(fmod(dOffset, 1.0) * 86400.0);
+		AddSeconds(nSeconds);
+
+	// Time format is "hours since ..."
+	} else if (
+	    (strFormattedTime.length() >= 12) &&
+	    (strncmp(strFormattedTime.c_str(), "hours since ", 12) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(12);
+		FromFormattedString(strSubStr);
+
+		int nHours = static_cast<int>(dOffset);
+		AddHours(nHours);
+
+		int nSeconds = static_cast<int>(fmod(dOffset, 1.0) * 3600.0);
+		AddSeconds(nSeconds);
+
+	// Time format is "minutes since ..."
+	} else if (
+	    (strFormattedTime.length() >= 14) &&
+	    (strncmp(strFormattedTime.c_str(), "minutes since ", 14) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(14);
+		FromFormattedString(strSubStr);
+
+		int nMinutes = static_cast<int>(dOffset);
+		AddMinutes(nMinutes);
+
+		int nSeconds = static_cast<int>(fmod(dOffset, 1.0) * 60.0);
+		AddSeconds(nSeconds);
+
+	} else {
+		_EXCEPTIONT("Unknown \"time::units\" format");
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+double Time::GetCFCompliantUnitsOffsetDouble(
+	const std::string & strFormattedTime
+) {
+	// Time format is "days since ..."
+	if ((strFormattedTime.length() >= 11) &&
+	    (strncmp(strFormattedTime.c_str(), "days since ", 11) == 0)
+	) {
+		Time timeBuf(m_eCalendarType);
+		std::string strSubStr = strFormattedTime.substr(11);
+		timeBuf.FromFormattedString(strSubStr);
+
+		return timeBuf.DeltaDays(*this);
+
+	// Time format is "hours since ..."
+	} else if (
+	    (strFormattedTime.length() >= 12) &&
+	    (strncmp(strFormattedTime.c_str(), "hours since ", 12) == 0)
+	) {
+		Time timeBuf(m_eCalendarType);
+		std::string strSubStr = strFormattedTime.substr(12);
+		timeBuf.FromFormattedString(strSubStr);
+
+		return timeBuf.DeltaHours(*this);
+
+	// Time format is "minutes since ..."
+	} else if (
+	    (strFormattedTime.length() >= 14) &&
+	    (strncmp(strFormattedTime.c_str(), "minutes since ", 14) == 0)
+	) {
+		Time timeBuf(m_eCalendarType);
+		std::string strSubStr = strFormattedTime.substr(14);
+		timeBuf.FromFormattedString(strSubStr);
+
+		return timeBuf.DeltaMinutes(*this);
+
+	} else {
+		_EXCEPTIONT("Unknown \"time::units\" format");
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 std::string Time::GetCalendarName() const {
 	if (m_eCalendarType == CalendarNone) {
 		return std::string("none");
@@ -831,6 +977,10 @@ std::string Time::GetCalendarName() const {
 		return std::string("noleap");
 	} else if (m_eCalendarType == CalendarStandard) {
 		return std::string("standard");
+	} else if (m_eCalendarType == CalendarGregorian) {
+		return std::string("gregorian");
+	} else if (m_eCalendarType == Calendar360Day) {
+		return std::string("360_day");
 	} else {
 		_EXCEPTIONT("Invalid CalendarType");
 	}
