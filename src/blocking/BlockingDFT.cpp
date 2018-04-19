@@ -176,13 +176,19 @@ int main(int argc, char ** argv){
             for (int b=0; b<lonLen; b++){
               inputVal = inputData[a][b];
               if (ZtoGH){
+                if (a==50 && b==20){
+                  std::cout<<"Initial value is "<<inputVal<<std::endl;
+                }
                 inputVal /= 9.8;
+                if (a==50 && b==20){
+                  std::cout<<"Value is now "<<inputVal<<std::endl;
+                }
               }
               storeMat[dayIndex][a][b]+= inputVal;
               countsMat[dayIndex][a][b]+= 1.;
-             // if (a==50 && b==20){
-             //   std::cout<<"Store: "<<storeMat[dayIndex][a][b]<< " count: "<< countsMat[dayIndex][a][b]<<std::endl;
-            //  }
+              if (a==50 && b==20){
+                std::cout<<"Store: "<<storeMat[dayIndex][a][b]<< " count: "<< countsMat[dayIndex][a][b]<<std::endl;
+              }
             }
           }
         }
