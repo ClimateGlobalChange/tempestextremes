@@ -337,7 +337,6 @@ int main(int argc, char **argv){
 */
 
 
-    std::cout<<"About to close files."<<std::endl;
  //Close input files
     readin.close();
 

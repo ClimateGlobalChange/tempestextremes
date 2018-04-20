@@ -98,7 +98,6 @@ int main(int argc, char ** argv){
           _EXCEPTIONT("Could not identify correct pressure level. Check file.");
         }
       }
-    std::cout<<"pIndex is "<<pIndex<<std::endl;
 
     //Initialize storage array: day, lat, lon
     int yearLen = (endday-startday)+1;
@@ -172,25 +171,15 @@ int main(int argc, char ** argv){
           dateMonth, dateDay, dateHour, timeVec[t]);
         if (leap == false){
           dayIndex = DayInYear(dateMonth, dateDay)-1;
-          std::cout<<"Input data at 50,50 is "<<inputData[50][50]<<std::endl;
           //std::cout<<"Day index is "<<dayIndex<<std::endl;
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
               inputVal = inputData[a][b];
               if (ZtoGH){
-                if (a==50 && b==50){
-                  std::cout<<"Initial value is "<<inputVal<<std::endl;
-                }
                 inputVal /= 9.8;
-                if (a==50 && b==50){
-                  std::cout<<"Value is now "<<inputVal<<std::endl;
-                }
               }
               storeMat[dayIndex][a][b]+= inputVal;
               countsMat[dayIndex][a][b]+= 1.;
-              if (a==50 && b==50){
-                std::cout<<"Store: "<<storeMat[dayIndex][a][b]<< " count: "<< countsMat[dayIndex][a][b]<<std::endl;
-              }
             }
           }
         }
