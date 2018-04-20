@@ -168,7 +168,7 @@ int main(int argc, char** argv){
       if (nDims > 3 && !is4D){
         _EXCEPTIONT("Error: variable has more than 3 dimensions, must use --is4D.");
       }
-
+      std::cout<<"pIndex is "<<pIndex<<std::endl;
       //Create a DataMatrix to hold the timestep's data
       DataMatrix<double>ZData(nLat,nLon);
       DataMatrix<double>outIndex(nLat,nLon);
@@ -255,6 +255,7 @@ int main(int argc, char** argv){
     for (int t=0; t<nTime; t++){
       if (is4D){
         zvar->set_cur(t,pIndex,0,0);
+        std::cout<<"Is 4D, used pressure level index "<<pIndex<<std::endl;
         zvar->get(&(ZData[0][0]),1,1,nLat,nLon);
       }else{
         zvar->set_cur(t,0,0);
@@ -281,7 +282,9 @@ int main(int argc, char** argv){
             z_N /= 9.8;
             z_S /= 9.8;
           }
-
+          if (a==50 && b==50){
+            std::cout<<"Z values at 50,50:"<<z_C<<", "<<z_N<<", "<<z_S<<std::endl;
+          }
           outIndex[a][b] = GHcheck(z_C,z_N,z_S,lat_C,lat_N,lat_S,"N");
         }
         for (int a=SHLatStart; a<=SHLatEnd; a++){
