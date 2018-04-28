@@ -19,11 +19,24 @@ check_overlaps<-function(Alt,Alb,All,Alr,
   }
 }
 
-df_tot<-df_tot_nostitch
+if (region=="NA" | region=="SA"){
+  #lon_plot<-lons_seq_c
+  clon_var<-"centlon_c.x"
+  lon_max<-"maxlon_c.x"
+  lon_min<-"minlon_c.x"
+}else{
+  #lon_plot<-lons_seq
+  clon_var<-"centlon.x"
+  lon_max<-"maxlon.x"
+  lon_min<-"minlon.x"
+}
+
+#df_tot<-df_tot_nostitch
+df_tot$datehr<-sprintf("%s_%02d",df_tot$date,df_tot$hr)
 v_type<-data.frame(PV=numeric(),Z=numeric(),GHG=numeric())
-for (t in sort(unique(df_tot$tstep))){
+for (t in sort(unique(df_tot$datehr))[18:18]){
 #for (t in 129:129){
-  df_sub<-df_tot[df_tot$tstep==t,c("var","date","hr","minlat","maxlat","minlon_c","maxlon_c")]
+  df_sub<-df_tot[df_tot$datehr==t,c("var","date","hr","minlat.x","maxlat.x",lon_min,lon_max,"datehr")]
   ###print(df_sub)
   namevec<-unique(df_sub$var)
   if (length(namevec)>1){
@@ -47,6 +60,8 @@ for (t in sort(unique(df_tot$tstep))){
     }
     #holds the pairs
     AB<-data.frame(A=numeric(),B=numeric())
+    BC<-NULL
+    AC<-NULL
     #New frame to hold copy of A,B,C
     AllBlobs<-data.frame(type=character(),num=numeric(),stringsAsFactors = FALSE)
     AllBlobs<-rbind(
@@ -68,8 +83,8 @@ for (t in sort(unique(df_tot$tstep))){
     #check AB
     for (a in 1:l1){
       for (b in 1:l2){
-        check_AB<-check_overlaps(v1$maxlat[a],v1$minlat[a],v1$minlon_c[a],v1$maxlon_c[a],
-                                 v2$maxlat[b],v2$minlat[b],v2$minlon_c[b],v2$maxlon_c[b])
+        check_AB<-check_overlaps(v1$maxlat[a],v1$minlat[a],v1[a,lon_min],v1[a,lon_max],
+                                 v2$maxlat[b],v2$minlat[b],v2[b,lon_min],v2[b,lon_max])
         if(check_AB==TRUE){
           #Add pair to AB
           AB=rbind(AB,data.frame(A=a,B=b))
@@ -81,8 +96,8 @@ for (t in sort(unique(df_tot$tstep))){
       #Check AC
       for (a in 1:l1){
         for (c in 1:l3){
-          check_AC<-check_overlaps(v1$maxlat[a],v1$minlat[a],v1$minlon_c[a],v1$maxlon_c[a],
-                                   v3$maxlat[c],v3$minlat[c],v3$minlon_c[c],v3$maxlon_c[c])
+          check_AC<-check_overlaps(v1$maxlat[a],v1$minlat[a],v1[a,lon_min],v1[a,lon_max],
+                                   v3$maxlat[c],v3$minlat[c],v3[c,lon_min],v3[c,lon_max])
           if (check_AC==TRUE){
             AC=rbind(AC,data.frame(A=a,C=c))
           }
@@ -91,8 +106,8 @@ for (t in sort(unique(df_tot$tstep))){
       #check BC
       for (b in 1:l2){
         for (c in 1:l3){
-          check_BC<-check_overlaps(v3$maxlat[c],v3$minlat[c],v3$minlon_c[c],v3$maxlon_c[c],
-                                   v2$maxlat[b],v2$minlat[b],v2$minlon_c[b],v2$maxlon_c[b])
+          check_BC<-check_overlaps(v3$maxlat[c],v3$minlat[c],v3[c,lon_min],v3[c,lon_max],
+                                   v2$maxlat[b],v2$minlat[b],v2[b,lon_min],v2[b,lon_max])
           if (check_BC==TRUE){
             BC=rbind(BC,data.frame(B=b,C=c))
           }
