@@ -358,7 +358,8 @@ void GetAllTimes(
 
 			varTime->get(dTime, nTime);
 			for (int t = 0; t < nTime; t++) {
-				vecTimes.push_back(dTime[t]);
+			//	vecTimes.push_back(dTime[t]);
+			vecTimes.push_back(dTime[t] + (double)(1440 * f));
 			}
 		}
 	}
