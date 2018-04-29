@@ -1180,6 +1180,7 @@ void calcNormalizedDevs(bool isPV,
 //  int dPastStart = 0;
   double threshVal;
   if (isPV){
+    std::cout<<"Doing calcs for PV."<<std::endl;
     for (int t=0; t<nOutTime; t++){
       ParseTimeDouble(strTimeUnits,strCalendar,timeVals[t],dateYear,\
          dateMonth,dateDay,dateHour);

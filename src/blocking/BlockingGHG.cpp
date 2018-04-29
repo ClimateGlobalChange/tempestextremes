@@ -254,7 +254,6 @@ int main(int argc, char** argv){
     for (int t=0; t<nTime; t++){
       if (is4D){
         zvar->set_cur(t,pIndex,0,0);
-        std::cout<<"Is 4D, used pressure level index "<<pIndex<<std::endl;
         zvar->get(&(ZData[0][0]),1,1,nLat,nLon);
       }else{
         zvar->set_cur(t,0,0);

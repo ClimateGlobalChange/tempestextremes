@@ -1,29 +1,30 @@
 source("~/tempestextremes/test/sector_funcs.R")
 
-f_dir="/Volumes/ExFAT_drive/ERA_files/ERA_blobs/"
+for (data in c("ERA","MERRA")){
+f_dir=sprintf("~/block_r_data/new_data/%s_data/stats/",data)
 
-
+df_tot_stitch<-data.frame(var=character(),bnum=numeric(),tstep=numeric(),date=character(),hr=numeric(),
+                          minlat=numeric(),maxlat=numeric(),
+                          minlon=numeric(),maxlon=numeric(),
+                          centlat=numeric(),centlon=numeric(),area=numeric(),
+                          season=character(),sector=character())
+bnum=0
 for (sector in c("NA","NC","NP","SA","SI","SP")){
 #for (sector in c("NA")){
   for (season in c("MAM","JJA","SON","DJF")){
-    search_patt=sprintf("ERA_*_%s_%s_*stats.txt",season,sector)
+    search_patt=sprintf("%s_*_%s_%s_*stats.txt",data,season,sector)
     files_masterlist=list.files(path=f_dir,pattern=glob2rx(search_patt))
     files_masterlist=paste(f_dir,files_masterlist,sep="")
     nFiles=length(files_masterlist)
     
-    df_tot_stitch<-data.frame(var=character(),bnum=numeric(),tstep=numeric(),date=character(),hr=numeric(),
-                       minlat=numeric(),maxlat=numeric(),
-                       minlon=numeric(),maxlon=numeric(),
-                       centlat=numeric(),centlon=numeric(),area=numeric())
-    bnum=0
+
     for (a in files_masterlist){
       #gather the info from filename
       print(sprintf("Opening file %s",a))
-      finfo<-unlist(strsplit(a,split="_"))
-      vartype=ifelse(finfo[length(finfo)]=="stats.txt","PV",ifelse(
-        finfo[length(finfo)]=="Zstats.txt","Z","GHG"
-      ))
-      ynum<-finfo[length(finfo)-3]
+      dirsplit<-unlist(strsplit(a,split="/"))
+      finfo<-unlist(strsplit(dirsplit[length(dirsplit)],split="_"))
+      vartype=finfo[5]
+      ynum<-finfo[2]
       mnum<-ifelse(season=="MAM","03",ifelse(
         season=="JJA","06",ifelse(
           season=="SON","09","12")
@@ -53,20 +54,33 @@ for (sector in c("NA","NC","NP","SA","SI","SP")){
           df_new<-data.frame(var=vartype,bnum=bnum,tstep=infoline[1],date=t,hr=hr,
                              minlat=infoline[2],maxlat=infoline[3],
                              minlon=infoline[4],maxlon=infoline[5],
-                             centlat=infoline[6],centlon=infoline[7],area=infoline[8])
+                             centlat=infoline[6],centlon=infoline[7],area=infoline[8],
+                             season=season,sector=sector)
+
           df_tot_stitch<-rbind(df_tot_stitch,df_new)
         }
       }
       print(sprintf("df is now %d long",nrow(df_tot_stitch)))
     }
     print(sprintf("There were %s blobs in %s %s",sector,season,bnum))
-    df_tot_stitch$minlon_c<-lon_convert(df_tot_stitch$minlon)
-    df_tot_stitch$maxlon_c<-lon_convert(df_tot_stitch$maxlon)
-    df_tot_stitch$centlon_c<-lon_convert(df_tot_stitch$centlon)
-    #Save the dataframe
-    df_tot_stitch<-df_tot_stitch[format(df_tot_stitch$date,"%m_%d")!="02_29",]
-    statsname<-sprintf("~/block_r_data/stats_stitch_%s_%s_table.RData",season,sector)
-    save(list=c("df_tot_stitch"),file=statsname)
+
   }
 }
-
+if (data=="ERA"){
+  df_tot_stitch$minlon_c<-lon_convert(df_tot_stitch$minlon)
+  df_tot_stitch$maxlon_c<-lon_convert(df_tot_stitch$maxlon)
+  df_tot_stitch$centlon_c<-lon_convert(df_tot_stitch$centlon)
+}
+if (data=="MERRA"){
+  df_tot_stitch$minlon_c<-df_tot_stitch$minlon
+  df_tot_stitch$maxlon_c<-df_tot_stitch$maxlon
+  df_tot_stitch$centlon_c<-df_tot_stitch$centlon
+  df_tot_stitch$minlon<-lon_convert2(df_tot_stitch$minlon_c)
+  df_tot_stitch$maxlon<-lon_convert2(df_tot_stitch$maxlon_c)
+  df_tot_stitch$centlon<-lon_convert2(df_tot_stitch$centlon_c)
+}
+#Save the dataframe
+df_tot_stitch<-df_tot_stitch[format(df_tot_stitch$date,"%m_%d")!="02_29",]
+statsname<-sprintf("~/block_r_data/%s_stats_stitch_table.RData",data)
+save(list=c("df_tot_stitch"),file=statsname)
+}
