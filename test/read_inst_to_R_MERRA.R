@@ -8,12 +8,11 @@ if (length(args)<3){
 
 fdir<-args[1]
 setwd(fdir)
-data="ERA"
+data="MERRA"
 syear=as.numeric(args[2])
 eyear=as.numeric(args[3])
 
 sectors<-c("NA","NC","NP","SA","SI","SP")
-
 if (data=="ERA"){
 LEFT_BOUND=c(250, 30, 130, 290, 20, 120)
 RIGHT_BOUND=c(50, 150, 270, 40, 140, 310)
@@ -36,9 +35,8 @@ lons<-read.nc(f)$lon
 close.nc(f)
 
 nyears=(eyear-syear)+1
-#for (i in 1:6){
-#  seci<-which(sectors==sectors[i])
-seci=which(sectors==args[4])
+for (i in 1:6){
+  seci<-which(sectors==sectors[i])
   lb<-get_index(lons,LEFT_BOUND[seci])
   rb<-get_index(lons,RIGHT_BOUND[seci])
   if (lb>rb){
@@ -72,40 +70,47 @@ seci=which(sectors==args[4])
   for (y in syear:eyear){
     subdir<-sprintf("%s_%04d",data,y)
     for (m in 1:12){
-      #READ Z ANOM DATA
-      fname_zanom<-paste(fdir,subdir,sprintf("%s_%04d_%02d_vars.nc",data,y,m),sep="/")
-#      fname_pvanom<-paste(fdir,subdir,sprintf("%s_%04d_%02d_vars_integ.nc",data,y,m),sep="/")
-      print(sprintf("Reading %s",fname_zanom))
-      #Open Z anom
-      fz<-open.nc(fname_zanom)
-      fp<-read.nc(fz)$lev
-      pindex<-which(fp=="500")
-#      z_inst[,,start_t:end_t]<-read.nc(fz)$Z[lons_sub,lats_sub,pindex,]/9.8
-      #READ PV ANOM DATA
-#      print(sprintf("Reading %s",fname_pvanom))
-      #Open PV
-#      fpv<-open.nc(fname_pvanom)
-      #Add hours to time axis
-      t<-read.nc(fz)$time
-      hrs<-c(hrs,t)
-      time_date<-as.Date(t/24, origin="1800-01-01")
-      time_hours<-t%%24
-      time_string<-sprintf("%s_%02d",time_date,time_hours)
-      time_format<-c(time_format,time_string)
-      #Get end index for time axis
-      end_t<-start_t+length(t)-1
-      #Save PV data
- #     pv_inst[,,start_t:end_t]<-read.nc(fpv)$VPV[lons_sub,lats_sub,]
- #     close.nc(fpv)
-#      print(sprintf("Reading %s",fname_zanom))
-      #Open Z anom
-     # fz<-open.nc(fname_zanom)
-    #  fp<-read.nc(fz)$lev
-    #  pindex<-which(fp=="500")
-      z_inst[,,start_t:end_t]<-read.nc(fz)$Z[lons_sub,lats_sub,pindex,]/9.8
-      close.nc(fz)
-      #Increment next t
-      start_t<-end_t+1
+      #List the inst files
+      plist=list.files(path=subdir,full.names=TRUE,pattern=glob2rx(sprintf("*%04d_%02d*integ.nc",y,m)))
+      zlist=list.files(path=subdir,full.names=TRUE,pattern=glob2rx(sprintf("*%04d_%02d*vars.nc4",y,m)))
+      nfiles=length(plist) 
+      for (d in 1:nfiles){
+        #READ Z ANOM DATA
+        # fname_zanom<-paste(fdir,subdir,sprintf("%s_%04d_%02d_vars_z500_devs.nc",data,y,m),sep="")
+        # fname_pvanom<-paste(fdir,subdir,sprintf("%s_%04d_%02d_vars_integ_devs.nc",data,y,m),sep="")
+        fname_zanom<-zlist[d]
+ #       fname_pvanom<-plist[d]
+        print(sprintf("Reading %s",fname_zanom))
+        #Open Z anom
+        fz<-open.nc(fname_zanom)
+        fp<-read.nc(fz)$lev
+        pindex<-which(fp==500)
+        #READ PV ANOM DATA
+#        print(sprintf("Reading %s",fname_pvanom))
+        #Open PV
+#        fpv<-open.nc(fname_pvanom)
+        #Add hours to time axis
+        t<-read.nc(fz)$time
+        hrs<-c(hrs,t)
+        time_date<-as.Date(t/(24*60), origin=sprintf("%04d-%02d-%02d",y,m,d))
+        time_hours<-(t/60)%%24
+        time_string<-sprintf("%s_%02d",time_date,time_hours)
+        time_format<-c(time_format,time_string)
+        #Get end index for time axis
+        end_t<-start_t+length(t)-1
+        #Save PV data
+ #       pv_inst[,,start_t:end_t]<-read.nc(fpv)$VPV[lons_sub,lats_sub,]
+ #       close.nc(fpv)
+     #   print(sprintf("Reading %s",fname_zanom))
+        #Open Z anom
+     #   fz<-open.nc(fname_zanom)
+     #   fp<-read.nc(fz)$lev
+     #   pindex<-which(fp==500)
+        z_inst[,,start_t:end_t]<-read.nc(fz)$Z[lons_sub,lats_sub,pindex,]
+        close.nc(fz)
+        #Increment next t
+        start_t<-end_t+1
+      }
     }
   }
   image_name<-paste(sprintf("~/block_r_data/%s_%s_z_inst_data.RData",data,sectors[i]))
@@ -113,6 +118,6 @@ seci=which(sectors==args[4])
   lats_seq<-lats[lats_sub]
   save(list=c("z_inst","hrs","lats_sub","lats_seq","lons_seq",
               "lons_sub","lats","lons","time_format"),file=image_name)
-#}
+}
 
 

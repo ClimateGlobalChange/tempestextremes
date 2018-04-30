@@ -1,22 +1,30 @@
 source("~/tempestextremes/test/sector_funcs.R")
 
-for (data in c("ERA","MERRA")){
-f_dir=sprintf("~/block_r_data/new_data/%s_data/stats/",data)
+args=commandArgs(trailingOnly=TRUE)
+if (length(args)<3){
+  stop("Argument 1: input directory Argument 2: output directory  Argument 3: dataset")
+}
+f_dir=args[1]
+data=args[3]
+sector=args[4]
+season=args[5]
+#for (data in c("ERA","MERRA")){
+#f_dir=sprintf("~/block_r_data/new_data/%s_data/stats/",data)
 
+#for (sector in c("NA","NC","NP","SA","SI","SP")){
+#for (sector in c("NA")){
+#  for (season in c("MAM","JJA","SON","DJF")){
+    search_patt=sprintf("%s_*_%s_%s_*stats.txt",data,season,sector)
+    files_masterlist=list.files(path=f_dir,pattern=glob2rx(search_patt))
+    files_masterlist=paste(f_dir,files_masterlist,sep="/")
+    nFiles=length(files_masterlist)
+    
 df_tot_stitch<-data.frame(var=character(),bnum=numeric(),tstep=numeric(),date=character(),hr=numeric(),
                           minlat=numeric(),maxlat=numeric(),
                           minlon=numeric(),maxlon=numeric(),
                           centlat=numeric(),centlon=numeric(),area=numeric(),
                           season=character(),sector=character())
 bnum=0
-for (sector in c("NA","NC","NP","SA","SI","SP")){
-#for (sector in c("NA")){
-  for (season in c("MAM","JJA","SON","DJF")){
-    search_patt=sprintf("%s_*_%s_%s_*stats.txt",data,season,sector)
-    files_masterlist=list.files(path=f_dir,pattern=glob2rx(search_patt))
-    files_masterlist=paste(f_dir,files_masterlist,sep="")
-    nFiles=length(files_masterlist)
-    
 
     for (a in files_masterlist){
       #gather the info from filename
@@ -50,7 +58,7 @@ for (sector in c("NA","NC","NP","SA","SI","SP")){
           #t<-as.Date(nhours/24,origin="1986-12-01")
           #print(t)
           hr<-nhours%%24
-          infoline[8]<-infoline[8]*6371000
+#          infoline[8]<-infoline[8]*6371000
           df_new<-data.frame(var=vartype,bnum=bnum,tstep=infoline[1],date=t,hr=hr,
                              minlat=infoline[2],maxlat=infoline[3],
                              minlon=infoline[4],maxlon=infoline[5],
@@ -64,8 +72,6 @@ for (sector in c("NA","NC","NP","SA","SI","SP")){
     }
     print(sprintf("There were %s blobs in %s %s",sector,season,bnum))
 
-  }
-}
 if (data=="ERA"){
   df_tot_stitch$minlon_c<-lon_convert(df_tot_stitch$minlon)
   df_tot_stitch$maxlon_c<-lon_convert(df_tot_stitch$maxlon)
@@ -81,6 +87,8 @@ if (data=="MERRA"){
 }
 #Save the dataframe
 df_tot_stitch<-df_tot_stitch[format(df_tot_stitch$date,"%m_%d")!="02_29",]
-statsname<-sprintf("~/block_r_data/%s_stats_stitch_table.RData",data)
+statsname<-sprintf("%s/%s_%s_%s_stats_stitch_table.RData",args[2],data,season,sector)
 save(list=c("df_tot_stitch"),file=statsname)
-}
+#  }
+#}
+#}

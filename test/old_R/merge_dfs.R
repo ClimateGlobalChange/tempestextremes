@@ -1,32 +1,36 @@
-for (data in c("ERA","MERRA")){
-for (season in c("MAM","JJA","SON","DJF")){
-  for (sector in c("NA","NC","NP","SA","SI","SP")){
+args=commandArgs(trailingOnly=TRUE)
+data=args[1]
+sector=args[2]
+season=args[3]
+#for (data in c("ERA","MERRA")){
+#for (season in c("MAM","JJA","SON","DJF")){
+#  for (sector in c("NA","NC","NP","SA","SI","SP")){
 #for (season in c("JJA")){
 #  for (sector in c("NP")){
     fname<-sprintf("~/block_r_data/%s_stats_merged_%s_%s_table.RData",data,season,sector)
     #load(fname)
-    f2<-sprintf("~/block_r_data/%s_stats_stitch_%s_%s_table.RData",data,season,sector)
-    f3<-sprintf("~/block_r_data/%s_stats_nostitch_%s_%s_table.RData",data,season,sector)
+    f2<-sprintf("~/block_r_data/%s_%s_%s_stats_stitch_table.RData",data,season,sector)
+    f3<-sprintf("~/block_r_data/%s_%s_%s_stats_nostitch_table.RData",data,season,sector)
     load(f2)
     load(f3)
-    df_tot_stitch$area_km<-(df_tot_stitch$area/6371000)*(4*pi*(6.371e6)^2)/1e6
-    df_tot_nostitch$area_km<-(df_tot_nostitch$area/6371000)*(4*pi*(6.371e6)^2)/1e6
+    df_tot_stitch$area_km<-(df_tot_stitch$area)*(4*pi*(6.371e6)^2)/1e6
+    df_tot_nostitch$area_km<-(df_tot_nostitch$area)*(4*pi*(6.371e6)^2)/1e6
     df_comm<-merge(df_tot_stitch,df_tot_nostitch,by=c("date","area_km","hr","var","tstep"))
     df_comm$datehr<-sprintf("%s_%02d",df_comm$date,df_comm$hr)
-    df_all<-merge(df_tot_stitch,df_tot_nostitch,by=c("date","area","hr","var","tstep"), all=TRUE)
+    df_all<-merge(df_tot_stitch,df_tot_nostitch,by=c("date","area_km","hr","var","tstep"), all=TRUE)
     
     df_istot<-df_all[is.na(df_all$bnum.y),]
     df_istot$datehr<-sprintf("%s_%02d",df_istot$date,df_istot$hr)
     df_isnot<-df_all[is.na(df_all$bnum.x),]
     df_isnot$datehr<-sprintf("%s_%02d",df_isnot$date,df_isnot$hr)
     
-    df_tot<-df_comm[,c(1:15,26)]
+    df_tot<-df_comm[,c(1:18,length(names(df_comm)))]
     df_tot$bnum2<-df_tot$bnum.x
     min1<-ifelse((sector=="NA"|sector=="SA"),"minlon_c.x","minlon.x")
     max1<-ifelse((sector=="NA"|sector=="SA"),"maxlon_c.x","maxlon.x")
     for (t in unique(df_istot$datehr)){
       df_check<-df_istot[df_istot$datehr==t,]
-      df_sub<-df_isnot[df_isnot$datehr==t,c(1:5,16:26)]
+      df_sub<-df_isnot[df_isnot$datehr==t,c(1:5,19:length(names(df_comm)))]
       colnames(df_sub)<-gsub(".y",".x",names(df_sub))
       df_sub$bnum2<-df_sub$bnum.x
       for (n in 1:nrow(df_check)){
@@ -48,12 +52,12 @@ for (season in c("MAM","JJA","SON","DJF")){
             df_tot<-rbind(df_tot,df_sub[y,])
             
           }else{
-            #print("outside of range")
+            print("outside of range")
           }
         }
       }
     }
     save(list=c("df_tot","df_tot_stitch","df_tot_nostitch"),file=fname)
-  }
-}
-}
+#  }
+#}
+#}
