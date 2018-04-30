@@ -215,7 +215,11 @@ season=args[3]
 #for (region in c("SA","SI","SP")){
   load(sprintf("~/block_r_data/%s_%s_pv_z_ghg_block_data.RData",data,region))
   
-  lat_plot<-rev(lats_seq)
+  if (data=="ERA"){
+    lat_plot<-rev(lats_seq)
+  }else{
+    lat_plot<-lats_seq
+  }
   
   if (region=="NA" | region=="SA"){
     lon_plot<-lon_convert(lons_seq)
@@ -258,7 +262,7 @@ season=args[3]
     #time_vec<-sprintf("%s_%02d",time_format,time_hrs)
     time_vec<-time_format
     for (d in sort(unique(df_tot$datehr))){
-      #print(sprintf("Date %s",d))
+      print(sprintf("Date %s",d))
       ncount<-1
       overcopy<-df_overlaps[1,]
       overcopy[,]<-NA
@@ -269,6 +273,11 @@ season=args[3]
       #If only one type of block, add and skip calcs
       nvar<-length(unique(dsub$var))
       varname<-as.character(sort(unique(as.character(dsub$var))))
+      if (varname[length(varname)]=="ZG" & length(varname)>1){
+        #put it at the beginning so the code works! :P
+        varname_copy<-c(varname[length(varname)],varname[1:(length(varname)-1)])
+        varname<-varname_copy
+      }
       if (nvar==1){
         #print("Only one type of block")
         # for (n in 1:nrow(dsub)){
@@ -284,7 +293,7 @@ season=args[3]
         #}
       }else{
         #A bit more complicated! Check overlaps each against each
-        
+
         if (varname[1]=="ZG"){
           v1<-ghg
           df1<-dsub[dsub$var=="ZG",]
@@ -317,7 +326,7 @@ season=args[3]
           name_13<-NULL
           v3count<-NULL
         }
-        
+
         #Loop through the variables
         for (b1 in 1:nrow(df1)){
           it1<-which(lats_seq==as.integer(df1[b1,"maxlat.x"]))
@@ -372,6 +381,7 @@ season=args[3]
                 s23<-similarity_contours(v2slice,v3slice)
                 #Check overlap between all 3
                 sAll<-similarity_contours_3(v1slice,v2slice,v3slice)
+
                 overcopy[ncount,"datehr"]<-d
                 overcopy[ncount,sprintf("%sminlat",varname[1])]<-df1[b1,"minlat.x"]
                 overcopy[ncount,sprintf("%smaxlat",varname[1])]<-df1[b1,"maxlat.x"]
@@ -407,7 +417,7 @@ season=args[3]
                 overcopy[ncount,sprintf("%ssize",name_13)]<-v13count
                 overcopy[ncount,sprintf("%ssize",name_23)]<-v23count
                 overcopy[ncount,"ALLsize"]<-vAllcount
-                #print("At the end of adding to overcopy")
+
                 ncount<-ncount+1
               }
               
@@ -438,12 +448,11 @@ season=args[3]
               overcopy[ncount,sprintf("%sbnum2",varname[2])]<-df2[b2,"bnum2"]
               overcopy[ncount,sprintf("%scentlat",varname[2])]<-df2[b2,"centlat.x"]
               overcopy[ncount,sprintf("%scentlon",varname[2])]<-df2[b2,lon_c]
-              #print("filled v2")
+              print("filled v2")
               overcopy[ncount,sprintf("%ssize",varname[1])]<-v1count
               overcopy[ncount,sprintf("%ssize",varname[2])]<-v2count
               overcopy[ncount,sprintf("%ssize",name_12)]<-v12count
               
-             # print("At the end of adding to overcopy")
               ncount<-ncount+1
             }
             
@@ -451,7 +460,7 @@ season=args[3]
           
         }
         #Unique combos of vars
-        #print("Beginning melt")
+
         df_meltpz<-melt(overcopy[,c("PVbnum2","Zbnum2","PV_Z")],
                         id.vars<-c("PVbnum2","Zbnum2"))
         df_meltpz_nonzero<-df_meltpz[(df_meltpz$value>0 & 
