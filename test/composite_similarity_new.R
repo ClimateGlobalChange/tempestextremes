@@ -2,6 +2,17 @@ library(abind)
 library(reshape2)
 library(ggplot2)
 library(spatstat)
+
+lon_convert<-function(lon){
+  distFrom180=lon-180.
+  return(ifelse(
+    distFrom180<0,
+    lon,
+    -(180-distFrom180)
+  ))
+}
+
+
 check_overlaps<-function(Alt,Alb,All,Alr,
                          Blt,Blb,Bll,Blr){
   #Note: lons must deal with periodic boundary
@@ -123,14 +134,14 @@ prob_vec<-function(df,dfo,lat="ALL"){
   }else{
     dfp<-df[df$var=="PV" & df$HILO==lat,]
     dfz<-df[df$var=="Z" & df$HILO==lat,]
-    dfg<-df[df$var=="GHG" & df$HILO==lat,]
+    dfg<-df[df$var=="ZG" & df$HILO==lat,]
     dfo<-dfo[(!is.na(dfo$PVZHILO==lat) | 
-                !is.na(dfo$PVGHGHILO==lat) | 
-                !is.na(dfo$ZGHGHILO==lat)),]
+                !is.na(dfo$PVZGHILO==lat) | 
+                !is.na(dfo$ZZGHILO==lat)),]
   }
   PVcount<-c(nrow(dfp[dfp$var=="PV",]))
   Zcount<-c(nrow(dfz[dfz$var=="Z",]))
-  GHGcount<-c(nrow(dfg[dfg$var=="GHG",]))
+  ZGcount<-c(nrow(dfg[dfg$var=="ZG",]))
   PVZcount<-0
   PVGcount<-0
   ZZGcount<-0
@@ -142,19 +153,19 @@ prob_vec<-function(df,dfo,lat="ALL"){
     if (lat=="ALL"){
       nPV<-length(unique(dsub[!is.na(dsub$PVbnum2),"PVbnum2"]))
       nZ<-length(unique(dsub[!is.na(dsub$Zbnum2),"Zbnum2"]))
-      nGHG<-length(unique(dsub[!is.na(dsub$GHGbnum2),"GHGbnum2"])) 
+      nZG<-length(unique(dsub[!is.na(dsub$ZGbnum2),"ZGbnum2"])) 
       nPVZ<-length(unique(dsub[!is.na(dsub$PV_Z),"PV_Z"]))
-      nZZG<-length(unique(dsub[!is.na(dsub$Z_GHG),"Z_GHG"]))
-      nPVZG<-length(unique(dsub[!is.na(dsub$PV_GHG),"PV_GHG"]))
+      nZZG<-length(unique(dsub[!is.na(dsub$Z_ZG),"Z_ZG"]))
+      nPVZG<-length(unique(dsub[!is.na(dsub$PV_ZG),"PV_ZG"]))
       nALL<-length(unique(dsub[!is.na(dsub$ALL),"ALL"]))
     }
     else{
       nPV<-length(unique(dsub[!is.na(dsub$PVbnum2) & dsub$PVHILO==lat,"PVbnum2"]))
       nZ<-length(unique(dsub[!is.na(dsub$Zbnum2) & dsub$ZHILO==lat,"Zbnum2"]))
-      nGHG<-length(unique(dsub[!is.na(dsub$GHGbnum2) & dsub$GHGHILO==lat,"GHGbnum2"])) 
+      nZG<-length(unique(dsub[!is.na(dsub$ZGbnum2) & dsub$ZGHILO==lat,"ZGbnum2"])) 
       nPVZ<-length(unique(dsub[!is.na(dsub$PV_Z) & dsub$PVZHILO==lat,"PV_Z"]))
-      nZZG<-length(unique(dsub[!is.na(dsub$Z_GHG) & dsub$ZGHGHILO==lat,"Z_GHG"]))
-      nPVZG<-length(unique(dsub[!is.na(dsub$PV_GHG) & dsub$PVGHGHILO==lat,"PV_GHG"]))
+      nZZG<-length(unique(dsub[!is.na(dsub$Z_ZG) & dsub$ZZGHILO==lat,"Z_ZG"]))
+      nPVZG<-length(unique(dsub[!is.na(dsub$PV_ZG) & dsub$PVZGHILO==lat,"PV_ZG"]))
       nALL<-length(unique(dsub[!is.na(dsub$ALL),"ALL"]))
     }
 
@@ -167,16 +178,16 @@ prob_vec<-function(df,dfo,lat="ALL"){
       PVZ<-min(nPVZ,nPV,nZ)
       PVZcount<-PVZcount+PVZ
     }
-    if (nPV>0 & nGHG>0 & nPVZG>0){
-      PVZG<-min(nPV,nGHG,nPVZG)
+    if (nPV>0 & nZG>0 & nPVZG>0){
+      PVZG<-min(nPV,nZG,nPVZG)
       PVGcount<-PVGcount+PVZG
     }
-    if (nZ>0 & nGHG>0 & nZZG>0){
-      ZZG<-min(nZ, nGHG, nZZG)
+    if (nZ>0 & nZG>0 & nZZG>0){
+      ZZG<-min(nZ, nZG, nZZG)
       ZZGcount<-ZZGcount+ZZG
     }
-    if (nZ>0 & nGHG>0 & nPV>0 & nALL>0){
-      ALL<-min(nZ, nGHG, nPV,nALL)
+    if (nZ>0 & nZG>0 & nPV>0 & nALL>0){
+      ALL<-min(nZ, nZG, nPV,nALL)
       ALLcount<-ALLcount+ALL
     }
     
@@ -184,9 +195,9 @@ prob_vec<-function(df,dfo,lat="ALL"){
   
   #Probabilities
   PVZgivenZ<-PVZcount/Zcount
-  PVGgivenG<-PVGcount/GHGcount
+  PVGgivenG<-PVGcount/ZGcount
   PVZgivenP<-PVZcount/PVcount
-  ZZGgivenG<-ZZGcount/GHGcount
+  ZZGgivenG<-ZZGcount/ZGcount
   PVGgivenP<-PVGcount/PVcount
   ZZGgivenZ<-ZZGcount/Zcount
   
@@ -195,14 +206,19 @@ prob_vec<-function(df,dfo,lat="ALL"){
 }
 
 
-for (region in c("NA","NC","NP","SA","SI","SP")){
+args=commandArgs(trailingOnly=TRUE)
+data=args[1]
+region=args[2]
+season=args[3]
+
+#for (region in c("NA","NC","NP","SA","SI","SP")){
 #for (region in c("SA","SI","SP")){
-  load(sprintf("~/block_r_data/%s_pv_z_ghg_block_data.RData",region))
+  load(sprintf("~/block_r_data/%s_%s_pv_z_ghg_block_data.RData",data,region))
   
   lat_plot<-rev(lats_seq)
   
   if (region=="NA" | region=="SA"){
-    lon_plot<-lons_seq_c
+    lon_plot<-lon_convert(lons_seq)
     clon_var<-"centlon_c.x"
     lon_max<-"maxlon_c.x"
     lon_min<-"minlon_c.x"
@@ -214,8 +230,8 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
     lon_min<-"minlon.x"
     lon_c<-"centlon.x"
   }
-  for (season in c("MAM","JJA","SON","DJF")){
-    load(sprintf("~/block_r_data/stats_merged_%s_%s_table.RData",season,region))
+#  for (season in c("MAM","JJA","SON","DJF")){
+    load(sprintf("~/block_r_data/%s_stats_merged_%s_%s_table.RData",data,season,region))
     df_tot$HILO<-ifelse(abs(df_tot$centlat.x)<40,"LOLAT","HILAT")
     # load(sprintf("~/block_r_data/%s_summ_stats.RData",season))
     # 
@@ -223,23 +239,24 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
     # df_summ$HILO<-ifelse(abs(df_summ$avgclat)<40,"LOWLAT",ifelse(abs(df_summ$avgclat)>60,"HILAT","MIDLAT"))
     # df_summ$HILO<-factor(df_summ$HILO,levels=c("HILAT","MIDLAT","LOWLAT"))
     
-    df_overlaps<-data.frame(datehr=character(),PVbnum=numeric(),Zbnum=numeric(),GHGbnum=numeric(),
-                            PVbnum2=numeric(),Zbnum2=numeric(),GHGbnum2=numeric(),
+    df_overlaps<-data.frame(datehr=character(),PVbnum=numeric(),Zbnum=numeric(),ZGbnum=numeric(),
+                            PVbnum2=numeric(),Zbnum2=numeric(),ZGbnum2=numeric(),
                             PVminlat=numeric(),PVminlon=numeric(),
                             PVmaxlat=numeric(),PVmaxlon=numeric(),
                             PVcentlat=numeric(),PVcentlon=numeric(),
                             Zminlat=numeric(),Zminlon=numeric(),
                             Zmaxlat=numeric(),Zmaxlon=numeric(),
                             Zcentlat=numeric(),Zcentlon=numeric(),
-                            GHGminlat=numeric(),GHGminlon=numeric(),
-                            GHGmaxlat=numeric(),GHGmaxlon=numeric(),
-                            GHGcentlat=numeric(),GHGcentlon=numeric(),
-                            PV_Z=numeric(),PV_GHG=numeric(),Z_GHG=numeric(),ALL=numeric(),
-                            PV_Zsize=numeric(),PV_GHGsize=numeric(),Z_GHGsize=numeric(),ALLsize=numeric(),
+                            ZGminlat=numeric(),ZGminlon=numeric(),
+                            ZGmaxlat=numeric(),ZGmaxlon=numeric(),
+                            ZGcentlat=numeric(),ZGcentlon=numeric(),
+                            PV_Z=numeric(),PV_ZG=numeric(),Z_ZG=numeric(),ALL=numeric(),
+                            PV_Zsize=numeric(),PV_ZGsize=numeric(),Z_ZGsize=numeric(),ALLsize=numeric(),
                             stringsAsFactors = FALSE
     )
     nr=1
-    time_vec<-sprintf("%s_%02d",time_format,time_hrs)
+    #time_vec<-sprintf("%s_%02d",time_format,time_hrs)
+    time_vec<-time_format
     for (d in sort(unique(df_tot$datehr))){
       #print(sprintf("Date %s",d))
       ncount<-1
@@ -268,17 +285,17 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
       }else{
         #A bit more complicated! Check overlaps each against each
         
-        if (varname[1]=="GHG"){
+        if (varname[1]=="ZG"){
           v1<-ghg
-          df1<-dsub[dsub$var=="GHG",]
+          df1<-dsub[dsub$var=="ZG",]
           if (varname[2]=="PV"){
             v2<-pv_anom
             df2<-dsub[dsub$var=="PV",]
-            name_12<-"PV_GHG"
+            name_12<-"PV_ZG"
           }else{
             v2<-z_anom
             df2<-dsub[dsub$var=="Z",]
-            name_12<-"Z_GHG"
+            name_12<-"Z_ZG"
           }
         }else{
           v1<-pv_anom
@@ -292,7 +309,7 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
           v3val<-100
           df3<-dsub[dsub$var=="Z",]
           name_23<-"PV_Z"
-          name_13<-"Z_GHG"
+          name_13<-"Z_ZG"
         }else{
           v3<-NULL
           df3<-NULL
@@ -440,31 +457,31 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
         df_meltpz_nonzero<-df_meltpz[(df_meltpz$value>0 & 
                                         !is.na(df_meltpz$value)),c(1:2,4)] 
         df_pz<-df_meltpz_nonzero[!duplicated(df_meltpz_nonzero),]
-        df_meltzg<-melt(overcopy[,c("GHGbnum2","Zbnum2","Z_GHG")],
-                        id.vars<-c("GHGbnum2","Zbnum2"))
+        df_meltzg<-melt(overcopy[,c("ZGbnum2","Zbnum2","Z_ZG")],
+                        id.vars<-c("ZGbnum2","Zbnum2"))
         df_meltzg_nonzero<-df_meltzg[(df_meltzg$value>0 & 
                                         !is.na(df_meltzg$value)),c(1:2,4)]
         df_zg<-df_meltzg_nonzero[!duplicated(df_meltzg_nonzero),]
-        df_meltpg<-melt(overcopy[,c("PVbnum2","GHGbnum2","PV_GHG")],
-                        id.vars<-c("PVbnum2","GHGbnum2"))
+        df_meltpg<-melt(overcopy[,c("PVbnum2","ZGbnum2","PV_ZG")],
+                        id.vars<-c("PVbnum2","ZGbnum2"))
         df_meltpg_nonzero<-df_meltpg[(df_meltpg$value>0 & 
                                         !is.na(df_meltpg$value)),c(1:2,4)]
         df_pg<-df_meltpg_nonzero[!duplicated(df_meltpg_nonzero),]
-        df_meltall<-melt(overcopy[,c("PVbnum2","Zbnum2","GHGbnum2","ALL")],
-                         id.vars<-c("PVbnum2","Zbnum2","GHGbnum2"))
+        df_meltall<-melt(overcopy[,c("PVbnum2","Zbnum2","ZGbnum2","ALL")],
+                         id.vars<-c("PVbnum2","Zbnum2","ZGbnum2"))
         df_meltall_nonzero<-df_meltall[(df_meltall$value>0 & 
                                           !is.na(df_meltall$value)),c(1:3,5)]
         df_all<-df_meltall_nonzero[!duplicated(df_meltall_nonzero),]
         
         df_merge1<-merge(df_all[,1:3],df_pz[,1:2],id.vars=c("PVbnum2","Zbnum2"),all=T)
-        df_merge2<-merge(df_merge1,df_pg[,1:2],id.vars=c("PVbnum2","GHGbnum2"),all=T)
-        df_merge3<-merge(df_merge2,df_zg[,1:2],id.vars=c("GHGbnum2","Zbnum2"),all=T)
+        df_merge2<-merge(df_merge1,df_pg[,1:2],id.vars=c("PVbnum2","ZGbnum2"),all=T)
+        df_merge3<-merge(df_merge2,df_zg[,1:2],id.vars=c("ZGbnum2","Zbnum2"),all=T)
         
         if (nrow(df_merge3)>0){
           for (r in 1:nrow(df_merge3)){
             df_overlaps[nr,"datehr"]<-d
             bp<-df_merge3[r,"PVbnum2"]
-            bg<-df_merge3[r,"GHGbnum2"]
+            bg<-df_merge3[r,"ZGbnum2"]
             bz<-df_merge3[r,"Zbnum2"]
             
             for (v in varname){
@@ -491,16 +508,16 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
                 df_overlaps[nr,"PVsize"]<-sizep
                 if (!is.na(bg)){
                   bpg<-unique(overcopy[overcopy$PVbnum2==bp & 
-                                         overcopy$GHGbnum2==bg,"PV_GHG"])
+                                         overcopy$ZGbnum2==bg,"PV_ZG"])
                   sizepg<-unique(overcopy[overcopy$PVbnum2==bp & 
-                                            overcopy$GHGbnum2==bg,"PV_GHGsize"])
-                  sizeg<-unique(overcopy[overcopy$GHGbnum2==bg,"GHGsize"])
-                  df_overlaps[nr,"GHGsize"]<-sizeg   
+                                            overcopy$ZGbnum2==bg,"PV_ZGsize"])
+                  sizeg<-unique(overcopy[overcopy$ZGbnum2==bg,"ZGsize"])
+                  df_overlaps[nr,"ZGsize"]<-sizeg   
                   if (length(bpg)>0){
                     bpg<-bpg[!is.na(bpg)]
                   }
-                  df_overlaps[nr,"PV_GHG"]<-bpg
-                  df_overlaps[nr,"PV_GHGsize"]<-sizepg      
+                  df_overlaps[nr,"PV_ZG"]<-bpg
+                  df_overlaps[nr,"PV_ZGsize"]<-sizepg      
                 }
                 if (!is.na(bz)){
                   bpz<-unique(overcopy[overcopy$PVbnum2==bp & 
@@ -517,29 +534,29 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
                 }
               }
               if (!is.na(bg) & !is.na(bz)){
-                bzg<-unique(overcopy[overcopy$GHGbnum2==bg & 
-                                       overcopy$Zbnum2==bz,"Z_GHG"])
+                bzg<-unique(overcopy[overcopy$ZGbnum2==bg & 
+                                       overcopy$Zbnum2==bz,"Z_ZG"])
                 
-                sizezg<-unique(overcopy[overcopy$GHGbnum2==bg & 
-                                          overcopy$Zbnum2==bz,"Z_GHGsize"])
+                sizezg<-unique(overcopy[overcopy$ZGbnum2==bg & 
+                                          overcopy$Zbnum2==bz,"Z_ZGsize"])
                 
-                sizeg<-unique(overcopy[overcopy$GHGbnum2==bg,"GHGsize"])
+                sizeg<-unique(overcopy[overcopy$ZGbnum2==bg,"ZGsize"])
                 sizez<-unique(overcopy[overcopy$Zbnum2==bz,"Zsize"])
                 
-                df_overlaps[nr,"GHGsize"]<-sizeg
+                df_overlaps[nr,"ZGsize"]<-sizeg
                 df_overlaps[nr,"Zsize"]<-sizez  
                 if (length(bzg)>0){
                   bzg<-bzg[!is.na(bzg)]
                 }
-                df_overlaps[nr,"Z_GHG"]<-bzg
-                df_overlaps[nr,"Z_GHGsize"]<-sizezg
+                df_overlaps[nr,"Z_ZG"]<-bzg
+                df_overlaps[nr,"Z_ZGsize"]<-sizezg
                 if (!is.na(bp)){
                   ball<-unique(overcopy[overcopy$PVbnum2==bp & 
                                           overcopy$Zbnum2==bz &
-                                          overcopy$GHGbnum2==bg,"ALL"])
+                                          overcopy$ZGbnum2==bg,"ALL"])
                   sizeall<-unique(overcopy[overcopy$PVbnum2==bp & 
                                              overcopy$Zbnum2==bz &
-                                             overcopy$GHGbnum2==bg,"ALLsize"])
+                                             overcopy$ZGbnum2==bg,"ALLsize"])
                   if (length(ball)>0){
                     ball<-ball[!is.na(ball)]
                   }
@@ -576,16 +593,16 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
                                    ifelse(abs(df_overlaps$PVcentlat)<40,"LOLAT","HILAT"))
     df_overlaps$ZHILO<-ifelse(is.na(df_overlaps$Zcentlat),NA,
                                   ifelse(abs(df_overlaps$Zcentlat)<40,"LOLAT","HILAT"))
-    df_overlaps$GHGHILO<-ifelse(is.na(df_overlaps$GHGcentlat),NA,
-                                    ifelse(abs(df_overlaps$GHGcentlat)<40,"LOLAT","HILAT"))
+    df_overlaps$ZGHILO<-ifelse(is.na(df_overlaps$ZGcentlat),NA,
+                                    ifelse(abs(df_overlaps$ZGcentlat)<40,"LOLAT","HILAT"))
     df_overlaps$PVZlat<-(df_overlaps$PVcentlat + df_overlaps$Zcentlat)*0.5
-    df_overlaps$PVGlat<-(df_overlaps$PVcentlat + df_overlaps$GHGcentlat)*0.5
-    df_overlaps$ZZGlat<-(df_overlaps$GHGcentlat + df_overlaps$Zcentlat)*0.5
+    df_overlaps$PVGlat<-(df_overlaps$PVcentlat + df_overlaps$ZGcentlat)*0.5
+    df_overlaps$ZZGlat<-(df_overlaps$ZGcentlat + df_overlaps$Zcentlat)*0.5
     df_overlaps$PVZHILO<-ifelse(is.na(df_overlaps$PVZlat),NA,
                                     ifelse(abs(df_overlaps$PVZlat)<40,"LOLAT","HILAT"))
-    df_overlaps$PVGHGHILO<-ifelse(is.na(df_overlaps$PVGlat),NA,
+    df_overlaps$PVZGHILO<-ifelse(is.na(df_overlaps$PVGlat),NA,
                                       ifelse(abs(df_overlaps$PVGlat)<40,"LOLAT","HILAT"))
-    df_overlaps$ZGHGHILO<-ifelse(is.na(df_overlaps$ZZGlat),NA,
+    df_overlaps$ZZGHILO<-ifelse(is.na(df_overlaps$ZZGlat),NA,
                                      ifelse(abs(df_overlaps$ZZGlat)<40,"LOLAT","HILAT"))
     
     
@@ -601,9 +618,9 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
     
     #Save this info 
     save(list=c("df_tot","df_overlaps","pvec_all","pvec_hi","pvec_lo"),
-         file=sprintf("~/block_r_data/%s_%s_prob_overlaps_sim.RData",season,region))
-  }
-}
+         file=sprintf("~/block_r_data/%s_%s_%s_prob_overlaps_sim.RData",data,season,region))
+#  }
+#}
 
 
 #load(sprintf("~/block_r_data/%s_pv_z_inst_anom_data.RData",region))
@@ -702,7 +719,7 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
 # 
 # df_pv<-df_tot_sub[df_tot_sub$var=="PV",]
 # df_z<-df_tot_sub[df_tot_sub$var=="Z",]
-# df_zg<-df_tot_sub[df_tot_sub$var=="GHG",]
+# df_zg<-df_tot_sub[df_tot_sub$var=="ZG",]
 # 
 # df_date_sim<-date.frame(datehr=character(),PV_Z=numeric(),PV_ZG=numeric(),
 #                         Z_ZG=numeric(),ALL=numeric())
@@ -729,6 +746,6 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
 # 
 # minl<-min(c(lp,lz,lg))
 # 
-# varmin<-ifelse(minl==lp,"PV",ifelse(minl==lz,"Z","GHG"))
+# varmin<-ifelse(minl==lp,"PV",ifelse(minl==lz,"Z","ZG"))
 # 
 # 
