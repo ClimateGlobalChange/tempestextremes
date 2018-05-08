@@ -152,36 +152,6 @@ int main(int argc, char **argv){
     int dim1 = AvarData->get_dim(0)->size();
     int dim2 = AvarData->get_dim(1)->size();
     int dim3 = AvarData->get_dim(2)->size();    
-/*    //Initialize a matrix. If constant, it will be filled with anom values, else it will hold the 
-    //threshold values
-
-    DataMatrix3D <double> threshMat(dim1,dim2,dim3);
-
-    if (!const_thresh){
-      //Open threshold values file
-
-      NcFile threshFile(threshName.c_str());
-      if (!threshFile.is_valid()){
-        _EXCEPTION1("Cannot open NetCDF file %s",threshName.c_str());
-      }
-
-      NcVar *threshVar = threshFile.get_var(threshVarName.c_str());
-      if (threshVar == NULL){
-        _EXCEPTION2("%s is missing variable %s",threshName.c_str(),threshVarName.c_str());
-      }
-      threshVar->set_cur(0,0,0);
-      threshVar->get(&(threshMat[0][0][0]),dim1,dim2,dim3);
-      threshFile.close();
-    }else{
-      for (int a=0; a<dim1; a++){
-        for (int b=0; b<dim2; b++){
-          for (int c=0; c<dim3; c++){
-            threshMat[a][b][c] = anomVal;
-          }
-        }
-      }
-    }
-*/
     //Open var files
     NcFile tempFile(InputFiles[0].c_str());
     NcDim *latDim = tempFile.get_dim(latname.c_str());
@@ -325,28 +295,6 @@ int main(int argc, char **argv){
         }
       }
       
-/*      //Number of time steps per day?
-      int nSteps = 1;
-      ParseTimeDouble(strTimeUnits, strCalendar, timeVals[0], leapYear,\
-         leapMonth, leapDay, leapHour);
-      int d1 = DayInYear(leapMonth,leapDay);
-
-      int d2;
-      for (int t=1; t<nTime; t++){
-        ParseTimeDouble(strTimeUnits, strCalendar, timeVals[t], leapYear,\
-            leapMonth, leapDay, leapHour);
-        d2 = DayInYear(leapMonth,leapDay);
-        if (d1 != d2){
-          break;
-        }else{
-          nSteps ++;
-        }
-      }
-      if (d1 == d2 && nSteps < 1){
-        _EXCEPTIONT("Need to know the number of time steps per day.");
-      }
-      std::cout<<"There are "<<nSteps<<" steps per day."<<std::endl;
-*/
       //Create output file that corresponds to IPV data
 
       std::string strOutFile;
@@ -358,9 +306,8 @@ int main(int argc, char **argv){
 
         strOutFile = InputFiles[x].replace(pos,len,outsuff.c_str());
       }
-      std::cout<<"Writing variables to file "<<strOutFile.c_str()<<std::endl;
+      std::cout<<"Writing unsmoothed anomaly variables to file "<<strOutFile.c_str()<<std::endl;
 			InputDevFiles.push_back(strOutFile);
-			//std::cout<<"DEBUG: list of dev files is "<< InputDevFiles.size()<<" long"<<std::endl;
       NcFile outfile(strOutFile.c_str(), NcFile::Replace, NULL,0,NcFile::Offset64Bits);
       int nOutTime;
       nOutTime = nTime-nLeapSteps;
@@ -383,22 +330,12 @@ int main(int argc, char **argv){
       //Create variables for Deviations
       
       if (PVCalc){
-        //NcVar *aDevOut = outfile.add_var("ADVPV",ncDouble,tDimOut,latDimOut,lonDimOut);
-  //      NcVar *devIntOut = outfile.add_var("INT_ADIPV",ncInt,tDimOut,latDimOut,lonDimOut);
-				calcDevs(true,ZGHval,fourDval,pIndex, tSteps, nOutTime, strTimeUnits, strCalendar, \
+	calcDevs(true,ZGHval,fourDval,pIndex, tSteps, nOutTime, strTimeUnits, strCalendar, \
         varData, devOut, AvarData, inTime, avgTimeVals, inLat);
-        //calcDevs(true,ZGHval,fourDval,pIndex, tSteps, nOutTime, strTimeUnits, strCalendar, \
-         varData, devOut, aDevOut, AvarData, inTime,avgTimeVals, inLat, currMatIndex,\
-          StepsLeft,twoDayMat);
       }
       else if (GHCalc){
-        //NcVar *aDevOut = outfile.add_var("ADZ",ncDouble,tDimOut,latDimOut,lonDimOut);
-//        NcVar *devIntOut = 
         calcDevs(false,ZGHval,fourDval,pIndex,tSteps, nOutTime, strTimeUnits, strCalendar,\
           varData, devOut,AvarData,inTime, avgTimeVals,inLat);
-//        calcDevs(false,ZGHval,fourDval,pIndex,tSteps, nOutTime, strTimeUnits, strCalendar,\
-          varData, devOut,aDevOut,AvarData,inTime, avgTimeVals,inLat, currMatIndex,\
-          StepsLeft,twoDayMat);
       }
       else{
         _EXCEPTIONT("Invalid variable specified!");
@@ -415,22 +352,23 @@ int main(int argc, char **argv){
 		DataMatrix3D<double> nextFileBuffer(tSteps,nLat,nLon);
 		DataMatrix<double>aDevMat(nLat,nLon);
 		int xcount=0;
-             
+                int prevYear,prevMonth,prevDay,prevHour,nextYear,nextMonth,nextDay,nextHour = 0;                
+                bool isSequential;
 		//Case 1: File contains less than two days' worth of data
 		if (nTime<2*tSteps && stepsLeft>tSteps){
 			while (stepsLeft>tSteps){
-		    NcFile infile(InputDevFiles[xcount].c_str(),NcFile::Write);
-		    if(!infile.is_valid()){
-		      _EXCEPTION1("Unable to open file \"%s\".",InputDevFiles[xcount].c_str());
-		    }
-		    std::cout<<"Opening file "<<InputDevFiles[xcount].c_str()<<std::endl;
-		    NcDim *tDim = infile.get_dim(tname.c_str());
-		    nTime = tDim->size();
-				NcDim *latDim = infile.get_dim(latname.c_str());
-		    NcDim *lonDim = infile.get_dim(lonname.c_str());
+			    NcFile infile(InputDevFiles[xcount].c_str(),NcFile::Write);
+			    if(!infile.is_valid()){
+		   		   _EXCEPTION1("Unable to open file \"%s\".",InputDevFiles[xcount].c_str());
+		 	   }
+		  	  std::cout<<"Opening file "<<InputDevFiles[xcount].c_str()<<std::endl;
+		   	  NcDim *tDim = infile.get_dim(tname.c_str());
+		  	  nTime = tDim->size();
+			    NcDim *latDim = infile.get_dim(latname.c_str());
+			    NcDim *lonDim = infile.get_dim(lonname.c_str());
 
-		    NcVar *varData = infile.get_var(devName.c_str());
-		    NcVar *aDevOut = infile.add_var(aDevName.c_str(),ncDouble,tDim,latDim,lonDim);			
+			  NcVar *varData = infile.get_var(devName.c_str());
+		 	 NcVar *aDevOut = infile.add_var(aDevName.c_str(),ncDouble,tDim,latDim,lonDim);			
 				
 				varData->set_cur(0,0,0);
 				aDevOut->set_cur(0,0,0);
@@ -455,9 +393,26 @@ int main(int argc, char **argv){
       NcDim *tDim = infile.get_dim(tname.c_str());
       NcVar *tVar = infile.get_var(tname.c_str());
       nTime = tDim->size();
-			NcDim *latDim = infile.get_dim(latname.c_str());
+	DataVector<double> tVarVals(nTime);
+	tVar->set_cur((long) 0);
+	tVar->get(&(tVarVals[0]),nTime);	
+	NcDim *latDim = infile.get_dim(latname.c_str());
       NcDim *lonDim = infile.get_dim(lonname.c_str());
-
+       NcAtt *attTime = tVar->get_att("units");
+       if (attTime==NULL){
+           _EXCEPTIONT("Time variable has no units attribute.");
+       }
+       strTimeUnits = attTime->as_string(0);
+       NcAtt *attCal = tVar->get_att("calendar");
+       if (attCal==NULL){
+          strCalendar = "standard";
+        }else{
+          strCalendar = attCal->as_string(0);
+        }
+        if (strncmp(strCalendar.c_str(),"gregorian",9)==0){
+          strCalendar = "standard";
+        }
+      ParseTimeDouble(strTimeUnits,strCalendar,tVarVals[nTime-1],prevYear,prevMonth,prevDay,prevHour);
       NcVar *varData = infile.get_var(devName.c_str());
       NcVar *aDevOut = infile.add_var(aDevName.c_str(),ncDouble,tDim,latDim,lonDim);
 			
@@ -466,8 +421,28 @@ int main(int argc, char **argv){
 			if (x<(nFiles-1)){
 				NcFile nextFile(InputDevFiles[x+1].c_str());
                                 NcVar * nextTvar = nextFile.get_var(tname.c_str());
-				NcVar *fillData = nextFile.get_var(devName.c_str());
-			  fillData->get(&(nextFileBuffer[0][0][0]),tSteps,nLat,nLon);
+                                int nextTsz = nextFile.get_dim(tname.c_str())->size();
+				DataVector<double> nextVarVals(nextTsz);
+				nextTvar->set_cur((long) 0);
+				nextTvar->get(&(nextVarVals[0]),nextTsz);
+                                ParseTimeDouble(strTimeUnits,strCalendar,nextVarVals[0],nextYear,nextMonth,nextDay,nextHour);
+                                
+				isSequential = sequentialFiles(prevYear,prevMonth,prevDay,prevHour,\
+                                  nextYear,nextMonth,nextDay,nextHour);
+                                if (isSequential == true){
+					NcVar *fillData = nextFile.get_var(devName.c_str());
+					fillData->get(&(nextFileBuffer[0][0][0]),tSteps,nLat,nLon);
+				}
+                                else{
+				//Fill the buffer with fill values
+					for (int t=0; t<tSteps; t++){
+						for (int a=0; a<nLat; a++){
+							for (int b=0; b<nLon; b++){
+								nextFileBuffer[t][a][b] = -999999;
+							}						
+						}
+					}					
+				}
 				nextFile.close();
 			}
 			
@@ -487,8 +462,6 @@ int main(int argc, char **argv){
 				//If t starts after 0, fill in the first few steps with the unsmoothed data which was just added
 				aDevOut->put(&(twoDayMat[0][0][0]),tStart,nLat,nLon);
 			}
-			//std::cout<<"DEBUG: tStart is "<<tStart<<" and nTime - (tSteps+1) is "<<nTime-(tSteps+1)<<std::endl;
-			//std::cout<<"DEBUG: current mat index is "<<currMatIndex<<std::endl;
 			int buffIndex=0;
 			for (int t=tStart; t<nTime;t++){
 				aDevOut->set_cur(t,0,0);
@@ -497,11 +470,25 @@ int main(int argc, char **argv){
 					varData->get(&(aDevMat[0][0]),1,nLat,nLon);
 				}
 				else{
-					for (int a=0; a<nLat; a++){
-						for (int b=0; b<nLon; b++){
-							aDevMat[a][b] = 0.0;
-							for (int n=0; n<2*tSteps; n++){
-								aDevMat[a][b]+= (twoDayMat[n][a][b]*invDiv);
+					//Make sure that none of the two day mat contains fill data
+					//if it does, the anomalies will be unsmoothed
+					bool hasFill = false;
+					for (int f=0; f<2*tSteps; f++){
+						if (twoDayMat[f][0][0] <= -999998){
+							hasFill = true;
+							break;
+						}
+					}
+					if (hasFill == true){
+						varData->set_cur(t,0,0);
+						varData->get(&(aDevMat[0][0]),1,nLat,nLon);
+					}else{
+						for (int a=0; a<nLat; a++){
+							for (int b=0; b<nLon; b++){
+								aDevMat[a][b] = 0.0;
+								for (int n=0; n<2*tSteps; n++){
+									aDevMat[a][b]+= (twoDayMat[n][a][b]*invDiv);
+								}	
 							}
 						}
 					}
@@ -511,12 +498,10 @@ int main(int argc, char **argv){
 					}
 					//Fill the two day mat with the next step 
 					if (t<(nTime-tSteps)){
-						//std::cout<<"DEBUG: nTime is "<<nTime<<" Filling mat index "<<currMatIndex<<" with data from time "<<t<<std::endl;
 						varData->set_cur((t+tSteps),0,0);
 						varData->get(&(twoDayMat[currMatIndex][0][0]),1,nLat,nLon);
 					}
 					else if(t>=(nTime-tSteps)){
-						//std::cout<<"t is "<<t<<", filling with buffer data index "<<buffIndex<<std::endl;
 						for (int a=0; a<nLat; a++){
 							for (int b=0; b<nLon; b++){
 								twoDayMat[currMatIndex][a][b] = nextFileBuffer[buffIndex][a][b];
@@ -531,7 +516,7 @@ int main(int argc, char **argv){
 				aDevOut->put(&(aDevMat[0][0]),1,nLat,nLon);
 				currMatIndex+=1;
 			}	
-	    std::cout<<"Finished writing devs to file "<<InputDevFiles[x].c_str()<<std::endl;
+	    std::cout<<"Finished writing smoothed anomalies to file "<<InputDevFiles[x].c_str()<<std::endl;
 		}
 
   }

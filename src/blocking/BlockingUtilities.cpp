@@ -214,36 +214,29 @@ void ParseTimeDouble(
 }
 
 bool sequentialFiles(
-  double prevYear,
-  double prevMonth,
-  double prevDay,
-  double prevHour,
-  double nextYear,
-  double nextMonth,
-  double nextDay,
-  double nextHour
+  int prevYear,
+  int prevMonth,
+  int prevDay,
+  int prevHour,
+  int nextYear,
+  int nextMonth,
+  int nextDay,
+  int nextHour
 ){
   bool isSequential = false;
   //Day in year of each date?
-  double dayPrev = DayInYear(prevMonth,prevDay);
-  double dayNext = DayInYear(nextMonth,nextDay);
+  int dayPrev = DayInYear(prevMonth,prevDay);
+  int dayNext = DayInYear(nextMonth,nextDay);
   //Difference between years?
-  double yearDiff = nextYear-prevYear;
-  //More than one year, definitely not sequential
-  if (yearDiff>1){
-    isSequential = false;
-  }
+  int yearDiff = nextYear-prevYear;
   //If yearDiff is 1, is it going from December to January?
-  double dayDiff = dayNext-dayPrev;
-  std::cout<<"year is "<<prevYear<<" and "<<nextYear<<", dayInYear is "<<dayPrev<<" and "<<dayNext<<std::endl;
+  int dayDiff = dayNext-dayPrev;
   if (yearDiff <=1.){
     //Is the difference 365-1?
-    if (dayDiff<=-364){
-      std::cout<<"Is sequential"<<std::endl;
+    if (std::fabs(dayDiff)>=364){
       isSequential = true;
     }
-    if (dayDiff<=1){
-      std::cout<<"Is sequential"<<std::endl;
+    if (std::fabs(dayDiff)<=1){
       isSequential = true;
     }
   }
@@ -796,7 +789,6 @@ void MissingFill(
   if (dateIndex >= 365){
     dateIndex-=365;
   }
-  //std::cout<<"The new date index is "<<dateIndex<<" at the end of the missing fill."<<std::endl;
 }
 
 
@@ -1145,7 +1137,6 @@ void calcDevs( bool isPV,
   }
 
 
-  std::cout<<"Wrote devs to file."<<std::endl;
 }
 
 
@@ -1184,7 +1175,6 @@ void calcNormalizedDevs(bool isPV,
 //  int dPastStart = 0;
   double threshVal;
   if (isPV){
-    std::cout<<"Doing calcs for PV."<<std::endl;
     for (int t=0; t<nOutTime; t++){
       ParseTimeDouble(strTimeUnits,strCalendar,timeVals[t],dateYear,\
          dateMonth,dateDay,dateHour);

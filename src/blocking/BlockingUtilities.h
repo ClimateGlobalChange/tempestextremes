@@ -73,6 +73,17 @@ void ParseTimeDouble(
         int & nDateHour
 ); 
 
+bool sequentialFiles(
+  int prevYear,
+  int prevMonth,
+  int prevDay,
+  int prevHour,
+  int nextYear,
+  int nextMonth,
+  int nextDay,
+  int nextHour
+);
+
 //Takes the last time value of the previous file
 //and the first time value of the current file
 //and returns the difference in the amount of time 
