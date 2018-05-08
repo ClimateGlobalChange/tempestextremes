@@ -84,7 +84,7 @@ int main(int argc, char **argv){
     AnnounceBanner();
 
     if ((!PVCalc) && (!GHCalc)){
-      _EXCEPTIONT("Need to specify either PV (--pv) or GH (--gh) calculations.");
+      _EXCEPTIONT("Need to specify either PV (--pv) or Z (--z500) calculations.");
     }
     if (fileName == "" && fileList == ""){
       _EXCEPTIONT("Need to specify either input file (--in) or file list (--inlist).");
