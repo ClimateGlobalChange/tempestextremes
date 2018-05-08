@@ -159,20 +159,6 @@ void ParseTimeDouble(
         } else {
 		_EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
 	}
-/*
-	Time time(Time::CalendarStandard);
-	time.FromFormattedString("1800-01-01 00:00:00");
-	printf("%1.15e %i\n", 3600.0 * 1577832.0, (int)(3600.0 * 1577832.0));
-	time.AddHours(1577832);
-
-	Announce("Time (YMDS): %i %i %i %i",
-			time.GetYear(),
-			time.GetMonth(),
-			time.GetDay(),
-			time.GetSecond());
-
-	_EXCEPTION();
-*/
 	// Time format is "days since ..."
 	if ((strTimeUnits.length() >= 11) &&
 	    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
@@ -187,19 +173,10 @@ void ParseTimeDouble(
 		int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
 		time.AddSeconds(nSeconds);
 
-	/*	Announce("Time (YMDS): %i %i %i %i",
-				time.GetYear(),
-				time.GetMonth(),
-				time.GetDay(),
-				time.GetSecond());*/
-
-
 		nDateYear = time.GetYear();
 		nDateMonth = time.GetMonth();
 		nDateDay = time.GetDay();
 		nDateHour = time.GetSecond() / 3600;
-
-		//printf("%s\n", strSubStr.c_str());
 
 	// Time format is "hours since ..."
 	} else if (
@@ -209,20 +186,12 @@ void ParseTimeDouble(
 		std::string strSubStr = strTimeUnits.substr(12);
 		Time time(cal);
 		time.FromFormattedString(strSubStr);
-//                printf("Debug: dTime is %10f \n",dTime);
 		time.AddHours(static_cast<int>(dTime));
-  //              printf("Debug: after AddHours dTime is %10f\n",dTime);
-	/*	Announce("Time (YMDS): %i %i %i %i",
-				time.GetYear(),
-				time.GetMonth(),
-				time.GetDay(),
-				time.GetSecond());*/
 
 		nDateYear = time.GetYear();
 		nDateMonth = time.GetMonth();
 		nDateDay = time.GetDay();
 		nDateHour = time.GetSecond() / 3600;
-		//printf("%s\n", strSubStr.c_str());
 
 	// Time format is "minutes since ..."
 	} else if (
@@ -238,12 +207,47 @@ void ParseTimeDouble(
 		nDateMonth = time.GetMonth();
 		nDateDay = time.GetDay();
 		nDateHour = time.GetSecond() / 3600;
-		//printf("%s\n", strSubStr.c_str());
 
 	} else {
 		_EXCEPTIONT("Unknown \"time::units\" format");
 	}
-	//_EXCEPTION();
+}
+
+bool sequentialFiles(
+  double prevYear,
+  double prevMonth,
+  double prevDay,
+  double prevHour,
+  double nextYear,
+  double nextMonth,
+  double nextDay,
+  double nextHour
+){
+  bool isSequential = false;
+  //Day in year of each date?
+  double dayPrev = DayInYear(prevMonth,prevDay);
+  double dayNext = DayInYear(nextMonth,nextDay);
+  //Difference between years?
+  double yearDiff = nextYear-prevYear;
+  //More than one year, definitely not sequential
+  if (yearDiff>1){
+    isSequential = false;
+  }
+  //If yearDiff is 1, is it going from December to January?
+  double dayDiff = dayNext-dayPrev;
+  std::cout<<"year is "<<prevYear<<" and "<<nextYear<<", dayInYear is "<<dayPrev<<" and "<<dayNext<<std::endl;
+  if (yearDiff <=1.){
+    //Is the difference 365-1?
+    if (dayDiff<=-364){
+      std::cout<<"Is sequential"<<std::endl;
+      isSequential = true;
+    }
+    if (dayDiff<=1){
+      std::cout<<"Is sequential"<<std::endl;
+      isSequential = true;
+    }
+  }
+  return isSequential;
 }
 
 //Takes the last time value of the previous file

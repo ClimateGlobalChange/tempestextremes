@@ -415,6 +415,7 @@ int main(int argc, char **argv){
 		DataMatrix3D<double> nextFileBuffer(tSteps,nLat,nLon);
 		DataMatrix<double>aDevMat(nLat,nLon);
 		int xcount=0;
+             
 		//Case 1: File contains less than two days' worth of data
 		if (nTime<2*tSteps && stepsLeft>tSteps){
 			while (stepsLeft>tSteps){
@@ -435,12 +436,10 @@ int main(int argc, char **argv){
 				aDevOut->set_cur(0,0,0);
 
 				//Add the data to the two day matrix
-				//std::cout<<"DEBUG: matrix not yet filled. Anoms are unsmoothed."<<std::endl;
 				varData->get(&(twoDayMat[0][0][0]),nTime,nLat,nLon);
 				aDevOut->put(&(twoDayMat[0][0][0]),nTime,nLat,nLon);
 				stepsLeft -= nTime;
 				currMatIndex+=nTime;
-				//std::cout<<"There are "<<stepsLeft<<" steps left and curr matrix index is "<<currMatIndex<<std::endl;
 				xcount+=1;
 			}		
 		}
@@ -454,6 +453,7 @@ int main(int argc, char **argv){
       }
       std::cout<<"Opening file "<<InputDevFiles[x].c_str()<<std::endl;
       NcDim *tDim = infile.get_dim(tname.c_str());
+      NcVar *tVar = infile.get_var(tname.c_str());
       nTime = tDim->size();
 			NcDim *latDim = infile.get_dim(latname.c_str());
       NcDim *lonDim = infile.get_dim(lonname.c_str());
@@ -462,8 +462,10 @@ int main(int argc, char **argv){
       NcVar *aDevOut = infile.add_var(aDevName.c_str(),ncDouble,tDim,latDim,lonDim);
 			
 			//Load the buffer data from the next file (first day's worth of data)
+                        //But first, check: are the files sequential?
 			if (x<(nFiles-1)){
 				NcFile nextFile(InputDevFiles[x+1].c_str());
+                                NcVar * nextTvar = nextFile.get_var(tname.c_str());
 				NcVar *fillData = nextFile.get_var(devName.c_str());
 			  fillData->get(&(nextFileBuffer[0][0][0]),tSteps,nLat,nLon);
 				nextFile.close();
