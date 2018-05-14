@@ -7,7 +7,7 @@ library(maptools)
 library(Rmisc)
 library(spatstat)
 library(ggplot2)
-
+library(reshape2)
 
 vec_pvz<-c()
 vec_pvg<-c()
@@ -117,12 +117,12 @@ hgt.cols<-colorRampPalette(c("purple","blue","cyan4","green","yellow", "orange",
 pv.cols<-colorRampPalette(c("darkred","red","white","blue","navyblue"))(length(brks_pvanom))
 for (region in c("NA","NC","NP","SA","SI","SP")){
 #for (region in c("NA")){
-  load(sprintf('~/block_r_data/new_data/ERA_data/ERA_%s_pv_z_ghg_block_data.RData',region))
+  load(sprintf('~/block_r_data/ERA_data/ERA_%s_pv_z_ghg_block_data.RData',region))
   #time_format1<-time_format
 
   time_hr1<-time_format
   time_hrs<-rep(seq(0,18,6),length(time_format)/4)
-  load(sprintf('~/block_r_data/new_data/ERA_data/ERA_%s_z_inst_data.RData',region))
+  load(sprintf('~/block_r_data/ERA_data/ERA_%s_z_inst_data.RData',region))
   time_hr2<-time_format
   #Need to reverse the latitude axis for each of the data
   lats_seq<-lats_seq[length(lats_seq):1]
@@ -139,12 +139,15 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
     mapr="world2"
   }
 
+  ratio.values<-(max(lons_plot)-min(lons_plot))/(max(lats_seq)-min(lats_seq))
+  ratio.display<-4/3
+
   for (season in c("MAM","JJA","SON","DJF")){
   #for (season in c("MAM")){
        # load(sprintf('~/block_r_data/stats_stitch_%s_%s_table.RData',season,region))
 
-	     load(sprintf('~/block_r_data/new_data/ERA_data/ERA_stats_merged_%s_%s_table.RData',season,region))
-  
+	     load(sprintf('~/block_r_data/ERA_data/ERA_stats_merged_%s_%s_table.RData',season,region))
+    colnames(df_tot)<-gsub("[.]x","",colnames(df_tot))
     #df_tot<-df_tot_nostitch
     #df_ref<-df_tot_nostitch
     #df_tot$date_hr<-sprintf("%s_%02d",df_tot$date,df_tot$hr)
@@ -152,14 +155,14 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
     #print(sprintf("Length of date hr for total frame is %d, for ref is %d",nrow(df_tot),nrow(df_ref)))
     v_type<-data.frame(PV=numeric(),Z=numeric(),GHG=numeric())
     v_type_date<-data.frame(PV=numeric(),Z=numeric(),GHG=numeric(),date=character())
-    for (t in sort(unique(df_tot$datehr))[1:10]){
+    for (t in sort(unique(df_tot$datehr))[1:100]){
 
       t1=which(time_hr1==t)
       t2=which(time_hr2==t)
       print(t1)
       print(t2)
-      time_overlaps<-c(time_overlaps,sprintf("%s %s %02dZ",region, time_format1[t1],time_hrs[t1]))
-
+      time_overlaps<-c(time_overlaps,sprintf("%s %s %02dZ",region, substr(time_hr1[t1],1,10),time_hrs[t1]))
+      
       df_sub<-df_tot[df_tot$datehr==t,c("var","date","hr",
                                          "minlat","maxlat",
                                          "minlon","maxlon",
@@ -185,11 +188,21 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
       print(c(sim_pvz,sim_pvg,sim_zg,sim_all))
       print("finished calculating similarities")
       namevec<-unique(df_sub$var)
+
+      #Subset the data for plotting
+      longdata_sub<-melt(z_inst[,,t2],varnames=c("x","y"))
+      longdata_sub$lon<-lons_plot[longdata_sub[,1]]
+      longdata_sub$lat<-lats_seq[longdata_sub[,2]]
+      longdata_sub$ZG<-melt(ghg[,,t1])$value
+      longdata_sub$PV<-melt(pv_anom[,,t1])$value
+      longdata_sub$Z<-melt(z_anom[,,t1])$value
+
       #Case 1: only one type of block
       if (length(namevec)==1){
         v_dir=sprintf("%s_ONLY",namevec[1])
-				dir.create(file.path("~/block_r_data/figs/", v_dir), showWarnings = FALSE)
-        fname<-sprintf("~/block_r_data/figs/%s/%s_%s_%02dZ_noT.png",v_dir,region,time_format1[t1],time_hrs[t1])
+        print(sprintf("Directory is %s",v_dir))
+	dir.create(file.path("/home/mcpinhei/block_r_data/figs/", v_dir), showWarnings = FALSE)
+        fname<-sprintf("~/block_r_data/figs/%s/%s_%sZ.png",v_dir,region,time_hr1[t1])
         print(fname)
         # png(fname,height=600,width=800)
         # print(sprintf("making picture for %d",t1))
@@ -235,8 +248,11 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
         if (sim_all>0){
           v_dir<-c(v_dir,"PV_Z_ZG")
         }
-				dir.create(file.path("~/block_r_data/figs/", v_dir), showWarnings = FALSE)
-        fname<-sprintf("~/block_r_data/figs/%s/%s_%s_%02dZ_noT.png",v_dir,region,time_format1[t1],time_hrs[t1])
+        print(sprintf("Directory is %s",v_dir))
+	if (length(v_dir)==1){
+		dir.create(file.path("/home/mcpinhei/block_r_data/figs/", v_dir), showWarnings = FALSE)
+	}
+        fname<-sprintf("~/block_r_data/figs/%s/%s_%sZ.png",v_dir,region,time_hr1[t1])
         print(fname)
         # png(fname,height=600,width=800)
         # print(sprintf("making picture for %d",t1))
@@ -254,8 +270,33 @@ for (region in c("NA","NC","NP","SA","SI","SP")){
         # dev.off()
 
       }
+      g<-ggplot() + 
+	coord_fixed(ratio.values/ratio.display) + 
+        coord_cartesian(xlim=c(min(lons_plot),max(lons_plot)),
+			ylim=c(min(lats_seq),max(lats_seq)),expand=FALSE) +
+	geom_map(data=map_data(mapr),map=map_data(mapr),aes(map_id=region))+
+	geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=value,color=..level..),breaks=brks_z,size=1) +
+	scale_color_gradientn(limits=c(min(brks_z),max(brks_z)),colors=hgt.cols,name="Z500 (m)") +
+	geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=Z),breaks=c(0,1),color="cornflowerblue",size=3.25) +
+	geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=ZG),breaks=c(0,1),color="purple",size=3.25) +
+        geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=PV ),breaks=c(0,1),color="chartreuse4",size=3.25) +
+        ggtitle(sprintf("%s %02dZ\nPV* & Z*: %.2f Z* & ZG: %.2f PV* & ZG: %.2f all: %.2f",
+                       substr(time_hr1[t1],1,10),time_hrs[t1], sim_pvz, sim_zg, sim_pvg, sim_all)) +
+	labs(x="Longitude",y="Latitude") +
+	theme(axis.text=element_text(size=20),
+          axis.title=element_text(size=22),
+          legend.text=element_text(size=20),
+          legend.title=element_text(size=22),
+          legend.direction = "horizontal",
+          legend.position = "bottom",
+          legend.key.size = unit(2,"line"),
+          legend.key.width=unit(3.5,"line"),
+          plot.title=element_text(size=24)) 
 
-      
+       png(fname,width=600,height=450)
+	print(g)
+	dev.off()
+
     }
 
 
