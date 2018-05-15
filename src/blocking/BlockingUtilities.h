@@ -282,7 +282,7 @@ void IPV_calc(
               NcVar *lat);
 */
 
-void calcDevs(bool isPV,
+void calcDevs(bool latNorm,
               std::string ZtoGH,
               std::string is4D,
               int pIndex,

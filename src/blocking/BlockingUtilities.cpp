@@ -1038,7 +1038,7 @@ void IPV_calc(
 //daily average and outputs 3 variables: instantaneous 
 //anomalies, anomalies with 2-day smoothing, and a normalized
 //anomaly (all values below threshold or wrong sign set to 0)
-void calcDevs( bool isPV,
+void calcDevs( bool latNorm,
               std::string ZtoGH,
               std::string is4D,
               int pIndex,
@@ -1125,7 +1125,7 @@ void calcDevs( bool isPV,
             inputVal /= 9.8;
           }
           devMat[a][b] = inputVal-avgMat[a][b];
-          if (!isPV){
+          if (latNorm){
             devMat[a][b]*=sineRatio;
           }
         }

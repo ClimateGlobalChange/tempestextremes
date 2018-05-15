@@ -50,6 +50,8 @@ int main(int argc, char **argv){
     std::string fourDval="F";
     std::string ZGHval="F";
     std::string Hpaval="F";
+    std::string devName;
+    std::string aDevName;
     std::string prevFile;
     std::string nextFile;
     bool PVCalc;
@@ -75,6 +77,8 @@ int main(int argc, char **argv){
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
       CommandLineString(insuff,"insuff",".nc");
+      CommandLineString(devName,"devname","");
+      CommandLineString(aDevName,"adevname","");
       CommandLineString(outsuff,"outsuff","_devs.nc");
       CommandLineString(prevFile,"prev","");
       CommandLineString(nextFile,"next","");
@@ -84,7 +88,13 @@ int main(int argc, char **argv){
     AnnounceBanner();
 
     if ((!PVCalc) && (!GHCalc)){
-      _EXCEPTIONT("Need to specify either PV (--pv) or Z (--z500) calculations.");
+      //Need to explicitly specify devName and ADevName
+      if (devName==""){
+        _EXCEPTIONT("Need to either specify PV calculation (--pv), Z500 calculation (--z500) or provide variable name (--devname).");
+      }
+      if (aDevName==""){
+        _EXCEPTIONT("Need to either specify PV calculation (--pv), Z500 calculation (--z500) or provide variable name (--adevname).");
+      }
     }
     if (fileName == "" && fileList == ""){
       _EXCEPTIONT("Need to specify either input file (--in) or file list (--inlist).");
@@ -99,12 +109,10 @@ int main(int argc, char **argv){
     if (ZtoGH){
       ZGHval="T";
     }
-    std::string devName;
-		std::string aDevName;
     if (PVCalc){
       devName = "DVPV";
 			aDevName = "ADVPV";
-    }else{
+    }else if (GHCalc){
       devName = "DZ";
 			aDevName = "ADZ";
     }
@@ -330,15 +338,16 @@ int main(int argc, char **argv){
       //Create variables for Deviations
       
       if (PVCalc){
-	calcDevs(true,ZGHval,fourDval,pIndex, tSteps, nOutTime, strTimeUnits, strCalendar, \
+	calcDevs(false,ZGHval,fourDval,pIndex, tSteps, nOutTime, strTimeUnits, strCalendar, \
         varData, devOut, AvarData, inTime, avgTimeVals, inLat);
       }
       else if (GHCalc){
-        calcDevs(false,ZGHval,fourDval,pIndex,tSteps, nOutTime, strTimeUnits, strCalendar,\
+        calcDevs(true,ZGHval,fourDval,pIndex,tSteps, nOutTime, strTimeUnits, strCalendar,\
           varData, devOut,AvarData,inTime, avgTimeVals,inLat);
       }
       else{
-        _EXCEPTIONT("Invalid variable specified!");
+        calcDevs(false,ZGHval,fourDval,pIndex, tSteps, nOutTime, strTimeUnits, strCalendar, \
+        varData, devOut, AvarData, inTime, avgTimeVals, inLat);
       }
 			outfile.close();
     }
