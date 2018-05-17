@@ -695,7 +695,7 @@ void ParseTimeDouble(
 
 	} else if (
 		(strTimeCalendar.length() >= 8) &&
-		(strncmp(strTimeCalendar.c_str(), "standard", 8) == 0)
+		( (strncmp(strTimeCalendar.c_str(), "standard", 8) == 0) || (strncmp(strTimeCalendar.c_str(), "gregorian", 8) == 0) )
 	) {
 		cal = Time::CalendarStandard;
 
