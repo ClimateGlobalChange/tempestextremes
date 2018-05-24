@@ -33,7 +33,11 @@ check_overlaps<-function(Alt,Alb,All,Alr,
 }
 
 similarity_weighted<-function(arr1,arr2,lats){
+  print(dim(arr1))
+  print(dim(arr2))
+  print("Melting arr 1")
   longdata<-melt(arr1,value.name = "V1")
+  print("Melting arr2")
   longdata$V2<-melt(arr2)$value
   longdata$V1[longdata$V1>0]<-1
   longdata$V2[longdata$V2>0]<-1
@@ -250,7 +254,12 @@ season=args[3]
         #}
       }else{
         #A bit more complicated! Check overlaps each against each
-
+        #Reshuffle the vars if ZG is the last one (code hack :P)
+        if (varname[length(varname)]=="ZG"){
+          #Put it first
+          varname_copy<-c("ZG",varname)
+          varname<-varname_copy[1:(length(varname)-1)]
+        }
         if (varname[1]=="ZG"){
           v1<-ghg
           df1<-dsub[dsub$var=="ZG",]
@@ -312,11 +321,11 @@ season=args[3]
             v13count<-NULL
             v23count<-NULL
             vAllcount<-NULL
-            
+            #print(sprintf("Doing vars %s, 1 and 2",name_12))
             s12<-similarity_weighted(v1slice,v2slice,lats_seq)
             v12count<-length(which((v1slice + v2slice)>0))
             if (!is.null(v3)){
-              #print("There are 3 variables")
+             # print("There are 3 variables")
               for (b3 in 1:nrow(df3)){
                 #print("CHeck 3: inside null")
                 it3<-which(lats_seq==as.integer(df3[b3,"maxlat.x"]))
@@ -333,8 +342,10 @@ season=args[3]
                 vAllcount<-length(which((v1slice+v2slice+v3slice)>0))
                 overcopy[ncount,name_12]<-s12
                 #Check overlap between 1 and 3
+                #print(sprintf("Doing vars %s, 1 and 3",name_13))
                 s13<-similarity_weighted(v1slice,v3slice,lats_seq)
                 #Check overlap between 2 and 3
+                #print(sprintf("Doing vars %s, 2 and 3",name_23))
                 s23<-similarity_weighted(v2slice,v3slice,lats_seq)
                 #Check overlap between all 3
                 sAll<-similarity_weighted3(v1slice,v2slice,v3slice,lats_seq)
@@ -382,11 +393,13 @@ season=args[3]
               #print("There are 2 variables")
               overcopy[ncount,name_12]<-s12
               #Check overlap between 1 and 3
-              s13<-similarity_weighted(v1slice,v3slice,lats_seq)
+              #print(sprintf("Doing vars %s, 1 and 3",name_13))
+              s13<-0
               #Check overlap between 2 and 3
-              s23<-similarity_weighted(v2slice,v3slice,lats_seq)
+              #print(sprintf("Doing vars %s, 2 and 3",name_23))
+              s23<-0
               #Check overlap between all 3
-              sAll<-similarity_weighted3(v1slice,v2slice,v3slice,lats_seq)
+              sAll<-0
               overcopy[ncount,"datehr"]<-d
               overcopy[ncount,sprintf("%sminlat",varname[1])]<-df1[b1,"minlat.x"]
               overcopy[ncount,sprintf("%smaxlat",varname[1])]<-df1[b1,"maxlat.x"]
