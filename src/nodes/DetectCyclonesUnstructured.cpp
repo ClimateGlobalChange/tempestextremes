@@ -700,6 +700,12 @@ void ParseTimeDouble(
 		cal = Time::CalendarStandard;
 
 	} else if (
+		(strTimeCalendar.length() >= 9) &&
+		(strncmp(strTimeCalendar.c_str(), "gregorian", 9) == 0)
+	) {
+		cal = Time::CalendarGregorian;
+
+	} else if (
 		(strTimeCalendar.length() >= 7) &&
 		(strncmp(strTimeCalendar.c_str(), "360_day", 8) == 0)
 	) {
