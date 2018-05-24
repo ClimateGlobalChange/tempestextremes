@@ -32,7 +32,7 @@ check_overlaps<-function(Alt,Alb,All,Alr,
   }
 }
 
-similarity_contours<-function(arr1,arr2){
+#similarity_contours<-function(arr1,arr2){
   arr1[which(arr1>0)]<-1
   arr2[which(arr2>0)]<-1
   sum1<-sum(arr1)
@@ -76,7 +76,7 @@ similarity_contours<-function(arr1,arr2){
   }
   return(sim_total)
 }
-similarity_contours_3<-function(arr1,arr2,arr3){
+#similarity_contours_3<-function(arr1,arr2,arr3){
   arr1[which(arr1>0)]<-1
   arr2[which(arr2>0)]<-1
   arr3[which(arr3>0)]<-1
@@ -123,6 +123,55 @@ similarity_contours_3<-function(arr1,arr2,arr3){
   }
   return(sim_total)
 }
+
+similarity_weighted<-function(arr1,arr2,lats){
+  longdata<-melt(arr1,value.name = "V1")
+  longdata$V2<-melt(arr2)$value
+  longdata$V1[longdata$V1>0]<-1
+  longdata$V2[longdata$V2>0]<-1
+  longdata$lat<-lats[longdata$Var2]
+  longdata$V1_w<-longdata$V1*cos(longdata$lat*pi/180)
+  longdata$V2_w<-longdata$V2*cos(longdata$lat*pi/180)
+  intersect_12<-longdata[longdata$V1>0 & longdata$V2>0,]
+  ncommon<-nrow(intersect_12)
+  
+  union_12<-longdata[longdata$V1>0 | longdata$V2>0,]
+  union_12$VU_w<-cos(union_12$lat*pi/180)
+  nunion<-nrow(union_12)
+  #print(sprintf("There are %d common points for union (%d points)",ncommon,nunion))
+  
+  sum_iw<-sum(intersect_12$V1_w)
+  sum_uw<-sum(union_12$VU_w)
+  #print(sprintf("Weighted sums are %f and %f",sum_iw,sum_uw))
+  return(sum_iw/sum_uw)
+}
+
+similarity_weighted3<-function(arr1,arr2,arr3,lats){
+  longdata<-melt(arr1,value.name = "V1")
+  longdata$V2<-melt(arr2)$value
+  longdata$V3<-melt(arr3)$value
+  longdata$V1[longdata$V1>0]<-1
+  longdata$V2[longdata$V2>0]<-1
+  longdata$V3[longdata$V3>0]<-1
+  longdata$lat<-lats[longdata$Var2]
+  longdata$V1_w<-longdata$V1*cos(longdata$lat*pi/180)
+  longdata$V2_w<-longdata$V2*cos(longdata$lat*pi/180)
+  longdata$V3_w<-longdata$V3*cos(longdata$lat*pi/180)
+  intersect_123<-longdata[longdata$V1>0 & longdata$V2>0 & longdata$V3>0,]
+  ncommon<-nrow(intersect_123)
+  
+  union_123<-longdata[longdata$V1>0 | longdata$V2>0 | longdata$V3>0,]
+  union_123$VU_w<-cos(union_123$lat*pi/180)
+  nunion<-nrow(union_123)
+  #print(sprintf("There are %d common points for union (%d points)",ncommon,nunion))
+  
+  sum_iw<-sum(intersect_123$V1_w)
+  sum_uw<-sum(union_123$VU_w)
+  #print(sprintf("Weighted sums are %f and %f",sum_iw,sum_uw))
+  return(sum_iw/sum_uw)
+}
+
+
 
 prob_vec<-function(df,dfo,lat="ALL"){
   
@@ -356,7 +405,7 @@ season=args[3]
             v23count<-NULL
             vAllcount<-NULL
             
-            s12<-similarity_contours(v1slice,v2slice)
+            s12<-similarity_weighted(v1slice,v2slice,lats_seq)
             v12count<-length(which((v1slice + v2slice)>0))
             if (!is.null(v3)){
               #print("There are 3 variables")
@@ -376,11 +425,11 @@ season=args[3]
                 vAllcount<-length(which((v1slice+v2slice+v3slice)>0))
                 overcopy[ncount,name_12]<-s12
                 #Check overlap between 1 and 3
-                s13<-similarity_contours(v1slice,v3slice)
+                s13<-similarity_weighted(v1slice,v3slice,lats_seq)
                 #Check overlap between 2 and 3
-                s23<-similarity_contours(v2slice,v3slice)
+                s23<-similarity_weighted(v2slice,v3slice,lats_seq)
                 #Check overlap between all 3
-                sAll<-similarity_contours_3(v1slice,v2slice,v3slice)
+                sAll<-similarity_weighted3(v1slice,v2slice,v3slice,lats_seq)
 
                 overcopy[ncount,"datehr"]<-d
                 overcopy[ncount,sprintf("%sminlat",varname[1])]<-df1[b1,"minlat.x"]
@@ -425,11 +474,11 @@ season=args[3]
               #print("There are 2 variables")
               overcopy[ncount,name_12]<-s12
               #Check overlap between 1 and 3
-              s13<-similarity_contours(v1slice,v3slice)
+              s13<-similarity_weighted(v1slice,v3slice,lats_seq)
               #Check overlap between 2 and 3
-              s23<-similarity_contours(v2slice,v3slice)
+              s23<-similarity_weighted(v2slice,v3slice,lats_seq)
               #Check overlap between all 3
-              sAll<-similarity_contours_3(v1slice,v2slice,v3slice)
+              sAll<-similarity_weighted3(v1slice,v2slice,v3slice,lats_seq)
               overcopy[ncount,"datehr"]<-d
               overcopy[ncount,sprintf("%sminlat",varname[1])]<-df1[b1,"minlat.x"]
               overcopy[ncount,sprintf("%smaxlat",varname[1])]<-df1[b1,"maxlat.x"]
