@@ -37,7 +37,7 @@ ratio.values <- (max(lons_seq)-min(lons_seq))/(max(lats_seq)-min(lats_seq))
 subfigs<-c("a","b","c","d")
 
 ctr<-1
-print("range of lons is %d",range(lons_plot))
+print(range(lons_plot))
 #Figure lowlat blocking, with new boundaries
 dates_plot<-c("2007-07-30_00","2007-08-01_00","2007-08-03_00","2007-08-05_00")
 for (x in dates_plot){
