@@ -12,11 +12,11 @@ source("~/tempestextremes/test/sector_funcs.R")
 brks_z<-seq(4500,6100,50)
 hgt.cols<-colorRampPalette(c("purple","blue","cyan4","green","yellow", "orange","red","darkred"))(length(brks_z))
 
-load('~/block_r_data/ERA_data/ERA_NA_pv_z_ghg_block_data.RData')
+load('~/block_r_data/ERA_NA_pv_z_ghg_block_data.RData')
 
 time_hr1<-time_format
 time_format1<-substr(time_hr1,1,10)
-load('~/block_r_data/ERA_data/ERA_NA_z_inst_data.RData')
+load('~/block_r_data/ERA_NA_z_inst_data.RData')
 time_hr2<-time_format
 
 time_hrs<-rep(seq(0,18,6),length(time_hr1)/4)
