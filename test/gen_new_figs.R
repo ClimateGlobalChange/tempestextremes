@@ -41,11 +41,14 @@ ctr<-1
 print(range(lons_plot))
 dates_plot<-c("1984-06-08_12","1984-06-10_12","1984-06-12_12","1984-06-14_12")
 for (x in dates_plot){
-  t<-which(time_hr1==x)
-  longdata_sub<-melt(z_inst[,,t],varnames=c("x","y"))
+  t1<-which(time_hr1==x)
+  t2<-which(time_hr2==x)
+  longdata_sub<-melt(z_inst[,,t2],varnames=c("x","y"))
   longdata_sub$lon<-lons_plot[longdata_sub[,1]]
   longdata_sub$lat<-lats_seq[longdata_sub[,2]]
-  longdata_sub$cont<-melt(ZG[,,t])$value
+  longdata_sub$cont<-melt(ghg[,,t1])$value
+  longdata_sub$cont2<-melt(pv_anom[,,t1])$value
+  longdata_sub$cont3<-melt(z_anom[,,t1])$value
   
   g<-ggplot()+ 
     coord_fixed(ratio.values / ratio.display) +
@@ -55,6 +58,8 @@ for (x in dates_plot){
     geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=value,color=..level..),breaks=brks_z,size=1) +
     scale_color_gradientn(limits=c(min(brks_z),max(brks_z)),colors=hgt.cols,name="Z500 (m)") +
     geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=cont),breaks=c(0,1),color="purple",size=3.25) +
+    geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=cont2),breaks=c(0,1),color="cornflowerblue",size=3.25) +
+    geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=cont3),breaks=c(0,1),color="chartreuse4",size=3.25) +
     geom_rect(aes(xmin = -105, xmax=-50,ymin=30,ymax=45),
               fill = "transparent", color = "blue", size = 1.5) +
     ggtitle(sprintf("(%s) %s %sZ",subfigs[ctr],time_format1[t],time_hrs[t])) +
