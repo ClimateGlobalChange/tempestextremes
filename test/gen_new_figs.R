@@ -39,7 +39,7 @@ subfigs<-c("a","b","c","d")
 ctr<-1
 print(range(lons_plot))
 #Figure lowlat blocking, with new boundaries
-dates_plot<-c("2007-07-30_00","2007-08-01_00","2007-08-03_00","2007-08-05_00")
+dates_plot<-c("2007-07-30_00","2007-07-31_00","2007-08-01_00","2007-08-02_00")
 for (x in dates_plot){
   t1<-which(time_hr1==x)
   t2<-which(time_hr2==x)
@@ -60,7 +60,7 @@ for (x in dates_plot){
     geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=cont1),breaks=c(0,1),color="cornflowerblue",size=3.25) +
     geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=cont3),breaks=c(0,1),color="purple",size=3.25) +
     geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=cont2),breaks=c(0,1),color="chartreuse4",size=3.25) +
-    geom_rect(aes(xmin = min(lons_plot), xmax=-40,ymin=32,ymax=48),
+    geom_rect(aes(xmin = -70, xmax=-25,ymin=32,ymax=50),
               fill = "transparent", color = "blue", size = 1.5) +
     ggtitle(sprintf("(%s) %s %sZ",subfigs[ctr],time_format1[t1],time_hrs[t1])) +
     labs(x="Longitude",y="Latitude")+
