@@ -37,7 +37,7 @@ ratio.values <- (max(lons_seq)-min(lons_seq))/(max(lats_seq)-min(lats_seq))
 subfigs<-c("a","b","c","d")
 
 ctr<-1
-
+print("range of lons is %d",range(lons_plot))
 #Figure lowlat blocking, with new boundaries
 dates_plot<-c("2000-08-13_06","2000-08-15_06","2000-08-17_06","2000-08-19_06")
 for (x in dates_plot){
@@ -52,14 +52,16 @@ for (x in dates_plot){
 
   g<-ggplot()+
     coord_fixed(ratio.values / ratio.display) +
-    coord_cartesian(xlim=c(-120,-80),
-                    ylim=c(30,45),expand=FALSE) +
+    coord_cartesian(xlim=range(lons_plot),
+                    ylim=range(lats_seq),expand=FALSE) +
     geom_map(data= m, map = m, aes(map_id=region)) +
     geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=value,color=..level..),breaks=brks_z,size=1) +
     scale_color_gradientn(limits=c(min(brks_z),max(brks_z)),colors=hgt.cols,name="Z500 (m)") +
     geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=cont1),breaks=c(0,1),color="cornflowerblue",size=3.25) +
     geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=cont3),breaks=c(0,1),color="purple",size=3.25) +
     geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=cont2),breaks=c(0,1),color="chartreuse4",size=3.25) +
+    geom_rect(aes(xmin = min(lons_plot), xmax=-40,ymin=32,ymax=48),
+              fill = "transparent", color = "blue", size = 1.5) +
     ggtitle(sprintf("(%s) %s %sZ",subfigs[ctr],time_format1[t1],time_hrs[t1])) +
     labs(x="Longitude",y="Latitude")+
     theme(axis.text=element_text(size=20),
