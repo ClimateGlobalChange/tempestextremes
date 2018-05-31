@@ -39,7 +39,7 @@ subfigs<-c("a","b","c","d")
 ctr<-1
 
 #Figure lowlat blocking, with new boundaries
-dates_plot<-c("1986-08-17_18","1986-08-19_18","1986-08-21_18","1986-08-23_18")
+dates_plot<-c("2000-08-13_06","2000-08-15_06","2000-08-17_06","2000-08-19_06")
 for (x in dates_plot){
   t1<-which(time_hr1==x)
   t2<-which(time_hr2==x)
@@ -52,7 +52,7 @@ for (x in dates_plot){
 
   g<-ggplot()+
     coord_fixed(ratio.values / ratio.display) +
-    coord_cartesian(xlim=c(-150,50),
+    coord_cartesian(xlim=c(-120,-80),
                     ylim=c(30,45),expand=FALSE) +
     geom_map(data= m, map = m, aes(map_id=region)) +
     geom_contour(data=longdata_sub,aes(x=lon,y=lat,z=value,color=..level..),breaks=brks_z,size=1) +
