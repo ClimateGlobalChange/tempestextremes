@@ -39,7 +39,7 @@ subfigs<-c("a","b","c","d")
 ctr<-1
 print("range of lons is %d",range(lons_plot))
 #Figure lowlat blocking, with new boundaries
-dates_plot<-c("2000-08-13_06","2000-08-15_06","2000-08-17_06","2000-08-19_06")
+dates_plot<-c("2007-07-30_00","2007-08-01_00","2007-08-03_00","2007-08-05_00")
 for (x in dates_plot){
   t1<-which(time_hr1==x)
   t2<-which(time_hr2==x)
