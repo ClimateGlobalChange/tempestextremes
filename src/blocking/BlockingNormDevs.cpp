@@ -40,6 +40,7 @@ int main(int argc, char **argv){
     std::string threshName;
     std::string threshVarName;
     std::string tname,latname,lonname;
+    std::string normName;
     bool PVCalc;
     bool GHCalc;
     bool const_thresh;
@@ -55,10 +56,12 @@ int main(int argc, char **argv){
 //      CommandLineString(avgVarName, "avgname","");
       CommandLineString(threshName,"thresh","");
       CommandLineString(threshVarName,"threshname","");
+      CommandLineString(normName,"normname","");
       CommandLineBool(PVCalc,"pv");
       CommandLineBool(GHCalc,"z500");
       CommandLineBool(const_thresh,"const");
-      CommandLineDouble(anomVal,"threshold",0.);
+      CommandLineDouble(anomVal,"threshval",0.);
+      CommandLineDouble(minThresh,"minthreshval",0.);
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
@@ -68,9 +71,9 @@ int main(int argc, char **argv){
     EndCommandLine(argv);
     AnnounceBanner();
 
-    if ((!PVCalc) && (!GHCalc)){
+  /*  if ((!PVCalc) && (!GHCalc)){
       _EXCEPTIONT("Need to specify either PV (--pv) or GH (--gh) calculations.");
-    }
+    }*/
     if (fileName == "" && fileList == ""){
       _EXCEPTIONT("Need to specify either input file (--in) or file list (--inlist).");
     }
@@ -80,19 +83,26 @@ int main(int argc, char **argv){
     if (outputName != "" && fileList != ""){
       _EXCEPTIONT("Currently cannot specify output name for list of files. This will only work with a single file (--in).");
     }
+    if (!PVCalc && !GHCalc && normName == ""){
+      _EXCEPTIONT("Need to either specify calculations for PV (--pv) or Z500 (--z500) or provide a name for the output variable (--normname).");
+    }
 
    int nFiles,avgTime,nTime,nLat,nLon;
-   if (const_thresh && anomVal==0.){
+   if (const_thresh){
      if (PVCalc){
        anomVal = 1.2*std::pow(10,-6);
      }else if (GHCalc){
        anomVal = 170.;
+     }else if (anomVal == 0.){
+       _EXCEPTIONT("Anomaly threshold is currently set at 0. Specify a value using --threshval.");
      }
    }
    if (PVCalc){
      minThresh = 1.1*std::pow(10,-6);
+     normName = "INT_ADVPV";
    }else if (GHCalc){
      minThresh = 100.;
+     normName = "INT_ADZ";
    }
 
 
@@ -249,30 +259,15 @@ int main(int argc, char **argv){
       NcVar *lonVarOut = outfile.add_var(lonname.c_str(),ncDouble,lonDimOut);
       copy_dim_var(inLon,lonVarOut);
 
+      NcVar *devIntOut = outfile.add_var(normName.c_str(),ncInt,tDimOut,latDimOut,lonDimOut);
       //Create variables for Deviations
 
       if (PVCalc){
-//        NcVar *devOut = outfile.add_var("DIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
-//        NcVar *aDevOut = outfile.add_var("ADIPV",ncDouble,tDimOut,latDimOut,lonDimOut);
-        NcVar *devIntOut = outfile.add_var("INT_ADVPV",ncInt,tDimOut,latDimOut,lonDimOut);
-
-//        calcDevs(leap,true, startIndex, varData, devOut, aDevOut, AvarData, inTime,\
-        avgTimeVals, inLat, tVarOut);
         calcNormalizedDevs(true,varData,devIntOut,inLat,tVarOut,strTimeUnits,strCalendar,threshMat,minThresh);
 
       }
-      else if (GHCalc){
-//        NcVar *devOut = outfile.add_var("DGH",ncDouble,tDimOut,latDimOut,lonDimOut);
-//        NcVar *aDevOut = outfile.add_var("ADGH",ncDouble,tDimOut,latDimOut,lonDimOut);
-        NcVar *devIntOut = outfile.add_var("INT_ADZ",ncInt,tDimOut,latDimOut,lonDimOut);
-//        NcVar *stdDevOut = outfile.add_var("STD_DEV",ncDouble,latDimOut,lonDimOut);
-//        calcDevs(leap,false, startIndex, varData, devOut,aDevOut,AvarData,inTime,\
-          avgTimeVals,inLat,tVarOut);
-        calcNormalizedDevs(false,varData,devIntOut,inLat,tVarOut,strTimeUnits,strCalendar,threshMat,minThresh);
-        std::cout<<"Finished writing to file "<<strOutFile.c_str()<<std::endl;
-      }
       else{
-        _EXCEPTIONT("Invalid variable specified!");
+        calcNormalizedDevs(false,varData,devIntOut,inLat,tVarOut,strTimeUnits,strCalendar,threshMat,minThresh);
       }
     }
   }catch (Exception & e){

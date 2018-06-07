@@ -1,0 +1,20 @@
+\contentsline {section}{\numberline {1}Objective blocking detection methods}{1}
+\contentsline {paragraph}{Geopotential height gradient (TM90)}{2}
+\contentsline {paragraph}{Anomaly methods (S04 and DG83)}{2}
+\contentsline {subsection}{\numberline {1.1}Optional flags}{2}
+\contentsline {subsubsection}{\numberline {1.1.1}File and variable names}{2}
+\contentsline {subsection}{\numberline {1.2}BlockingGHG}{3}
+\contentsline {subsubsection}{\numberline {1.2.1}File input and output}{4}
+\contentsline {subsection}{\numberline {1.3}Anomalies, Step 1 (S04): Input files: BlockingPV}{4}
+\contentsline {subsubsection}{\numberline {1.3.1}File input and output}{5}
+\contentsline {subsection}{\numberline {1.4}Anomalies, Step 2: Long Term Daily Mean: BlockingDFT}{5}
+\contentsline {subsubsection}{\numberline {1.4.1}File input and output}{6}
+\contentsline {subsection}{\numberline {1.5}Anomalies, Step 3: Unsmoothed and Smoothed Anomalies: BlockingDevs}{6}
+\contentsline {subsubsection}{\numberline {1.5.1}File input and output}{7}
+\contentsline {subsection}{\numberline {1.6}Anomalies, Step 4: Long Term Daily Mean of Anomalies: BlockingDFT}{7}
+\contentsline {subsection}{\numberline {1.7}Anomalies, Step 5: Spatiotemporally Varying Threshold: BlockingThresh}{7}
+\contentsline {subsubsection}{\numberline {1.7.1}File input and output}{8}
+\contentsline {section}{\numberline {2}DetectCyclonesUnstructured}{8}
+\contentsline {subsection}{\numberline {2.1}Variable Specification}{10}
+\contentsline {subsection}{\numberline {2.2}MPI Support}{11}
+\contentsline {section}{\numberline {3}StitchNodes}{11}
