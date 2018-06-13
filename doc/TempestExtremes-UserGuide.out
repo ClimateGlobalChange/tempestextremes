@@ -1,0 +1,25 @@
+\BOOKMARK [1][-]{section.1}{Setting up TempestExtremes}{}% 1
+\BOOKMARK [1][-]{section.2}{Objective blocking detection methods}{}% 2
+\BOOKMARK [2][-]{subsection.2.1}{Blocking Event Detection: The StitchBlobs Framework}{section.2}% 3
+\BOOKMARK [2][-]{subsection.2.2}{General workflow}{section.2}% 4
+\BOOKMARK [2][-]{subsection.2.3}{BlockingGHG}{section.2}% 5
+\BOOKMARK [3][-]{subsubsection.2.3.1}{File input and output}{subsection.2.3}% 6
+\BOOKMARK [2][-]{subsection.2.4}{Anomalies, Step 1 \(S04\): Input files: BlockingPV}{section.2}% 7
+\BOOKMARK [3][-]{subsubsection.2.4.1}{File input and output}{subsection.2.4}% 8
+\BOOKMARK [2][-]{subsection.2.5}{Anomalies, Step 2: Long Term Daily Mean: BlockingDFT}{section.2}% 9
+\BOOKMARK [3][-]{subsubsection.2.5.1}{File input and output}{subsection.2.5}% 10
+\BOOKMARK [2][-]{subsection.2.6}{Anomalies, Step 3: Unsmoothed and Smoothed Anomalies: BlockingDevs}{section.2}% 11
+\BOOKMARK [3][-]{subsubsection.2.6.1}{File input and output}{subsection.2.6}% 12
+\BOOKMARK [2][-]{subsection.2.7}{Anomalies, Step 4a: Long Term Daily Mean of Anomalies: BlockingDFT}{section.2}% 13
+\BOOKMARK [2][-]{subsection.2.8}{Anomalies, Step 4b: Spatiotemporally Varying Threshold: BlockingThresh}{section.2}% 14
+\BOOKMARK [3][-]{subsubsection.2.8.1}{File input and output}{subsection.2.8}% 15
+\BOOKMARK [2][-]{subsection.2.9}{Anomalies, Step 6: Normalized Anomalies: BlockingNormDevs}{section.2}% 16
+\BOOKMARK [3][-]{subsubsection.2.9.1}{File input and output}{subsection.2.9}% 17
+\BOOKMARK [2][-]{subsection.2.10}{Optional flags}{section.2}% 18
+\BOOKMARK [3][-]{subsubsection.2.10.1}{Variable and axis names}{subsection.2.10}% 19
+\BOOKMARK [3][-]{subsubsection.2.10.2}{File naming conventions}{subsection.2.10}% 20
+\BOOKMARK [3][-]{subsubsection.2.10.3}{Booleans}{subsection.2.10}% 21
+\BOOKMARK [1][-]{section.3}{DetectCyclonesUnstructured}{}% 22
+\BOOKMARK [2][-]{subsection.3.1}{Variable Specification}{section.3}% 23
+\BOOKMARK [2][-]{subsection.3.2}{MPI Support}{section.3}% 24
+\BOOKMARK [1][-]{section.4}{StitchNodes}{}% 25

@@ -1,20 +1,27 @@
-\contentsline {section}{\numberline {1}Objective blocking detection methods}{1}
-\contentsline {paragraph}{Geopotential height gradient (TM90)}{2}
-\contentsline {paragraph}{Anomaly methods (S04 and DG83)}{2}
-\contentsline {subsection}{\numberline {1.1}Optional flags}{2}
-\contentsline {subsubsection}{\numberline {1.1.1}File and variable names}{2}
-\contentsline {subsection}{\numberline {1.2}BlockingGHG}{3}
-\contentsline {subsubsection}{\numberline {1.2.1}File input and output}{4}
-\contentsline {subsection}{\numberline {1.3}Anomalies, Step 1 (S04): Input files: BlockingPV}{4}
-\contentsline {subsubsection}{\numberline {1.3.1}File input and output}{5}
-\contentsline {subsection}{\numberline {1.4}Anomalies, Step 2: Long Term Daily Mean: BlockingDFT}{5}
-\contentsline {subsubsection}{\numberline {1.4.1}File input and output}{6}
-\contentsline {subsection}{\numberline {1.5}Anomalies, Step 3: Unsmoothed and Smoothed Anomalies: BlockingDevs}{6}
-\contentsline {subsubsection}{\numberline {1.5.1}File input and output}{7}
-\contentsline {subsection}{\numberline {1.6}Anomalies, Step 4: Long Term Daily Mean of Anomalies: BlockingDFT}{7}
-\contentsline {subsection}{\numberline {1.7}Anomalies, Step 5: Spatiotemporally Varying Threshold: BlockingThresh}{7}
-\contentsline {subsubsection}{\numberline {1.7.1}File input and output}{8}
-\contentsline {section}{\numberline {2}DetectCyclonesUnstructured}{8}
-\contentsline {subsection}{\numberline {2.1}Variable Specification}{10}
-\contentsline {subsection}{\numberline {2.2}MPI Support}{11}
-\contentsline {section}{\numberline {3}StitchNodes}{11}
+\contentsline {section}{\numberline {1}Setting up TempestExtremes}{2}{section.1}
+\contentsline {section}{\numberline {2}Objective blocking detection methods}{2}{section.2}
+\contentsline {paragraph}{Geopotential height gradient (TM90)}{2}{section*.2}
+\contentsline {paragraph}{Anomaly methods (S04 and DG83)}{2}{section*.3}
+\contentsline {subsection}{\numberline {2.1}Blocking Event Detection: The StitchBlobs Framework}{3}{subsection.2.1}
+\contentsline {subsection}{\numberline {2.2}General workflow}{3}{subsection.2.2}
+\contentsline {subsection}{\numberline {2.3}BlockingGHG}{3}{subsection.2.3}
+\contentsline {subsubsection}{\numberline {2.3.1}File input and output}{4}{subsubsection.2.3.1}
+\contentsline {subsection}{\numberline {2.4}Anomalies, Step 1 (S04): Input files: BlockingPV}{4}{subsection.2.4}
+\contentsline {subsubsection}{\numberline {2.4.1}File input and output}{5}{subsubsection.2.4.1}
+\contentsline {subsection}{\numberline {2.5}Anomalies, Step 2: Long Term Daily Mean: BlockingDFT}{5}{subsection.2.5}
+\contentsline {subsubsection}{\numberline {2.5.1}File input and output}{6}{subsubsection.2.5.1}
+\contentsline {subsection}{\numberline {2.6}Anomalies, Step 3: Unsmoothed and Smoothed Anomalies: BlockingDevs}{6}{subsection.2.6}
+\contentsline {subsubsection}{\numberline {2.6.1}File input and output}{7}{subsubsection.2.6.1}
+\contentsline {subsection}{\numberline {2.7}Anomalies, Step 4a: Long Term Daily Mean of Anomalies: BlockingDFT}{7}{subsection.2.7}
+\contentsline {subsection}{\numberline {2.8}Anomalies, Step 4b: Spatiotemporally Varying Threshold: BlockingThresh}{7}{subsection.2.8}
+\contentsline {subsubsection}{\numberline {2.8.1}File input and output}{8}{subsubsection.2.8.1}
+\contentsline {subsection}{\numberline {2.9}Anomalies, Step 6: Normalized Anomalies: BlockingNormDevs}{8}{subsection.2.9}
+\contentsline {subsubsection}{\numberline {2.9.1}File input and output}{9}{subsubsection.2.9.1}
+\contentsline {subsection}{\numberline {2.10}Optional flags}{9}{subsection.2.10}
+\contentsline {subsubsection}{\numberline {2.10.1}Variable and axis names}{9}{subsubsection.2.10.1}
+\contentsline {subsubsection}{\numberline {2.10.2}File naming conventions}{10}{subsubsection.2.10.2}
+\contentsline {subsubsection}{\numberline {2.10.3}Booleans}{10}{subsubsection.2.10.3}
+\contentsline {section}{\numberline {3}DetectCyclonesUnstructured}{10}{section.3}
+\contentsline {subsection}{\numberline {3.1}Variable Specification}{12}{subsection.3.1}
+\contentsline {subsection}{\numberline {3.2}MPI Support}{13}{subsection.3.2}
+\contentsline {section}{\numberline {4}StitchNodes}{13}{section.4}

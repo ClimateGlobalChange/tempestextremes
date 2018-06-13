@@ -5,7 +5,8 @@
 \usepackage{multicol}
 \usepackage{color}
 \usepackage{comment}
-
+\usepackage{makeidx}
+\usepackage{hyperref}
 \oddsidemargin 0cm
 \evensidemargin 0cm
 
@@ -35,6 +36,8 @@
 \newcommand{\arccosh}{\mathrm{arccosh}}
 \newcommand{\arctanh}{\mathrm{arctanh}}
 
+\makeindex
+
 \begin{document}
 
 {\Huge \textbf{TempestExtremes}}
@@ -42,11 +45,17 @@
 
 \tableofcontents
 
+\section{Setting up TempestExtremes}
+
+All of the necessary source files for compiling TempestExtremes can be found at the GitHub repository \url{https://github.com/ClimateGlobalChange/tempestextremes}. Users can either download a zip file or \texttt{git clone} the url. 
+
+Once the directory has been set up, simply use the \texttt{make} command in the base directory (\texttt{\$BASE\_DIR/tempestextremes/}) and it will compile all of the necessary binaries.
+
 \section{Objective blocking detection methods}
 
 There are two main methods for block detection: the Z500 gradient method of Tibaldi and Molteni 1990 (hereafter referred to as TM90), and anomaly-based methods such as that of Dole and Gordon 1983 (Z500 anomaly, DG83) or Schwierz et al 2004 (potential vorticity anomaly, S04). 
 
-\paragraph{Geopotential height gradient (TM90)} Two slopes are calculated around a single gridpoint:
+\paragraph{Geopotential height gradient (TM90)} Two slopes are calculated around a single gridpoint:\index{Tibaldi and Molteni 1990}
 
 \begin{eqnarray}
 GHGN=\frac{Z(\phi_n)-Z(\phi_0)}{\phi_n-\phi_0}\\
@@ -64,51 +73,45 @@ This is a modification of the original TM90 algorithm, which was calculated for 
 \item If doing S04: Generate the input files using \texttt{BlockingPV}.
 \item Calculate the long term daily average, using \texttt{BlockingDFT} (Section \ref{avg})
 \item Calculate the anomalies from the long term daily average, using \texttt{BlockingDevs} (Section \ref{dev})
-\item (If using a non-constant threshold) Calculate the long term daily average of the anomalies using \texttt{BlockingDFT} for use in the threshold calculations
-\item (If using a non-constant threshold) Calculate a spatiotemporally varying threshold variable using \texttt{BlockingThresh}
+\item (If using a non-constant threshold) Calculate the long term daily average of the anomalies using \texttt{BlockingDFT} for use in the threshold calculations, then calculate a spatiotemporally varying threshold variable using \texttt{BlockingThresh}
 \item Calculate the normalized anomalies using \texttt{BlockingNormDevs}
 \end{enumerate}
 
 
-\textit{Potential Vorticity anomaly:} S04 uses vertically averaged (150-500 hPa) potential vorticity as the variable of choice for block detection. The presence of negative (positive) anomalies in the Northern (Southern) Hemisphere denotes either a slowing or reversal of the flow with respect to the climatological mean. 
+\textit{Potential Vorticity anomaly:} S04 uses vertically averaged (150-500 hPa) potential vorticity as the variable of choice for block detection. The presence of negative (positive) anomalies in the Northern (Southern) Hemisphere denotes either a slowing or reversal of the flow with respect to the climatological mean. \index{Schwierz et al 2004}
 
-\textit{Z500 anomaly:} DG83 uses 500 hPa geopotential height (Z500) anomaly as the variable of choice for block detection. The anomaly signifies heights that exceed a threshold above a climatological mean, 
+\textit{Z500 anomaly:} DG83 uses 500 hPa geopotential height (Z500) anomaly as the variable of choice for block detection. The anomaly signifies heights that exceed a threshold above a climatological mean.\index{Dole and Gordon 1983}
 
-\subsection{Optional flags}\label{option}
+All of the initial blocking code can be found in the \texttt{src/blocking/} directory.
 
-Some of the flags, such as \texttt{--latname}, are optional; if not provided, they will default to the value specified in the code. These flags are not all available for each program, so check the documentation to see which ones can be utilized (you can also run the desired program without any flags, which will print out the command list, raise an exception, and terminate).
+\subsection{Blocking Event Detection: The StitchBlobs Framework} \index{StitchBlobs}\index{BlobStats}
 
-\subsubsection{File and variable names}
-\begin{itemize}
-\item[] \texttt{--tname <string>}\\Name of the time axis (default \texttt{time}).
-\item[] \texttt{--levname <string>}\\Name of the vertical level axis (default \texttt{lev}).
-\item[]\texttt{--latname <string>}\\Name of the latitude axis (default \texttt{lat}).
-\item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
-\item[]\texttt{--insuff <string>}\\Input file extension string (default \texttt{.nc}).
-\item[]\texttt{--outsuff <string>}\\Output file naming convention (default varies between programs).
-\item[]\texttt{--insuff2d <string>}\\Input surface pressure file extension string (default \texttt{.nc}).
-\item[] \texttt{--outsuffipl<string>}\\Output interpolated variable file naming convention (default varies between programs).
-\item[] \texttt{--gh}\\Boolean that tells the program to convert geopotential to geopotential height ($Z=\frac{\Phi}{g}$).
-\item[] \texttt{--hpa}\\Boolean that tells the program that the pressure axis is in hPa instead of Pa.
-\item[] \texttt{--is4D}\\Boolean that tells the program that the input variable has 4 dimensions (time, vertical level, latitude, longitude).
-\end{itemize}
+StitchBlobs is a standardized framework for identifying persistent events (in this case, blocking). Clusters of grid points that meet minimum spatial constraints (if specified) and overlap over time are defined as individual events and tagged with unique identifiers. The corresponding BlobStats program reads in the StitchBlobs output and provides a text file with per-timestep information on size(in terms of maximum latitude/longitude extent or area) and location (in terms of the cluster centroid's latitude/longitude position). This allows the user to track events from start to finish and and examine trends in the event's spatial characteristics.
+
+There are options to provide constraints in terms of the study region (specifying minimum and maximum latitude and longitude values), cluster size, and minimum duration (in terms of number of timesteps).
+
+\subsection{General workflow}
+
+The following sections explain the various command line parameters that control the program inputs and outputs. Parameters with an asterisk (\texttt{*}) are mandatory and will raise an exception if not included. Parameters with multiple asterisks (\texttt{**}), such as \texttt{--in} and \texttt{inlist}, are also mandatory, but only one of the two should be used; if both are used, the program will raise an exception. If there is a default value, it is included in brackets (\texttt{["string"]}); otherwise, the quotation marks indicate a default empty string (\texttt{[""]}).
+
+Flags such as \texttt{--latname} are only necessary if the variable names differ from the default. These optional flags are marked with a plus (\texttt{+}) and are explained in Section \ref{option}.
 
 \subsection{BlockingGHG}\label{ghg}
 
 \begin{verbatim}
 Usage: BlockingGHG <parameter list>
 Parameters:
-  --in <string> [""]
-  --inlist <string>  [""]
+  --in <string> [""] **
+  --inlist <string>  [""] **
   --varname <string> ["Z"]
-  --tname <string> ["time"]
-  --latname <string> ["lat"]
-  --lonname <string> ["lon"]
-  --insuff <string> [".nc"]
-  --outsuff <string> ["_GHG.nc"]
-  --gh
-  --hpa
-  --is4D
+  --tname <string> ["time"] +
+  --latname <string> ["lat"] +
+  --lonname <string> ["lon"] +
+  --insuff <string> [".nc"] +
+  --outsuff <string> ["_GHG.nc"] +
+  --gh +
+  --hpa +
+  --is4D +
 \end{verbatim}
 
 \begin{itemize}
@@ -117,7 +120,7 @@ Parameters:
 \item[] \texttt{--varname <string>}\\ name of Z500 variable (default \texttt{Z}).
 \end{itemize}
 
-\textbf{Note: do not use both \texttt{--in} and \texttt{--inlist} flags simultaneously.}
+** Do not use both \texttt{--in} and \texttt{--inlist} flags simultaneously.
 
 
 \subsubsection{File input and output}
@@ -133,26 +136,26 @@ This program takes each input file containing the Z500 variable (specified by th
 \begin{verbatim}
 Usage: BlockingPV <parameter list>
 Parameters:
-  --in <string> [""]
-  --in2d <string> [""]
-  --inlist <string>  [""]
-  --inlist2d <string> [""]
-  --ipl
-  --hpa
+  --in <string> [""] **
+  --in2d <string> [""] 
+  --inlist <string>  [""] **
+  --inlist2d <string> [""] 
   --hasPV
-  --PVname <string> ["PV"]
-  --VPVname <string> ["VPV"]
-  --uname <string> ["U"]
-  --vname <string> ["V"]
-  --tempname <string> ["T"]
-  --tname <string> ["time"]
-  --levname <string> ["lev"]
-  --latname <string> ["lat"]
-  --lonname <string> ["lon"]
-  --insuff <string> [".nc"]
-  --outsuff <string> ["_integ.nc"]
-  --insuff2d <string> [".nc"]
-  --outsuff2d <string> ["_ipl.nc"]
+  --ipl +
+  --hpa +
+  --PVname <string> ["PV"] +
+  --VPVname <string> ["VPV"] +
+  --uname <string> ["U"] +
+  --vname <string> ["V"] +
+  --tempname <string> ["T"] +
+  --tname <string> ["time"] +
+  --levname <string> ["lev"] +
+  --latname <string> ["lat"] +
+  --lonname <string> ["lon"] +
+  --insuff <string> [".nc"] +
+  --outsuff <string> ["_integ.nc"] +
+  --insuff2d <string> [".nc"] +
+  --outsuff2d <string> ["_ipl.nc"] +
 \end{verbatim}
 
 
@@ -162,23 +165,18 @@ Parameters:
 \item[]\texttt{--in2d <string>} \\ Optional input file in NetCDF format containing surface pressure, with axes \texttt{[time, lat, lon]}. Only necessary if input file's vertical axis is on model levels.
 \item[]\texttt{--inlist <string>} \\ A list of input datafiles in NetCDF format containing temperature and wind variables, with axes \texttt{[time, lev, lat, lon]}
 \item[]\texttt{--inlist2d <string>} \\ Optional list of input datafiles in NetCDF format containing surface pressure, with axes \texttt{[time, lat, lon]}. Only necessary if input files' vertical axis is on model levels.
-\item[]\texttt{--ipl}\\ Optional bool directing program to create new input file with vertical pressure axis (using input file with vertical model level axis and surface pressure file)
-\item[]\texttt{--hpa} \\ Optional bool that tells program that pressure levels have units of hPa rather than Pa.
 \item[]\texttt{--hasPV} \\ Optional bool that tells program that PV variable is already present, and only vertically averaged PV needs to be calculated.
-\item[] \texttt{--PVname <string>}\\Name of the potential vorticity variable (default \texttt{PV}).
-\item[]\texttt{--VPVname <string>}\\Name of the output vertically averaged potential vorticity variable (default \texttt{VPV})
-\item[] \texttt{--uname <string>}\\Name of the zonal wind variable (default \texttt{U}).
-\item[] \texttt{--vname <string>}\\Name of the meridional wind variable (default \texttt{V}).
-\item[] \texttt{--tempname <string>}\\Name of the temperature variable (default \texttt{T}).
 \end{itemize}
 
-\textbf{Note: do not use both \texttt{--in} and \texttt{--inlist} flags simultaneously. Also, do not use both \texttt{--in2d} and \texttt{--inlist2d} flags simultaneously.}
+** Do not use both \texttt{--in} and \texttt{--inlist} flags simultaneously.
+
+
 
 \subsubsection{File input and output}
 
-Without the \texttt{--hasPV flag}, this program takes input files containing temperature (\texttt{T}) and zonal (\texttt{U}) and meridional (\texttt{V}) winds and outputs files  (original file name plus suffix \texttt{\_integ.nc}) with both potential vorticity (\texttt{PV}) and vertically averaged potential vorticity (\texttt{VPV}). 
+This program produces vertically averaged (150-500 hPa) potential vorticity for use in S04. Without the \texttt{--hasPV flag}, this program takes input files containing temperature (\texttt{T}) and zonal (\texttt{U}) and meridional (\texttt{V}) winds and outputs files  (original file name plus suffix \texttt{\_integ.nc}) with both potential vorticity (\texttt{PV}) and vertically averaged potential vorticity (\texttt{VPV}). 
 
-If potential vorticity variable is already present,  use the \texttt{--hasPV} flag (with optional \texttt{--PVname} flag if name of variable differs from the default) and the program will output new files (original file name plus suffix \texttt{\_integ.nc}) containing the vertically averaged \texttt{IPV} variable.
+If potential vorticity variable is already present in the input file,  use the \texttt{--hasPV} flag (with optional \texttt{--PVname} flag if name of variable differs from the default) and the program will output new files (original file name plus suffix \texttt{\_integ.nc}) containing the vertically averaged \texttt{IPV} variable.
 
 Input files should have a vertical axis on pressure levels. If the vertical axis is on model levels, use the \texttt{--ipl} flag, as well as input surface pressure files (\texttt{--in2d} or \texttt{--inlist2d}) to first interpolate variables to pressure levels. If the pressure levels are in units of hPa (or mb), use the \texttt{--hpa} flag to inform the program that the units need to be converted.
 
@@ -186,18 +184,18 @@ Input files should have a vertical axis on pressure levels. If the vertical axis
 \begin{verbatim}
 Usage: BlockingDFT <parameter list>
 Parameters:
-  --inlist <string>  [""]
-  --out <string>  [""]
-  --varname<string>  [""]
-  --avgname <string>  [""]
+  --inlist <string>  [""] *
+  --out <string>  [""] *
+  --varname<string>  [""] *
+  --avgname <string>  [""] *
   --ncoef <integer>  [12]
-  --tname <string> ["time"]
-  --levname <string> ["lev"]
-  --latname <string> ["lat"]
-  --lonname <string> ["lon"]
-  --is4D
-  --gh
-  --hpa
+  --is4D +
+  --gh +
+  --hpa +
+  --tname <string> ["time"] +
+  --levname <string> ["lev"] +
+  --latname <string> ["lat"] +
+  --lonname <string> ["lon"] +
 \end{verbatim}
 
 \begin{itemize}
@@ -217,21 +215,21 @@ The program outputs a file that contains the averaged variable with axes \texttt
 \begin{verbatim}
 Usage: BlockingDevs <parameter list>
 Parameters:
-  --in <string> [""]
-  --inlist <string>  [""]
-  --out <string> [""]
-  --avg <string> [""]
-  --avgname <string> [""]
-  --varname <string> [""]
+  --in <string> [""] **
+  --inlist <string>  [""] **
+  --out <string> [""] ***
+  --avg <string> [""] *
+  --avgname <string> [""] *
+  --varname <string> [""] *
   --pv
   --z500
-  --is4D
-  --gh
-  --hpa
-  --tname <string> ["time"]
-  --levname <string> ["lev"]
-  --latname <string> ["lat"]
-  --lonname <string> ["lon"]
+  --is4D +
+  --gh +
+  --hpa +
+  --tname <string> ["time"] +
+  --levname <string> ["lev"] +
+  --latname <string> ["lat"] +
+  --lonname <string> ["lon"] +
 \end{verbatim}
 
 \begin{itemize}
@@ -243,35 +241,41 @@ Parameters:
 \item[]\texttt{--pv} or \texttt{--z500}\\Boolean which specifies whether the vertically averaged potential anomaly (\texttt{--pv}) or 500 mb geopotential height (\texttt{--z500}) anomaly will be calculated. If neither is specified, the names for the unsmoothed (\texttt{--devname}) and smoothed (\texttt{--adevname}) anomalies are required.
 \end{itemize}
 
+** Do not use both \texttt{--in} and \texttt{--inlist} flags simultaneously.
+
+*** Only use \texttt{--out} in conjunction with the \texttt{--in} flag.
+
 \subsubsection{File input and output}
 This program takes a list of files and calculates anomalies from the long term daily mean (the file which was calculated in Section \ref{avg}). If \texttt{--z500} is not included, then the anomaly is simply $V^*=V-\overline{V}$. The boolean flag \texttt{--z500} tells the program to multiply the Z500 anomalies by a weight that is proportional to the sine of latitude (this eliminates bias in energy propagation due to the convergence of meridians at the higher latitudes).
 
 For each input file, the program produces a corresponding output file containing the calculated anomalies with the suffix (default \texttt{\_devs}) appended to the original file name. There are 2 output variables: the unsmoothed anomaly (\texttt{DVPV/DZ/other}) and  the anomaly with 2-day smoothing (\texttt{ADVPV/ADZ/other}).
 
 
-\subsection{Anomalies, Step 4: Long Term Daily Mean of Anomalies: BlockingDFT}\label{davg}
+\subsection{Anomalies, Step 4a: Long Term Daily Mean of Anomalies: BlockingDFT}\label{davg}
 
 The procedure is identical to that of Section \ref{avg}, except the list of input files will be a list of the anomaly files that were calculated in the previous step (Section \ref{dev}). It is recommended to use the smoothed anomalies.
 
-\subsection{Anomalies, Step 5: Spatiotemporally Varying Threshold: BlockingThresh}\label{thresh}
+Note that this step is optional if you wish to use a constant threshold value.
+
+\subsection{Anomalies, Step 4b: Spatiotemporally Varying Threshold: BlockingThresh}\label{thresh}
 
 \begin{verbatim}
 Usage: BlockingThresh <parameter list>
 Parameters:
-  --inlist <string>  [""]
-  --outfile <string>  [""]
-  --davgfile <string>  [""]
-  --davgname <string>  [""]
-  --dvarname <string> [""]
-  --tname <string> ["time"]
-  --levname <string> ["lev"]
-  --latname <string> ["lat"]
-  --lonname <string> ["lon"]
+  --inlist <string>  [""] *
+  --outfile <string>  [""] *
+  --davgfile <string>  [""] *
+  --davgname <string>  [""] *
+  --dvarname <string> [""] *
+  --tname <string> ["time"] +
+  --levname <string> ["lev"] +
+  --latname <string> ["lat"] +
+  --lonname <string> ["lon"] +
 \end{verbatim}
 
 \begin{itemize}
 \item[]\texttt{--inlist <string>} \\ A list of input datafiles in NetCDF format containing variables that will be averaged, with axes \texttt{[time, lat, lon]} (if axes are \texttt{[time, lev, lat, lon] } then use boolean flag \texttt{--is4D})
-\item[]\texttt{--outfile <string>} \\ Name of output file
+\item[]\texttt{--outfile <string>} \\ Name of output file.
 \item[]\texttt{--davgfile <string>} \\ Name of time-average anomalies file (as calculated in Section \ref{davg})
 \item[]\texttt{--davgname <string>} \\ Name of time-average anomaly variable
 \item[]\texttt{--dvarname <string>} \\ Name of the anomaly variable (preferably the smoothed anomaly variable)
@@ -280,10 +284,82 @@ Parameters:
 \subsubsection{File input and output}
 This program calculates a threshold field that varies in both time and space. The threshold is defined as 1.5 times the standard deviation of the anomaly values for a given day over the course of a range of years, and is calculated at each grid point. The threshold is smoothed across the latitude, longitude, and time axes using the same Fourier transform method that was utilized in Section \ref{avg}.
 
+The program outputs a file that contains the threshold variable with axes \texttt{[time, lat, lon]}. The time axis has 365 time steps, each representing a day in the year. The time axis has units of ``days since 0001-01-01''.
+
+Note that this step is optional if you wish to use a constant threshold value.
+
+\subsection{Anomalies, Step 6: Normalized Anomalies: BlockingNormDevs}\label{ndev}
+\begin{verbatim}
+Usage: BlockingNormDevs <parameter list>
+Parameters:
+  --in <string> [""] **
+  --inlist <string>  [""] **
+  --out <string> [""] ***
+  --varname <string> [""] *
+  --thresh <string> [""] ***
+  --threshname <string> [""] ***
+  --normname <string> [""]
+  --pv
+  --z500
+  --const ***
+  --threshval <double> [0.]
+  --minthreshval <double> [0.]
+  --tname <string> ["time"] +
+  --levname <string> ["lev"] +
+  --latname <string> ["lat"] +
+  --lonname <string> ["lon"] +
+\end{verbatim}
+
+\begin{itemize}
+\item[]\texttt{--in <string>}\\ Name of input datafile in NetCDF format.
+\item[]\texttt{--inlist <string>} \\ A list of input datafiles in NetCDF format. 
+\item[] \texttt{--out <string>} \\ Name of a single output file (only use with \texttt{--in} flag).
+\item[] \texttt{--varname <string>}\\Name of input anomaly variable which will be normalized.
+\item[]\texttt{--pv} or \texttt{--z500}\\Boolean which specifies whether the vertically averaged potential anomaly (\texttt{--pv}) or 500 mb geopotential height (\texttt{--z500}) anomaly will be used. If neither is specified, a generic anomaly normalization is performed.
+\item[]\texttt{--thresh <string>} Name of threshold file calculated in Section \ref{thresh} (if using spatiotemporally varying threshold)
+\end{itemize}
 
 
+** Do not use both \texttt{--in} and \texttt{--inlist} flags simultaneously.
 
+*** Either specify a threshold file with a spatiotemporally varying threshold (\texttt{--thresh}) or use the \texttt{--const} boolean to specify a constant threshold.
 
+\subsubsection{File input and output}
+This program calculates anomalies that are normalized by the specified threshold value. The \texttt{--pv} flag tells the program to search for negative anomalies in the Northern Hemisphere and positive anomalies in the Southern Hemisphere (minimum magnitude 1.1 PVU for varying threshold, or a constant 1.2 PVU threshold). The \texttt{--z500} flag tells the program to search for positive anomalies (minimum magnitude 100 m for varying threshold, or a constant 170 m threshold). If neither \texttt{--pv} nor \texttt{--z500} is specified, 
+
+\subsection{Optional flags}\label{option}
+
+Some of the flags, such as \texttt{--latname}, are optional; if not provided, they will default to the value specified in the code. These flags are not all available for each program, so check the documentation to see which ones can be utilized (you can also run the desired program without any flags, which will print out the command list, raise an exception, and terminate).
+
+\subsubsection{Variable and axis names}
+
+\begin{itemize}
+\item[] \texttt{--tname <string>}\\Name of the time axis (default \texttt{time}).
+\item[] \texttt{--levname <string>}\\Name of the vertical level axis (default \texttt{lev}).
+\item[]\texttt{--latname <string>}\\Name of the latitude axis (default \texttt{lat}).
+\item[]\texttt{--lonname <string>}\\Name of the longitude axis (default \texttt{lon}).
+\item[] \texttt{--PVname <string>}\\Name of the potential vorticity variable (default \texttt{PV}).
+\item[]\texttt{--VPVname <string>}\\Name of the output vertically averaged potential vorticity variable (default \texttt{VPV})
+\item[] \texttt{--uname <string>}\\Name of the zonal wind variable (default \texttt{U}).
+\item[] \texttt{--vname <string>}\\Name of the meridional wind variable (default \texttt{V}).
+\item[] \texttt{--tempname <string>}\\Name of the temperature variable (default \texttt{T}).
+\end{itemize}
+
+\subsubsection{File naming conventions}
+\begin{itemize}
+\item[]\texttt{--insuff <string>}\\Input file extension string (default \texttt{.nc}).
+\item[]\texttt{--insuff2d <string>}\\Input surface pressure file extension string (default \texttt{.nc}).
+\item[]\texttt{--outsuff <string>}\\Output file naming convention (default varies between programs).
+\item[] \texttt{--outsuffipl<string>}\\Output interpolated variable file naming convention (default varies between programs).
+\end{itemize}
+
+\subsubsection{Booleans}
+\begin{itemize}
+\item[] \texttt{--gh}\\Boolean that tells the program to convert geopotential to geopotential height ($Z=\frac{\Phi}{g}$).
+\item[] \texttt{--hpa}\\Boolean that tells the program that the pressure axis is in hPa instead of Pa.
+\item[]\texttt{--ipl}\\ Optional bool directing program to create new input file with vertical pressure axis (using input file with vertical model level axis and surface pressure file)
+\item[] \texttt{--is4D}\\Boolean that tells the program that the input variable has 4 dimensions (time, vertical level, latitude, longitude).
+\end{itemize}
 
 \section{DetectCyclonesUnstructured}
 
@@ -422,4 +498,5 @@ Parameters:
 \item[] \texttt{--timestride <integer>} \\ Only examine discrete times at the given stride (by default 1).
 \end{itemize}
 
+\printindex
 \end{document}
