@@ -47,9 +47,13 @@
 
 \section{Setting up TempestExtremes}
 
-All of the necessary source files for compiling TempestExtremes can be found at the GitHub repository \url{https://github.com/ClimateGlobalChange/tempestextremes}. Users can either download a zip file or \texttt{git clone} the url. 
+All of the necessary source files for compiling TempestExtremes can be found at the GitHub repository \url{https://github.com/ClimateGlobalChange/tempestextremes}. Users can either download a zip file and extract it into the directory of choice (here denoted as \texttt{\$USER\_DIR}) or 
 
-Once the directory has been set up, simply use the \texttt{make} command in the base directory (\texttt{\$BASE\_DIR/tempestextremes/}) and it will compile all of the necessary binaries.
+\texttt{git clone https://github.com/ClimateGlobalChange/tempestextremes} 
+
+into \texttt{\$USER\_DIR}.
+
+Once the directory has been set up, simply use the \texttt{make} command in the base directory (\texttt{\$USER\_DIR/tempestextremes/}) and it will compile all of the necessary binaries.
 
 \section{Objective blocking detection methods}
 
@@ -95,6 +99,33 @@ There are options to provide constraints in terms of the study region (specifyin
 The following sections explain the various command line parameters that control the program inputs and outputs. Parameters with an asterisk (\texttt{*}) are mandatory and will raise an exception if not included. Parameters with multiple asterisks (\texttt{**}), such as \texttt{--in} and \texttt{inlist}, are also mandatory, but only one of the two should be used; if both are used, the program will raise an exception. If there is a default value, it is included in brackets (\texttt{["string"]}); otherwise, the quotation marks indicate a default empty string (\texttt{[""]}).
 
 Flags such as \texttt{--latname} are only necessary if the variable names differ from the default. These optional flags are marked with a plus (\texttt{+}) and are explained in Section \ref{option}.
+
+\textbf{Example: Calculating vertically averaged PV anomalies with a non-constant threshold:} This example assumes a dataset with default axes \texttt{[time, lev, lat, lon]} with the \texttt{lev} axis initially in units of hPa.
+
+\begin{enumerate}
+\item Calculate vertically averaged PV from a list of input files, \texttt{inPV.txt}: \\
+\texttt{\$USER\_DIR/tempestextremes/bin/BlockingPV --hpa --inlist inPV.txt }
+\item Calculate the LTDM from a list of vertically averaged PV files, \texttt{VPV.txt}: \\
+\texttt{\$USER\_DIR/tempestextremes/bin/BlockingDFT  --inlist VPV.txt --out avgPV.nc --varname VPV --avgname AVPV }
+\item Calculate PV anomalies from the LTDM using list \texttt{VPV.txt}:\\
+ \texttt{\$USER\_DIR/tempestextremes/bin/BlockingDevs --inlist VAPV.txt --avg avgPV.nc --avgname AVPV --varname VPV --pv}
+\item Calculate the LTDM of anomalies from a list of anomaly files, \texttt{ADVPV.txt} and using the smoothed anomaly, \texttt{ADVPV}:\\
+\texttt{\$USER\_DIR/tempestextremes/bin/BlockingDFT --inlist ADVPV.txt --out avgADVPV.nc --varname ADVPV --avgname AVG\_ADVPV}
+\item Calculate a spatiotemporally varying threshold for the normalized anomalies calculation using \texttt{ADVPV.txt} and the averaged anomalies file: \\
+\texttt{\$USER\_DIR/tempestextremes/bin/BlockingThresh --inlist ADVPV.txt --outfile PVthresh.nc --davgfile avgADVPV.nc --davgname AVG\_ADVPV --dvarname ADVPV}
+\item Calculate normalized anomalies using the threshold file \texttt{PVthresh.nc} and list \texttt{ADVPV.txt}:\\
+\texttt{\$USER\_DIR/tempestextremes/bin/BlockingNormDevs --inlist ADVPV.txt --varname ADVPV --thresh PVthresh.nc --threshname THRESHOLD\_DFT --pv}
+\end{enumerate}
+
+\textbf{Example: Calculating 500 hPa geopotential height anomalies with a constant threshold:} This example assumes a dataset with default axes \texttt{[time, lev, lat, lon]} with the \texttt{lev} axis initially in units of hPa and geopotential (\texttt{GEOPOTENTIAL}), rather than geopotential height, as the input variable.
+
+\begin{enumerate}
+\item Calculate the LTDM from a list of input files, \texttt{fList.txt}, noting that the input has 4 axes rather than the default 3 and the variable is geopotential: \\
+\texttt{\$USER\_DIR/tempestextremes/bin/BlockingDFT  --inlist fLIst.txt --out avgZ500.nc --varname GEOPOTENTIAL--avgname AZ500 --hpa --is4D --gh}
+\item Calculate Z500 anomalies from the LTDM using list \texttt{fList.txt}:\\
+ \texttt{\$USER\_DIR/tempestextremes/bin/BlockingDevs --inlist fList.txt --avg avgZ500.nc --avgname AZ500 --varname GEOPOTENTIAL --z500 --hpa --gh --is4D}
+\item Calculate normalized anomalies 
+\end{enumerate}
 
 \subsection{BlockingGHG}\label{ghg}
 
@@ -282,7 +313,7 @@ Parameters:
 \end{itemize}
 
 \subsubsection{File input and output}
-This program calculates a threshold field that varies in both time and space. The threshold is defined as 1.5 times the standard deviation of the anomaly values for a given day over the course of a range of years, and is calculated at each grid point. The threshold is smoothed across the latitude, longitude, and time axes using the same Fourier transform method that was utilized in Section \ref{avg}.
+This program calculates a threshold field (with variable name \texttt{THRESHOLD\_DFT}) that varies in both time and space. The threshold is defined as 1.5 times the standard deviation of the anomaly values for a given day over the course of a range of years, and is calculated at each grid point. The threshold is smoothed across the latitude, longitude, and time axes using the same Fourier transform method that was utilized in Section \ref{avg}.
 
 The program outputs a file that contains the threshold variable with axes \texttt{[time, lat, lon]}. The time axis has 365 time steps, each representing a day in the year. The time axis has units of ``days since 0001-01-01''.
 
