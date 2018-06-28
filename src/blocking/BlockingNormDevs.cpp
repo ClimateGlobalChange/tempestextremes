@@ -44,6 +44,7 @@ int main(int argc, char **argv){
     bool PVCalc;
     bool GHCalc;
     bool const_thresh;
+    bool appendBool;
     double anomVal,minThresh;
     int startday, endday;
 
@@ -60,6 +61,7 @@ int main(int argc, char **argv){
       CommandLineBool(PVCalc,"pv");
       CommandLineBool(GHCalc,"z500");
       CommandLineBool(const_thresh,"const");
+      CommandLineBool(appendBool,"append");
       CommandLineDouble(anomVal,"threshval",0.);
       CommandLineDouble(minThresh,"minthreshval",0.);
       CommandLineString(tname,"tname","time");
@@ -157,7 +159,17 @@ int main(int argc, char **argv){
 
     for (int x=0; x<nFiles; x++){
 
-      NcFile infile(InputFiles[x].c_str());
+      //Opening in read/write or read only depending on bool
+      NcFile::FileMode readwrite;
+
+      if (appendBool){
+        readwrite=NcFile::Write;
+        std::cout << "Appending variable to file "<< InputFiles[x].c_str() <<std::endl;
+      }
+      else{
+        readwrite=NcFile::ReadOnly;
+      }
+      NcFile infile(InputFiles[x].c_str(),readwrite);
       if(!infile.is_valid()){
         _EXCEPTION1("Unable to open file \"%s\".",InputFiles[0].c_str());
       }
@@ -193,36 +205,6 @@ int main(int argc, char **argv){
       inTime->set_cur((long) 0);
       inTime->get(&(timeVals[0]),nTime);
 
-//      int dateYear; 
-  //    int dateMonth;
-    //  int dateDay;
-   //   int dateHour;
-      //std::cout<<"time units and calendar: "<<strTimeUnits<<","<<strCalendar<<std::endl;
-      //std::cout<<"first value of time variable:"<<timeVals[0]<<std::endl;
-  //    ParseTimeDouble(strTimeUnits, strCalendar, timeVals[0], dateYear,\
-        dateMonth, dateDay, dateHour);
-      //std::cout<<"D/M/Y:"<<dateDay<<"/"<<dateMonth<<"/"<<dateYear<<std::endl;
- //     int day = DayInYear(dateMonth,dateDay);
-      //std::cout<<"For month "<<dateMonth<<" and day "<<dateDay<<" day is "<<day<<std::endl;
- //     int startIndex = day-1;
-
-    //  int nSteps = int(1.0/(timeVals[1]-timeVals[0]));
-/*      double tRes;
-      if ((strTimeUnits.length() >= 11) && \
-        (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)){
-        tRes = timeVals[1]-timeVals[0];
-      }
-      else if((strTimeUnits.length() >= 12) && \
-      (strncmp(strTimeUnits.c_str(), "hours since ",12)==0)) {
-        tRes = (timeVals[1]-timeVals[0])/24.0;
-      }else if (strTimeUnits.length() >= 14 && \
-        (strncmp(strTimeUnits.c_str(),"minutes since ",14)== 0) ){
-        tRes = (timeVals[1]-timeVals[0])/(24. * 60.);
-      }else{
-       _EXCEPTIONT("Cannot determine time resolution (unknown time units).");
-      }
-      int nSteps = 1/tRes; 
-*/
       //Create output file that corresponds to IPV data
 
   
@@ -242,33 +224,50 @@ int main(int argc, char **argv){
       if (const_thresh){
         strOutFile = strOutFile.replace(strOutFile.end()-3,strOutFile.end(),"_const.nc");
       }
-      std::cout<<"Writing variables to file "<<strOutFile.c_str()<<std::endl;
-      NcFile outfile(strOutFile.c_str(), NcFile::Replace, NULL,0,NcFile::Offset64Bits);
-      int nOutTime = nTime;
-      NcDim *tDimOut = outfile.add_dim(tname.c_str(),nOutTime);
-      NcDim *latDimOut = outfile.add_dim(latname.c_str(),nLat);
-      NcDim *lonDimOut = outfile.add_dim(lonname.c_str(),nLon);
-
-      NcVar *tVarOut = outfile.add_var(tname.c_str(),ncDouble,tDimOut);
-      CopyNcVarAttributes(inTime,tVarOut);      
-      copy_dim_var(inTime,tVarOut);
-
-
-      NcVar *latVarOut = outfile.add_var(latname.c_str(),ncDouble,latDimOut);
-      copy_dim_var(inLat,latVarOut);
-      NcVar *lonVarOut = outfile.add_var(lonname.c_str(),ncDouble,lonDimOut);
-      copy_dim_var(inLon,lonVarOut);
-
-      NcVar *devIntOut = outfile.add_var(normName.c_str(),ncInt,tDimOut,latDimOut,lonDimOut);
+      if (appendBool){
+        //Does this variable already exist within the file?
+        NcVar *devIntOut = infile.get_var(normName.c_str());
+        if (devIntOut == NULL){
+          NcVar *devIntOut = infile.add_var(normName.c_str(),ncInt,tDim,latDim,lonDim);
+        }
       //Create variables for Deviations
+        if (PVCalc){
+          calcNormalizedDevs(true,varData,devIntOut,inLat,inTime,strTimeUnits,strCalendar,threshMat,minThresh);
 
-      if (PVCalc){
-        calcNormalizedDevs(true,varData,devIntOut,inLat,tVarOut,strTimeUnits,strCalendar,threshMat,minThresh);
-
+        }
+        else{
+          calcNormalizedDevs(false,varData,devIntOut,inLat,inTime,strTimeUnits,strCalendar,threshMat,minThresh);
+        }
       }
       else{
-        calcNormalizedDevs(false,varData,devIntOut,inLat,tVarOut,strTimeUnits,strCalendar,threshMat,minThresh);
+        std::cout<<"Writing variables to file "<<strOutFile.c_str()<<std::endl;
+        NcFile outfile(strOutFile.c_str(), NcFile::Replace, NULL,0,NcFile::Offset64Bits);
+        int nOutTime = nTime;
+        NcDim *tDimOut = outfile.add_dim(tname.c_str(),nOutTime);
+        NcDim *latDimOut = outfile.add_dim(latname.c_str(),nLat);
+        NcDim *lonDimOut = outfile.add_dim(lonname.c_str(),nLon);
+
+        NcVar *tVarOut = outfile.add_var(tname.c_str(),ncDouble,tDimOut);
+        CopyNcVarAttributes(inTime,tVarOut);      
+        copy_dim_var(inTime,tVarOut);
+
+
+        NcVar *latVarOut = outfile.add_var(latname.c_str(),ncDouble,latDimOut);
+        copy_dim_var(inLat,latVarOut);
+        NcVar *lonVarOut = outfile.add_var(lonname.c_str(),ncDouble,lonDimOut);
+        copy_dim_var(inLon,lonVarOut);
+        NcVar *devIntOut = outfile.add_var(normName.c_str(),ncInt,tDimOut,latDimOut,lonDimOut);
+        //Create variables for Deviations
+
+        if (PVCalc){
+          calcNormalizedDevs(true,varData,devIntOut,inLat,tVarOut,strTimeUnits,strCalendar,threshMat,minThresh);
+  
+        }
+        else{
+          calcNormalizedDevs(false,varData,devIntOut,inLat,tVarOut,strTimeUnits,strCalendar,threshMat,minThresh);
+        }
       }
+
     }
   }catch (Exception & e){
     std::cout<<e.ToString() <<std::endl;
