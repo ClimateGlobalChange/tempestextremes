@@ -64,7 +64,7 @@ try {
 	// Minimum pointwise integrated water vapor
 	double dMinIWV;
 
-	// Minimum area
+	// Minimum area (grid cells)
 	double dMinArea;
 
 	// Maximal areal fraction
@@ -82,7 +82,7 @@ try {
 	// Meridional max weight
 	double dMeridMaxWeight;
 
-	// Minimum area (steradians)
+	// Minimum area
 	int nMinArea;
 
 	// Add a time dimension if absent
