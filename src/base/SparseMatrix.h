@@ -153,6 +153,20 @@ public:
 		m_mapEntries.clear();
 	}
 
+	///	<summary>
+	///		Iterator to beginning of SparseMap.
+	///	</summary>
+	SparseMapIterator begin() {
+		return m_mapEntries.begin();
+	}
+
+	///	<summary>
+	///		Iterator to end of SparseMap.
+	///	</summary>
+	SparseMapIterator end() {
+		return m_mapEntries.end();
+	}
+
 public:
 	///	<summary>
 	///		Apply the sparse matrix to a DataVector.

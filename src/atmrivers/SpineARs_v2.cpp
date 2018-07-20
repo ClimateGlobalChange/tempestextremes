@@ -129,28 +129,13 @@ void BuildLaplacianOperator(
 	const SimpleGrid & grid,
 	int nLaplacianPoints,
 	double dLaplacianDist,
-	double dLaplacianSmoothDistFactor,
 	SparseMatrix<double> & opLaplacian
 ) {
 	opLaplacian.Clear();
 
 	int iRef = 0;
-/*
-	// Convert distance to radians
-	dMinDist = dMinDist * M_PI / 180.0;
-	dMaxDist = dMaxDist * M_PI / 180.0;
 
-	// Convert distance to chord length
-	dMinDist = 2.0 * sin(dMinDist / 2.0);
-	dMaxDist = 2.0 * sin(dMaxDist / 2.0);
-
-	// Convert distance to chord length squared
-	double dMinDist2 = dMinDist * dMinDist;
-	double dMaxDist2 = dMaxDist * dMaxDist;
-*/
-	// SPH smoothing distance
-	double dH = dLaplacianDist * dLaplacianSmoothDistFactor;
-	double dHScale = 3.0 / (2.0 * M_PI * dH * dH * dH);
+	double dScale = 4.0 / static_cast<double>(nLaplacianPoints);
 
 	// Create a kdtree with all nodes in grid
 	kdtree * kdGrid = kd_create(3);
@@ -198,13 +183,14 @@ void BuildLaplacianOperator(
 
 		std::cout << nNodes << " found at distance " << dMaxDist << std::endl;
 */
-		std::vector<int> vecCols;
-		std::vector<double> vecWeight;
-		double dVolume = 0.0;
-
+		//std::vector<int> vecCols;
+		//std::vector<double> vecWeight;
 		std::set<int> setPoints;
+		setPoints.insert(i);
 
-		for (int j = 0; j < nLaplacianPoints; j++) {
+		double dAccumulatedDiff = 0.0;
+
+		for (int j = 0; j < dXout.size(); j++) {
 			// Find the nearest grid point to the output point
 			kdres * kdr = kd_nearest3(kdGrid, dXout[j], dYout[j], dZout[j]);
 			if (kdr == NULL) {
@@ -218,6 +204,10 @@ void BuildLaplacianOperator(
 			int k = ((int*)(pData)) - (&iRef);
 
 			kd_res_free(kdr);
+
+			if (k == i) {
+				continue;
+			}
 
 			if (k > dXi.GetRows()) {
 				_EXCEPTIONT("Invalid point index");
@@ -261,55 +251,38 @@ void BuildLaplacianOperator(
 			// ============== END DEBUGGING =============================
 */
 
-			// Kernel derivatives (cubic kernel)
 			double dX1 = dXi[k] - dXi[i];
 			double dY1 = dYi[k] - dYi[i];
 			double dZ1 = dZi[k] - dZi[i];
 
-			double dDist2 = dX1 * dX1 + dY1 * dY1 + dZ1 * dZ1;
+			double dChordDist2 = dX1 * dX1 + dY1 * dY1 + dZ1 * dZ1;
 
-			double dQ = sqrt(dDist2) / dH;
-			double dTwoMinusQ = 2.0 - dQ;
+			double dSurfDist2 = 2.0 * asin(0.5 * sqrt(dChordDist2));
+			dSurfDist2 *= dSurfDist2;
 
-			double dW;
-			double dWq;
-			double dWqq;
-			if (dQ < 1.0) {
-				dW = 2.0/3.0 - dQ * dQ * (1.0 - 0.5 * dQ);
-				dWq =  -2.0 * dQ + 1.5 * dQ * dQ;
-				dWqq = -2.0 + 3.0 * dQ;
-			} else if (dQ < 2.0) {
-				dW = 1.0/6.0 * dTwoMinusQ * dTwoMinusQ * dTwoMinusQ;
-				dWq = -0.5 * dTwoMinusQ * dTwoMinusQ;
-				dWqq = dTwoMinusQ;
-			} else {
-				dW = 0.0;
-				dWq = 0.0;
-				dWqq = 0.0;
-			}
+			//double dTanDist2 = (2.0 - dChordDist2);
+			//dTanDist2 = dChordDist2 * (4.0 - dChordDist2) / (dTanDist2 * dTanDist2);
 
-			dW *= dHScale;
-			dWq *= dHScale;
-			dWqq *= dHScale;
+			opLaplacian(i,k) = dScale / dSurfDist2;
 
-			dVolume += dW;
-
-			vecCols.push_back(k);
-			vecWeight.push_back(dWqq / (dH * dH) + dWq * 2.0 / dH);
+			dAccumulatedDiff += dScale / dSurfDist2;
 		}
-		if (dVolume <= 0.0) {
-			_EXCEPTIONT("Logic error: point with negative volume detected");
-		}
+
+		opLaplacian(i,i) = - dAccumulatedDiff;
+
 		if (setPoints.size() < 5) {
-			Announce("WARNING: Fewer than 5 points used for Laplacian in cell %i"
-				" -- accuracy may be affected", i);
-		}
-
-		for (int j = 0; j < vecWeight.size(); j++) {
-			opLaplacian(i, vecCols[j]) = vecWeight[j] / dVolume;
+			Announce("WARNING: Only %i points used for Laplacian in cell %i"
+				" -- accuracy may be affected", setPoints.size(), i);
 		}
 	}
-
+/*
+	for (
+		SparseMatrix<double>::SparseMapIterator iter = opLaplacian.begin();
+		iter != opLaplacian.end(); iter++
+	) {
+		std::cout << iter->first.first << " " << iter->first.second << " " << iter->second << std::endl;
+	}
+*/
 	kd_free(kdGrid);
 }
 
@@ -340,9 +313,6 @@ try {
 
 	// Radius of the Laplacian
 	double dLaplacianDist;
-
-	// Laplacian smooth distance
-	double dLaplacianSmoothDistFactor;
 
 	// Minimum Laplacian
 	double dMinLaplacian;
@@ -387,12 +357,10 @@ try {
 		CommandLineString(strOutputVariable, "outvar", "");
 		CommandLineInt(nLaplacianPoints, "laplacianpoints", 8);
 		CommandLineDoubleD(dLaplacianDist, "laplaciandist", 10.0, "(degrees)");
-		CommandLineDouble(dLaplacianSmoothDistFactor, "laplaciansmoothdist", 1.2);
 		//CommandLineDoubleD(dMinLaplacianSize, "minlaplaciansize", 8.0, "(degrees)");
 		//CommandLineDoubleD(dMaxLaplacianSize, "maxlaplaciansize", 12.0, "(degrees)");
 		CommandLineDouble(dMinLaplacian, "minlaplacian", 0.5e4);
 		CommandLineDouble(dMinAbsLat, "minabslat", 15.0);
-		CommandLineDouble(dEqBandMaxLat, "eqbandmaxlat", 15.0);
 		CommandLineDouble(dMinIWV, "minval", 20.0);
 		CommandLineInt(nMinArea, "minarea", 0);
 		CommandLineInt(nAddTimeDim, "addtimedim", -1);
@@ -564,7 +532,6 @@ try {
 		grid,
 		nLaplacianPoints,
 		dLaplacianDist,
-		dLaplacianSmoothDistFactor,
 		opLaplacian);
 
 	AnnounceEndBlock("Done");
@@ -572,7 +539,7 @@ try {
 	// Input buffers and output variables
 	DataVector<double> dIWV(grid.GetSize());
 
-	DataVector<int> dIWVtag(grid.GetSize());
+	DataVector<int> bIWVtag(grid.GetSize());
 	DataVector<double> dLaplacian(grid.GetSize());
 
 	// Create output variables
@@ -682,7 +649,37 @@ try {
 		AnnounceStartBlock("Applying Laplacian");
 		opLaplacian.Apply(dIWV, dLaplacian);
 		AnnounceEndBlock("Done");
+/*
+		// DEBUG: Output Laplacian range
+		double dMinLaplacian = dLaplacian[0];
+		double dMaxLaplacian = dLaplacian[0];
+		for (int i = 0; i < dLaplacian.GetRows(); i++) {
+			if (dLaplacian[i] < dMinLaplacian) {
+				dMinLaplacian = dLaplacian[i];
+			}
+			if (dLaplacian[i] > dMaxLaplacian) {
+				dMaxLaplacian = dLaplacian[i];
+			}
+		}
+		Announce("Laplacian Range: %1.5e %1.5e", dMinLaplacian, dMaxLaplacian);
+*/
 
+		AnnounceStartBlock("Build tagged cell array");
+		bIWVtag.Zero();
+		for (int i = 0; i < dLaplacian.GetRows(); i++) {
+			if (fabs(grid.m_dLat[i]) < dMinAbsLat) {
+				continue;
+			}
+			if (dIWV[i] < dMinIWV) {
+				continue;
+			}
+			if (dLaplacian[i] > -dMinLaplacian) {
+				continue;
+			}
+
+			bIWVtag[i] = 1;
+		}
+		AnnounceEndBlock("Done");
 /*
 
 		// Compute zonal threshold
@@ -865,8 +862,16 @@ try {
 				}
 			}
 
-			//varIWVtag->set_cur(t, 0, 0);
-			//varIWVtag->put(&(dIWVtag[0][0]), 1, dimLatOut->size(), dimLonOut->size());
+			if (grid.m_nGridDim.size() == 1) {
+				varIWVtag->set_cur(t, 0);
+				varIWVtag->put(&(bIWVtag[0]), 1, grid.m_nGridDim[0]);
+			} else if (grid.m_nGridDim.size() == 2) {
+
+				varIWVtag->set_cur(t, 0, 0);
+				varIWVtag->put(&(bIWVtag[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
+			} else {
+				_EXCEPTION();
+			}
 
 		} else {
 			if (varLaplacian != NULL) {
@@ -881,8 +886,15 @@ try {
 				}
 			}
 
-			//varIWVtag->set_cur(0, 0);
-			//varIWVtag->put(&(dIWVtag[0][0]), dimLatOut->size(), dimLonOut->size());
+			if (grid.m_nGridDim.size() == 1) {
+				varIWVtag->set_cur((long)0);
+				varIWVtag->put(&(bIWVtag[0]), grid.m_nGridDim[0]);
+			} else if (grid.m_nGridDim.size() == 2) {
+				varIWVtag->set_cur(0, 0);
+				varIWVtag->put(&(bIWVtag[0]), grid.m_nGridDim[0], grid.m_nGridDim[1]);
+			} else {
+				_EXCEPTION();
+			}
 		}
 
 		AnnounceEndBlock("Done");
