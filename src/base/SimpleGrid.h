@@ -147,12 +147,12 @@ public:
 
 public:
 	///	<summary>
-	///		Longitude of each grid point.
+	///		Longitude of each grid point (in degrees).
 	///	</summary>
 	DataVector<double> m_dLon;
 
 	///	<summary>
-	///		Latitude of each grid point.
+	///		Latitude of each grid point (in degrees).
 	///	</summary>
 	DataVector<double> m_dLat;
 
