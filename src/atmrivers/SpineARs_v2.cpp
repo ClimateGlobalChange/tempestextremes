@@ -14,12 +14,11 @@
 ///		or implied warranty.
 ///	</remarks>
 
+#include "Variable.h"
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
 #include "SimpleGrid.h"
-#include "SparseMatrix.h"
-#include "kdtree.h"
 
 #include "DataVector.h"
 #include "DataMatrix.h"
@@ -28,6 +27,11 @@
 #include "NetCDFUtilities.h"
 
 #include <set>
+#include <queue>
+
+#if defined(TEMPEST_MPIOMP)
+#include <mpi.h>
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -35,381 +39,439 @@ typedef std::pair<int, int> Point;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void GenerateEqualDistanceSpherePoints(
-	double dX0,
-	double dY0,
-	double dZ0,
-	int nPoints,
-	double dDist,
-	std::vector<double> & dXout,
-	std::vector<double> & dYout,
-	std::vector<double> & dZout
-) { 
-	dXout.resize(nPoints);
-	dYout.resize(nPoints);
-	dZout.resize(nPoints);
+///	<summary>
+///		A class storing a thresholding operator.
+///	</summary>
+class ThresholdOp {
 
-	// Pick a quasi-arbitrary reference direction
-	double dX1;
-	double dY1;
-	double dZ1;
-	if ((fabs(dX0) >= fabs(dY0)) && (fabs(dX0) >= fabs(dZ0))) {
-		dX1 = dX0;
-		dY1 = dY0 + 1.0;
-		dZ1 = dZ0;
-	} else if ((fabs(dY0) >= fabs(dX0)) && (fabs(dY0) >= fabs(dZ0))) {
-		dX1 = dX0;
-		dY1 = dY0;
-		dZ1 = dZ0 + 1.0;
-	} else {
-		dX1 = dX0 + 1.0;
-		dY1 = dY0;
-		dZ1 = dZ0;
-	}
+public:
+	///	<summary>
+	///		Possible operations.
+	///	</summary>
+	enum Operation {
+		GreaterThan,
+		LessThan,
+		GreaterThanEqualTo,
+		LessThanEqualTo,
+		EqualTo,
+		NotEqualTo
+	};
 
-	// Project perpendicular to detection location
-	double dDot = dX1 * dX0 + dY1 * dY0 + dZ1 * dZ0;
-
-	dX1 -= dDot * dX0;
-	dY1 -= dDot * dY0;
-	dZ1 -= dDot * dZ0;
-
-	// Normalize
-	double dMag1 = sqrt(dX1 * dX1 + dY1 * dY1 + dZ1 * dZ1);
-
-	if (dMag1 < 1.0e-12) {
-		_EXCEPTIONT("Logic error");
-	}
-
-	double dScale1 = tan(dDist * M_PI / 180.0) / dMag1;
-
-	dX1 *= dScale1;
-	dY1 *= dScale1;
-	dZ1 *= dScale1;
-
-	// Verify dot product is zero
-	dDot = dX0 * dX1 + dY0 * dY1 + dZ0 * dZ1;
-	if (fabs(dDot) > 1.0e-12) {
-		_EXCEPTIONT("Logic error");
-	}
-
-	// Cross product (magnitude automatically 
-	double dCrossX = dY0 * dZ1 - dZ0 * dY1;
-	double dCrossY = dZ0 * dX1 - dX0 * dZ1;
-	double dCrossZ = dX0 * dY1 - dY0 * dX1;
-
-	// Generate all points
-	for (int j = 0; j < nPoints; j++) {
-
-		// Angle of rotation
-		double dAngle = 2.0 * M_PI
-			* static_cast<double>(j)
-			/ static_cast<double>(nPoints);
-
-		// Calculate new rotated vector
-		double dX2 = dX0 + dX1 * cos(dAngle) + dCrossX * sin(dAngle);
-		double dY2 = dY0 + dY1 * cos(dAngle) + dCrossY * sin(dAngle);
-		double dZ2 = dZ0 + dZ1 * cos(dAngle) + dCrossZ * sin(dAngle);
-
-		double dMag2 = sqrt(dX2 * dX2 + dY2 * dY2 + dZ2 * dZ2);
-
-		dX2 /= dMag2;
-		dY2 /= dMag2;
-		dZ2 /= dMag2;
-
-		dXout[j] = dX2;
-		dYout[j] = dY2;
-		dZout[j] = dZ2;
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void BuildLaplacianOperator(
-	const SimpleGrid & grid,
-	int nLaplacianPoints,
-	double dLaplacianDist,
-	SparseMatrix<double> & opLaplacian
-) {
-	opLaplacian.Clear();
-
-	int iRef = 0;
-
-	double dScale = 4.0 / static_cast<double>(nLaplacianPoints);
-
-	// Create a kdtree with all nodes in grid
-	kdtree * kdGrid = kd_create(3);
-	if (kdGrid == NULL) {
-		_EXCEPTIONT("Error creating kdtree");
-	}
-
-	DataVector<double> dXi(grid.GetSize());
-	DataVector<double> dYi(grid.GetSize());
-	DataVector<double> dZi(grid.GetSize());
-	for (int i = 0; i < grid.GetSize(); i++) {
-		double dLat = grid.m_dLat[i] * M_PI / 180.0;
-		double dLon = grid.m_dLon[i] * M_PI / 180.0;
-
-		dXi[i] = cos(dLon) * cos(dLat);
-		dYi[i] = sin(dLon) * cos(dLat);
-		dZi[i] = sin(dLat);
-
-		kd_insert3(kdGrid, dXi[i], dYi[i], dZi[i], (void*)((&iRef)+i));
-	}
-
-	// Construct the Laplacian operator using SPH
-	for (int i = 0; i < grid.GetSize(); i++) {
-
-		// Generate points for the Laplacian
-		std::vector<double> dXout;
-		std::vector<double> dYout;
-		std::vector<double> dZout;
-
-		GenerateEqualDistanceSpherePoints(
-			dXi[i], dYi[i], dZi[i],
-			nLaplacianPoints,
-			dLaplacianDist,
-			dXout, dYout, dZout);
-
-		dXout.push_back(dXi[i]);
-		dYout.push_back(dYi[i]);
-		dZout.push_back(dZi[i]);
-/*
-		kdres * kdr = kd_nearest_range3(kdGrid, dXi[i], dYi[i], dZi[i], dMaxDist);
-		if (kdr == NULL) {
-			_EXCEPTIONT("Error in kd_nearest_range3");
-		}
-		int nNodes = kd_res_size(kdr);
-
-		std::cout << nNodes << " found at distance " << dMaxDist << std::endl;
-*/
-		//std::vector<int> vecCols;
-		//std::vector<double> vecWeight;
-		std::set<int> setPoints;
-		setPoints.insert(i);
-
-		double dAccumulatedDiff = 0.0;
-
-		for (int j = 0; j < dXout.size(); j++) {
-			// Find the nearest grid point to the output point
-			kdres * kdr = kd_nearest3(kdGrid, dXout[j], dYout[j], dZout[j]);
-			if (kdr == NULL) {
-				_EXCEPTIONT("NULL return value in call to kd_nearest3");
-			}
-
-			void* pData = kd_res_item_data(kdr);
-			if (pData == NULL) {
-				_EXCEPTIONT("NULL data index");
-			}
-			int k = ((int*)(pData)) - (&iRef);
-
-			kd_res_free(kdr);
-
-			if (k == i) {
-				continue;
-			}
-
-			if (k > dXi.GetRows()) {
-				_EXCEPTIONT("Invalid point index");
-			}
-
-			// Ensure points are not duplicated
-			if (setPoints.find(k) != setPoints.end()) {
-				continue;
-			} else {
-				setPoints.insert(k);
-			}
-	/*
-			// ============== BEGIN DEBUGGING =============================
-			double dLon0 = atan2(dYi[i], dXi[i]) * 180.0 / M_PI;
-			double dLat0 = asin(dZi[i]) * 180.0 / M_PI;
-
-			double dLon1 = atan2(dYout[j], dXout[j]) * 180.0 / M_PI;
-			double dLat1 = asin(dZout[j]) * 180.0 / M_PI;
-
-			double dDist0 =
-				sqrt(
-					(dXout[j] - dXi[i]) * (dXout[j] - dXi[i])
-					+ (dYout[j] - dYi[i]) * (dYout[j] - dYi[i])
-					+ (dZout[j] - dZi[i]) * (dZout[j] - dZi[i]));
-
-			std::cout << 2.0 * sin(dDist0 / 2.0) * 180.0 / M_PI << std::endl;
-
-			double dDist1 =
-				sqrt(
-					(dXi[k] - dXi[i]) * (dXi[k] - dXi[i])
-					+ (dYi[k] - dYi[i]) * (dYi[k] - dYi[i])
-					+ (dZi[k] - dZi[i]) * (dZi[k] - dZi[i]));
-
-			std::cout << 2.0 * sin(dDist1 / 2.0) * 180.0 / M_PI << std::endl;
-
-			double dLon2 = atan2(dYi[k], dXi[k]) * 180.0 / M_PI;
-			double dLat2 = asin(dZi[k]) * 180.0 / M_PI;
-
-			printf("XY: %1.3f %1.3f :: %1.3f %1.3f :: %1.3f %1.3f\n", dXi[i], dYi[i], dXout[j], dYout[j], dXi[k], dYi[k]);
-			printf("LL: %1.2f %1.2f :: %1.2f %1.2f\n", dLon0, dLat0, dLon1, dLat1);
-			// ============== END DEBUGGING =============================
-*/
-
-			double dX1 = dXi[k] - dXi[i];
-			double dY1 = dYi[k] - dYi[i];
-			double dZ1 = dZi[k] - dZi[i];
-
-			double dChordDist2 = dX1 * dX1 + dY1 * dY1 + dZ1 * dZ1;
-
-			double dSurfDist2 = 2.0 * asin(0.5 * sqrt(dChordDist2));
-			dSurfDist2 *= dSurfDist2;
-
-			//double dTanDist2 = (2.0 - dChordDist2);
-			//dTanDist2 = dChordDist2 * (4.0 - dChordDist2) / (dTanDist2 * dTanDist2);
-
-			opLaplacian(i,k) = dScale / dSurfDist2;
-
-			dAccumulatedDiff += dScale / dSurfDist2;
-		}
-
-		opLaplacian(i,i) = - dAccumulatedDiff;
-
-		if (setPoints.size() < 5) {
-			Announce("WARNING: Only %i points used for Laplacian in cell %i"
-				" -- accuracy may be affected", setPoints.size(), i);
-		}
-	}
-/*
-	for (
-		SparseMatrix<double>::SparseMapIterator iter = opLaplacian.begin();
-		iter != opLaplacian.end(); iter++
+public:
+	///	<summary>
+	///		Parse a threshold operator string.
+	///	</summary>
+	void Parse(
+		VariableRegistry & varreg,
+		const std::string & strOp
 	) {
-		std::cout << iter->first.first << " " << iter->first.second << " " << iter->second << std::endl;
+		// Read mode
+		enum {
+			ReadMode_Op,
+			ReadMode_Value,
+			ReadMode_Distance,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Op;
+
+		// Parse variable
+		Variable var;
+		int iLast = var.ParseFromString(varreg, strOp) + 1;
+		m_varix = varreg.FindOrRegister(var);
+
+		// Loop through string
+		for (int i = iLast; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in operation
+				if (eReadMode == ReadMode_Op) {
+					if (strSubStr == ">") {
+						m_eOp = GreaterThan;
+					} else if (strSubStr == "<") {
+						m_eOp = LessThan;
+					} else if (strSubStr == ">=") {
+						m_eOp = GreaterThanEqualTo;
+					} else if (strSubStr == "<=") {
+						m_eOp = LessThanEqualTo;
+					} else if (strSubStr == "=") {
+						m_eOp = EqualTo;
+					} else if (strSubStr == "!=") {
+						m_eOp = NotEqualTo;
+					} else {
+						_EXCEPTION1("Threshold invalid operation \"%s\"",
+							strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Value;
+
+				// Read in value
+				} else if (eReadMode == ReadMode_Value) {
+					m_dValue = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Distance;
+
+				// Read in minimum count
+				} else if (eReadMode == ReadMode_Distance) {
+					m_dDistance = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
+							"\nRequired: \"<name>,<operation>"
+							",<value>,<distance>\"",
+							strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
+					"\nRequired: \"<name>,<operation>,<value>,<distance>\"",
+					strOp.c_str());
+		}
+
+		if (m_dDistance < 0.0) {
+			_EXCEPTIONT("For threshold op, distance must be nonnegative");
+		}
+
+		// Output announcement
+		std::string strDescription = var.ToString(varreg);
+		if (m_eOp == GreaterThan) {
+			strDescription += " is greater than ";
+		} else if (m_eOp == LessThan) {
+			strDescription += " is less than ";
+		} else if (m_eOp == GreaterThanEqualTo) {
+			strDescription += " is greater than or equal to ";
+		} else if (m_eOp == LessThanEqualTo) {
+			strDescription += " is less than or equal to ";
+		} else if (m_eOp == EqualTo) {
+			strDescription += " is equal to ";
+		} else if (m_eOp == NotEqualTo) {
+			strDescription += " is not equal to ";
+		}
+
+		char szBuffer[128];
+		sprintf(szBuffer, "%f within %f degrees",
+			m_dValue, m_dDistance);
+		strDescription += szBuffer;
+
+		Announce("%s", strDescription.c_str());
 	}
-*/
-	kd_free(kdGrid);
+
+public:
+	///	<summary>
+	///		Variable to use for thresholding.
+	///	</summary>
+	VariableIndex m_varix;
+
+	///	<summary>
+	///		Operation.
+	///	</summary>
+	Operation m_eOp;
+
+	///	<summary>
+	///		Threshold value.
+	///	</summary>
+	double m_dValue;
+
+	///	<summary>
+	///		Distance to search for threshold value
+	///	</summary>
+	double m_dDistance;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Determine if the given field satisfies the threshold.
+///	</summary>
+template <typename real>
+bool SatisfiesThreshold(
+	const SimpleGrid & grid,
+	const DataVector<real> & dataState,
+	const int ix0,
+	const ThresholdOp::Operation op,
+	const double dTargetValue,
+	const double dMaxDist
+) {
+	// Special case if dMaxDist is zero
+	if (dMaxDist < 1.0e-12) {
+		double dValue = dataState[ix0];
+
+		if (op == ThresholdOp::GreaterThan) {
+			if (dValue > dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::LessThan) {
+			if (dValue < dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::GreaterThanEqualTo) {
+			if (dValue >= dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::LessThanEqualTo) {
+			if (dValue <= dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::EqualTo) {
+			if (dValue == dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::NotEqualTo) {
+			if (dValue != dTargetValue) {
+				return true;
+			}
+
+		} else {
+			_EXCEPTIONT("Invalid operation");
+		}
+
+	}
+
+	// Verify that dMaxDist is less than 180.0
+	if (dMaxDist > 180.0) {
+		_EXCEPTIONT("MaxDist must be less than 180.0");
+	}
+
+	// Queue of nodes that remain to be visited
+	std::queue<int> queueNodes;
+	queueNodes.push(ix0);
+
+	// Set of nodes that have already been visited
+	std::set<int> setNodesVisited;
+
+	// Latitude and longitude at the origin
+	double dLat0 = grid.m_dLat[ix0];
+	double dLon0 = grid.m_dLon[ix0];
+
+	// Loop through all latlon elements
+	while (queueNodes.size() != 0) {
+		int ix = queueNodes.front();
+		queueNodes.pop();
+
+		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
+			continue;
+		}
+
+		setNodesVisited.insert(ix);
+
+		// Great circle distance to this element
+		double dLatThis = grid.m_dLat[ix];
+		double dLonThis = grid.m_dLon[ix];
+
+		double dR =
+			sin(dLat0) * sin(dLatThis)
+			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
+
+		if (dR >= 1.0) {
+			dR = 0.0;
+		} else if (dR <= -1.0) {
+			dR = 180.0;
+		} else {
+			dR = 180.0 / M_PI * acos(dR);
+		}
+		if (dR != dR) {
+			_EXCEPTIONT("NaN value detected");
+		}
+
+		if ((ix != ix0) && (dR > dMaxDist)) {
+			continue;
+		}
+
+		// Value at this location
+		double dValue = dataState[ix];
+
+		// Apply operator
+		if (op == ThresholdOp::GreaterThan) {
+			if (dValue > dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::LessThan) {
+			if (dValue < dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::GreaterThanEqualTo) {
+			if (dValue >= dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::LessThanEqualTo) {
+			if (dValue <= dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::EqualTo) {
+			if (dValue == dTargetValue) {
+				return true;
+			}
+
+		} else if (op == ThresholdOp::NotEqualTo) {
+			if (dValue != dTargetValue) {
+				return true;
+			}
+
+		} else {
+			_EXCEPTIONT("Invalid operation");
+		}
+
+		// Special case: zero distance
+		if (dMaxDist == 0.0) {
+			return false;
+		}
+
+		// Add all neighbors of this point
+		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+			queueNodes.push(grid.m_vecConnectivity[ix][n]);
+		}
+	}
+
+	return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-int main(int argc, char** argv) {
+///	<summary>
+///		Parse the list of input files.
+///	</summary>
+void ParseInputFiles(
+	const std::string & strInputFile,
+	std::vector<NcFile *> & vecFiles
+) {
+	int iLast = 0;
+	for (int i = 0; i <= strInputFile.length(); i++) {
+		if ((i == strInputFile.length()) ||
+		    (strInputFile[i] == ';')
+		) {
+			std::string strFile =
+				strInputFile.substr(iLast, i - iLast);
 
-	NcError error(NcError::silent_nonfatal);
+			NcFile * pNewFile = new NcFile(strFile.c_str());
 
-try {
-	// Input file
-	std::string strInputFile;
+			if (!pNewFile->is_valid()) {
+				_EXCEPTION1("Cannot open input file \"%s\"",
+					strFile.c_str());
+			}
 
-	// Output file
-	std::string strOutputFile;
+			vecFiles.push_back(pNewFile);
+			iLast = i+1;
+		}
+	}
 
-	// Grid connectivity file
-	std::string strConnectivity;
+	if (vecFiles.size() == 0) {
+		_EXCEPTION1("No input files found in \"%s\"",
+			strInputFile.c_str());
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class SpineARsParam {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	SpineARsParam() :
+		fpLog(NULL),
+		nLaplacianPoints(0),
+		dLaplacianDist(0.0),
+		dMinLaplacian(0.0),
+		dMinAbsLat(0.0),
+		fOutputLaplacian(false),
+		fRegional(false),
+		iVerbosityLevel(0),
+		pvecThresholdOp(NULL)
+	{ }
+
+public:
+	// Log
+	FILE * fpLog;
 
 	// Input integrated water vapor variable name
-	std::string strIWVVariable;
-
-	// Output variable name
-	std::string strOutputVariable;
+	//std::string strIWVVariable;
 
 	// Number of points in Laplacian calculation
 	int nLaplacianPoints;
 
-	// Radius of the Laplacian
+	// Radius of the Laplacian (in degrees)
 	double dLaplacianDist;
 
 	// Minimum Laplacian
 	double dMinLaplacian;
 
-	// Minimum absolute latitude
+	// Minimum absolute latitude (in degrees)
 	double dMinAbsLat;
 
-	// Maximum absolute latitude of equatorial band
-	double dEqBandMaxLat;
-
 	// Minimum pointwise integrated water vapor
-	double dMinIWV;
-
-	// Minimum area
-	double dMinArea;
-
-	// Maximal areal fraction
-	double dMaxArealFraction;
-
-	// Minimum area
-	int nMinArea;
-
-	// Add a time dimension if absent
-	int nAddTimeDim;
-
-	// Time dimension units
-	std::string strAddTimeDimUnits;
+	//double dMinIWV;
 
 	// Output Laplacian
 	bool fOutputLaplacian;
 
-	// Regional data
+	// Regional (do not wrap longitudinal boundaries)
 	bool fRegional;
 
-	// Parse the command line
-	BeginCommandLine()
-		CommandLineString(strInputFile, "in", "");
-		//CommandLineString(strInputFileList, "inlist", "");
-		CommandLineString(strOutputFile, "out", "");
-		CommandLineString(strConnectivity, "in_connect", "");
-		CommandLineString(strIWVVariable, "var", "");
-		CommandLineString(strOutputVariable, "outvar", "");
-		CommandLineInt(nLaplacianPoints, "laplacianpoints", 8);
-		CommandLineDoubleD(dLaplacianDist, "laplaciandist", 10.0, "(degrees)");
-		//CommandLineDoubleD(dMinLaplacianSize, "minlaplaciansize", 8.0, "(degrees)");
-		//CommandLineDoubleD(dMaxLaplacianSize, "maxlaplaciansize", 12.0, "(degrees)");
-		CommandLineDouble(dMinLaplacian, "minlaplacian", 0.5e4);
-		CommandLineDouble(dMinAbsLat, "minabslat", 15.0);
-		CommandLineDouble(dMinIWV, "minval", 20.0);
-		CommandLineInt(nMinArea, "minarea", 0);
-		CommandLineInt(nAddTimeDim, "addtimedim", -1);
-		CommandLineString(strAddTimeDimUnits, "addtimedimunits", "");
-		CommandLineBool(fOutputLaplacian, "laplacianout");
-		CommandLineBool(fRegional, "regional");
+	// Verbosity level
+	int iVerbosityLevel;
 
-		ParseCommandLine(argc, argv);
-	EndCommandLine(argv)
+	// Vector of threshold operators
+	std::vector<ThresholdOp> * pvecThresholdOp;
+};
 
-	AnnounceBanner();
+///////////////////////////////////////////////////////////////////////////////
 
-	// Check input
-	if (strInputFile == "") {
-		_EXCEPTIONT("No input file (--in) specified");
+void SpineARs(
+	int iFile,
+	const std::string & strInputFiles,
+	const std::string & strOutputFile,
+	const std::string & strConnectivity,
+	VariableRegistry & varreg,
+	const SpineARsParam & param
+) {
+	// Set the Announce buffer
+	if (param.fpLog == NULL) {
+		_EXCEPTIONT("Invalid log buffer");
 	}
 
-	// Check output
-	if (strOutputFile == "") {
-		_EXCEPTIONT("No output file (--out) specified");
-	}
+	AnnounceSetOutputBuffer(param.fpLog);
+	AnnounceOutputOnAllRanks();
 
-	// Check variable
-	if (strIWVVariable == "") {
-		_EXCEPTIONT("No IWV variable name (--iwvvar) specified");
-	}
+	// Dereference pointers to operators
+	std::vector<ThresholdOp> & vecThresholdOp =
+		*(param.pvecThresholdOp);
 
-	// Check output variable
-	if (strOutputVariable.length() == 0) {
-		strOutputVariable = strIWVVariable + "tag";
-	}
+	// Unload data from the VariableRegistry
+	varreg.UnloadAllGridData();
 
-	// Open the NetCDF input file
-	NcFile ncInput(strInputFile.c_str());
-
-	if (!ncInput.is_valid()) {
-		_EXCEPTION1("Unable to open NetCDF file \"%s\" for reading",
-			strInputFile.c_str());
-	}
-
-	AnnounceStartBlock("Building grid");
-
-	// Define SimpleGrid
+	// Define the SimpleGrid
 	SimpleGrid grid;
 
 	// Dimensions
 	int nSize = 0;
 	int nLon = 0;
 	int nLat = 0;
+
+	// Load in the benchmark file
+	NcFileVector vecFiles;
+
+	ParseInputFiles(strInputFiles, vecFiles);
 
 	// Check for connectivity file
 	if (strConnectivity != "") {
@@ -419,56 +481,98 @@ try {
 
 	// No connectivity file; check for latitude/longitude dimension
 	} else {
-		// Get the longitude dimension
-		NcDim * dimLon = ncInput.get_dim("lon");
-		if (dimLon == NULL) {
-			_EXCEPTIONT("Error accessing dimension \"lon\"");
-		}
 
-		// Get the longitude variable
-		NcVar * varLon = ncInput.get_var("lon");
-		if (varLon == NULL) {
-			_EXCEPTIONT("Error accessing variable \"lon\"");
-		}
-
-		DataVector<double> dLonDeg(dimLon->size());
-		varLon->get(&(dLonDeg[0]), dimLon->size());
-
-		// Get the latitude dimension
-		NcDim * dimLat = ncInput.get_dim("lat");
+		NcDim * dimLat = vecFiles[0]->get_dim("lat");
 		if (dimLat == NULL) {
-			_EXCEPTIONT("Error accessing dimension \"lat\"");
+			_EXCEPTIONT("No dimension \"lat\" found in input file");
 		}
 
-		// Get the latitude variable
-		NcVar * varLat = ncInput.get_var("lat");
+		NcDim * dimLon = vecFiles[0]->get_dim("lon");
+		if (dimLon == NULL) {
+			_EXCEPTIONT("No dimension \"lon\" found in input file");
+		}
+
+		NcVar * varLat = vecFiles[0]->get_var("lat");
 		if (varLat == NULL) {
-			_EXCEPTIONT("Error accessing variable \"lat\"");
+			_EXCEPTIONT("No variable \"lat\" found in input file");
 		}
 
-		DataVector<double> dLatDeg(dimLat->size());
-		varLat->get(&(dLatDeg[0]), dimLat->size());
+		NcVar * varLon = vecFiles[0]->get_var("lon");
+		if (varLon == NULL) {
+			_EXCEPTIONT("No variable \"lon\" found in input file");
+		}
+
+		nLat = dimLat->size();
+		nLon = dimLon->size();
+
+		DataVector<double> vecLat(nLat);
+		varLat->get(vecLat, nLat);
+
+		for (int j = 0; j < nLat; j++) {
+			vecLat[j] *= M_PI / 180.0;
+		}
+
+		DataVector<double> vecLon(nLon);
+		varLon->get(vecLon, nLon);
+
+		for (int i = 0; i < nLon; i++) {
+			vecLon[i] *= M_PI / 180.0;
+		}
 
 		// Generate the SimpleGrid
-		grid.GenerateLatitudeLongitude(dLatDeg, dLonDeg, fRegional);
+		grid.GenerateLatitudeLongitude(vecLat, vecLon, param.fRegional);
 	}
 
-	AnnounceEndBlock("Done");
-
-	AnnounceStartBlock("Copying metadata to output file");
-
-	// Get the time dimension
-	NcDim * dimTime = ncInput.get_dim("time");
-	//if (dimTime == NULL) {
-	//	_EXCEPTIONT("Error accessing dimension \"time\"");
-	//}
-
-	// Get the integrated water vapor variable
-	NcVar * varIWV = ncInput.get_var(strIWVVariable.c_str());
-	if (varIWV == NULL) {
-		_EXCEPTION1("Error accessing variable \"%s\"",
-			strIWVVariable.c_str());
+	// Get time dimension
+	NcDim * dimTime = vecFiles[0]->get_dim("time");
+	NcVar * varTime = NULL;
+	if (dimTime != NULL) {
+		varTime = vecFiles[0]->get_var("time");
 	}
+
+	int nTime = 1;
+	if (dimTime != NULL) {
+		nTime = dimTime->size();
+	}
+
+	DataVector<double> dTime;
+	dTime.Initialize(nTime);
+
+	if (varTime != NULL) {
+		if (varTime->type() == ncDouble) {
+			varTime->get(dTime, nTime);
+
+		} else if (varTime->type() == ncFloat) {
+			DataVector<float> dTimeFloat;
+			dTimeFloat.Initialize(nTime);
+
+			varTime->get(dTimeFloat, nTime);
+			for (int t = 0; t < nTime; t++) {
+				dTime[t] = static_cast<double>(dTimeFloat[t]);
+			}
+
+		} else if (varTime->type() == ncInt) {
+			DataVector<int> dTimeInt;
+			dTimeInt.Initialize(nTime);
+
+			varTime->get(dTimeInt, nTime);
+			for (int t = 0; t < nTime; t++) {
+				dTime[t] = static_cast<double>(dTimeInt[t]);
+			}
+
+		} else {
+			_EXCEPTIONT("Variable \"time\" has an invalid type:\n"
+				"Expected \"float\", \"double\" or \"int\"");
+		}
+
+	} else {
+		for (int t = 0; t < nTime; t++) {
+			dTime[t] = static_cast<double>(t);
+		}
+	}
+
+	// Create reference to NetCDF input file
+	NcFile & ncInput = *(vecFiles[0]);
 
 	// Open the NetCDF output file
 	NcFile ncOutput(strOutputFile.c_str(), NcFile::Replace);
@@ -479,14 +583,14 @@ try {
 
 	// Copy over latitude, longitude and time variables to output file
 	NcDim * dimTimeOut = NULL;
-	if (dimTime != NULL) {
+	if ((dimTime != NULL) && (varTime != NULL)) {
 		CopyNcVar(ncInput, ncOutput, "time", true);
 		dimTimeOut = ncOutput.get_dim("time");
 		if (dimTimeOut == NULL) {
 			_EXCEPTIONT("Error copying variable \"time\" to output file");
 		}
 
-	} else if (nAddTimeDim != -1) {
+	} /*else if (nAddTimeDim != -1) {
 		dimTimeOut = ncOutput.add_dim("time", 0);
 		if (dimTimeOut == NULL) {
 			_EXCEPTIONT("Error creating dimension \"time\" in output file");
@@ -507,7 +611,7 @@ try {
 		varTimeOut->add_att("long_name", "time");
 		varTimeOut->add_att("calendar", "standard");
 		varTimeOut->add_att("standard_name", "time");
-	}
+	}*/
 
 	// FIX for unstructured grids
 	CopyNcVar(ncInput, ncOutput, "lat", true);
@@ -521,26 +625,6 @@ try {
 	if (dim1 == NULL) {
 		_EXCEPTIONT("Error copying variable \"lon\" to output file");
 	}
-
-	AnnounceEndBlock("Done");
-
-	// Build Laplacian operator
-	AnnounceStartBlock("Building Laplacian operator");
-
-	SparseMatrix<double> opLaplacian;
-	BuildLaplacianOperator(
-		grid,
-		nLaplacianPoints,
-		dLaplacianDist,
-		opLaplacian);
-
-	AnnounceEndBlock("Done");
-
-	// Input buffers and output variables
-	DataVector<double> dIWV(grid.GetSize());
-
-	DataVector<int> bIWVtag(grid.GetSize());
-	DataVector<double> dLaplacian(grid.GetSize());
 
 	// Create output variables
 	NcVar * varIWVtag = NULL;
@@ -606,19 +690,22 @@ try {
 		_EXCEPTIONT("Invalid grid dimension -- value must be 1 or 2");
 	}
 
-	// Loop through all times
-	int nTimes = 1;
-	if (dimTime != NULL) {
-		nTimes = dimTime->size();
-	}
+	AnnounceEndBlock("Done");
 
-	for (int t = 0; t < nTimes; t++) {
+	// Tagged cell array
+	DataVector<int> bIWVtag(grid.GetSize());
+
+	// REMOVE: Laplacian
+	DataVector<double> dLaplacian(grid.GetSize());
+
+	// Loop through all times
+	for (int t = 0; t < nTime; t ++) {
 
 		// Announce
 		char szBuffer[20];
 		sprintf(szBuffer, "Time %i", t);
 		AnnounceStartBlock(szBuffer);
-
+/*
 		// Load in data at this time slice
 		AnnounceStartBlock("Reading data");
 		if (dimTime != NULL) {
@@ -649,6 +736,7 @@ try {
 		AnnounceStartBlock("Applying Laplacian");
 		opLaplacian.Apply(dIWV, dLaplacian);
 		AnnounceEndBlock("Done");
+*/
 /*
 		// DEBUG: Output Laplacian range
 		double dMinLaplacian = dLaplacian[0];
@@ -666,189 +754,60 @@ try {
 
 		AnnounceStartBlock("Build tagged cell array");
 		bIWVtag.Zero();
-		for (int i = 0; i < dLaplacian.GetRows(); i++) {
-			if (fabs(grid.m_dLat[i]) < dMinAbsLat) {
+		for (int i = 0; i < grid.GetSize(); i++) {
+			if (fabs(grid.m_dLat[i]) < param.dMinAbsLat * M_PI / 180.0) {
 				continue;
 			}
+
+/*
 			if (dIWV[i] < dMinIWV) {
 				continue;
 			}
+*/
+/*
 			if (dLaplacian[i] > -dMinLaplacian) {
 				continue;
 			}
-
+*/
 			bIWVtag[i] = 1;
 		}
 		AnnounceEndBlock("Done");
-/*
 
-		// Compute zonal threshold
-		DataVector<float> dZonalThreshold(dimLat->size());
-		for (int j = 0; j < dimLat->size(); j++) {
-			float dMaxZonalIWV = dIWV[j][0];
-			for (int i = 0; i < dimLon->size(); i++) {
-				dZonalThreshold[j] += dIWV[j][i];
-				if (dIWV[j][i] > dMaxZonalIWV) {
-					dMaxZonalIWV = dIWV[j][i];
+		// Eliminate based on threshold commands
+		AnnounceStartBlock("Apply threshold commands");
+		for (int tc = 0; tc < vecThresholdOp.size(); tc++) {
+
+			// Load the search variable data
+			Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
+			var.LoadGridData(varreg, vecFiles, grid, t);
+			const DataVector<float> & dataState = var.GetData();
+
+			// Loop through data
+			for (int i = 0; i < grid.GetSize(); i++) {
+				if (bIWVtag[i] == 0) {
+					continue;
+				}
+
+				// Determine if the threshold is satisfied
+				bool fSatisfiesThreshold =
+					SatisfiesThreshold<float>(
+						grid,
+						dataState,
+						i,
+						vecThresholdOp[tc].m_eOp,
+						vecThresholdOp[tc].m_dValue,
+						vecThresholdOp[tc].m_dDistance
+					);
+
+				if (!fSatisfiesThreshold) {
+					bIWVtag[i] = 0;
 				}
 			}
-			dZonalThreshold[j] /= static_cast<float>(dimLon->size());
-
-			dZonalThreshold[j] =
-				dZonalMeanWeight * dZonalThreshold[j]
-				+ dZonalMaxWeight * dMaxZonalIWV;
 		}
-
-		// Compute meridional threshold
-		DataVector<float> dMeridThreshold(dimLon->size());
-		for (int i = 0; i < dimLon->size(); i++) {
-			float dMaxMeridIWV = dIWV[0][i];
-			for (int j = 0; j < dimLat->size(); j++) {
-				dMeridThreshold[i] += dIWV[j][i];
-				if (dIWV[j][i] > dMaxMeridIWV) {
-					dMaxMeridIWV = dIWV[j][i];
-				}
-			}
-			dMeridThreshold[i] /= static_cast<float>(dimLon->size());
-
-			dMeridThreshold[i] =
-				dMeridMeanWeight * dMeridThreshold[i]
-				+ dMeridMaxWeight * dMaxMeridIWV;
-		}
-
-		// Announce
 		AnnounceEndBlock("Done");
 
-		AnnounceStartBlock("Build tagged cell array");
-
-		// Build tagged cell array
-		for (int j = 0; j < dimLat->size(); j++) {
-		for (int i = 0; i < dimLon->size(); i++) {
-			if (fabs(dLatDeg[j]) < dMinAbsLat) {
-				continue;
-			}
-			if (dIWV[j][i] < dMinIWV) {
-				continue;
-			}
-			if (dIWV[j][i] < dZonalThreshold[j]) {
-				continue;
-			}
-			if (dIWV[j][i] < dMeridThreshold[i]) {
-				continue;
-			}
-
-			//dIWVtag[j][i] = 1 + static_cast<int>(dLaplacian[j][i]);
-			if (dLaplacian[j][i] > -dMinLaplacian) {
-				dIWVtag[j][i] = 0;
-			} else {
-				dIWVtag[j][i] = 1;
-			}
-		}
-		}
-
-		// Only retain blobs with minimum area
-		if (nMinArea > 0) {
-			std::set<Point> setBlobs;
-
-			for (int j = 0; j < dimLat->size(); j++) {
-			for (int i = 0; i < dimLon->size(); i++) {
-				if (dIWVtag[j][i] != 0) {
-					setBlobs.insert(std::pair<int,int>(j,i));
-				}
-			}
-			}
-
-			for (;;) {
-				if (setBlobs.size() == 0) {
-					break;
-				}
-
-				std::set<Point> setThisBlob;
-				std::set<Point> setPointsToExplore;
-
-				Point pt = *(setBlobs.begin());
-				setBlobs.erase(setBlobs.begin());
-				setPointsToExplore.insert(pt);
-
-				for (;;) {
-					if (setPointsToExplore.size() == 0) {
-						break;
-					}
-					pt = *(setPointsToExplore.begin());
-					setThisBlob.insert(pt);
-					setPointsToExplore.erase(setPointsToExplore.begin());
-
-					for (int j = -1; j <= 1; j++) {
-					for (int i = -1; i <= 1; i++) {
-						Point pt2(pt.first + j, pt.second + i);
-						if (pt2.first < 0) {
-							continue;
-						}
-						if (pt2.first >= dimLat->size()) {
-							continue;
-						}
-						if (pt2.second < 0) {
-							pt2.second += dimLon->size();
-						}
-						if (pt2.second >= dimLon->size()) {
-							pt2.second -= dimLon->size();
-						}
-
-						std::set<Point>::iterator iter = setBlobs.find(pt2);
-						if (iter != setBlobs.end()) {
-							setPointsToExplore.insert(*iter);
-							setBlobs.erase(iter);
-						}
-					}
-					}
-				}
-
-				if (setThisBlob.size() < nMinArea) {
-					std::set<Point>::iterator iter = setThisBlob.begin();
-					for (; iter != setThisBlob.end(); iter++) {
-						dIWVtag[iter->first][iter->second] = 0;
-					}
-				}
-			}
-		}
-*/
-/*
-		// Remove points connected with equatorial moisture band
-		for (int i = 0; i < dimLon->size(); i++) {
-			bool fSouthDone = false;
-			bool fNorthDone = false;
-
-			for (int j = 0; j < dimLat->size(); j++) {
-				if ((!fSouthDone) && (dLatDeg[j] > -dMinAbsLat)) {
-					for (int k = j-1; k > 0; k--) {
-						if (dIWVtag[k][i] == 0) {
-							break;
-						}
-						if (dLatDeg[k] < -dEqBandMaxLat) {
-							break;
-						}
-						dIWVtag[k][i] = 0;
-					}
-					fSouthDone = true;
-				}
-				if ((!fNorthDone) && (dLatDeg[j] > dMinAbsLat)) {
-					for (int k = j-1; k < dimLat->size(); k++) {
-						if (dIWVtag[k][i] == 0) {
-							break;
-						}
-						if (dLatDeg[k] > dEqBandMaxLat) {
-							break;
-						}
-						dIWVtag[k][i] = 0;
-					}
-					fNorthDone = true;
-				}
-			}
-		}
-*/
-		AnnounceStartBlock("Writing results");
-
 		// Output tagged cell array
+		AnnounceStartBlock("Writing results");
 		if (dimTimeOut != NULL) {
 			if (varLaplacian != NULL) {
 				if (grid.m_nGridDim.size() == 1) {
@@ -899,9 +858,257 @@ try {
 
 		AnnounceEndBlock("Done");
 
-		AnnounceEndBlock("Done");
-
 		AnnounceEndBlock(NULL);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+int main(int argc, char** argv) {
+
+#if defined(TEMPEST_MPIOMP)
+	// Initialize MPI
+	MPI_Init(&argc, &argv);
+#endif
+
+	NcError error(NcError::silent_nonfatal);
+
+	// Enable output only on rank zero
+	AnnounceOnlyOutputOnRankZero();
+
+try {
+	// Parameters for SpineARs
+	SpineARsParam sarparam;
+
+	// Input dat file
+	std::string strInputFile;
+
+	// Input list file
+	std::string strInputFileList;
+
+	// Connectivity file
+	std::string strConnectivity;
+
+	// Output file
+	std::string strOutput;
+
+	// Output file list
+	std::string strOutputFileList;
+
+	// Output file list
+	std::string strThresholdCmd;
+
+	// Parse the command line
+	BeginCommandLine()
+		CommandLineString(strInputFile, "in_data", "");
+		CommandLineString(strInputFileList, "in_data_list", "");
+		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineString(strOutput, "out", "");
+		CommandLineString(strOutputFileList, "out_file_list", "");
+		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
+		//CommandLineString(sarparam.strIWVVariable, "var", "");
+		CommandLineInt(sarparam.nLaplacianPoints, "laplacianpoints", 8);
+		CommandLineDoubleD(sarparam.dLaplacianDist, "laplaciandist", 10.0, "(degrees)");
+		CommandLineDouble(sarparam.dMinLaplacian, "minlaplacian", 0.5e4);
+		CommandLineDouble(sarparam.dMinAbsLat, "minabslat", 15.0);
+		//CommandLineDouble(sarparam.dMinIWV, "minval", 20.0);
+		//CommandLineInt(nMinArea, "minarea", 0);
+		//CommandLineInt(nAddTimeDim, "addtimedim", -1);
+		//CommandLineString(strAddTimeDimUnits, "addtimedimunits", "");
+		CommandLineBool(sarparam.fOutputLaplacian, "laplacianout");
+		CommandLineBool(sarparam.fRegional, "regional");
+		CommandLineInt(sarparam.iVerbosityLevel, "verbosity", 0);
+
+		ParseCommandLine(argc, argv);
+	EndCommandLine(argv)
+
+	AnnounceBanner();
+
+	// Create Variable registry
+	VariableRegistry varreg;
+
+	// Set verbosity level
+	AnnounceSetVerbosityLevel(sarparam.iVerbosityLevel);
+
+	// Check input
+	if ((strInputFile.length() == 0) && (strInputFileList.length() == 0)) {
+		_EXCEPTIONT("No input data file (--in_data) or (--in_data_list)"
+			" specified");
+	}
+	if ((strInputFile.length() != 0) && (strInputFileList.length() != 0)) {
+		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list)"
+			" may be specified");
+	}
+
+	// Check output
+	if ((strOutput.length() != 0) && (strOutputFileList.length() != 0)) {
+		_EXCEPTIONT("Only one of (--out) or (--out_data_list)"
+			" may be specified");
+	}
+
+	// Load input file list
+	std::vector<std::string> vecInputFiles;
+
+	if (strInputFile.length() != 0) {
+		vecInputFiles.push_back(strInputFile);
+
+	} else {
+		std::ifstream ifInputFileList(strInputFileList.c_str());
+		if (!ifInputFileList.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\"",
+				strInputFileList.c_str());
+		}
+		std::string strFileLine;
+		while (std::getline(ifInputFileList, strFileLine)) {
+			if (strFileLine.length() == 0) {
+				continue;
+			}
+			if (strFileLine[0] == '#') {
+				continue;
+			}
+			vecInputFiles.push_back(strFileLine);
+		}
+	}
+
+	// Load output file list
+	std::vector<std::string> vecOutputFiles;
+
+	if (strOutputFileList.length() != 0) {
+
+		std::ifstream ifOutputFileList(strOutputFileList.c_str());
+		if (!ifOutputFileList.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\"",
+				strOutputFileList.c_str());
+		}
+		std::string strFileLine;
+		while (std::getline(ifOutputFileList, strFileLine)) {
+			if (strFileLine.length() == 0) {
+				continue;
+			}
+			if (strFileLine[0] == '#') {
+				continue;
+			}
+			vecOutputFiles.push_back(strFileLine);
+		}
+
+		if (vecOutputFiles.size() != vecInputFiles.size()) {
+			_EXCEPTIONT("File --in_file_list must match --out_file_list");
+		}
+	}
+
+	// Parse the threshold operator command string
+	std::vector<ThresholdOp> vecThresholdOp;
+	sarparam.pvecThresholdOp = &vecThresholdOp;
+
+	if (strThresholdCmd != "") {
+		AnnounceStartBlock("Parsing threshold operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strThresholdCmd.length(); i++) {
+
+			if ((i == strThresholdCmd.length()) ||
+				(strThresholdCmd[i] == ';') ||
+				(strThresholdCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strThresholdCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecThresholdOp.size());
+				vecThresholdOp.resize(iNextOp + 1);
+				vecThresholdOp[iNextOp].Parse(varreg, strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+/*
+	// Build Laplacian operator
+	AnnounceStartBlock("Building Laplacian operator");
+
+	SparseMatrix<double> opLaplacian;
+	BuildLaplacianOperator(
+		grid,
+		nLaplacianPoints,
+		dLaplacianDist,
+		opLaplacian);
+
+	AnnounceEndBlock("Done");
+*/
+#if defined(TEMPEST_MPIOMP)
+	// Spread files across nodes
+	int nMPIRank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &nMPIRank);
+
+	int nMPISize;
+	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+#endif
+
+	AnnounceStartBlock("Begin search operation");
+	if (vecInputFiles.size() != 1) {
+		if (vecOutputFiles.size() != 0) {
+			Announce("Output will be written following --out_file_list");
+		} else if (strOutput == "") {
+			Announce("Output will be written to outXXXXXX.dat");
+		} else {
+			Announce("Output will be written to %sXXXXXX.dat",
+				strOutput.c_str());
+		}
+		Announce("Logs will be written to logXXXXXX.txt");
+	}
+
+	// Loop over all files to be processed
+	for (int f = 0; f < vecInputFiles.size(); f++) {
+#if defined(TEMPEST_MPIOMP)
+		if (f % nMPISize != nMPIRank) {
+			continue;
+		}
+#endif
+		// Generate output file name
+		std::string strOutputFile;
+		if (vecInputFiles.size() == 1) {
+			sarparam.fpLog = stdout;
+
+			if (strOutput == "") {
+				strOutputFile = "out.dat";
+			} else {
+				strOutputFile = strOutput;
+			}
+
+		} else {
+			char szFileIndex[32];
+			sprintf(szFileIndex, "%06i", f);
+
+			if (vecOutputFiles.size() != 0) {
+				strOutputFile = vecOutputFiles[f];
+			} else {
+				if (strOutput == "") {
+					strOutputFile =
+						"out" + std::string(szFileIndex) + ".dat";
+				} else {
+					strOutputFile =
+						strOutput + std::string(szFileIndex) + ".dat";
+				}
+			}
+
+			std::string strLogFile = "log" + std::string(szFileIndex) + ".txt";
+			sarparam.fpLog = fopen(strLogFile.c_str(), "w");
+		}
+
+		// Perform SpineARs
+		SpineARs(
+			f,
+			vecInputFiles[f],
+			strOutputFile,
+			strConnectivity,
+			varreg,
+			sarparam);
+
+		// Close the log file
+		if (vecInputFiles.size() != 1) {
+			fclose(sarparam.fpLog);
+		}
 	}
 
 	AnnounceEndBlock("Done");
@@ -911,6 +1118,12 @@ try {
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());
 }
+
+#if defined(TEMPEST_MPIOMP)
+	// Deinitialize MPI
+	MPI_Finalize();
+#endif
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////

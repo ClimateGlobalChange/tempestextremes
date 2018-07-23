@@ -14,6 +14,7 @@ FILES= Announce.cpp \
        NetCDFUtilities.cpp \
        TimeObj.cpp \
        Variable.cpp \
+	   DataOp.cpp \
        kdtree.cpp
 
 LIB_TARGET= libextremesbase.a

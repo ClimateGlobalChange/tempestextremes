@@ -21,6 +21,7 @@
 
 #include "DataVector.h"
 #include "SimpleGrid.h"
+#include "DataOp.h"
 
 #include <vector>
 
@@ -36,11 +37,22 @@ typedef std::vector<Variable> VariableVector;
 
 typedef int VariableIndex;
 
-typedef std::vector<VariableIndex> VariableIndexVector;
+class VariableIndexVector : public std::vector<VariableIndex> {};
 
 ///////////////////////////////////////////////////////////////////////////////
 
 class VariableRegistry {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	VariableRegistry();
+
+	///	<summary>
+	///		Destructor.
+	///	</summary>
+	~VariableRegistry();
 
 public:
 	///	<summary>
@@ -59,11 +71,22 @@ public:
 	///	</summary>
 	void UnloadAllGridData();
 
+public:
+	///	<summary>
+	///		Get the DataOp with the specified name.
+	///	</summary>
+	DataOp * GetDataOp(const std::string & strName);
+
 private:
 	///	<summary>
 	///		Array of variables.
 	///	</summary>
 	VariableVector m_vecVariables;
+
+	///	<summary>
+	///		Map of data operators.
+	///	</summary>
+	DataOpManager m_domDataOp;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

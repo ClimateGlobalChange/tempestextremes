@@ -2,10 +2,10 @@
 ///
 ///	\file    Variable.cpp
 ///	\author  Paul Ullrich
-///	\version November 18, 2015
+///	\version July 22, 2018
 ///
 ///	<remarks>
-///		Copyright 2000-2014 Paul Ullrich
+///		Copyright 2000-2018 Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -20,6 +20,23 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 // VariableRegistry
+///////////////////////////////////////////////////////////////////////////////
+
+VariableRegistry::VariableRegistry() {
+	m_domDataOp.Add("_VECMAG");
+	m_domDataOp.Add("_ABS");
+	m_domDataOp.Add("_AVG");
+	m_domDataOp.Add("_DIFF");
+	m_domDataOp.Add("_DIV");
+	m_domDataOp.Add("_LAT");
+	m_domDataOp.Add("_F");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+VariableRegistry::~VariableRegistry() {
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 int VariableRegistry::FindOrRegister(
@@ -51,6 +68,19 @@ void VariableRegistry::UnloadAllGridData() {
 	for (int i = 0; i < m_vecVariables.size(); i++) {
 		m_vecVariables[i].UnloadGridData();
 	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+DataOp * VariableRegistry::GetDataOp(
+	const std::string & strName
+) {
+	DataOp * pdo = m_domDataOp.Find(strName);
+	if (pdo != NULL) {
+		return pdo;
+	}
+
+	return m_domDataOp.Add(strName);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -93,6 +123,7 @@ int Variable::ParseFromString(
 	m_nSpecifiedDim = 0;
 	m_varArg.clear();
 
+	bool fParamMode = false;
 	bool fDimMode = false;
 	std::string strDim;
 
@@ -106,9 +137,34 @@ int Variable::ParseFromString(
 		// Reading the variable name
 		if (!fDimMode) {
 			if (n == strIn.length()) {
+				if (fParamMode) {
+					_EXCEPTIONT("Unbalanced curly brackets in variable");
+				}
 				m_strName = strIn;
 				return n;
 			}
+
+			// Items in curly brackets are included in variable name
+			if (fParamMode) {
+				if (strIn[n] == '(') {
+					_EXCEPTIONT("Unexpected \'(\' in variable");
+				}
+				if (strIn[n] == ')') {
+					_EXCEPTIONT("Unexpected \')\' in variable");
+				}
+				if (strIn[n] == '{') {
+					_EXCEPTIONT("Unexpected \'{\' in variable");
+				}
+				if (strIn[n] == '}') {
+					fParamMode = false;
+				}
+				continue;
+			}
+			if (strIn[n] == '{') {
+				fParamMode = true;
+				continue;
+			}
+
 			if (strIn[n] == ',') {
 				m_strName = strIn.substr(0, n);
 				return n;
@@ -396,96 +452,28 @@ void Variable::LoadGridData(
 		return;
 	}
 
-	// Evaluate the vector magnitude operator
-	if (m_strName == "_VECMAG") {
-		if (m_varArg.size() != 2) {
-			_EXCEPTION1("_VECMAG expects two arguments: %i given",
-				m_varArg.size());
-		}
-		Variable & varLeft = varreg.Get(m_varArg[0]);
-		Variable & varRight = varreg.Get(m_varArg[1]);
-
-		varLeft.LoadGridData(varreg, vecFiles, grid, iTime);
-		varRight.LoadGridData(varreg, vecFiles, grid, iTime);
-
-		const DataVector<float> & dataLeft  = varLeft.GetData();
-		const DataVector<float> & dataRight = varRight.GetData();
-
-		for (int i = 0; i < m_data.GetRows(); i++) {
-			m_data[i] =
-				sqrt(dataLeft[i] * dataLeft[i]
-					+ dataRight[i] * dataRight[i]);
+	{
+		// Get the associated operator
+		DataOp * pop = varreg.GetDataOp(m_strName);
+		if (pop == NULL) {
+			_EXCEPTION1("Unexpected operator \"%s\"", m_strName.c_str());
 		}
 
-	// Evaluate the absolute value operator
-	} else if (m_strName == "_ABS") {
-		if (m_varArg.size() != 1) {
-			_EXCEPTION1("_ABS expects one argument: %i given",
-				m_varArg.size());
+		// Build argument list
+		std::vector<std::string> strArg;
+		std::vector<DataVector<float> const *> vecArgData;
+		for (int i = 0; i < m_varArg.size(); i++) {
+			Variable & var = varreg.Get(m_varArg[i]);
+			var.LoadGridData(varreg, vecFiles, grid, iTime);
+
+			strArg.push_back("");
+			vecArgData.push_back(&var.GetData());
 		}
 
-		m_data.Zero();
-
-		Variable & varParam = varreg.Get(m_varArg[0]);
-		varParam.LoadGridData(varreg, vecFiles, grid, iTime);
-		const DataVector<float> & dataParam  = varParam.m_data;
-
-		for (int i = 0; i < m_data.GetRows(); i++) {
-			m_data[i] = fabs(dataParam[i]);
-		}
-
-	// Evaluate the average operator
-	} else if (m_strName == "_AVG") {
-		if (m_varArg.size() <= 1) {
-			_EXCEPTION1("_AVG expects at least two arguments: %i given",
-				m_varArg.size());
-		}
-
-		m_data.Zero();
-		for (int v = 0; v < m_varArg.size(); v++) {
-			Variable & varParam = varreg.Get(m_varArg[v]);
-			varParam.LoadGridData(varreg, vecFiles, grid, iTime);
-			const DataVector<float> & dataParam  = varParam.m_data;
-
-			for (int i = 0; i < m_data.GetRows(); i++) {
-				m_data[i] += dataParam[i];
-			}
-		}
-
-		for (int i = 0; i < m_data.GetRows(); i++) {
-			m_data[i] /= static_cast<double>(m_varArg.size());
-		}
-
-	// Evaluate the minus operator
-	} else if (m_strName == "_DIFF") {
-		if (m_varArg.size() != 2) {
-			_EXCEPTION1("_VECMAG expects two arguments: %i given",
-				m_varArg.size());
-		}
-		Variable & varLeft = varreg.Get(m_varArg[0]);
-		Variable & varRight = varreg.Get(m_varArg[1]);
-
-		varLeft.LoadGridData(varreg, vecFiles, grid, iTime);
-		varRight.LoadGridData(varreg, vecFiles, grid, iTime);
-
-		const DataVector<float> & dataLeft  = varLeft.m_data;
-		const DataVector<float> & dataRight = varRight.m_data;
-
-		for (int i = 0; i < m_data.GetRows(); i++) {
-			m_data[i] = dataLeft[i] - dataRight[i];
-		}
-
-	// Evaluate the Coriolis parameter operator
-	} else if (m_strName == "_F") {
-		if (m_varArg.size() != 0) {
-			_EXCEPTION1("_F expects zero arguments: %i given",
-				m_varArg.size());
-		}
-
-		for (int i = 0; i < m_data.GetRows(); i++) {
-			m_data[i] = 2.0 * 7.2921e-5 * sin(grid.m_dLat[i]);
-		}
-
+		// Apply the DataOp
+		pop->Apply(grid, strArg, vecArgData, m_data);
+	}
+/*
 	// Evaluate the mean operator
 	} else if (m_strName == "_MEAN") {
 		if (m_varArg.size() != 2) {
@@ -581,6 +569,7 @@ void Variable::LoadGridData(
 	} else {
 		_EXCEPTION1("Unexpected operator \"%s\"", m_strName.c_str());
 	}
+*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////
