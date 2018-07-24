@@ -389,6 +389,9 @@ bool DataOp_F::Apply(
 ///		Generate an array of points that are of equal distance along the
 ///		surface of the sphere from a given central point.
 ///	</summary>
+///	<param name="dDist">
+///		Great circle distance in degrees.
+///	</param>
 void GenerateEqualDistanceSpherePoints(
 	double dX0,
 	double dY0,
@@ -482,6 +485,9 @@ void GenerateEqualDistanceSpherePoints(
 ///	<summary>
 ///		Build a sparse Laplacian operator on an unstructured SimpleGrid.
 ///	</summary>
+///	<param name="dLaplacianDist">
+///		Great circle radius of the Laplacian operator, in degrees.
+///	</param>
 void BuildLaplacianOperator(
 	const SimpleGrid & grid,
 	int nLaplacianPoints,
@@ -492,7 +498,8 @@ void BuildLaplacianOperator(
 
 	int iRef = 0;
 
-	double dScale = 4.0 / static_cast<double>(nLaplacianPoints);
+	// Scaling factor used in Laplacian calculation
+	const double dScale = 4.0 / static_cast<double>(nLaplacianPoints);
 
 	// Create a kdtree with all nodes in grid
 	kdtree * kdGrid = kd_create(3);
@@ -504,8 +511,8 @@ void BuildLaplacianOperator(
 	DataVector<double> dYi(grid.GetSize());
 	DataVector<double> dZi(grid.GetSize());
 	for (int i = 0; i < grid.GetSize(); i++) {
-		double dLat = grid.m_dLat[i] * M_PI / 180.0;
-		double dLon = grid.m_dLon[i] * M_PI / 180.0;
+		double dLat = grid.m_dLat[i];
+		double dLon = grid.m_dLon[i];
 
 		dXi[i] = cos(dLon) * cos(dLat);
 		dYi[i] = sin(dLon) * cos(dLat);
@@ -620,12 +627,17 @@ void BuildLaplacianOperator(
 			//double dTanDist2 = (2.0 - dChordDist2);
 			//dTanDist2 = dChordDist2 * (4.0 - dChordDist2) / (dTanDist2 * dTanDist2);
 
-			opLaplacian(i,k) = dScale / dSurfDist2;
+			opLaplacian(i,k) = static_cast<float>(dScale / dSurfDist2);
+
+			//printf("(%1.2e %1.2e %1.2e) (%1.2e %1.2e %1.2e) %1.5e\n", dXout[j], dYout[j], dZout[j], dXi[k], dYi[k], dZi[k], dSurfDist2 * 180.0 / M_PI);
+			//printf("%1.5e %i %i %1.5e\n", sqrt(dSurfDist2) * 180.0 / M_PI, i, k, opLaplacian(i,k));
 
 			dAccumulatedDiff += dScale / dSurfDist2;
 		}
 
-		opLaplacian(i,i) = - dAccumulatedDiff;
+		opLaplacian(i,i) = static_cast<float>(- dAccumulatedDiff);
+
+		//printf("%i %i %1.5e\n", i, i, opLaplacian(i,i));
 
 		if (setPoints.size() < 5) {
 			Announce("WARNING: Only %i points used for Laplacian in cell %i"
@@ -674,7 +686,8 @@ bool DataOp_LAPLACIAN::Apply(
 	}
 
 	if (!m_fInitialized) {
-		Announce("Building Laplacian operator %s", m_strName.c_str());
+		Announce("Building Laplacian operator %s (%i, %1.2f)",
+			m_strName.c_str(), m_nLaplacianPoints, m_dLaplacianDist);
 
 		BuildLaplacianOperator(
 			grid,

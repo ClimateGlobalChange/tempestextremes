@@ -135,7 +135,7 @@ public:
 
 		if (eReadMode != ReadMode_Invalid) {
 			_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
-					"\nRequired: \"<name>,<operation>,<value>,<distance>\"",
+					"\nRequired: \"<variable>,<operation>,<value>,<distance>\"",
 					strOp.c_str());
 		}
 
@@ -348,6 +348,83 @@ bool SatisfiesThreshold(
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		A class storing a output operator.
+///	</summary>
+class OutputOp {
+
+public:
+	///	<summary>
+	///		Parse a threshold operator string.
+	///	</summary>
+	void Parse(
+		VariableRegistry & varreg,
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Name,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Name;
+
+		// Parse variable
+		Variable var;
+		int iLast = var.ParseFromString(varreg, strOp) + 1;
+		m_varix = varreg.FindOrRegister(var);
+
+		// Loop through string
+		for (int i = iLast; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in name
+				if (eReadMode == ReadMode_Name) {
+					m_strName = strSubStr;
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nInsufficient entries in output op \"%s\""
+							"\nRequired: \"<variable>,<name>\"",
+							strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("\nInsufficient entries in output op \"%s\""
+					"\nRequired: \"<variable>,<name>\"",
+					strOp.c_str());
+		}
+
+		// Output announcement
+		std::string strDescription = var.ToString(varreg);
+		strDescription += " with name \"";
+		strDescription += m_strName;
+		strDescription += "\"";
+
+		Announce("%s", strDescription.c_str());
+	}
+
+public:
+	///	<summary>
+	///		Variable to use for output.
+	///	</summary>
+	VariableIndex m_varix;
+
+	///	<summary>
+	///		Name of variable in NetCDF output file.
+	///	</summary>
+	std::string m_strName;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Parse the list of input files.
 ///	</summary>
 void ParseInputFiles(
@@ -394,18 +471,15 @@ public:
 		dLaplacianDist(0.0),
 		dMinLaplacian(0.0),
 		dMinAbsLat(0.0),
-		fOutputLaplacian(false),
 		fRegional(false),
 		iVerbosityLevel(0),
-		pvecThresholdOp(NULL)
+		pvecThresholdOp(NULL),
+		pvecOutputOp(NULL)
 	{ }
 
 public:
 	// Log
 	FILE * fpLog;
-
-	// Input integrated water vapor variable name
-	//std::string strIWVVariable;
 
 	// Number of points in Laplacian calculation
 	int nLaplacianPoints;
@@ -419,12 +493,6 @@ public:
 	// Minimum absolute latitude (in degrees)
 	double dMinAbsLat;
 
-	// Minimum pointwise integrated water vapor
-	//double dMinIWV;
-
-	// Output Laplacian
-	bool fOutputLaplacian;
-
 	// Regional (do not wrap longitudinal boundaries)
 	bool fRegional;
 
@@ -433,6 +501,10 @@ public:
 
 	// Vector of threshold operators
 	std::vector<ThresholdOp> * pvecThresholdOp;
+
+	// Vector of output operators
+	std::vector<OutputOp> * pvecOutputOp;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -628,7 +700,6 @@ void SpineARs(
 
 	// Create output variables
 	NcVar * varIWVtag = NULL;
-	NcVar * varLaplacian = NULL;
 
 	if (grid.m_nGridDim.size() == 1) {
 		if (dimTimeOut != NULL) {
@@ -638,21 +709,10 @@ void SpineARs(
 				dimTimeOut,
 				dim0);
 
-			varLaplacian = ncOutput.add_var(
-				"laplacian",
-				ncDouble,
-				dimTimeOut,
-				dim0);
-
 		} else {
 			varIWVtag = ncOutput.add_var(
 				"ar_binary_tag",
 				ncByte,
-				dim0);
-
-			varLaplacian = ncOutput.add_var(
-				"laplacian",
-				ncDouble,
 				dim0);
 		}
 
@@ -665,23 +725,10 @@ void SpineARs(
 				dim0,
 				dim1);
 
-			varLaplacian = ncOutput.add_var(
-				"laplacian",
-				ncDouble,
-				dimTimeOut,
-				dim0,
-				dim1);
-
 		} else {
 			varIWVtag = ncOutput.add_var(
 				"ar_binary_tag",
 				ncByte,
-				dim0,
-				dim1);
-
-			varLaplacian = ncOutput.add_var(
-				"laplacian",
-				ncDouble,
 				dim0,
 				dim1);
 		}
@@ -694,9 +741,6 @@ void SpineARs(
 
 	// Tagged cell array
 	DataVector<int> bIWVtag(grid.GetSize());
-
-	// REMOVE: Laplacian
-	DataVector<double> dLaplacian(grid.GetSize());
 
 	// Loop through all times
 	for (int t = 0; t < nTime; t ++) {
@@ -809,6 +853,7 @@ void SpineARs(
 		// Output tagged cell array
 		AnnounceStartBlock("Writing results");
 		if (dimTimeOut != NULL) {
+/*
 			if (varLaplacian != NULL) {
 				if (grid.m_nGridDim.size() == 1) {
 					varLaplacian->set_cur(t, 0);
@@ -820,7 +865,7 @@ void SpineARs(
 					_EXCEPTION();
 				}
 			}
-
+*/
 			if (grid.m_nGridDim.size() == 1) {
 				varIWVtag->set_cur(t, 0);
 				varIWVtag->put(&(bIWVtag[0]), 1, grid.m_nGridDim[0]);
@@ -832,7 +877,46 @@ void SpineARs(
 				_EXCEPTION();
 			}
 
+			for (int oc = 0; oc < param.pvecOutputOp->size(); oc++) {
+				if (grid.m_nGridDim.size() == 1) {
+					NcVar * ncvar =
+						ncOutput.add_var(
+							(*param.pvecOutputOp)[oc].m_strName.c_str(),
+							ncFloat,
+							dimTimeOut,
+							dim0);
+
+					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
+					var.LoadGridData(varreg, vecFiles, grid, t);
+					const DataVector<float> & dataState = var.GetData();
+
+					ncvar->set_cur(t, 0);
+					ncvar->put(&(dataState[0]), 1, grid.m_nGridDim[0]);
+
+				} else if (grid.m_nGridDim.size() == 2) {
+					NcVar * ncvar =
+						ncOutput.add_var(
+							(*param.pvecOutputOp)[oc].m_strName.c_str(),
+							ncFloat,
+							dimTimeOut,
+							dim0,
+							dim1);
+
+					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
+					var.LoadGridData(varreg, vecFiles, grid, t);
+					const DataVector<float> & dataState = var.GetData();
+
+					ncvar->set_cur(t, 0, 0);
+					ncvar->put(&(dataState[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
+
+				} else {
+					_EXCEPTION();
+				}
+
+			}
+
 		} else {
+/*
 			if (varLaplacian != NULL) {
 				if (grid.m_nGridDim.size() == 1) {
 					varLaplacian->set_cur((long)0);
@@ -844,7 +928,7 @@ void SpineARs(
 					_EXCEPTION();
 				}
 			}
-
+*/
 			if (grid.m_nGridDim.size() == 1) {
 				varIWVtag->set_cur((long)0);
 				varIWVtag->put(&(bIWVtag[0]), grid.m_nGridDim[0]);
@@ -853,6 +937,41 @@ void SpineARs(
 				varIWVtag->put(&(bIWVtag[0]), grid.m_nGridDim[0], grid.m_nGridDim[1]);
 			} else {
 				_EXCEPTION();
+			}
+
+			for (int oc = 0; oc < param.pvecOutputOp->size(); oc++) {
+				if (grid.m_nGridDim.size() == 1) {
+					NcVar * ncvar =
+						ncOutput.add_var(
+							(*param.pvecOutputOp)[oc].m_strName.c_str(),
+							ncFloat,
+							dim0);
+
+					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
+					var.LoadGridData(varreg, vecFiles, grid, t);
+					const DataVector<float> & dataState = var.GetData();
+
+					ncvar->set_cur((long)0);
+					ncvar->put(&(dataState[0]), grid.m_nGridDim[0]);
+
+				} else if (grid.m_nGridDim.size() == 2) {
+					NcVar * ncvar =
+						ncOutput.add_var(
+							(*param.pvecOutputOp)[oc].m_strName.c_str(),
+							ncFloat,
+							dim0,
+							dim1);
+
+					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
+					var.LoadGridData(varreg, vecFiles, grid, t);
+					const DataVector<float> & dataState = var.GetData();
+
+					ncvar->set_cur(0, 0);
+					ncvar->put(&(dataState[0]), grid.m_nGridDim[0], grid.m_nGridDim[1]);
+
+				} else {
+					_EXCEPTION();
+				}
 			}
 		}
 
@@ -898,6 +1017,9 @@ try {
 	// Output file list
 	std::string strThresholdCmd;
 
+	// Output file list
+	std::string strOutputCmd;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in_data", "");
@@ -906,6 +1028,7 @@ try {
 		CommandLineString(strOutput, "out", "");
 		CommandLineString(strOutputFileList, "out_file_list", "");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
+		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,name;...]");
 		//CommandLineString(sarparam.strIWVVariable, "var", "");
 		CommandLineInt(sarparam.nLaplacianPoints, "laplacianpoints", 8);
 		CommandLineDoubleD(sarparam.dLaplacianDist, "laplaciandist", 10.0, "(degrees)");
@@ -915,7 +1038,7 @@ try {
 		//CommandLineInt(nMinArea, "minarea", 0);
 		//CommandLineInt(nAddTimeDim, "addtimedim", -1);
 		//CommandLineString(strAddTimeDimUnits, "addtimedimunits", "");
-		CommandLineBool(sarparam.fOutputLaplacian, "laplacianout");
+		//CommandLineBool(sarparam.fOutputLaplacian, "laplacianout");
 		CommandLineBool(sarparam.fRegional, "regional");
 		CommandLineInt(sarparam.iVerbosityLevel, "verbosity", 0);
 
@@ -1023,19 +1146,35 @@ try {
 
 		AnnounceEndBlock("Done");
 	}
-/*
-	// Build Laplacian operator
-	AnnounceStartBlock("Building Laplacian operator");
 
-	SparseMatrix<double> opLaplacian;
-	BuildLaplacianOperator(
-		grid,
-		nLaplacianPoints,
-		dLaplacianDist,
-		opLaplacian);
+	// Parse the threshold operator command string
+	std::vector<OutputOp> vecOutputOp;
+	sarparam.pvecOutputOp = &vecOutputOp;
 
-	AnnounceEndBlock("Done");
-*/
+	if (strOutputCmd != "") {
+		AnnounceStartBlock("Parsing output operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strOutputCmd.length(); i++) {
+
+			if ((i == strOutputCmd.length()) ||
+				(strOutputCmd[i] == ';') ||
+				(strOutputCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strOutputCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecOutputOp.size());
+				vecOutputOp.resize(iNextOp + 1);
+				vecOutputOp[iNextOp].Parse(varreg, strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
 #if defined(TEMPEST_MPIOMP)
 	// Spread files across nodes
 	int nMPIRank;

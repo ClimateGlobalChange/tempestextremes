@@ -54,6 +54,13 @@ public:
 		m_nGridDim[0] = nLat;
 		m_nGridDim[1] = nLon;
 
+		// Verify units of latitude and longitude
+		for (int j = 0; j < nLat; j++) {
+			if (fabs(vecLat[j]) > 0.5 * M_PI + 1.0e-12) {
+				_EXCEPTIONT("In SimpleGrid, latitude array must be given in radians");
+			}
+		}
+
 		int ixs = 0;
 		for (int j = 0; j < nLat; j++) {
 		for (int i = 0; i < nLon; i++) {
@@ -147,12 +154,12 @@ public:
 
 public:
 	///	<summary>
-	///		Longitude of each grid point (in degrees).
+	///		Longitude of each grid point (in radians).
 	///	</summary>
 	DataVector<double> m_dLon;
 
 	///	<summary>
-	///		Latitude of each grid point (in degrees).
+	///		Latitude of each grid point (in radians).
 	///	</summary>
 	DataVector<double> m_dLat;
 
