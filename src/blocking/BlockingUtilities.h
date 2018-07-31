@@ -340,4 +340,27 @@ void calcDevsGH(bool leap,
 
 
 
+void PV_calc2(
+        int nPlev,
+        int nLat,
+        int nLon,
+        DataMatrix3D<double>UMat,
+        DataMatrix3D<double>VMat,
+        DataMatrix3D<double> PTMat,
+        DataMatrix3D<double> RVMat,
+        DataVector<double>pVec,
+        DataVector<double> coriolis,
+        DataVector<double>cosphi,
+        double dphi,
+        double dlambda,
+        double lat_res,
+        double lon_res,
+        DataMatrix3D<double> &PVMat,
+  DataMatrix3D<double> &dpt_dp,
+  DataMatrix3D<double> &du_dp,
+  DataMatrix3D<double> &dv_dp,
+  DataMatrix3D<double> &dpt_dphi,
+  DataMatrix3D<double> &dpt_dl
+);
+
 #endif

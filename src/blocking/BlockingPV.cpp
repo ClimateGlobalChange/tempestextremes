@@ -282,8 +282,21 @@ int main(int argc, char **argv){
 
     //Add the PV variable to the file
       pv_var = file_out.add_var("PV", ncDouble, out_time, out_plev, out_lat, out_lon);
-    
 
+    //DEBUG PURPOSES: Output PT, RV
+      NcVar* pt_var = file_out.add_var("PT",ncDouble,out_time,out_plev,out_lat,out_lon);    
+      NcVar* rv_var = file_out.add_var("RV",ncDouble,out_time,out_plev,out_lat,out_lon);
+      NcVar* dvdp = file_out.add_var("DVDP",ncDouble,out_time,out_plev,out_lat,out_lon);
+      NcVar* dudp = file_out.add_var("DUDP",ncDouble,out_time,out_plev,out_lat,out_lon);
+      NcVar* dptdp = file_out.add_var("DPTDP",ncDouble,out_time,out_plev,out_lat,out_lon);
+      NcVar* dptdlam = file_out.add_var("DPTDLAM",ncDouble,out_time,out_plev,out_lat,out_lon);
+      NcVar* dptdphi = file_out.add_var("DPTDPHI",ncDouble,out_time,out_plev,out_lat,out_lon);
+      DataMatrix3D<double> DV(lev_len,lat_len,lon_len);
+      DataMatrix3D<double> DU(lev_len,lat_len,lon_len);
+      DataMatrix3D<double> DPP(lev_len,lat_len,lon_len);
+      DataMatrix3D<double> DPL(lev_len,lat_len,lon_len);
+      DataMatrix3D<double> DPH(lev_len,lat_len,lon_len);
+     //
 
       DataMatrix3D<double> PTVar(lev_len,lat_len,lon_len);
       DataMatrix3D<double> TVar(lev_len,lat_len,lon_len);
@@ -306,11 +319,30 @@ int main(int argc, char **argv){
         vvar->get(&(VMat[0][0][0]),1,lev_len,lat_len,lon_len);
         rVort_calc(lev_len,lat_len,lon_len,UMat,VMat, dphi, dlambda, cosphi, RVVar);
 
-        PV_calc(lev_len,lat_len,lon_len, UMat, VMat, PTVar, RVVar, pVec, coriolis,cosphi, dphi, dlambda,\
+//        PV_calc(lev_len,lat_len,lon_len, UMat, VMat, PTVar, RVVar, pVec, coriolis,cosphi, dphi, dlambda,\
           lat_res, lon_res, PVMat);
 
+        PV_calc2(lev_len,lat_len,lon_len, UMat, VMat, PTVar, RVVar, pVec, coriolis,cosphi, dphi, dlambda,\
+          lat_res, lon_res, PVMat,DPP,DU,DV,DPH,DPL);
         pv_var->set_cur(t,0,0,0);
         pv_var->put(&(PVMat[0][0][0]),1,lev_len,lat_len,lon_len);
+      //DEBUG PURPOSES: output PV, RV
+        pt_var->set_cur(t,0,0,0);
+        pt_var->put(&(PTVar[0][0][0]),1,lev_len,lat_len,lon_len);
+        rv_var->set_cur(t,0,0,0);
+        rv_var->put(&(RVVar[0][0][0]),1,lev_len,lat_len,lon_len);
+        dvdp->set_cur(t,0,0,0);
+        dvdp->put(&(DV[0][0][0]),1,lev_len,lat_len,lon_len);
+        dudp->set_cur(t,0,0,0);
+        dudp->put(&(DU[0][0][0]),1,lev_len,lat_len,lon_len);
+        dptdlam->set_cur(t,0,0,0);
+        dptdlam->put(&(DPL[0][0][0]),1,lev_len,lat_len,lon_len);
+        dptdp->set_cur(t,0,0,0);
+        dptdp->put(&(DPP[0][0][0]),1,lev_len,lat_len,lon_len);
+        dptdphi->set_cur(t,0,0,0);
+        dptdphi->put(&(DPH[0][0][0]),1,lev_len,lat_len,lon_len);
+
+      //
       }
     }
     if (has_PV){
