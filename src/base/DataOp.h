@@ -20,6 +20,8 @@
 #include "DataVector.h"
 #include "SparseMatrix.h"
 
+#include <string>
+#include <vector>
 #include <map>
 
 ///////////////////////////////////////////////////////////////////////////////
