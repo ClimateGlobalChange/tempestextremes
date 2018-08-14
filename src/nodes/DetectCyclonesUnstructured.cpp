@@ -2,10 +2,10 @@
 ///
 ///	\file    DetectCyclonesUnstructured.cpp
 ///	\author  Paul Ullrich
-///	\version September 18, 2015
+///	\version August 14, 2018
 ///
 ///	<remarks>
-///		Copyright 2000-2014 Paul Ullrich
+///		Copyright 2000-2018 Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -21,6 +21,8 @@
 #include "DataVector.h"
 #include "DataMatrix.h"
 #include "TimeObj.h"
+#include "NodeOutputOp.h"
+#include "SimpleGridUtilities.h"
 
 #include "kdtree.h"
 
@@ -325,143 +327,6 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		A class storing an output operator.
-///	</summary>
-class OutputOp {
-
-public:
-	///	<summary>
-	///		Possible operations.
-	///	</summary>
-	enum Operation {
-		Max,
-		Min,
-		Avg,
-		MaxDist,
-		MinDist
-	};
-
-public:
-	///	<summary>
-	///		Parse a output operator string.
-	///	</summary>
-	void Parse(
-		VariableRegistry & varreg,
-		const std::string & strOp
-	) {
-		// Read mode
-		enum {
-			ReadMode_Op,
-			ReadMode_Distance,
-			ReadMode_Invalid
-		} eReadMode = ReadMode_Op;
-
-		// Get variable information
-		Variable var;
-		int iLast = var.ParseFromString(varreg, strOp) + 1;
-		m_varix = varreg.FindOrRegister(var);
-
-		// Loop through string
-		for (int i = iLast; i <= strOp.length(); i++) {
-
-			// Comma-delineated
-			if ((i == strOp.length()) || (strOp[i] == ',')) {
-
-				std::string strSubStr =
-					strOp.substr(iLast, i - iLast);
-
-				// Read in operation
-				if (eReadMode == ReadMode_Op) {
-					if (strSubStr == "max") {
-						m_eOp = Max;
-					} else if (strSubStr == "min") {
-						m_eOp = Min;
-					} else if (strSubStr == "avg") {
-						m_eOp = Avg;
-					} else if (strSubStr == "maxdist") {
-						m_eOp = MaxDist;
-					} else if (strSubStr == "mindist") {
-						m_eOp = MinDist;
-					} else {
-						_EXCEPTION1("Output invalid operation \"%s\"",
-							strSubStr.c_str());
-					}
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Distance;
-
-				// Read in minimum count
-				} else if (eReadMode == ReadMode_Distance) {
-					m_dDistance = atof(strSubStr.c_str());
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Invalid;
-
-				// Invalid
-				} else if (eReadMode == ReadMode_Invalid) {
-					_EXCEPTION1("\nInsufficient entries in output op \"%s\""
-							"\nRequired: \"<name>,<operation>,<distance>\"",
-							strOp.c_str());
-				}
-			}
-		}
-
-		if (eReadMode != ReadMode_Invalid) {
-			_EXCEPTION1("\nInsufficient entries in output op \"%s\""
-					"\nRequired: \"<name>,<operation>,<distance>\"",
-					strOp.c_str());
-		}
-
-		if (m_dDistance < 0.0) {
-			_EXCEPTIONT("For output op, distance must be nonnegative");
-		}
-
-		// Output announcement
-		std::string strDescription;
-
-		if (m_eOp == Max) {
-			strDescription += "Maximum of ";
-		} else if (m_eOp == Min) {
-			strDescription += "Minimum of ";
-		} else if (m_eOp == Avg) {
-			strDescription += "Average of ";
-		} else if (m_eOp == MaxDist) {
-			strDescription += "Distance to maximum of ";
-		} else if (m_eOp == MinDist) {
-			strDescription += "Distance to minimum of ";
-		}
-
-		char szBuffer[128];
-
-		sprintf(szBuffer, "%s", var.ToString(varreg).c_str());
-		strDescription += szBuffer;
-
-		sprintf(szBuffer, " within %f degrees", m_dDistance);
-		strDescription += szBuffer;
-
-		Announce("%s", strDescription.c_str());
-	}
-
-public:
-	///	<summary>
-	///		Variable to use for output.
-	///	</summary>
-	VariableIndex m_varix;
-
-	///	<summary>
-	///		Operation.
-	///	</summary>
-	Operation m_eOp;
-
-	///	<summary>
-	///		Distance to use when applying operation.
-	///	</summary>
-	double m_dDistance;
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
 ///		Parse the list of input files.
 ///	</summary>
 void ParseInputFiles(
@@ -492,322 +357,6 @@ void ParseInputFiles(
 		_EXCEPTION1("No input files found in \"%s\"",
 			strInputFile.c_str());
 	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Find the locations of all minima in the given DataMatrix.
-///	</summary>
-template <typename real>
-void FindAllLocalMinima(
-	const SimpleGrid & grid,
-	const DataVector<real> & data,
-	std::set<int> & setMinima
-) {
-	int sFaces = grid.m_vecConnectivity.size();
-	for (int f = 0; f < sFaces; f++) {
-		
-		bool fMinimum = true;
-
-		real dValue = data[f];
-		int sNeighbors = grid.m_vecConnectivity[f].size();
-		for (int n = 0; n < sNeighbors; n++) {
-			if (data[grid.m_vecConnectivity[f][n]] < dValue) {
-				fMinimum = false;
-				break;
-			}
-		}
-
-		if (fMinimum) {
-			setMinima.insert(f);
-		}
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Find the locations of all maxima in the given DataMatrix.
-///	</summary>
-template <typename real>
-void FindAllLocalMaxima(
-	const SimpleGrid & grid,
-	const DataVector<real> & data,
-	std::set<int> & setMaxima
-) {
-	int sFaces = grid.m_vecConnectivity.size();
-	for (int f = 0; f < sFaces; f++) {
-		
-		bool fMaximum = true;
-
-		real dValue = data[f];
-		int sNeighbors = grid.m_vecConnectivity[f].size();
-		for (int n = 0; n < sNeighbors; n++) {
-			if (data[grid.m_vecConnectivity[f][n]] > dValue) {
-				fMaximum = false;
-				break;
-			}
-		}
-
-		if (fMaximum) {
-			setMaxima.insert(f);
-		}
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Find the minimum/maximum value of a field near the given point.
-///	</summary>
-///	<param name="dMaxDist">
-///		Maximum distance from the initial point in degrees.
-///	</param>
-template <typename real>
-void FindLocalMinMax(
-	const SimpleGrid & grid,
-	bool fMinimum,
-	const DataVector<real> & data,
-	int ix0,
-	double dMaxDist,
-	int & ixExtremum,
-	real & dMaxValue,
-	float & dRMax
-) {
-	// Verify that dMaxDist is less than 180.0
-	if (dMaxDist > 180.0) {
-		_EXCEPTIONT("MaxDist must be less than 180.0");
-	}
-
-	// Initialize the maximum to the central location
-	ixExtremum = ix0;
-	dMaxValue = data[ix0];
-	dRMax = 0.0;
-
-	// Queue of nodes that remain to be visited
-	std::queue<int> queueNodes;
-	queueNodes.push(ixExtremum);
-
-	// Set of nodes that have already been visited
-	std::set<int> setNodesVisited;
-
-	// Latitude and longitude at the origin
-	double dLat0 = grid.m_dLat[ix0];
-	double dLon0 = grid.m_dLon[ix0];
-
-	// Loop through all latlon elements
-	while (queueNodes.size() != 0) {
-		int ix = queueNodes.front();
-		queueNodes.pop();
-
-		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
-			continue;
-		}
-
-		setNodesVisited.insert(ix);
-
-		double dLatThis = grid.m_dLat[ix];
-		double dLonThis = grid.m_dLon[ix];
-
-		// Great circle distance to this element
-		double dR =
-			sin(dLat0) * sin(dLatThis)
-			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
-
-		if (dR >= 1.0) {
-			dR = 0.0;
-		} else if (dR <= -1.0) {
-			dR = 180.0;
-		} else {
-			dR = 180.0 / M_PI * acos(dR);
-		}
-		if (dR != dR) {
-			_EXCEPTIONT("NaN value detected");
-		}
-
-		if (dR > dMaxDist) {
-			continue;
-		}
-
-		// Check for new local extremum
-		if (fMinimum) {
-			if (data[ix] < dMaxValue) {
-				ixExtremum = ix;
-				dMaxValue = data[ix];
-				dRMax = dR;
-			}
-
-		} else {
-			if (data[ix] > dMaxValue) {
-				ixExtremum = ix;
-				dMaxValue = data[ix];
-				dRMax = dR;
-			}
-		}
-
-		// Add all neighbors of this point
-		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
-			queueNodes.push(grid.m_vecConnectivity[ix][n]);
-		}
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Parse a pair of Date values.
-///	</summary>
-void ParseDate(
-	int nDate,
-	int nDateSec,
-	int & nDateYear,
-	int & nDateMonth,
-	int & nDateDay,
-	int & nDateHour
-) {
-	nDateYear  = nDate / 10000;
-	nDateMonth = (nDate % 10000) / 100;
-	nDateDay   = (nDate % 100);
-	nDateHour  = nDateSec / 3600;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Parse a time value.
-///	</summary>
-void ParseTimeDouble(
-	const std::string & strTimeUnits,
-	const std::string & strTimeCalendar,
-	double dTime,
-	int & nDateYear,
-	int & nDateMonth,
-	int & nDateDay,
-	int & nDateHour
-) {
-	// Get calendar type
-	Time::CalendarType cal;
-	if ((strTimeCalendar.length() >= 6) &&
-		(strncmp(strTimeCalendar.c_str(), "noleap", 6) == 0)
-	) {
-		cal = Time::CalendarNoLeap;
-
-	} else if (
-		(strTimeCalendar.length() >= 8) &&
-		(strncmp(strTimeCalendar.c_str(), "standard", 8) == 0)
-	) {
-		cal = Time::CalendarStandard;
-
-	} else if (
-		(strTimeCalendar.length() >= 9) &&
-		(strncmp(strTimeCalendar.c_str(), "gregorian", 9) == 0)
-	) {
-		cal = Time::CalendarGregorian;
-
-	} else if (
-		(strTimeCalendar.length() >= 7) &&
-		(strncmp(strTimeCalendar.c_str(), "360_day", 8) == 0)
-	) {
-		cal = Time::Calendar360Day;
-
-	} else {
-		_EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
-	}
-/*
-	Time time(Time::CalendarStandard);
-	time.FromFormattedString("1800-01-01 00:00:00");
-	printf("%1.15e %i\n", 3600.0 * 1577832.0, (int)(3600.0 * 1577832.0));
-	time.AddHours(1577832);
-
-	Announce("Time (YMDS): %i %i %i %i",
-			time.GetYear(),
-			time.GetMonth(),
-			time.GetDay(),
-			time.GetSecond());
-
-	_EXCEPTION();
-*/
-	// Time format is "days since ..."
-	if ((strTimeUnits.length() >= 11) &&
-	    (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
-	) {
-		std::string strSubStr = strTimeUnits.substr(11);
-		Time time(cal);
-		time.FromFormattedString(strSubStr);
-
-		int nDays = static_cast<int>(dTime);
-		time.AddDays(nDays);
-
-		int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
-		time.AddSeconds(nSeconds);
-
-		Announce("Time (YMDS): %i %i %i %i",
-				time.GetYear(),
-				time.GetMonth(),
-				time.GetDay(),
-				time.GetSecond());
-
-
-		nDateYear = time.GetYear();
-		nDateMonth = time.GetMonth();
-		nDateDay = time.GetDay();
-		nDateHour = time.GetSecond() / 3600;
-
-		//printf("%s\n", strSubStr.c_str());
-
-	// Time format is "hours since ..."
-	} else if (
-	    (strTimeUnits.length() >= 12) &&
-	    (strncmp(strTimeUnits.c_str(), "hours since ", 12) == 0)
-	) {
-		std::string strSubStr = strTimeUnits.substr(12);
-		Time time(cal);
-		time.FromFormattedString(strSubStr);
-
-		time.AddHours(static_cast<int>(dTime));
-
-		Announce("Time (YMDS): %i %i %i %i",
-				time.GetYear(),
-				time.GetMonth(),
-				time.GetDay(),
-				time.GetSecond());
-
-		nDateYear = time.GetYear();
-		nDateMonth = time.GetMonth();
-		nDateDay = time.GetDay();
-		nDateHour = time.GetSecond() / 3600;
-
-		//printf("%s\n", strSubStr.c_str());
-
-	// Time format is "minutes since ..."
-	} else if (
-	    (strTimeUnits.length() >= 14) &&
-	    (strncmp(strTimeUnits.c_str(), "minutes since ", 14) == 0)
-	) {
-		std::string strSubStr = strTimeUnits.substr(14);
-		Time time(cal);
-		time.FromFormattedString(strSubStr);
-
-		time.AddMinutes(static_cast<int>(dTime));
-
-		Announce("Time (YMDS): %i %i %i %i",
-				time.GetYear(),
-				time.GetMonth(),
-				time.GetDay(),
-				time.GetSecond());
-
-		nDateYear = time.GetYear();
-		nDateMonth = time.GetMonth();
-		nDateDay = time.GetDay();
-		nDateHour = time.GetSecond() / 3600;
-
-		//printf("%s\n", strSubStr.c_str());
-
-	} else {
-		_EXCEPTIONT("Unknown \"time::units\" format");
-	}
-	//_EXCEPTION();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -871,7 +420,6 @@ bool HasClosedContour(
 
 	Announce(2, "Checking (%lu) : (%1.5f %1.5f)",
 		ixOrigin, dLat0, dLon0);
-
 
 	// Build up nodes
 	while (queueToVisit.size() != 0) {
@@ -1054,89 +602,6 @@ bool SatisfiesThreshold(
 	}
 
 	return false;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Find the maximum value of a field near the given point.
-///	</summary>
-///	<param name="dMaxDist">
-///		Maximum distance from the initial point in degrees.
-///	</param>
-template <typename real>
-void FindLocalAverage(
-	const SimpleGrid & grid,
-	const DataVector<real> & data,
-	int ix0,
-	double dMaxDist,
-	float & dAverage
-) {
-	// Verify that dMaxDist is less than 180.0
-	if (dMaxDist > 180.0) {
-		_EXCEPTIONT("MaxDist must be less than 180.0");
-	}
-
-	// Queue of nodes that remain to be visited
-	std::queue<int> queueNodes;
-	queueNodes.push(ix0);
-
-	// Set of nodes that have already been visited
-	std::set<int> setNodesVisited;
-
-	// Latitude and longitude at the origin
-	double dLat0 = grid.m_dLat[ix0];
-	double dLon0 = grid.m_dLon[ix0];
-
-	// Number of points
-	float dSum = 0.0;
-	int nCount = 0;
-
-	// Loop through all latlon elements
-	while (queueNodes.size() != 0) {
-		int ix = queueNodes.front();
-		queueNodes.pop();
-
-		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
-			continue;
-		}
-
-		setNodesVisited.insert(ix);
-
-		double dLatThis = grid.m_dLat[ix];
-		double dLonThis = grid.m_dLon[ix];
-
-		// Great circle distance to this element
-		double dR =
-			sin(dLat0) * sin(dLatThis)
-			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
-
-		if (dR >= 1.0) {
-			dR = 0.0;
-		} else if (dR <= -1.0) {
-			dR = 180.0;
-		} else {
-			dR = 180.0 / M_PI * acos(dR);
-		}
-		if (dR != dR) {
-			_EXCEPTIONT("NaN value detected");
-		}
-
-		if (dR > dMaxDist) {
-			continue;
-		}
-
-		// Check for new local extremum
-		dSum += data[ix];
-		nCount++;
-
-		// Add all neighbors of this point
-		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
-			queueNodes.push(grid.m_vecConnectivity[ix][n]);
-		}
-	}
-
-	dAverage = dSum / static_cast<float>(nCount);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1402,7 +867,6 @@ void DetectCyclonesUnstructured(
 
 	// Loop through all times
 	for (int t = 0; t < nTime; t += param.nTimeStride) {
-	//for (int t = 0; t < 1; t++) {
 
 		char szStartBlock[128];
 		sprintf(szStartBlock, "Time %i", t);
@@ -1413,6 +877,26 @@ void DetectCyclonesUnstructured(
 		varSearchBy.LoadGridData(varreg, vecFiles, grid, t);
 
 		const DataVector<float> & dataSearch = varSearchBy.GetData();
+
+		// Parse time information
+		NcAtt * attTimeUnits = varTime->get_att("units");
+		if (attTimeUnits == NULL) {
+			_EXCEPTIONT("Variable \"time\" has no \"units\" attribute");
+		}
+
+		std::string strTimeUnits = attTimeUnits->as_string(0);
+
+		Time::CalendarType eCalendarType = Time::CalendarStandard;
+		NcAtt * attTimeCalendar = varTime->get_att("calendar");
+		if (attTimeCalendar != NULL) {
+			eCalendarType = Time::CalendarTypeFromString(attTimeCalendar->as_string(0));
+			if (eCalendarType == Time::CalendarUnknown) {
+				_EXCEPTIONT("Unknown calendar type associated with variable \"time\"");
+			}
+		}
+
+		Time time(eCalendarType);
+		time.FromCFCompliantUnitsOffsetDouble(strTimeUnits, dTime[t]);
 
 		// Tag all minima
 		std::set<int> setCandidates;
@@ -1727,140 +1211,54 @@ void DetectCyclonesUnstructured(
 
 		// Write results to file
 		{
-			// Parse time information
-			//NcVar * varDate = ncInput.get_var("date");
-			//NcVar * varDateSec = ncInput.get_var("datesec");
-
-			int nDateYear;
-			int nDateMonth;
-			int nDateDay;
-			int nDateHour;
-
-			NcAtt * attTimeUnits = varTime->get_att("units");
-			if (attTimeUnits == NULL) {
-				_EXCEPTIONT("Variable \"time\" has no \"units\" attribute");
-			}
-
-			std::string strTimeUnits = attTimeUnits->as_string(0);
-
-			std::string strTimeCalendar = "standard";
-			NcAtt * attTimeCalendar = varTime->get_att("calendar");
-			if (attTimeCalendar != NULL) {
-				strTimeCalendar = attTimeCalendar->as_string(0);
-			}
-
-			ParseTimeDouble(
-				strTimeUnits,
-				strTimeCalendar,
-				dTime[t],
-				nDateYear,
-				nDateMonth,
-				nDateDay,
-				nDateHour);
-
 			// Write time information
 			fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
-				nDateYear,
-				nDateMonth,
-				nDateDay,
+				time.GetYear(),
+				time.GetMonth(),
+				time.GetDay(),
 				static_cast<int>(setCandidates.size()),
-				nDateHour);
-
+				time.GetSecond() / 3600);
+/*
+			if (param.fOutputInfileInfo) {
+				fprintf(fpOutput, "\t\"%s\"\t%i\n", strInputFiles.c_str(), t);
+			} else {
+				fprintf(fpOutput, "\n");
+			}
+*/
 			// Write candidate information
-			int iCandidateCount = 0;
+			int iCandidateIx = 0;
 
 			// Apply output operators
-			DataMatrix<float> dOutput(setCandidates.size(), vecOutputOp.size());
-			for (int outc = 0; outc < vecOutputOp.size(); outc++) {
+			std::vector< std::vector<std::string> > vecOutputValue;
+			vecOutputValue.resize(setCandidates.size());
+			for (int i = 0; i < setCandidates.size(); i++) {
+				vecOutputValue[i].resize(vecOutputOp.size());
+			}
 
-				// Load the search variable data
-				Variable & var = varreg.Get(vecOutputOp[outc].m_varix);
-				var.LoadGridData(varreg, vecFiles, grid, t);
-				const DataVector<float> & dataState = var.GetData();
+			//DataMatrix<float> dOutput(setCandidates.size(), vecOutputOp.size());
+			for (int outc = 0; outc < vecOutputOp.size(); outc++) {
 
 				// Loop through all pressure minima
 				std::set<int>::const_iterator iterCandidate
 					= setCandidates.begin();
 
-				iCandidateCount = 0;
+				iCandidateIx = 0;
 				for (; iterCandidate != setCandidates.end(); iterCandidate++) {
+					ApplyOutputOp<float>(
+						vecOutputOp[outc],
+						grid,
+						varreg,
+						vecFiles,
+						t,
+						*iterCandidate,
+						vecOutputValue[iCandidateIx][outc]);
 
-					int ixExtremum;
-					float dValue;
-					float dRMax;
-
-					if (vecOutputOp[outc].m_eOp == OutputOp::Max) {
-						FindLocalMinMax<float>(
-							grid,
-							false,
-							dataState,
-							*iterCandidate,
-							vecOutputOp[outc].m_dDistance,
-							ixExtremum,
-							dValue,
-							dRMax);
-
-						dOutput[iCandidateCount][outc] = dValue;
-
-					} else if (vecOutputOp[outc].m_eOp == OutputOp::MaxDist) {
-						FindLocalMinMax<float>(
-							grid,
-							false,
-							dataState,
-							*iterCandidate,
-							vecOutputOp[outc].m_dDistance,
-							ixExtremum,
-							dValue,
-							dRMax);
-
-						dOutput[iCandidateCount][outc] = dRMax;
-
-					} else if (vecOutputOp[outc].m_eOp == OutputOp::Min) {
-						FindLocalMinMax<float>(
-							grid,
-							true,
-							dataState,
-							*iterCandidate,
-							vecOutputOp[outc].m_dDistance,
-							ixExtremum,
-							dValue,
-							dRMax);
-
-						dOutput[iCandidateCount][outc] = dValue;
-
-					} else if (vecOutputOp[outc].m_eOp == OutputOp::MinDist) {
-						FindLocalMinMax<float>(
-							grid,
-							true,
-							dataState,
-							*iterCandidate,
-							vecOutputOp[outc].m_dDistance,
-							ixExtremum,
-							dValue,
-							dRMax);
-
-						dOutput[iCandidateCount][outc] = dRMax;
-
-					} else if (vecOutputOp[outc].m_eOp == OutputOp::Avg) {
-						FindLocalAverage<float>(
-							grid,
-							dataState,
-							*iterCandidate,
-							vecOutputOp[outc].m_dDistance,
-							dValue);
-
-						dOutput[iCandidateCount][outc] = dValue;
-
-					} else {
-						_EXCEPTIONT("Invalid Output operator");
-					}
-
-					iCandidateCount++;
+					iCandidateIx++;
 				}
 			}
 
 			// Output all candidates
-			iCandidateCount = 0;
+			iCandidateIx = 0;
 
 			std::set<int>::const_iterator iterCandidate = setCandidates.begin();
 			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
@@ -1879,13 +1277,12 @@ void DetectCyclonesUnstructured(
 					grid.m_dLat[*iterCandidate] * 180.0 / M_PI);
 
 				for (int outc = 0; outc < vecOutputOp.size(); outc++) {
-					fprintf(fpOutput, "\t%3.6e",
-						dOutput[iCandidateCount][outc]);
+					fprintf(fpOutput, "\t%s", vecOutputValue[iCandidateIx][outc].c_str());
 				}
 
 				fprintf(fpOutput, "\n");
 
-				iCandidateCount++;
+				iCandidateIx++;
 			}
 		}
 
@@ -2096,7 +1493,7 @@ try {
 			) {
 				std::string strSubStr =
 					strClosedContourCmd.substr(iLast, i - iLast);
-			
+
 				int iNextOp = (int)(vecClosedContourOp.size());
 				vecClosedContourOp.resize(iNextOp + 1);
 				vecClosedContourOp[iNextOp].Parse(varreg, strSubStr);

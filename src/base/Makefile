@@ -15,7 +15,8 @@ FILES= Announce.cpp \
        TimeObj.cpp \
        Variable.cpp \
 	   DataOp.cpp \
-       kdtree.cpp
+       kdtree.cpp \
+	   SimpleGridUtilities.cpp
 
 LIB_TARGET= libextremesbase.a
 

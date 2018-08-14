@@ -19,7 +19,8 @@ EXEC_FILES= AppendNodeData.cpp \
             DetectCyclones.cpp \
             DetectCyclonesUnstructured.cpp \
 			HistogramNodes.cpp \
-            StitchNodes.cpp
+            StitchNodes.cpp \
+			CalculatePosthocOutput.cpp
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 
