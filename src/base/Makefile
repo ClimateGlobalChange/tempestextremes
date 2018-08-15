@@ -16,7 +16,8 @@ FILES= Announce.cpp \
        Variable.cpp \
 	   DataOp.cpp \
        kdtree.cpp \
-	   SimpleGridUtilities.cpp
+	   SimpleGridUtilities.cpp \
+	   AutoCurator.cpp
 
 LIB_TARGET= libextremesbase.a
 

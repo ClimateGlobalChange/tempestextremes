@@ -1319,7 +1319,7 @@ try {
 	// Parameters for DetectCycloneUnstructured
 	DetectCyclonesParam dcuparam;
 
-	// Input dat file
+	// Input data file
 	std::string strInputFile;
 
 	// Input list file
@@ -1719,4 +1719,6 @@ try {
 	MPI_Finalize();
 #endif
 }
+
+///////////////////////////////////////////////////////////////////////////////
 

@@ -17,6 +17,8 @@
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
+#include "Variable.h"
+#include "AutoCurator.h"
 
 #include "netcdfcpp.h"
 
@@ -40,6 +42,58 @@ int main(int argc, char** argv) {
 	AnnounceOnlyOutputOnRankZero();
 
 try {
+
+	// Input data file
+	std::string strInputFile;
+
+	// Input list file
+	std::string strInputFileList;
+
+	// Parse the command line
+	BeginCommandLine()
+		CommandLineString(strInputFile, "in_data", "");
+		CommandLineString(strInputFileList, "in_data_list", "");
+	EndCommandLine(argv)
+
+	AnnounceBanner();
+
+	// Create Variable registry
+	VariableRegistry varreg;
+
+	// Create autocurator
+	AutoCurator autocur;
+
+	// Check input
+	if ((strInputFile.length() == 0) && (strInputFileList.length() == 0)) {
+		_EXCEPTIONT("No input data file (--in_data) or (--in_data_list)"
+			" specified");
+	}
+	if ((strInputFile.length() != 0) && (strInputFileList.length() != 0)) {
+		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list)"
+			" may be specified");
+	}
+
+	// Load input file list
+	if (strInputFile.length() != 0) {
+		autocur.IndexFiles(strInputFile);
+
+	} else {
+		std::ifstream ifInputFileList(strInputFileList.c_str());
+		if (!ifInputFileList.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\"",
+				strInputFileList.c_str());
+		}
+		std::string strFileLine;
+		while (std::getline(ifInputFileList, strFileLine)) {
+			if (strFileLine.length() == 0) {
+				continue;
+			}
+			if (strFileLine[0] == '#') {
+				continue;
+			}
+			autocur.IndexFiles(strFileLine);
+		}
+	}
 
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());
