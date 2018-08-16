@@ -36,16 +36,25 @@ gen_summary_table<-function(df_in,rfn="",textfn="",csvfn=""){
       df_summ[nline,"duration_days"]<-as.numeric(difftime(eline[1,"datehour"],
                                                           sline[1,"datehour"]))
       if (!is.null(dsub2$centlat) & !is.null(dsub2$centlon)){
+        df_summ[nline,"start_centlat"]<-sline[1,"centlat"]
+        df_summ[nline,"start_centlon"]<-sline[1,"centlon"]
+        df_summ[nline,"end_centlat"]<-eline[1,"centlat"]
+        df_summ[nline,"end_centlon"]<-eline[1,"centlon"]
         df_summ[nline,"dist_km"]<-getDistanceFromLatLonInKm(sline[1,"centlat"],
                                                             sline[1,"centlon"],
                                                             eline[1,"centlat"],
                                                             eline[1,"centlon"])
-        #For zonal distance, D^2-Lat^2 = Lon ^2
-        latdist<-getDistanceFromLatLonInKm(sline[1,"centlat"],
-                                           0,
-                                           eline[1,"centlat"],
-                                           0)
-        df_summ[nline,"zonal_dist_km"]<-sqrt((df_summ[nline,"dist_km"])^2-latdist^2)
+        avg_clat<-mean(dsub2$centlat)
+        df_summ[nline,"zonal_dist_km"]<-getDistanceFromLatLonInKm(avg_clat,
+                                                                  sline[1,"centlon"],
+                                                                  avg_clat,
+                                                                  eline[1,"centlon"])
+        # #For zonal distance, D^2-Lat^2 = Lon ^2
+        # latdist<-getDistanceFromLatLonInKm(sline[1,"centlat"],
+        #                                    0,
+        #                                    eline[1,"centlat"],
+        #                                    0)
+        # df_summ[nline,"zonal_dist_km"]<-sqrt((df_summ[nline,"dist_km"])^2-latdist^2)
         df_summ[nline,"zonal_speed_kph"]<-df_summ[nline,"zonal_dist_km"]/(df_summ[nline,"duration_days"]*24)
       }
       if (!is.null(dsub2$area_km)){
