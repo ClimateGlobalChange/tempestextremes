@@ -30,6 +30,39 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+struct VelocityVector {
+	double dU;
+	double dV;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+struct PathNode {
+	std::vector<int> m_coord;
+	std::vector<std::string> m_vecData;
+	std::vector<VelocityVector> m_dVelocityLat;
+	std::vector<double> m_dVelocityLon;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+struct Path {
+	Time m_timeStart;
+	std::vector<PathNode> m_vecPathNodes;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+typedef std::vector<Path> PathVector;
+
+///////////////////////////////////////////////////////////////////////////////
+
+void CalculateRadialWindProfile(
+) {
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 #if defined(TEMPEST_MPIOMP)
@@ -132,6 +165,11 @@ try {
 		_EXCEPTIONT("Invalid --in_file_type, expected \"SN\" or \"DCU\"");
 	}
 
+	// Radial wind profile can only be calculated with StitchNodes output
+	if ((strRadialWindProfileVars != "") && (iftype != InputFileTypeSN)) {
+		_EXCEPTIONT("--radial_wind_profile can only be used with --in_file_type SN");
+	}
+
 	// Define the SimpleGrid
 	SimpleGrid grid;
 
@@ -211,6 +249,10 @@ try {
 	std::vector<int> coord;
 	coord.resize(grid.m_nGridDim.size());
 
+	// Vector of Path information loaded from StitchNodes file
+	PathVector vecPaths;
+
+	// A map from Times to file lines, used for StitchNodes formatted output
 	std::map<Time, std::vector<int> > mapTimeToFileLines;
 
 	for (int f = 0; f < vecInputFiles.size(); f++) {
@@ -280,6 +322,18 @@ try {
 						_EXCEPTION2("Format error on line %i of \"%s\"",
 							iLine, vecInputFiles[f].c_str());
 					}
+
+					vecPaths.resize(vecPaths.size() + 1);
+					vecPaths[vecPaths.size()-1].m_timeStart =
+						Time(
+							iYear,
+							iMonth-1,
+							iDay-1,
+							3600 * iHour,
+							0,
+							autocurator.GetCalendarType());
+
+					vecPaths[vecPaths.size()-1].m_vecPathNodes.resize(nCount);
 				}
 
 				iLine++;
@@ -295,11 +349,11 @@ try {
 
 				std::istringstream iss(strBuffer);
 
-				double dLon;
-				double dLat;
-
 				for (int n = 0; n < grid.m_nGridDim.size(); n++) {
 					iss >> coord[n];
+					if ((coord[n] < 0) || (coord[n] >= grid.m_nGridDim[n])) {
+						_EXCEPTION1("Coordinate index out of range on line %i", coord[n]);
+					}
 				}
 				if (iss.eof()) {
 					_EXCEPTION2("Format error on line %i of \"%s\"",
@@ -320,6 +374,9 @@ try {
 
 				// StitchNodes requires us to reorder the data 
 				if (iftype == InputFileTypeSN) {
+					PathNode & pathnode =
+						vecPaths[vecPaths.size()-1].m_vecPathNodes[i];
+
 					if (nOutputSize < 4) {
 						_EXCEPTION2("Format error on line %i of \"%s\"",
 							iLine, vecInputFiles[f].c_str());
@@ -346,10 +403,15 @@ try {
 								time, std::vector<int>())).first;
 					}
 					iter->second.push_back(iLine);
+
+					pathnode.m_coord = coord;
+					pathnode.m_vecData = vecDelimitedOutput;
 				}
 
 				iLine++;
 			}
+
+			// Calculate velocity at each point
 		}
 	}
 
