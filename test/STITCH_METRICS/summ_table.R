@@ -33,8 +33,13 @@ gen_summary_table<-function(df_in,rfn="",textfn="",csvfn=""){
       eline<-dsub2[nrow(dsub2),]
       df_summ[nline,"startdate"]<-sline[1,"datehour"]
       df_summ[nline,"enddate"]<-eline[1,"datehour"]
-      df_summ[nline,"duration_days"]<-as.numeric(difftime(eline[1,"datehour"],
-                                                          sline[1,"datehour"]))
+      diff_days<-as.numeric(difftime(as.Date(eline[1,"datehour"]),as.Date(sline[1,"datehour"]),units="days"))
+      #print(diff_days)
+      hs<-as.numeric(strftime(sline[1,"datehour"],format="%H"))
+      he<-as.numeric(strftime(eline[1,"datehour"],format="%H"))
+      hdiff<-(he-hs)/24
+      #print(hdiff)
+      df_summ[nline,"duration_days"]<-diff_days+hdiff
       if (!is.null(dsub2$centlat) & !is.null(dsub2$centlon)){
         df_summ[nline,"start_centlat"]<-sline[1,"centlat"]
         df_summ[nline,"start_centlon"]<-sline[1,"centlon"]

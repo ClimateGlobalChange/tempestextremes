@@ -1,5 +1,5 @@
 # This function reads the BlobStats files into a single data table
-read_stats_to_table<-function(flist,nhrs,var,
+read_stats_to_table<-function(flist,nhrs,var="",
                               rfn="",textfn="",csvfn=""){
   nres<-nhrs/24
   fnum<-1
@@ -16,7 +16,7 @@ read_stats_to_table<-function(flist,nhrs,var,
     orig<-substr(fl[1],1,10)
     #Currently assuming that nres is manually entered
     #Second line: Column names
-    varnames<-unlist(strsplit(fl[2],split=" "))
+    varnames<-unlist(strsplit(fl[2],split="\t"))
     tname<-varnames[1]
     
     fdat<-fl[3:length(fl)]
