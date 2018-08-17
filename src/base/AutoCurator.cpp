@@ -22,6 +22,27 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void AutoCurator::InsertTimeToFileTimeIx(
+	const Time & time,
+	const int & iFileIx,
+	const int & iTimeIx
+) {
+	TimeToFileTimeIxMap::iterator iter =
+		m_mapTimeToTimeFileIx.find(time);
+
+	if (iter == m_mapTimeToTimeFileIx.end()) {
+		iter = m_mapTimeToTimeFileIx.insert(
+			TimeToFileTimeIxMap::value_type(
+				time, FileTimeIxVector())).first;
+	}
+
+	std::cout << time.ToString() << " " << iFileIx << " " << iTimeIx << std::endl;
+
+	iter->second.push_back(FileTimeIx(iFileIx, iTimeIx));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void AutoCurator::IndexFiles(
 	const std::string & strFile
 ) {
@@ -29,8 +50,8 @@ void AutoCurator::IndexFiles(
 	int iLast = 0;
 	for (int i = 0; i < strFile.length(); i++) {
 		if (strFile[i] == ';') {
-			iLast = i+1;
 			IndexFiles(strFile.substr(iLast, i-iLast));
+			iLast = i+1;
 		}
 	}
 	if (iLast != 0) {
@@ -83,9 +104,7 @@ void AutoCurator::IndexFiles(
 			time.SetYear(iFileIx);
 			time.SetMonth(t);
 
-			m_mapTimeToTimeFileIx.insert(
-				std::map<Time, LocalFileTimePair>::value_type(
-					time, LocalFileTimePair(iFileIx, t)));
+			InsertTimeToFileTimeIx(time, iFileIx, t);
 		}
 
 	// If time variable is present make sure it is CF-compliant and
@@ -164,29 +183,35 @@ void AutoCurator::IndexFiles(
 					vecTimeDouble[t]);
 			}
 
-			m_mapTimeToTimeFileIx.insert(
-				std::map<Time, LocalFileTimePair>::value_type(
-					time, LocalFileTimePair(iFileIx, t)));
+			InsertTimeToFileTimeIx(time, iFileIx, t);
 		}
 	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-AutoCurator::FilenameTimePair AutoCurator::Find(
+AutoCurator::FilenameTimePairVector AutoCurator::Find(
 	const Time & time
 ) {
-	std::map<Time, LocalFileTimePair>::const_iterator iter =
+	FilenameTimePairVector vec;
+
+	TimeToFileTimeIxMap::const_iterator iter =
 		m_mapTimeToTimeFileIx.find(time);
 
 	if (iter == m_mapTimeToTimeFileIx.end()) {
-		return FilenameTimePair("",-1);	
-	} else {
-		return
-			FilenameTimePair(
-				m_vecFiles[iter->second.first],
-				iter->second.second);
+		return vec;
 	}
+
+	const FileTimeIxVector & vecFileTimeIx = iter->second;
+
+	for (int f = 0; f < vecFileTimeIx.size(); f++) {
+		vec.push_back(
+			FilenameTimePair(
+				m_vecFiles[vecFileTimeIx[f].first],
+				vecFileTimeIx[f].second));
+	}
+
+	return vec;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

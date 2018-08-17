@@ -758,46 +758,10 @@ void DetectCyclonesUnstructured(
 
 	// No connectivity file; check for latitude/longitude dimension
 	} else {
+		grid.GenerateLatitudeLongitude(vecFiles[0], param.fRegional);
 
-		NcDim * dimLat = vecFiles[0]->get_dim("lat");
-		if (dimLat == NULL) {
-			_EXCEPTIONT("No dimension \"lat\" found in input file");
-		}
-
-		NcDim * dimLon = vecFiles[0]->get_dim("lon");
-		if (dimLon == NULL) {
-			_EXCEPTIONT("No dimension \"lon\" found in input file");
-		}
-
-		NcVar * varLat = vecFiles[0]->get_var("lat");
-		if (varLat == NULL) {
-			_EXCEPTIONT("No variable \"lat\" found in input file");
-		}
-
-		NcVar * varLon = vecFiles[0]->get_var("lon");
-		if (varLon == NULL) {
-			_EXCEPTIONT("No variable \"lon\" found in input file");
-		}
-
-		nLat = dimLat->size();
-		nLon = dimLon->size();
-
-		DataVector<double> vecLat(nLat);
-		varLat->get(vecLat, nLat);
-
-		for (int j = 0; j < nLat; j++) {
-			vecLat[j] *= M_PI / 180.0;
-		}
-
-		DataVector<double> vecLon(nLon);
-		varLon->get(vecLon, nLon);
-
-		for (int i = 0; i < nLon; i++) {
-			vecLon[i] *= M_PI / 180.0;
-		}
-
-		// Generate the SimpleGrid
-		grid.GenerateLatitudeLongitude(vecLat, vecLon, param.fRegional);
+		nLon = grid.m_dLon.GetRows();
+		nLat = grid.m_dLat.GetRows();
 	}
 
 	// Get time dimension

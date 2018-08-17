@@ -25,6 +25,8 @@
 #include <fstream>
 #include <vector>
 
+#include "netcdfcpp.h"
+
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
@@ -90,6 +92,55 @@ public:
 		}
 		}
 
+	}
+
+	///	<summary>
+	///		Try to automatically generate the SimpleGrid from a NetCDF
+	///		file with latitude/longitude coordinates.
+	///	</summary>
+	void GenerateLatitudeLongitude(
+		NcFile * ncFile,
+		bool fRegional
+	) {
+		NcDim * dimLat = ncFile->get_dim("lat");
+		if (dimLat == NULL) {
+			_EXCEPTIONT("No dimension \"lat\" found in input file");
+		}
+
+		NcDim * dimLon = ncFile->get_dim("lon");
+		if (dimLon == NULL) {
+			_EXCEPTIONT("No dimension \"lon\" found in input file");
+		}
+
+		NcVar * varLat = ncFile->get_var("lat");
+		if (varLat == NULL) {
+			_EXCEPTIONT("No variable \"lat\" found in input file");
+		}
+
+		NcVar * varLon = ncFile->get_var("lon");
+		if (varLon == NULL) {
+			_EXCEPTIONT("No variable \"lon\" found in input file");
+		}
+
+		int nLat = dimLat->size();
+		int nLon = dimLon->size();
+
+		DataVector<double> vecLat(nLat);
+		varLat->get(vecLat, nLat);
+
+		for (int j = 0; j < nLat; j++) {
+			vecLat[j] *= M_PI / 180.0;
+		}
+
+		DataVector<double> vecLon(nLon);
+		varLon->get(vecLon, nLon);
+
+		for (int i = 0; i < nLon; i++) {
+			vecLon[i] *= M_PI / 180.0;
+		}
+
+		// Generate the SimpleGrid
+		GenerateLatitudeLongitude(vecLat, vecLon, fRegional);
 	}
 
 	///	<summary>

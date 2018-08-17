@@ -31,12 +31,27 @@ public:
 	///	<summary>
 	///		A local (file index, local time index) pair.
 	///	</summary>
-	typedef std::pair<int, int> LocalFileTimePair;
+	typedef std::pair<int, int> FileTimeIx;
+
+	///	<summary>
+	///		A vector of (file index, local time index) pairs.
+	///	</summary>
+	typedef std::vector<FileTimeIx> FileTimeIxVector;
+
+	///	<summary>
+	///		A map from a Time to a vector of (file index, local time index) pairs.
+	///	</summary>
+	typedef std::map<Time, FileTimeIxVector> TimeToFileTimeIxMap;
 
 	///	<summary>
 	///		A (filename, local time index) pair.
 	///	</summary>
 	typedef std::pair<std::string, int> FilenameTimePair;
+
+	///	<summary>
+	///		A vector of (filename, local time index) pairs.
+	///	</summary>
+	typedef std::vector<FilenameTimePair> FilenameTimePairVector;
 
 public:
 	///	<summary>
@@ -45,6 +60,16 @@ public:
 	AutoCurator() :
 		m_eCalendarType(Time::CalendarUnknown)
 	{ }
+
+protected:
+	///	<summary>
+	///		Create a new entry in m_mapTimeToTimeFileIx for the given Time.
+	///	</summary>
+	void InsertTimeToFileTimeIx(
+		const Time & time,
+		const int & iFileIx,
+		const int & iTimeIx
+	);
 
 public:
 	///	<summary>
@@ -63,9 +88,16 @@ public:
 	}
 
 	///	<summary>
+	///		Get the vector of filenames.
+	///	</summary>
+	const std::vector<std::string> & GetFilenames() const {
+		return m_vecFiles;
+	}
+
+	///	<summary>
 	///		Find the file/time pair associated with a given Time.
 	///	</summary>
-	FilenameTimePair Find(
+	FilenameTimePairVector Find(
 		const Time & time
 	);
 
@@ -83,7 +115,7 @@ protected:
 	///	<summary>
 	///		A map between Time, and (file,time) index.
 	///	</summary>
-	std::map<Time, LocalFileTimePair> m_mapTimeToTimeFileIx;
+	TimeToFileTimeIxMap m_mapTimeToTimeFileIx;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

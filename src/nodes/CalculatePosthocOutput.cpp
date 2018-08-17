@@ -22,6 +22,8 @@
 
 #include "netcdfcpp.h"
 
+#include <fstream>
+
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
 #endif
@@ -43,16 +45,52 @@ int main(int argc, char** argv) {
 
 try {
 
-	// Input data file
+	// Input text file
 	std::string strInputFile;
 
-	// Input list file
+	// Input list of text files
 	std::string strInputFileList;
+
+	// Input file type
+	std::string strInputFileType;
+
+	// Input data file
+	std::string strInputData;
+
+	// Input list of data files
+	std::string strInputDataList;
+
+	// Connectivity file
+	std::string strConnectivity;
+
+	// Data is regional
+	bool fRegional;
+
+	// Output file
+	std::string strOutputFile;
+
+	// Append output to input file
+	bool fOutputAppend;
+
+	// Variables for calculating radial wind profile
+	std::string strRadialWindProfileVars;
 
 	// Parse the command line
 	BeginCommandLine()
-		CommandLineString(strInputFile, "in_data", "");
-		CommandLineString(strInputFileList, "in_data_list", "");
+		CommandLineString(strInputFile, "in_file", "");
+		//CommandLineString(strInputFileList, "in_file_list", "");
+		CommandLineStringD(strInputFileType, "in_file_type", "SN", "[DCU|SN]");
+		CommandLineString(strInputData, "in_data", "");
+		CommandLineString(strInputDataList, "in_data_list", "");
+		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineBool(fRegional, "regional");
+
+		CommandLineString(strOutputFile, "out_file", "");
+		CommandLineBool(fOutputAppend, "out_append");
+
+		CommandLineStringD(strRadialWindProfileVars, "radial_wind_profile", "", "U,V,bins,radius");
+
+		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
 
 	AnnounceBanner();
@@ -61,21 +99,93 @@ try {
 	VariableRegistry varreg;
 
 	// Create autocurator
-	AutoCurator autocur;
+	AutoCurator autocurator;
 
-	// Check input
-	if ((strInputFile.length() == 0) && (strInputFileList.length() == 0)) {
+	// Check arguments
+	if ((strInputData.length() == 0) && (strInputDataList.length() == 0)) {
 		_EXCEPTIONT("No input data file (--in_data) or (--in_data_list)"
 			" specified");
 	}
-	if ((strInputFile.length() != 0) && (strInputFileList.length() != 0)) {
+	if ((strInputData.length() != 0) && (strInputDataList.length() != 0)) {
 		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list)"
 			" may be specified");
 	}
+	if ((strInputFile.length() == 0) && (strInputFileList.length() == 0)) {
+		_EXCEPTIONT("No input file (--in_file) or (--in_file_list)"
+			" specified");
+	}
+	if ((strInputFile.length() != 0) && (strInputFileList.length() != 0)) {
+		_EXCEPTIONT("Only one of (--in_file) or (--in_file_list)"
+			" may be specified");
+	}
+
+	// Input file type
+	enum InputFileType {
+		InputFileTypeDCU,
+		InputFileTypeSN
+	} iftype;
+	if (strInputFileType == "DCU") {
+		iftype = InputFileTypeDCU;
+	} else if (strInputFileType == "SN") {
+		iftype = InputFileTypeSN;
+	} else {
+		_EXCEPTIONT("Invalid --in_file_type, expected \"SN\" or \"DCU\"");
+	}
+
+	// Define the SimpleGrid
+	SimpleGrid grid;
+
+	// Curate input data
+	if (strInputData.length() != 0) {
+		autocurator.IndexFiles(strInputData);
+
+	} else {
+		std::ifstream ifInputDataList(strInputDataList.c_str());
+		if (!ifInputDataList.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\"",
+				strInputDataList.c_str());
+		}
+		std::string strFileLine;
+		while (std::getline(ifInputDataList, strFileLine)) {
+			if (strFileLine.length() == 0) {
+				continue;
+			}
+			if (strFileLine[0] == '#') {
+				continue;
+			}
+			autocurator.IndexFiles(strFileLine);
+		}
+	}
+
+	// Check for connectivity file
+	if (strConnectivity != "") {
+		grid.FromFile(strConnectivity);
+
+	// No connectivity file; check for latitude/longitude dimension
+	} else {
+		const std::vector<std::string> & vecFiles = autocurator.GetFilenames();
+
+		if (vecFiles.size() < 1) {
+			_EXCEPTIONT("No data files specified");
+		}
+
+		NcFile ncFile(vecFiles[0].c_str());
+		if (!ncFile.is_valid()) {
+			_EXCEPTION1("Unable to open NetCDF file \"%s\"", vecFiles[0].c_str());
+		}
+
+		grid.GenerateLatitudeLongitude(&ncFile, fRegional);
+
+		if (grid.m_nGridDim.size() != 2) {
+			_EXCEPTIONT("Logic error when generating connectivity");
+		}
+	}
 
 	// Load input file list
+	std::vector<std::string> vecInputFiles;
+
 	if (strInputFile.length() != 0) {
-		autocur.IndexFiles(strInputFile);
+		vecInputFiles.push_back(strInputFile);
 
 	} else {
 		std::ifstream ifInputFileList(strInputFileList.c_str());
@@ -91,7 +201,155 @@ try {
 			if (strFileLine[0] == '#') {
 				continue;
 			}
-			autocur.IndexFiles(strFileLine);
+			vecInputFiles.push_back(strFileLine);
+		}
+	}
+
+	// Loop through all files
+	std::string strBuffer;
+
+	std::vector<int> coord;
+	coord.resize(grid.m_nGridDim.size());
+
+	std::map<Time, std::vector<int> > mapTimeToFileLines;
+
+	for (int f = 0; f < vecInputFiles.size(); f++) {
+
+		std::ifstream ifInput(vecInputFiles[f]);
+		if (!ifInput.is_open()) {
+			_EXCEPTION1("Unable to open input file \"%s\"", vecInputFiles[f].c_str());
+		}
+
+		int iLine = 1;
+		for (;;) {
+
+			int nCount = 0;
+			Time time;
+
+			// Read header lines
+			{
+				getline(ifInput, strBuffer);
+				if (ifInput.eof()) {
+					break;
+				}
+
+				std::istringstream iss(strBuffer);
+
+				// DetectCyclonesUnstructured output
+				if (iftype == InputFileTypeDCU) {
+					int iYear;
+					int iMonth;
+					int iDay;
+					int iHour;
+
+					iss >> iYear;
+					iss >> iMonth;
+					iss >> iDay;
+					iss >> nCount;
+					iss >> iHour;
+
+					if (iss.eof()) {
+						_EXCEPTION2("Format error on line %i of \"%s\"",
+							iLine, vecInputFiles[f].c_str());
+					}
+
+					time = Time(
+						iYear,
+						iMonth-1,
+						iDay-1,
+						3600 * iHour,
+						0,
+						autocurator.GetCalendarType());
+
+				// StitchNodes output
+				} else if (iftype == InputFileTypeSN) {
+					std::string strStart;
+					int iYear;
+					int iMonth;
+					int iDay;
+					int iHour;
+
+					iss >> strStart;
+					iss >> nCount;
+					iss >> iYear;
+					iss >> iMonth;
+					iss >> iDay;
+					iss >> iHour;
+
+					if (iss.eof()) {
+						_EXCEPTION2("Format error on line %i of \"%s\"",
+							iLine, vecInputFiles[f].c_str());
+					}
+				}
+
+				iLine++;
+			}
+
+			// Read contents under each header line
+			for (int i = 0; i < nCount; i++) {
+
+				getline(ifInput, strBuffer);
+				if (ifInput.eof()) {
+					break;
+				}
+
+				std::istringstream iss(strBuffer);
+
+				double dLon;
+				double dLat;
+
+				for (int n = 0; n < grid.m_nGridDim.size(); n++) {
+					iss >> coord[n];
+				}
+				if (iss.eof()) {
+					_EXCEPTION2("Format error on line %i of \"%s\"",
+						iLine, vecInputFiles[f].c_str());
+				}
+
+				std::string strBuf;
+				std::vector<std::string> vecDelimitedOutput;
+				for (;;) {
+					iss >> strBuf;
+					if (iss.eof()) {
+						break;
+					}
+					vecDelimitedOutput.push_back(strBuf);
+				}
+
+				int nOutputSize = vecDelimitedOutput.size();
+
+				// StitchNodes requires us to reorder the data 
+				if (iftype == InputFileTypeSN) {
+					if (nOutputSize < 4) {
+						_EXCEPTION2("Format error on line %i of \"%s\"",
+							iLine, vecInputFiles[f].c_str());
+					}
+
+					int iYear = std::stoi(vecDelimitedOutput[nOutputSize-4]);
+					int iMonth = std::stoi(vecDelimitedOutput[nOutputSize-3]);
+					int iDay = std::stoi(vecDelimitedOutput[nOutputSize-2]);
+					int iHour = std::stoi(vecDelimitedOutput[nOutputSize-1]);
+
+					time = Time(
+						iYear,
+						iMonth-1,
+						iDay-1,
+						3600 * iHour,
+						0,
+						autocurator.GetCalendarType());
+
+					std::map<Time, std::vector<int> >::iterator iter =
+						mapTimeToFileLines.find(time);
+					if (iter == mapTimeToFileLines.end()) {
+						iter = mapTimeToFileLines.insert(
+							std::map<Time, std::vector<int> >::value_type(
+								time, std::vector<int>())).first;
+					}
+					iter->second.push_back(iLine);
+				}
+
+				iLine++;
+			}
 		}
 	}
 
