@@ -19,6 +19,7 @@
 #include "Announce.h"
 #include "Variable.h"
 #include "AutoCurator.h"
+#include "DataMatrix.h"
 
 #include "netcdfcpp.h"
 
@@ -38,10 +39,11 @@ struct VelocityVector {
 ///////////////////////////////////////////////////////////////////////////////
 
 struct PathNode {
-	std::vector<int> m_coord;
+	Time m_time;
+	int m_gridix;
 	std::vector<std::string> m_vecData;
-	std::vector<VelocityVector> m_dVelocityLat;
-	std::vector<double> m_dVelocityLon;
+	double m_dVelocityLat;
+	double m_dVelocityLon;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -57,8 +59,181 @@ typedef std::vector<Path> PathVector;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void CalculateRadialWindProfile(
+///	<summary>
+///		Polynomial cubic Hermite interpolation function using Fritsch-Carlson
+///		method.
+///	</summary>
+///	<reference>
+///		https://en.wikipedia.org/wiki/Monotone_cubic_interpolation
+///	</reference>
+///	<param name="n">
+///		Number of points to use in interpolant.
+///	</param>
+///	<param name="x">
+///		Array of size n with independent coordinate values of interpolant.
+///		The values of x must be monotone increasing or behavior is undefined.
+///	</param>
+///	<param name="y">
+///		Array of size n with dependent coordinate values of interpolant.
+///	</param>
+///	<param name="c">
+///		Output array of cubic polynomial coefficients of size (n-1) x 4.
+///		The interpolation function is then defined by
+///		  xdiff = x - x[i]
+///		  f_i(x) = c[i][0]
+///		         + xdiff * (c[i][1] + xdiff * (c[i][2] + xdiff * c[i][3]))
+///	</param>
+///	<param name="work">
+///		Work array of size 3*n.
+///	</param>
+///	<returns>
+///		(-1) if the value of n is less than 2.
+///		(0) if the calculation completed successfully.
+///	</returns>
+int pchip_fc_coeff(
+	int n,
+	double * const x,
+	double * const y,
+	double * c,
+	double * work
 ) {
+	if (n < 2) {
+		return (-1);
+	}
+
+	double * dx = work;
+	double * dy = work+n;
+	double * m = work+2*n;
+
+	for (int i = 0; i < n-1; i++) {
+		dx[i] = x[i+1] - x[i];
+		dy[i] = y[i+1] - y[i];
+		m[i] = dy[i] / dx[i];
+		c[i*4] = y[i];
+	}
+	m[n-1] = dy[n-2] / dx[n-2];
+
+	c[1] = m[0];
+	for (int i = 0; i < n-2; i++) {
+		double mi = m[i];
+		double mn = m[i+1];
+		if (mi * mn <= 0.0) {
+			c[4*(i+1)+1] = 0.0;
+		} else {
+			double dc = dx[i] + dx[i+1];
+			c[4*(i+1)+1] = 3.0 * dc / ((dc + dx[i+1]) / mi + (dc + dx[i]) / mn);
+		}
+	}
+
+	for (int i = 0; i < n-2; i++) {
+		double c1 = c[4*i+1];
+		double invdx = 1.0/dx[i];
+		double dc = c1 + c[4*(i+1)+1] - 2.0 * m[i];
+
+		c[4*i+2] = (m[i] - c1 - dc) * invdx;
+		c[4*i+3] = dc * invdx * invdx;
+	}
+	{
+		int i = n-2;
+		double c1 = c[4*i+1];
+		double invdx = 1.0/dx[i];
+		double dc = c1 + m[n-1] - 2.0 * m[i];
+
+		c[4*i+2] = (m[i] - c1 - dc) * invdx;
+		c[4*i+3] = dc * invdx * invdx;
+	}
+
+	return 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void CalculateStormVelocity(
+	const SimpleGrid & grid,
+	Path & path
+) {
+	const double MetersPerRadian = 111.325 * 1000.0 * 180.0 / M_PI;
+
+	int nPathNodes = path.m_vecPathNodes.size();
+	if (path.m_vecPathNodes.size() < 2) {
+		_EXCEPTIONT("Path must contain at least two nodes");
+	}
+
+	DataVector<double> dX(nPathNodes);
+	DataVector<double> dY(nPathNodes);
+	DataMatrix<double> dC(nPathNodes-1, 4);
+	DataVector<double> dWork(nPathNodes*3);
+
+	// Calculate meridional velocity
+	for (int i = 0; i < nPathNodes; i++) {
+		PathNode & pathnode = path.m_vecPathNodes[i];
+
+		dX[i] = pathnode.m_time - path.m_timeStart;
+
+		if (pathnode.m_gridix >= grid.m_dLat.GetRows()) {
+			_EXCEPTION2("Grid index of path (%i) out of range "
+				"(only %i nodes in grid)",
+				pathnode.m_gridix,
+				grid.m_dLat.GetRows());
+		}
+		dY[i] = grid.m_dLat[pathnode.m_gridix];
+	}
+
+	const double dFinalDeltaT = dX[nPathNodes-1] - dX[nPathNodes-2];
+
+	pchip_fc_coeff(nPathNodes, &(dX[0]), &(dY[0]), &(dC[0][0]), &(dWork[0]));
+
+	for (int i = 0; i < nPathNodes-1; i++) {
+		PathNode & pathnode = path.m_vecPathNodes[i];
+		pathnode.m_dVelocityLat = dC[i][1];
+	}
+	path.m_vecPathNodes[nPathNodes-1].m_dVelocityLat =
+		dC[nPathNodes-2][1]
+		+ 2.0 * dC[nPathNodes-2][2] * dFinalDeltaT
+		+ 3.0 * dC[nPathNodes-2][3] * dFinalDeltaT * dFinalDeltaT;
+
+	for (int i = 0; i < nPathNodes; i++) {
+		PathNode & pathnode = path.m_vecPathNodes[i];
+		pathnode.m_dVelocityLat *= MetersPerRadian;
+	}
+
+	// Calculate zonal velocity
+	for (int i = 0; i < nPathNodes; i++) {
+		PathNode & pathnode = path.m_vecPathNodes[i];
+		dY[i] = grid.m_dLon[pathnode.m_gridix];
+	}
+
+	pchip_fc_coeff(nPathNodes, &(dX[0]), &(dY[0]), &(dC[0][0]), &(dWork[0]));
+
+	for (int i = 0; i < nPathNodes-1; i++) {
+		path.m_vecPathNodes[i].m_dVelocityLon = dC[i][1];
+	}
+	path.m_vecPathNodes[nPathNodes-1].m_dVelocityLon =
+		dC[nPathNodes-2][1]
+		+ 2.0 * dC[nPathNodes-2][2] * dFinalDeltaT
+		+ 3.0 * dC[nPathNodes-2][3] * dFinalDeltaT * dFinalDeltaT;
+
+	for (int i = 0; i < nPathNodes; i++) {
+		PathNode & pathnode = path.m_vecPathNodes[i];
+		pathnode.m_dVelocityLon *=
+			MetersPerRadian * cos(grid.m_dLat[pathnode.m_gridix]);
+	}
+
+/*
+	for (int i = 0; i < nPathNodes-1; i++) {
+		printf("%1.5e\n", path.m_vecPathNodes[i].m_dVelocityLat);
+		printf("%1.5e %1.5e :: %1.5e %1.5e %1.5e %1.5e\n", dX[i], dY[i], dC[i][0], dC[i][1], dC[i][2], dC[i][3]); //path.m_vecPathNodes[i].m_dVelocityLat);
+	}
+	printf("%1.5e\n", path.m_vecPathNodes[nPathNodes-1].m_dVelocityLat);
+	printf("%1.5e %1.5e\n", dX[nPathNodes-1], dY[nPathNodes-1]);
+*/
+/*
+	for (int i = 0; i < nPathNodes; i++) {
+		PathNode & pathnode = path.m_vecPathNodes[i];
+		printf("%1.5e %1.5e\n", pathnode.m_dVelocityLat, pathnode.m_dVelocityLon);
+	}
+*/
+	//_EXCEPTION();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -105,6 +280,9 @@ try {
 	// Append output to input file
 	bool fOutputAppend;
 
+	// Append trajectory velocities
+	bool fAppendTrajectoryVelocity;
+
 	// Variables for calculating radial wind profile
 	std::string strRadialWindProfileVars;
 
@@ -119,8 +297,9 @@ try {
 		CommandLineBool(fRegional, "regional");
 
 		CommandLineString(strOutputFile, "out_file", "");
-		CommandLineBool(fOutputAppend, "out_append");
+		//CommandLineBool(fOutputAppend, "out_append");
 
+		CommandLineBool(fAppendTrajectoryVelocity, "append_traj_vel");
 		CommandLineStringD(strRadialWindProfileVars, "radial_wind_profile", "", "U,V,bins,radius");
 
 		ParseCommandLine(argc, argv);
@@ -166,6 +345,10 @@ try {
 	}
 
 	// Radial wind profile can only be calculated with StitchNodes output
+	if ((fAppendTrajectoryVelocity) && (iftype != InputFileTypeSN)) {
+		_EXCEPTIONT("--append_traj_vel can only be used with --in_file_type SN");
+	}
+
 	if ((strRadialWindProfileVars != "") && (iftype != InputFileTypeSN)) {
 		_EXCEPTIONT("--radial_wind_profile can only be used with --in_file_type SN");
 	}
@@ -318,7 +501,7 @@ try {
 					iss >> iDay;
 					iss >> iHour;
 
-					if (iss.eof()) {
+					if (iss.bad()) {
 						_EXCEPTION2("Format error on line %i of \"%s\"",
 							iLine, vecInputFiles[f].c_str());
 					}
@@ -364,10 +547,10 @@ try {
 				std::vector<std::string> vecDelimitedOutput;
 				for (;;) {
 					iss >> strBuf;
+					vecDelimitedOutput.push_back(strBuf);
 					if (iss.eof()) {
 						break;
 					}
-					vecDelimitedOutput.push_back(strBuf);
 				}
 
 				int nOutputSize = vecDelimitedOutput.size();
@@ -404,7 +587,15 @@ try {
 					}
 					iter->second.push_back(iLine);
 
-					pathnode.m_coord = coord;
+					pathnode.m_time = time;
+
+					if (coord.size() == 1) {
+						pathnode.m_gridix = coord[0];
+					} else if (coord.size() == 2) {
+						pathnode.m_gridix = coord[0] + grid.m_nGridDim[1] * coord[1];
+					} else {
+						_EXCEPTIONT("Undefined behavior for SimpleGrid dimensionality > 2");
+					}
 					pathnode.m_vecData = vecDelimitedOutput;
 				}
 
@@ -412,6 +603,53 @@ try {
 			}
 
 			// Calculate velocity at each point
+			if (iftype == InputFileTypeSN) {
+				Path & path = vecPaths[vecPaths.size()-1];
+				CalculateStormVelocity(grid, path);
+
+				if (fAppendTrajectoryVelocity) {
+					for (int i = 0; i < path.m_vecPathNodes.size(); i++) {
+						PathNode & pathnode = path.m_vecPathNodes[i];
+						char buf[100];
+						sprintf(buf, "%3.6f", path.m_vecPathNodes[i].m_dVelocityLon);
+						pathnode.m_vecData.insert(
+							pathnode.m_vecData.end() - 4, buf);
+						sprintf(buf, "%3.6f", path.m_vecPathNodes[i].m_dVelocityLat);
+						pathnode.m_vecData.insert(
+							pathnode.m_vecData.end() - 4, buf);
+					}
+				}
+			}
+		}
+
+		// Output
+		if (strOutputFile != "") {
+			FILE * fpOutput = fopen(strOutputFile.c_str(),"w");
+
+			if (iftype == InputFileTypeSN) {
+				for (int p = 0; p < vecPaths.size(); p++) {
+					Path & path = vecPaths[p];
+					fprintf(fpOutput, "start\t%i\t%i\t%i\t%i\t%i\n",
+						static_cast<int>(path.m_vecPathNodes.size()),
+						path.m_timeStart.GetYear(),
+						path.m_timeStart.GetMonth(),
+						path.m_timeStart.GetDay(),
+						path.m_timeStart.GetSecond() / 3600);
+
+					for (int i = 0; i < vecPaths[p].m_vecPathNodes.size(); i++) {
+						PathNode & pathnode = path.m_vecPathNodes[i];
+						fprintf(fpOutput, "\t%i", pathnode.m_gridix);
+
+						for (int j = 0; j < pathnode.m_vecData.size(); j++) {
+							fprintf(fpOutput, "\t%s", pathnode.m_vecData[j].c_str());
+						}
+						fprintf(fpOutput, "\n");
+					}
+				}
+
+			} else {
+				_EXCEPTIONT("Sorry, not yet implemented!");
+			}
 		}
 	}
 

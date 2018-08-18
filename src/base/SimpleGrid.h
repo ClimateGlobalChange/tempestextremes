@@ -203,6 +203,47 @@ public:
 		return (m_vecConnectivity.size());
 	}
 
+	///	<summary>
+	///		Convert a coordinate to an index.
+	///	</summary>
+	int CoordinateVectorToIndex(
+		const std::vector<int> & coordvec
+	) {
+		if (m_nGridDim.size() == 0) {
+			_EXCEPTIONT("Invalid SimpleGrid");
+		}
+
+		if (coordvec.size() != m_nGridDim.size()) {
+			_EXCEPTIONT("Invalid coordinate vector");
+		}
+		if (coordvec.size() == 1) {
+			if (coordvec[0] >= m_nGridDim[0]) {
+				_EXCEPTIONT("Coordinate vector out of range");
+			}
+			return coordvec[0];
+		}
+		if (coordvec.size() == 2) {
+			if (coordvec[0] >= m_nGridDim[0]) {
+				_EXCEPTIONT("Coordinate vector out of range");
+			}
+			if (coordvec[1] >= m_nGridDim[1]) {
+				_EXCEPTIONT("Coordinate vector out of range");
+			}
+		}
+
+		int ix = 0;
+		int d = 1;
+		for (int i = 0; i < coordvec.size(); i++) {
+			if (coordvec[i] >= m_nGridDim[i]) {
+				_EXCEPTIONT("Coordinate vector out of range");
+			}
+			ix = ix + i * d;
+			d = d * m_nGridDim[i];
+		}
+
+		return ix;
+	}
+
 public:
 	///	<summary>
 	///		Longitude of each grid point (in radians).

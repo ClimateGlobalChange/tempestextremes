@@ -1003,8 +1003,8 @@ try {
 		for (int i = 0; i < vecPaths.size(); i++) {
 			int iStartTime = vecPaths[i].m_iTimes[0];
 
-			fprintf(fp, "start\t");
-			fprintf(fp, "%li\t", vecPaths[i].m_iTimes.size());
+			fprintf(fp, "start");
+			fprintf(fp, "\t%li", vecPaths[i].m_iTimes.size());
 
 			int jEnd = vecTimes[iStartTime].size();
 			if (jEnd > 5) {
@@ -1014,7 +1014,7 @@ try {
 				if (j == 3) {
 					continue;
 				}
-				fprintf(fp, "%s\t", vecTimes[iStartTime][j].c_str());
+				fprintf(fp, "\t%s", vecTimes[iStartTime][j].c_str());
 			}
 			fprintf(fp, "\n");
 
@@ -1022,16 +1022,15 @@ try {
 				int iTime = vecPaths[i].m_iTimes[t];
 				int iCandidate = vecPaths[i].m_iCandidates[t];
 
-				fprintf(fp, "\t");
 				for (int j = 0; j < vecCandidates[iTime][iCandidate].size(); j++) {
-					fprintf(fp, "%s\t",
+					fprintf(fp, "\t%s",
 						vecCandidates[iTime][iCandidate][j].c_str());
 				}
 				for (int j = 0; j < jEnd; j++) {
 					if (j == 3) {
 						continue;
 					}
-					fprintf(fp, "%s\t", vecTimes[iTime][j].c_str());
+					fprintf(fp, "\t%s", vecTimes[iTime][j].c_str());
 				}
 				fprintf(fp, "\n");
 			}
