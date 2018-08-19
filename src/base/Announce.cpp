@@ -100,10 +100,16 @@ void AnnounceOutputOnAllRanks() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void AnnounceStartBlock(const char * szText) {
+void AnnounceStartBlock(
+	const char * szText,
+	...
+) {
 
 	// Do not start a block at maximum indentation level
 	if (s_nIndentationLevel == MaximumIndentationLevel) {
+		return;
+	}
+	if (szText == NULL) {
 		return;
 	}
 
@@ -125,17 +131,27 @@ void AnnounceStartBlock(const char * szText) {
 		fprintf(g_fpAnnounceOutput, "\n");
 	}
 
-	// Add indentation
-	int i;
-	for (i = 0; i < s_nIndentationLevel; i++) {
+	// Output buffer
+	char szBuffer[AnnouncementBufferSize];
+
+	va_list arguments;
+
+	// Initialize the argument list
+	va_start(arguments, szText);
+
+	// Write to string
+	vsprintf(szBuffer, szText, arguments);
+
+	// Cleans up the argument list
+	va_end(arguments);
+
+	// Output with proper indentation
+	for (int i = 0; i < s_nIndentationLevel; i++) {
 		fprintf(g_fpAnnounceOutput, "..");
 	}
+	fprintf(g_fpAnnounceOutput, "%s", szBuffer);
 
-	// Output the text
-	if (szText != NULL) {
-		fprintf(g_fpAnnounceOutput, "%s", szText);
-		s_fBlockFlag = true;
-	}
+	s_fBlockFlag = true;
 	s_nIndentationLevel++;
 
 	fflush(g_fpAnnounceOutput);

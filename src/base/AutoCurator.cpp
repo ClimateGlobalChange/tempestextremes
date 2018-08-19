@@ -17,6 +17,7 @@
 #include "AutoCurator.h"
 #include "Exception.h"
 #include "DataVector.h"
+#include "Variable.h"
 
 #include "netcdfcpp.h"
 
@@ -36,7 +37,7 @@ void AutoCurator::InsertTimeToFileTimeIx(
 				time, FileTimeIxVector())).first;
 	}
 
-	std::cout << time.ToString() << " " << iFileIx << " " << iTimeIx << std::endl;
+	//std::cout << time.ToString() << " " << iFileIx << " " << iTimeIx << std::endl;
 
 	iter->second.push_back(FileTimeIx(iFileIx, iTimeIx));
 }
@@ -192,7 +193,7 @@ void AutoCurator::IndexFiles(
 
 AutoCurator::FilenameTimePairVector AutoCurator::Find(
 	const Time & time
-) {
+) const {
 	FilenameTimePairVector vec;
 
 	TimeToFileTimeIxMap::const_iterator iter =
@@ -212,6 +213,37 @@ AutoCurator::FilenameTimePairVector AutoCurator::Find(
 	}
 
 	return vec;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void AutoCurator::Find(
+	const Time & time,
+	NcFileVector & vecFiles,
+	int & iTime
+) const {
+	FilenameTimePairVector vec = Find(time);
+
+	vecFiles.clear();
+	iTime = (-1);
+
+	for (int i = 0; i < vec.size(); i++) {
+		NcFile * pncfile = new NcFile(vec[i].first.c_str());
+		if (pncfile == NULL) {
+			_EXCEPTIONT("Unable to allocate new NcFile");
+		}
+		if (!pncfile->is_valid()) {
+			_EXCEPTION1("Unable to open data file \"%s\"", vec[i].first.c_str());
+		}
+
+		vecFiles.push_back(pncfile);
+
+		if (iTime == (-1)) {
+			iTime = vec[i].second;
+		} else if (iTime != vec[i].second) {
+			_EXCEPTIONT("Data files have different local time indices (unsupported)");
+		}
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -61,7 +61,7 @@ void AnnounceOutputOnAllRanks();
 ///	<summary>
 ///		Begin a new announcement block.
 ///	</summary>
-void AnnounceStartBlock(const char * szText);
+void AnnounceStartBlock(const char * szText, ...);
 
 ///	<summary>
 ///		Begin a new announcement block.

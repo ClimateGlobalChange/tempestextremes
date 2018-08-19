@@ -27,7 +27,46 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-typedef std::vector<NcFile *> NcFileVector;
+class NcFileVector : public std::vector<NcFile *> {
+private:
+	///	<summary>
+	///		Copy constructor.
+	///	</summary>
+	NcFileVector(const NcFileVector & vecFiles) {
+	}
+
+	///	<summary>
+	///		Assignment operator.
+	///	</summary>
+	NcFileVector & operator= (const NcFileVector & vecFiles) {
+		return (*this);
+	}
+
+public:
+	///	<summary>
+	///		Default constructor.
+	///	</summary>
+	NcFileVector() :
+		std::vector<NcFile *>()
+	{ }
+
+	///	<summary>
+	///		Destructor.
+	///	</summary>
+	~NcFileVector() {
+		NcFileVector::clear();
+	}
+
+	///	<summary>
+	///		Clear the contents of this NcFileVector.
+	///	</summary>
+	void clear() {
+		for (int i = 0; i < size(); i++) {
+			(*this)[i]->close();
+			delete (*this)[i];
+		}
+	}
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 

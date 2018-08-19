@@ -1255,10 +1255,6 @@ void DetectCyclonesUnstructured(
 
 	fclose(fpOutput);
 
-	for (int i = 0; i < vecFiles.size(); i++) {
-		vecFiles[i]->close();
-	}
-
 	// Reset the Announce buffer
 	AnnounceSetOutputBuffer(stdout);
 	AnnounceOnlyOutputOnRankZero();

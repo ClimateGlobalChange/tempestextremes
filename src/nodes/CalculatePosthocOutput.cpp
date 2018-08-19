@@ -24,6 +24,8 @@
 #include "netcdfcpp.h"
 
 #include <fstream>
+#include <queue>
+#include <set>
 
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
@@ -56,6 +58,308 @@ struct Path {
 ///////////////////////////////////////////////////////////////////////////////
 
 typedef std::vector<Path> PathVector;
+
+///////////////////////////////////////////////////////////////////////////////
+
+class RadialProfileCalculator {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	RadialProfileCalculator() :
+		m_varixU(0),
+		m_varixV(0),
+		m_nBins(0),
+		m_dRadius(0.0)
+	{ }
+
+	///	<summary>
+	///		Parse the command-line argument for parameters.
+	///	</summary>
+	void Parse(
+		VariableRegistry & varreg,
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_UVar,
+			ReadMode_VVar,
+			ReadMode_Bins,
+			ReadMode_Radius,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_UVar;
+
+		// Loop through string
+		int iLast = 0;
+
+		for (int i = iLast; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in amount
+				if (eReadMode == ReadMode_UVar) {
+					std::string strUVar = strSubStr;
+
+					Variable varU;
+					varU.ParseFromString(varreg, strUVar);
+					m_varixU = varreg.FindOrRegister(varU);
+
+					iLast = i + 1;
+					eReadMode = ReadMode_VVar;
+
+				} else if (eReadMode == ReadMode_VVar) {
+					std::string strVVar = strSubStr;
+
+					Variable varV;
+					varV.ParseFromString(varreg, strVVar);
+					m_varixV = varreg.FindOrRegister(varV);
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Bins;
+
+				// Read in distance
+				} else if (eReadMode == ReadMode_Bins) {
+					m_nBins = atoi(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Radius;
+
+				// Read in min/max distance
+				} else if (eReadMode == ReadMode_Radius) {
+					m_dRadius = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nToo many entries in --radial_wind_profile \"%s\""
+						"\nRequired: \"<u var>,<v var>,<bins>,<radius>\"",
+						strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("\nInsufficient entries in --radial_wind_profile \"%s\""
+					"\nRequired: \"<u var>,<v var>,<bins>,<radius>\"",
+					strOp.c_str());
+		}
+		if (m_nBins <= 0) {
+			_EXCEPTIONT("\nNonpositive value of <bins> argument given");
+		}
+		if (m_dRadius <= 0) {
+			_EXCEPTIONT("\nNonpositive value of <radius> argument given");
+		}
+		if (m_dRadius > 180.0) {
+			_EXCEPTIONT("\n<radius> argument must be no larger than 180 (degrees)");
+		}
+	}
+
+	///	<summary>
+	///		Parse the command-line argument for parameters.
+	///	</summary>
+	void Apply(
+		VariableRegistry & varreg,
+		NcFileVector & vecFiles,
+		SimpleGrid & grid,
+		int iTime,
+		const PathNode & pathnode,
+		std::vector<double> & dProfile
+	) {
+		const int ix0 = pathnode.m_gridix;
+
+		// Load the zonal wind data
+		Variable & varU = varreg.Get(m_varixU);
+		varU.LoadGridData(varreg, vecFiles, grid, iTime);
+		const DataVector<float> & dataStateU = varU.GetData();
+
+		// Load the meridional wind data
+		Variable & varV = varreg.Get(m_varixV);
+		varV.LoadGridData(varreg, vecFiles, grid, iTime);
+		const DataVector<float> & dataStateV = varV.GetData();
+
+		// Verify that m_dRadius is less than 180.0
+		if ((m_dRadius < 0.0) || (m_dRadius > 180.0)) {
+			_EXCEPTIONT("Radius must be in the range [0.0, 180.0]");
+		}
+
+		// Check grid index
+		if (ix0 >= grid.m_vecConnectivity.size()) {
+			_EXCEPTION2("Grid index (%i) out of range (< %i)",
+				ix0, static_cast<int>(grid.m_vecConnectivity.size()));
+		}
+
+		// Central lat/lon and Cartesian coord
+		double dLon0 = grid.m_dLon[ix0];
+		double dLat0 = grid.m_dLat[ix0];
+
+		double dX0 = cos(dLon0) * cos(dLat0);
+		double dY0 = sin(dLon0) * cos(dLat0);
+		double dZ0 = sin(dLat0);
+
+		// Allocate bins
+		std::vector< std::vector<double> > dVelocities;
+		dVelocities.resize(m_nBins);
+
+		// Queue of nodes that remain to be visited
+		std::queue<int> queueNodes;
+		for (int n = 0; n < grid.m_vecConnectivity[ix0].size(); n++) {
+			queueNodes.push(grid.m_vecConnectivity[ix0][n]);
+		}
+
+		// Set of nodes that have already been visited
+		std::set<int> setNodesVisited;
+
+		// Loop through all latlon elements
+		while (queueNodes.size() != 0) {
+			int ix = queueNodes.front();
+			queueNodes.pop();
+
+			if (setNodesVisited.find(ix) != setNodesVisited.end()) {
+				continue;
+			}
+
+			setNodesVisited.insert(ix);
+
+			// Don't perform calculation on central node
+			if (ix == ix0) {
+				continue;
+			}
+
+			// lat/lon and Cartesian coords of this point
+			double dLat = grid.m_dLat[ix];
+			double dLon = grid.m_dLon[ix];
+
+			double dX = cos(dLon) * cos(dLat);
+			double dY = sin(dLon) * cos(dLat);
+			double dZ = sin(dLat);
+
+			// Great circle distance to this element (in degrees)
+			double dR =
+				sin(dLat0) * sin(dLat)
+				+ cos(dLat0) * cos(dLat) * cos(dLon - dLon0);
+
+			if (dR >= 1.0) {
+				dR = 0.0;
+			} else if (dR <= -1.0) {
+				dR = 180.0;
+			} else {
+				dR = 180.0 / M_PI * acos(dR);
+			}
+			if (dR != dR) {
+				_EXCEPTIONT("NaN value detected");
+			}
+
+			if (dR >= m_dRadius) {
+				continue;
+			}
+
+			// Velocities at this location
+			double dUlon = dataStateU[ix];
+			double dUlat = dataStateV[ix];
+
+			// Cartesian velocities at this location
+			double dUx = - sin(dLat) * cos(dLon) * dUlat - sin(dLon) * dUlon;
+			double dUy = - sin(dLat) * sin(dLon) * dUlat + cos(dLon) * dUlon;
+			double dUz = cos(dLat) * dUlat;
+
+			double dUtot = sqrt(dUlon * dUlon + dUlat * dUlat);
+
+			// Calculate local radial vector from central lat/lon
+			// i.e. project \vec{X} - \vec{X}_0 to the surface of the
+			//      sphere and normalize to unit length.
+			double dRx = dX - dX0;
+			double dRy = dY - dY0;
+			double dRz = dZ - dZ0;
+
+			double dDot = dRx * dX + dRy * dY + dRz * dZ;
+
+			dRx -= dDot * dX;
+			dRy -= dDot * dY;
+			dRz -= dDot * dZ;
+
+			double dMag = sqrt(dRx * dRx + dRy * dRy + dRz * dRz);
+
+			dRx /= dMag;
+			dRy /= dMag;
+			dRz /= dMag;
+
+			// Calculate local azimuthal velocity vector
+			double dAx = dY * dRz - dZ * dRy;
+			double dAy = dZ * dRx - dX * dRz;
+			double dAz = dX * dRy - dY * dRx;
+/*
+			dDot = dAx * dAx + dAy * dAy + dAz * dAz;
+			if (fabs(dDot - 1.0) > 1.0e-10) {
+				std:: cout << dDot << std::endl;
+				_EXCEPTIONT("Logic error");
+			}
+*/
+			// Calculate radial velocity
+			//double dUr = dUx * dRx + dUy * dRy + dUz * dRz;
+
+			// Calculate azimuthal velocity
+			double dUa = dUx * dAx + dUy * dAy + dUz * dAz;
+
+			//printf("%1.5e %1.5e :: %1.5e %1.5e\n", dUlon, dUlat, dUr, dUa);
+
+			// Determine bin
+			int iBin = static_cast<int>((dR / m_dRadius) * m_nBins);
+			if (iBin >= m_nBins) {
+				_EXCEPTIONT("Logic error");
+			}
+
+			dVelocities[iBin].push_back(dUa);
+
+			// Add all neighbors of this point
+			for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+				queueNodes.push(grid.m_vecConnectivity[ix][n]);
+			}
+		}
+
+		// Construct radial profile
+		dProfile.resize(m_nBins);
+
+		for (int i = 0; i < m_nBins; i++) {
+			double dAvg = 0.0;
+			if (dVelocities[i].size() != 0) {
+				for (int j = 0; j < dVelocities[i].size(); j++) {
+					dAvg += dVelocities[i][j];
+				}
+				dAvg /= static_cast<double>(dVelocities[i].size());
+			}
+			dProfile[i] = dAvg;
+		}
+	}
+
+public:
+	///	<summary>
+	///		Variable to use for zonal velocity.
+	///	</summary>
+	VariableIndex m_varixU;
+
+	///	<summary>
+	///		Variable to use for meridional velocity.
+	///	</summary>
+	VariableIndex m_varixV;
+
+	///	<summary>
+	///		Number of bins to use in calculation.
+	///	</summary>
+	int m_nBins;
+
+	///	<summary>
+	///		Maximum radius (in degrees) to use in calculation.
+	///	</summary>
+	double m_dRadius;
+
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -243,6 +547,14 @@ int main(int argc, char** argv) {
 #if defined(TEMPEST_MPIOMP)
 	// Initialize MPI
 	MPI_Init(&argc, &argv);
+
+	// Not yet implemented
+	int nMPISize;
+	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+	if (nMPISize > 1) {
+		std::cout << "Sorry!  Parallel processing with MPI is not yet implemented" << std::endl;
+		return (-1);
+	}
 #endif
 
 	// Turn off fatal errors in NetCDF
@@ -300,7 +612,7 @@ try {
 		//CommandLineBool(fOutputAppend, "out_append");
 
 		CommandLineBool(fAppendTrajectoryVelocity, "append_traj_vel");
-		CommandLineStringD(strRadialWindProfileVars, "radial_wind_profile", "", "U,V,bins,radius");
+		CommandLineStringD(strRadialWindProfileVars, "radial_wind_profile", "", "(U,V,bins,radius)");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -357,6 +669,7 @@ try {
 	SimpleGrid grid;
 
 	// Curate input data
+	AnnounceStartBlock("Autocurating data");
 	if (strInputData.length() != 0) {
 		autocurator.IndexFiles(strInputData);
 
@@ -377,6 +690,7 @@ try {
 			autocurator.IndexFiles(strFileLine);
 		}
 	}
+	AnnounceEndBlock("Done");
 
 	// Check for connectivity file
 	if (strConnectivity != "") {
@@ -426,6 +740,12 @@ try {
 		}
 	}
 
+	// Parse radial input parameters
+	RadialProfileCalculator radprofcalc;
+	if (strRadialWindProfileVars != "") {
+		radprofcalc.Parse(varreg, strRadialWindProfileVars);
+	}
+
 	// Loop through all files
 	std::string strBuffer;
 
@@ -436,15 +756,20 @@ try {
 	PathVector vecPaths;
 
 	// A map from Times to file lines, used for StitchNodes formatted output
-	std::map<Time, std::vector<int> > mapTimeToFileLines;
+	typedef std::map<Time, std::vector< std::pair<int, int> > > TimeToPathNodeMap;
+	TimeToPathNodeMap mapTimeToPathNode;
 
+	// Loop over all files
 	for (int f = 0; f < vecInputFiles.size(); f++) {
+
+		AnnounceStartBlock("Processing input (%s)", vecInputFiles[f].c_str());
 
 		std::ifstream ifInput(vecInputFiles[f]);
 		if (!ifInput.is_open()) {
 			_EXCEPTION1("Unable to open input file \"%s\"", vecInputFiles[f].c_str());
 		}
 
+		AnnounceStartBlock("Reading input file");
 		int iLine = 1;
 		for (;;) {
 
@@ -578,14 +903,16 @@ try {
 						0,
 						autocurator.GetCalendarType());
 
-					std::map<Time, std::vector<int> >::iterator iter =
-						mapTimeToFileLines.find(time);
-					if (iter == mapTimeToFileLines.end()) {
-						iter = mapTimeToFileLines.insert(
-							std::map<Time, std::vector<int> >::value_type(
-								time, std::vector<int>())).first;
+					TimeToPathNodeMap::iterator iter =
+						mapTimeToPathNode.find(time);
+					if (iter == mapTimeToPathNode.end()) {
+						iter = mapTimeToPathNode.insert(
+							TimeToPathNodeMap::value_type(
+								time, std::vector< std::pair<int,int> >())).first;
 					}
-					iter->second.push_back(iLine);
+					iter->second.push_back(
+						std::pair<int,int>(
+							static_cast<int>(vecPaths.size()-1),i));
 
 					pathnode.m_time = time;
 
@@ -604,12 +931,19 @@ try {
 
 			// Calculate velocity at each point
 			if (iftype == InputFileTypeSN) {
+
+				// Calculate trajectory velocity
 				Path & path = vecPaths[vecPaths.size()-1];
 				CalculateStormVelocity(grid, path);
 
+				// Append velocity to file
 				if (fAppendTrajectoryVelocity) {
 					for (int i = 0; i < path.m_vecPathNodes.size(); i++) {
 						PathNode & pathnode = path.m_vecPathNodes[i];
+						if (pathnode.m_vecData.size() < 4) {
+							_EXCEPTIONT("Logic error");
+						}
+
 						char buf[100];
 						sprintf(buf, "%3.6f", path.m_vecPathNodes[i].m_dVelocityLon);
 						pathnode.m_vecData.insert(
@@ -621,9 +955,61 @@ try {
 				}
 			}
 		}
+		AnnounceEndBlock("Done");
+
+		// Perform the radial wind profile calculation
+		if (strRadialWindProfileVars != "") {
+			TimeToPathNodeMap::iterator iterPathNode =
+				mapTimeToPathNode.begin();
+			for (; iterPathNode != mapTimeToPathNode.end(); iterPathNode++) {
+				const Time & time = iterPathNode->first;
+
+				// Unload data from the VariableRegistry
+				varreg.UnloadAllGridData();
+
+				// Open NetCDF files with data at this time
+				NcFileVector vecncDataFiles;
+				int iTime;
+				autocurator.Find(time, vecncDataFiles, iTime);
+
+				// Loop through all PathNodes which need calculating at this time
+				for (int i = 0; i < iterPathNode->second.size(); i++) {
+					int iPath = iterPathNode->second[i].first;
+					int iPathNode = iterPathNode->second[i].second;
+
+					PathNode & pathnode =
+						vecPaths[iPath].m_vecPathNodes[iPathNode];
+
+					std::vector<double> dProfile;
+					radprofcalc.Apply(
+						varreg,
+						vecncDataFiles,
+						grid,
+						iTime,
+						pathnode,
+						dProfile);
+
+					// Write profile to string
+					std::string strProfile = "\"";
+					for (int i = 0; i < dProfile.size(); i++) {
+						char buf[100];
+						sprintf(buf, "%3.6f", dProfile[i]);
+						strProfile += buf;
+						if (i != dProfile.size()-1) {
+							strProfile += ",";
+						}
+					}
+					strProfile += "\"";
+
+					pathnode.m_vecData.insert(
+						pathnode.m_vecData.end() - 4, strProfile);
+				}
+			}
+		}
 
 		// Output
 		if (strOutputFile != "") {
+			AnnounceStartBlock("Writing output");
 			FILE * fpOutput = fopen(strOutputFile.c_str(),"w");
 
 			if (iftype == InputFileTypeSN) {
@@ -650,8 +1036,12 @@ try {
 			} else {
 				_EXCEPTIONT("Sorry, not yet implemented!");
 			}
+			AnnounceEndBlock("Done");
 		}
+		AnnounceEndBlock("Done");
 	}
+
+	AnnounceBanner();
 
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());

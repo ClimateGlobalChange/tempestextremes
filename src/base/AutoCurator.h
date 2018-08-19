@@ -25,6 +25,10 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class NcFileVector;
+
+///////////////////////////////////////////////////////////////////////////////
+
 class AutoCurator {
 
 public:
@@ -99,7 +103,16 @@ public:
 	///	</summary>
 	FilenameTimePairVector Find(
 		const Time & time
-	);
+	) const;
+
+	///	<summary>
+	///		Generate a NcFileVector and local time index for the given Time.
+	///	</summary>
+	void Find(
+		const Time & time,
+		NcFileVector & vecFiles,
+		int & iTime
+	) const;
 
 protected:
 	///	<summary>
