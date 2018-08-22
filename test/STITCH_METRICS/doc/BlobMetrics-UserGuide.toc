@@ -1,15 +1,16 @@
 \contentsline {section}{\numberline {1}Minimum Requirements}{2}
 \contentsline {section}{\numberline {2}Usage}{2}
 \contentsline {section}{\numberline {3}Read BlobStats files into a single table}{2}
-\contentsline {subsection}{\numberline {3.1}Command line syntax}{3}
-\contentsline {subsection}{\numberline {3.2}Function syntax}{3}
-\contentsline {subsection}{\numberline {3.3}Output}{4}
-\contentsline {section}{\numberline {4}Read previously created data table(s) into an R session}{4}
+\contentsline {subsection}{\numberline {3.1}Caveat}{3}
+\contentsline {subsection}{\numberline {3.2}Command line syntax}{3}
+\contentsline {subsection}{\numberline {3.3}Function syntax}{4}
+\contentsline {subsection}{\numberline {3.4}Output}{4}
+\contentsline {section}{\numberline {4}Read previously created data table(s) into an R session}{5}
 \contentsline {subsection}{\numberline {4.1}Command line syntax}{5}
-\contentsline {subsection}{\numberline {4.2}Function syntax}{5}
+\contentsline {subsection}{\numberline {4.2}Function syntax}{6}
 \contentsline {subsection}{\numberline {4.3}Output}{6}
 \contentsline {section}{\numberline {5}Create a per-blob summary table}{6}
 \contentsline {subsection}{\numberline {5.1}Command line syntax}{6}
 \contentsline {subsection}{\numberline {5.2}Function syntax}{7}
-\contentsline {subsection}{\numberline {5.3}Output}{7}
+\contentsline {subsection}{\numberline {5.3}Output}{8}
 \contentsline {section}{\numberline {A}BlobStats File Format}{8}

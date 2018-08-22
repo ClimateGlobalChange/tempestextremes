@@ -49,17 +49,11 @@ gen_summary_table<-function(df_in,rfn="",textfn="",csvfn=""){
                                                             sline[1,"centlon"],
                                                             eline[1,"centlat"],
                                                             eline[1,"centlon"])
-        avg_clat<-mean(dsub2$centlat)
+        avg_clat<-(sline[1,"centlat"]+eline[1,"centlat"])*0.5
         df_summ[nline,"zonal_dist_km"]<-getDistanceFromLatLonInKm(avg_clat,
                                                                   sline[1,"centlon"],
                                                                   avg_clat,
                                                                   eline[1,"centlon"])
-        # #For zonal distance, D^2-Lat^2 = Lon ^2
-        # latdist<-getDistanceFromLatLonInKm(sline[1,"centlat"],
-        #                                    0,
-        #                                    eline[1,"centlat"],
-        #                                    0)
-        # df_summ[nline,"zonal_dist_km"]<-sqrt((df_summ[nline,"dist_km"])^2-latdist^2)
         df_summ[nline,"zonal_speed_kph"]<-df_summ[nline,"zonal_dist_km"]/(df_summ[nline,"duration_days"]*24)
       }
       if (!is.null(dsub2$area_km)){

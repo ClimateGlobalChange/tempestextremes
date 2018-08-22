@@ -83,102 +83,102 @@ for (x in dates_plot){
 }
 #Also need to do wind and temperature data--------
 #load the netcdfs for zonal data
-# 
-# zonbrk<-seq(-20,20,2)
-# zon_cols<-colorRampPalette(c("green","turquoise4","darkblue",
-#                              "white","darkred","purple","orange"))(length(zonbrk))
-# 
-# 
-# zonalnc<-open.nc("~/block_r_data/ERA_1984_06_vars_U_devs.nc")
-# lat<-read.nc(zonalnc)$lat
-# lon<-read.nc(zonalnc)$lon
-# time_str<-as.Date(read.nc(zonalnc)$time/24,origin="1800-01-01")
-# hrs_vec<-rep(seq(0,18,6),(length(time_str)/4))
-# time_hrstr<-sprintf("%s_%02d",time_str,hrs_vec)
-# t1<-which(time_hrstr=="1984-06-08_12")
-# t2<-which(time_hrstr=="1984-06-17_00")
-# zon3d<-read.nc(zonalnc)$ADU[,,t1:t2]
-# close.nc(zonalnc)
-# 
-# zon<-apply(zon3d,c(1,2),mean)
-# dat<-melt(zon)
-# dat$lon<-lon[dat[,1]]
-# dat$lon2<-lon_convert(dat$lon)
-# dat$lat<-lat[dat[,2]]
-# 
-# meridnc<-open.nc("~/block_r_data/ERA_1984_06_vars_V_devs.nc")
-# mer3d<-read.nc(meridnc)$ADV[,,t1:t2]
-# close.nc(meridnc)
-# merid<-apply(mer3d,c(1,2),mean)
-# dat$ADV<-melt(merid)$value
-# #dat$brks<-breaks_cuts(dat,zonbrk)
-# 
-# mapr="world"
-# m<-map_data(mapr)
-# 
-# gz<-ggplot()+ 
-#   #  coord_fixed(ratio.values / ratio.display) +
-#   coord_cartesian(xlim=c(-110,-45),
-#                   ylim=c(25,50),expand=FALSE) +
-#   geom_map(data= m, map = m, aes(map_id=region)) +
-#   geom_raster(data=dat,aes(x=lon2,y=lat,fill=value),interpolate = T,alpha=0.5) +
-#   geom_contour(data=dat,aes(x=lon2,y=lat,z=value,color=..level..),breaks=zonbrk,size=1) +
-#   scale_fill_gradientn(breaks=zonbrk,limits=c(-20,20),
-#                        colors=zon_cols,name="U anom (m/s)",
-#                        labels=c("-20",rep("",9),"0",rep("",9),20)) +
-#   scale_color_gradientn(breaks=zonbrk,limits=c(-20,20),colors=zon_cols,guide=F) +
-#   geom_rect(aes(xmin = -105, xmax=-50,ymin=30,ymax=45),
-#             fill = "transparent", color = "blue", size = 1.5) +
-#   ggtitle(" (c) Average zonal wind anomaly\n1984-06-06 to 1984-06-17") +
-#   labs(x="Longitude",y="Latitude")+
-#   theme(axis.text=element_text(size=20),
-#         axis.title=element_text(size=22),
-#         legend.text=element_text(size=20),
-#         legend.title=element_text(size=22),
-#         legend.direction = "horizontal",
-#         legend.position = "bottom",
-#         legend.key.size = unit(2,"line"),
-#         legend.key.width=unit(3.5,"line"),
-#         plot.title=element_text(size=24)) 
-# 
+#
+ zonbrk<-seq(-20,20,2)
+ zon_cols<-colorRampPalette(c("green","turquoise4","darkblue",
+                              "white","darkred","purple","orange"))(length(zonbrk))
+#
+#
+ zonalnc<-open.nc("~/block_r_data/ERA_1984_06_vars_U_devs.nc")
+ lat<-read.nc(zonalnc)$lat
+ lon<-read.nc(zonalnc)$lon
+ time_str<-as.Date(read.nc(zonalnc)$time/24,origin="1800-01-01")
+ hrs_vec<-rep(seq(0,18,6),(length(time_str)/4))
+ time_hrstr<-sprintf("%s_%02d",time_str,hrs_vec)
+ t1<-which(time_hrstr=="1984-06-08_12")
+ t2<-which(time_hrstr=="1984-06-17_00")
+ zon3d<-read.nc(zonalnc)$ADU[,,t1:t2]
+ close.nc(zonalnc)
+
+ zon<-apply(zon3d,c(1,2),mean)
+ dat<-melt(zon)
+ dat$lon<-lon[dat[,1]]
+ dat$lon2<-lon_convert(dat$lon)
+ dat$lat<-lat[dat[,2]]
+#
+ meridnc<-open.nc("~/block_r_data/ERA_1984_06_vars_V_devs.nc")
+ mer3d<-read.nc(meridnc)$ADV[,,t1:t2]
+ close.nc(meridnc)
+ merid<-apply(mer3d,c(1,2),mean)
+ dat$ADV<-melt(merid)$value
+ dat$brks<-breaks_cuts(dat,zonbrk)
+#
+ mapr="world"
+ m<-map_data(mapr)
+#
+ gz<-ggplot()+
+   #  coord_fixed(ratio.values / ratio.display) +
+   coord_cartesian(xlim=c(-110,-45),
+                   ylim=c(25,50),expand=FALSE) +
+   geom_map(data= m, map = m, aes(map_id=region)) +
+   geom_raster(data=dat,aes(x=lon2,y=lat,fill=value),interpolate = T,alpha=0.5) +
+   geom_contour(data=dat,aes(x=lon2,y=lat,z=value,color=..level..),breaks=zonbrk,size=1) +
+   scale_fill_gradientn(breaks=zonbrk,limits=c(-20,20),
+                        colors=zon_cols,name="U anom (m/s)",
+                        labels=c("-20",rep("",9),"0",rep("",9),20)) +
+   scale_color_gradientn(breaks=zonbrk,limits=c(-20,20),colors=zon_cols,guide=F) +
+   geom_rect(aes(xmin = -105, xmax=-50,ymin=30,ymax=45),
+             fill = "transparent", color = "blue", size = 1.5) +
+   ggtitle(" (c) Average zonal wind anomaly\n1984-06-06 to 1984-06-17") +
+   labs(x="Longitude",y="Latitude")+
+   theme(axis.text=element_text(size=28),
+         axis.title=element_text(size=30),
+         legend.text=element_text(size=28),
+         legend.title=element_text(size=30),
+         legend.direction = "horizontal",
+         legend.position = "bottom",
+         legend.key.size = unit(2,"line"),
+         legend.key.width=unit(3.5,"line"),
+         plot.title=element_text(size=32))
+
 # #png("~/PAPERS_WRITING/PAPER1/lolat_JJA/zonal_anom_JJA.png",width=600,height=450)
-# png("~/block_r_data/figs/fig15c.png",width=600,height=450)
-# print(gz)
-# dev.off()
-# 
-# merbrk<-seq(-16,16,2)
-# mer_cols<-colorRampPalette(c("orange","darkgreen",
-#                              "white","purple","violetred4"))(length(merbrk))
-# 
-# gm<-ggplot()+ 
-#   #  coord_fixed(ratio.values / ratio.display) +
-#   coord_cartesian(xlim=c(-110,-45),
-#                   ylim=c(25,50),expand=FALSE) +
-#   geom_map(data= m, map = m, aes(map_id=region)) +
-#   geom_raster(data=dat,aes(x=lon2,y=lat,fill=ADV),interpolate = T,alpha=0.5) +
-#   geom_contour(data=dat,aes(x=lon2,y=lat,z=ADV,color=..level..),breaks=merbrk,size=1) +
-#   scale_fill_gradientn(breaks=merbrk,limits=c(-16,16),
-#                        colors=mer_cols,name="V anom (m/s)",
-#                        labels=c("-16",rep("",7),"0",rep("",7),16)) +
-#   scale_color_gradientn(breaks=merbrk,limits=c(-20,20),colors=mer_cols,guide=F) +
-#   geom_rect(aes(xmin = -105, xmax=-50,ymin=30,ymax=45),
-#             fill = "transparent", color = "blue", size = 1.5) +
-#   ggtitle(" (b) Average meridional wind anomaly\n1984-06-06 to 1984-06-17") +
-#   labs(x="Longitude",y="Latitude")+
-#   theme(axis.text=element_text(size=20),
-#         axis.title=element_text(size=22),
-#         legend.text=element_text(size=20),
-#         legend.title=element_text(size=22),
-#         legend.direction = "horizontal",
-#         legend.position = "bottom",
-#         legend.key.size = unit(2,"line"),
-#         legend.key.width=unit(3.5,"line"),
-#         plot.title=element_text(size=24)) 
-# 
-# #png("~/PAPERS_WRITING/PAPER1/lolat_JJA/zonal_anom_JJA.png",width=600,height=450)
-# png("~/block_r_data/figs/fig15b.png",width=600,height=450)
-# print(gm)
-# dev.off()
+ png("~/PAPERS_WRITING/PAPER1_REV/fig11c.png",width=600,height=500)
+ print(gz)
+ dev.off()
+#
+ merbrk<-seq(-16,16,2)
+ mer_cols<-colorRampPalette(c("orange","darkgreen",
+                              "white","purple","violetred4"))(length(merbrk))
+#
+gm<-ggplot()+
+  #  coord_fixed(ratio.values / ratio.display) +
+  coord_cartesian(xlim=c(-110,-45),
+                  ylim=c(25,50),expand=FALSE) +
+  geom_map(data= m, map = m, aes(map_id=region)) +
+  geom_raster(data=dat,aes(x=lon2,y=lat,fill=ADV),interpolate = T,alpha=0.5) +
+  geom_contour(data=dat,aes(x=lon2,y=lat,z=ADV,color=..level..),breaks=merbrk,size=1) +
+  scale_fill_gradientn(breaks=merbrk,limits=c(-16,16),
+                       colors=mer_cols,name="V anom (m/s)",
+                       labels=c("-16",rep("",7),"0",rep("",7),16)) +
+  scale_color_gradientn(breaks=merbrk,limits=c(-20,20),colors=mer_cols,guide=F) +
+  geom_rect(aes(xmin = -105, xmax=-50,ymin=30,ymax=45),
+            fill = "transparent", color = "blue", size = 1.5) +
+  ggtitle(" (b) Average meridional wind anomaly\n1984-06-06 to 1984-06-17") +
+  labs(x="Longitude",y="Latitude")+
+  theme(axis.text=element_text(size=28),
+        axis.title=element_text(size=30),
+        legend.text=element_text(size=28),
+        legend.title=element_text(size=30),
+        legend.direction = "horizontal",
+        legend.position = "bottom",
+        legend.key.size = unit(2,"line"),
+        legend.key.width=unit(3.5,"line"),
+        plot.title=element_text(size=32))
+
+#png("~/PAPERS_WRITING/PAPER1/lolat_JJA/zonal_anom_JJA.png",width=600,height=450)
+png("~/PAPERS_WRITING/PAPER1_REV/fig11b.png",width=600,height=500)
+print(gm)
+dev.off()
 
 
 
@@ -235,18 +235,18 @@ gz<-ggplot()+
             fill = "transparent", color = "blue", size = 1.5) +
   ggtitle("(c) Average zonal wind anomaly\n2006-01-05 to 2006-01-11") +
   labs(x="Longitude",y="Latitude")+
-  theme(axis.text=element_text(size=20),
-        axis.title=element_text(size=22),
-        legend.text=element_text(size=20),
-        legend.title=element_text(size=22),
+  theme(axis.text=element_text(size=28),
+        axis.title=element_text(size=30),
+        legend.text=element_text(size=28),
+        legend.title=element_text(size=20),
         legend.direction = "horizontal",
         legend.position = "bottom",
         legend.key.size = unit(2,"line"),
         legend.key.width=unit(3.5,"line"),
-        plot.title=element_text(size=24)) 
+        plot.title=element_text(size=32)) 
 
 #png("~/PAPERS_WRITING/PAPER1/lolat_JJA/zonal_anom_JJA.png",width=600,height=450)
-png("~/block_r_data/figs/fig17c.png",width=600,height=450)
+png("~/PAPERS_WRITING/PAPER1_REV/fig13c.png",width=600,height=450)
 print(gz)
 dev.off()
 #
@@ -269,18 +269,18 @@ gm<-ggplot()+
             fill = "transparent", color = "blue", size = 1.5) +
   ggtitle("(b) Average merid wind anomaly\n2006-01-05 to 2006-01-11") +
   labs(x="Longitude",y="Latitude")+
-  theme(axis.text=element_text(size=20),
-        axis.title=element_text(size=22),
-        legend.text=element_text(size=20),
-        legend.title=element_text(size=22),
+  theme(axis.text=element_text(size=28),
+        axis.title=element_text(size=30),
+        legend.text=element_text(size=28),
+        legend.title=element_text(size=30),
         legend.direction = "horizontal",
         legend.position = "bottom",
         legend.key.size = unit(2,"line"),
         legend.key.width=unit(3.5,"line"),
-        plot.title=element_text(size=24)) 
+        plot.title=element_text(size=32)) 
 
 # #png("~/PAPERS_WRITING/PAPER1/lolat_JJA/zonal_anom_JJA.png",width=600,height=450)
-png("~/block_r_data/figs/fig17b.png",width=600,height=450)
+png("~/PAPERS_WRITING/PAPER1_REV/fig13b.png",width=600,height=450)
 print(gm)
 dev.off()
 

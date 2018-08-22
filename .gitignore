@@ -36,3 +36,4 @@ test/*.eps
 test/*.png
 
 test/statfigs/*
+.Rproj.user

@@ -59,14 +59,19 @@ These various tools can also be utilized in an interactive R session by opening 
 
 \begin{verbatim}
 source("read_stitch.R")
-file_list<-"list_of_blobfiles.txt"
+file_list<-readLines("list_of_blobfiles.txt")
 table_stats<-read_stats_to_table(file_list,6,var="TM90")
 \end{verbatim}
 
-The \texttt{source} command reads in all of the commands from the R script \texttt{read\_stitch.R}, which loads the function \texttt{read\_stats\_to\_table}. This function takes an existing text file (\texttt{list\_of\_blobfiles.txt}) containing a list of BlobStats file names, and reads all of those files into a data frame that is named \texttt{table\_stats}. \texttt{6} refers to the number of hours per time step in the original data and \texttt{TM90} refers to the block detection algorithm (Tibaldi and Molteni 1990) that was used to produce input files for StitchBlobs. 
+The \texttt{source} command reads in all of the commands from the R script \texttt{read\_stitch.R}, which loads the function \texttt{read\_stats\_to\_table}. This function takes an existing text file (\texttt{list\_of\_blobfiles.txt}) containing a list of BlobStats file names, loads the file names into a vector of strings, and reads all of those files into a data frame that is named \texttt{table\_stats}. \texttt{6} refers to the number of hours per time step in the original data and \texttt{TM90} refers to the block detection algorithm (Tibaldi and Molteni 1990) that was used to produce input files for StitchBlobs. 
 
-\section{Read BlobStats files into a single table}
+\section{Read BlobStats files into a single table}\label{readtable}
 This utility takes each BlobStats file and reads the information into a single combined data frame. The columns of the data frame depend upon the included variables in the BlobStats output. Possible variables include \texttt{minlat, minlon, maxlat, maxlon, centlat, centlon,} and \texttt{area} and are specified when running BlobStats. There is optional functionality to save the output to one of three file types (RData, text, or CSV).
+
+\subsection{Caveat}
+There are some instances where multiple blobs will merge into a single blob at a later date, or a single blob will split off into multiple blobs (this was noted in Sinclair 1995). This can cause BlobStats to produce latitude/longitude blob extents which are much larger than those of each individual blob, and the centroid coordinate will subsequently ``jump'' a noticeable distance from one time step to the next. 
+
+While these merged blobs only made up a tiny subset of instances in our own dataset, we recognize that this data might skew results with respect to distribution of block size or centroid coordinate; therefore, there is a separate \texttt{DetectBlobs} binary which will produce output that is very similar to \texttt{StitchBlobs} output, but does not stitch the blobs together across the time axis. 
 
 \subsection{Command line syntax}
 \begin{verbatim}
@@ -135,6 +140,8 @@ An example output data table looks like this in the R console:
 \item[] \texttt{file} \\name of the BlobStats file which contains the specified blob information
 \end{itemize}
 
+
+
 \section{Read previously created data table(s) into an R session}\label{combinetable}
 This utility reads previously created data tables into the R session, combining tables into one single table. This function is particularly useful if attempting to examine data from multiple detection algorithms. There is optional functionality to save the output to one of three file types (RData, text, or CSV).
 \subsection{Command line syntax}
@@ -192,20 +199,24 @@ The output is identical to that seen in Section \ref{tableoutput}, but column va
 \section{Create a per-blob summary table}
 This utility reads in a data table (using the method outlined in Section \ref{combinetable}) and creates a table that provides per-blob information on quantities such a the blob's starting and ending centroid coordinates, the blob's duration in days, and others described in more detail below.  There is optional functionality to save the output to one of three file types (RData, text, or CSV).
 
-\subsection{Command line syntax}
-\begin{verbatim}
-Rscript --vanilla stitch_metric_framework.R [-st] [-rt] [-fn or -fl FILE] 
-[--isr or --istext or --iscsv]
 
-(optional)
-[--rsumm OUTPUT] [--textsumm OUTPUT] [--csvsumm OUTPUT]
+\subsection{Command line syntax}
+The \texttt{-st} flag is combined with either the \texttt{--readfiles} (Section \ref{readtable}) or \texttt{--readtable} (Section \ref{combinetable} 
+) commands.
+
+\begin{verbatim}
+Rscript --vanilla stitch_metric_framework.R [-st] [options from --readfiles or --readtable]
+
 \end{verbatim}
 
 The following flags are required:
 \begin{itemize}
 \item[] \texttt{-st} (\texttt{--summarize})\\ Tell program to summarize the data table output(s) from reading in BlobStats data.
-\item[] \texttt{-rt} (\texttt{--readtable}) \\ Tell program to read in BlobStats data.
-\item[]\texttt{-fn} (\texttt{--filename}) or \texttt{-fl} (\texttt{--filelist}) \texttt{FILE}\\ Name of single file containing output from \texttt{--readfiles}, or a text file containing a list of files with output from \texttt{--readfiles}.
+\item[] \texttt{-rt}  (\texttt{--readfiles}) or \texttt{-rt} (\texttt{--readtable})\\ Tell program to read in BlobStats data.
+\item[]\texttt{-fn} (\texttt{--filename}) or \texttt{-fl} (\texttt{--filelist}) \texttt{FILE}\\ Name of single file, or a text file containing a list of files.
+\end{itemize}
+
+If using the \texttt{--readtable} option:\begin{itemize}
 \item[]\texttt{--isr}\\Boolean telling the program that the input is in RData format
 \item[]\texttt{--istext}\\Boolean telling the program that the input is in text file format
 \item[] \texttt{--iscsv}\\Boolean telling the program that the input is in CSV format
@@ -231,7 +242,7 @@ which will summarize each unique blob in the input \texttt{data.frame} object an
 
 The following arguments are required:
 \begin{itemize}
-\item[] \texttt{df\_in}\\ Name of the input data frame.
+\item[] \texttt{df\_in}\\ Name of the input data frame (create using methods from Section \ref{readtable} or \ref{combinetable}).
 \end{itemize}
 
 The following arguments are optional:
@@ -247,8 +258,8 @@ An example summary table looks like this in the R console:
 2 1980-12-14 06:00:00 1980-12-29 18:00:00         15.50          43.5         239.5        57.0
 
   end_centlon  dist_km zonal_dist_km zonal_speed_kph min_area  max_area avg_area bnum
-1       152.5 2825.715     2932.1134        9.582070 24503497 105945491 48812899    1
-2       144.0 6377.548     5347.1906       14.374168 13394293  93958976 48812899    2
+1       152.5 2825.715     2795.8618        9.136803 24503497 105945491 48812899    1
+2       144.0 6377.548     6282.5810       16.888658 13394293  93958976 48812899    2
 
                          file
 1 ERA_1980_DJF_NP_Z_stats.txt
@@ -276,6 +287,9 @@ Blob 2 (2)
 53      39.00000        48.00000        226.00000       253.00000       43.50000        239.50000       0.00456
 54      36.00000        49.00000        221.00000       254.00000       42.50000        237.50000       0.00751
 \end{verbatim}
+
+
+
 \end{appendix}
 
 

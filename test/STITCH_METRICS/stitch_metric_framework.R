@@ -83,9 +83,6 @@ if (args$readfiles){
   }
   df_data<-read_stats_to_table(blobstats_vec,nhrs,args$algname,
                                args$rtable,args$texttable,args$csvtable)
-  if (args$verbose){
-    print(df_data)
-  }
 }
 
 #READ IN EXISTING DATA FROM PREVIOUS SESSION (FORMATTED USING ABOVE TOOL)-----
