@@ -71,7 +71,7 @@ public:
 		m_varixU(0),
 		m_varixV(0),
 		m_nBins(0),
-		m_dRadius(0.0)
+		m_dBinWidth(0.0)
 	{ }
 
 	///	<summary>
@@ -86,7 +86,7 @@ public:
 			ReadMode_UVar,
 			ReadMode_VVar,
 			ReadMode_Bins,
-			ReadMode_Radius,
+			ReadMode_BinWidth,
 			ReadMode_Invalid
 		} eReadMode = ReadMode_UVar;
 
@@ -127,11 +127,11 @@ public:
 					m_nBins = atoi(strSubStr.c_str());
 
 					iLast = i + 1;
-					eReadMode = ReadMode_Radius;
+					eReadMode = ReadMode_BinWidth;
 
 				// Read in min/max distance
-				} else if (eReadMode == ReadMode_Radius) {
-					m_dRadius = atof(strSubStr.c_str());
+				} else if (eReadMode == ReadMode_BinWidth) {
+					m_dBinWidth = atof(strSubStr.c_str());
 
 					iLast = i + 1;
 					eReadMode = ReadMode_Invalid;
@@ -139,7 +139,7 @@ public:
 				// Invalid
 				} else if (eReadMode == ReadMode_Invalid) {
 					_EXCEPTION1("\nToo many entries in --radial_wind_profile \"%s\""
-						"\nRequired: \"<u var>,<v var>,<bins>,<radius>\"",
+						"\nRequired: \"<u var>,<v var>,<bins>,<bin_width>\"",
 						strOp.c_str());
 				}
 			}
@@ -147,17 +147,17 @@ public:
 
 		if (eReadMode != ReadMode_Invalid) {
 			_EXCEPTION1("\nInsufficient entries in --radial_wind_profile \"%s\""
-					"\nRequired: \"<u var>,<v var>,<bins>,<radius>\"",
+					"\nRequired: \"<u var>,<v var>,<bins>,<bin_width>\"",
 					strOp.c_str());
 		}
 		if (m_nBins <= 0) {
 			_EXCEPTIONT("\nNonpositive value of <bins> argument given");
 		}
-		if (m_dRadius <= 0) {
-			_EXCEPTIONT("\nNonpositive value of <radius> argument given");
+		if (m_dBinWidth <= 0.0) {
+			_EXCEPTIONT("\nNonpositive value of <bin_width> argument given");
 		}
-		if (m_dRadius > 180.0) {
-			_EXCEPTIONT("\n<radius> argument must be no larger than 180 (degrees)");
+		if (static_cast<double>(m_nBins) * m_dBinWidth > 180.0) {
+			_EXCEPTIONT("\n<bins> x <bin_width> must be no larger than 180 (degrees)");
 		}
 	}
 
@@ -184,8 +184,10 @@ public:
 		varV.LoadGridData(varreg, vecFiles, grid, iTime);
 		const DataVector<float> & dataStateV = varV.GetData();
 
-		// Verify that m_dRadius is less than 180.0
-		if ((m_dRadius < 0.0) || (m_dRadius > 180.0)) {
+		// Verify that dRadius is less than 180.0
+		double dRadius = m_dBinWidth * static_cast<double>(m_nBins);
+
+		if ((dRadius < 0.0) || (dRadius > 180.0)) {
 			_EXCEPTIONT("Radius must be in the range [0.0, 180.0]");
 		}
 
@@ -256,7 +258,7 @@ public:
 				_EXCEPTIONT("NaN value detected");
 			}
 
-			if (dR >= m_dRadius) {
+			if (dR >= dRadius) {
 				continue;
 			}
 
@@ -310,12 +312,16 @@ public:
 			//printf("%1.5e %1.5e :: %1.5e %1.5e\n", dUlon, dUlat, dUr, dUa);
 
 			// Determine bin
-			int iBin = static_cast<int>((dR / m_dRadius) * m_nBins);
+			int iBin = static_cast<int>(dR / m_dBinWidth);
 			if (iBin >= m_nBins) {
 				_EXCEPTIONT("Logic error");
 			}
 
 			dVelocities[iBin].push_back(dUa);
+
+			if (iBin < m_nBins-1) {
+				dVelocities[iBin+1].push_back(dUa);
+			}
 
 			// Add all neighbors of this point
 			for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
@@ -326,7 +332,9 @@ public:
 		// Construct radial profile
 		dProfile.resize(m_nBins);
 
-		for (int i = 0; i < m_nBins; i++) {
+		dProfile[0] = 0.0;
+
+		for (int i = 1; i < m_nBins; i++) {
 			double dAvg = 0.0;
 			if (dVelocities[i].size() != 0) {
 				for (int j = 0; j < dVelocities[i].size(); j++) {
@@ -357,7 +365,7 @@ public:
 	///	<summary>
 	///		Maximum radius (in degrees) to use in calculation.
 	///	</summary>
-	double m_dRadius;
+	double m_dBinWidth;
 
 };
 
@@ -612,7 +620,7 @@ try {
 		//CommandLineBool(fOutputAppend, "out_append");
 
 		CommandLineBool(fAppendTrajectoryVelocity, "append_traj_vel");
-		CommandLineStringD(strRadialWindProfileVars, "radial_wind_profile", "", "(U,V,bins,radius)");
+		CommandLineStringD(strRadialWindProfileVars, "radial_wind_profile", "", "(U,V,bins,bin_width[,opts])");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -971,6 +979,10 @@ try {
 				NcFileVector vecncDataFiles;
 				int iTime;
 				autocurator.Find(time, vecncDataFiles, iTime);
+				if (vecncDataFiles.size() == 0) {
+					_EXCEPTION1("Time (%s) does not exist in input data fileset",
+						time.ToString().c_str());
+				}
 
 				// Loop through all PathNodes which need calculating at this time
 				for (int i = 0; i < iterPathNode->second.size(); i++) {
