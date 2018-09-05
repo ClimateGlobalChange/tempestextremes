@@ -1,16 +1,37 @@
-\contentsline {section}{\numberline {1}Minimum Requirements}{2}
-\contentsline {section}{\numberline {2}Usage}{2}
-\contentsline {section}{\numberline {3}Read BlobStats files into a single table}{2}
-\contentsline {subsection}{\numberline {3.1}Caveat}{3}
-\contentsline {subsection}{\numberline {3.2}Command line syntax}{3}
-\contentsline {subsection}{\numberline {3.3}Function syntax}{4}
-\contentsline {subsection}{\numberline {3.4}Output}{4}
-\contentsline {section}{\numberline {4}Read previously created data table(s) into an R session}{5}
-\contentsline {subsection}{\numberline {4.1}Command line syntax}{5}
-\contentsline {subsection}{\numberline {4.2}Function syntax}{6}
-\contentsline {subsection}{\numberline {4.3}Output}{6}
-\contentsline {section}{\numberline {5}Create a per-blob summary table}{6}
-\contentsline {subsection}{\numberline {5.1}Command line syntax}{6}
-\contentsline {subsection}{\numberline {5.2}Function syntax}{7}
-\contentsline {subsection}{\numberline {5.3}Output}{8}
-\contentsline {section}{\numberline {A}BlobStats File Format}{8}
+\contentsline {section}{\numberline {1}Minimum software and data requirements}{3}
+\contentsline {section}{\numberline {2}Usage}{3}
+\contentsline {subsection}{\numberline {2.1}Command line usage}{3}
+\contentsline {subsubsection}{\numberline {2.1.1}Namelists}{3}
+\contentsline {subsection}{\numberline {2.2}Interactive R Usage}{4}
+\contentsline {section}{\numberline {3}Read BlobStats files into a single table}{5}
+\contentsline {subsection}{\numberline {3.1}Requirements}{5}
+\contentsline {subsection}{\numberline {3.2}Command line syntax}{5}
+\contentsline {subsubsection}{\numberline {3.2.1}Required namelist variables}{5}
+\contentsline {subsection}{\numberline {3.3}Function syntax}{6}
+\contentsline {subsection}{\numberline {3.4}Output}{6}
+\contentsline {section}{\numberline {4}Read previously created data table(s) into an R session}{7}
+\contentsline {subsection}{\numberline {4.1}Requirements}{7}
+\contentsline {subsection}{\numberline {4.2}Command line syntax}{7}
+\contentsline {subsubsection}{\numberline {4.2.1}Required namelist variables}{7}
+\contentsline {subsection}{\numberline {4.3}Function syntax}{8}
+\contentsline {subsection}{\numberline {4.4}Output}{8}
+\contentsline {section}{\numberline {5}Handling instances of merging/splitting blobs}{8}
+\contentsline {subsection}{\numberline {5.1}Requirements}{9}
+\contentsline {subsection}{\numberline {5.2}Command line syntax}{9}
+\contentsline {subsubsection}{\numberline {5.2.1}Required namelist variables}{10}
+\contentsline {subsection}{\numberline {5.3}Function syntax}{10}
+\contentsline {subsection}{\numberline {5.4}Output}{11}
+\contentsline {section}{\numberline {6}Create a per-blob summary table}{11}
+\contentsline {subsection}{\numberline {6.1}Requirements}{11}
+\contentsline {subsection}{\numberline {6.2}Command line syntax}{11}
+\contentsline {subsubsection}{\numberline {6.2.1}Required namelist variables}{11}
+\contentsline {subsection}{\numberline {6.3}Function syntax}{12}
+\contentsline {subsection}{\numberline {6.4}Output}{12}
+\contentsline {section}{\numberline {7}Reading in NetCDF data}{13}
+\contentsline {subsection}{\numberline {7.1}Requirements}{13}
+\contentsline {subsection}{\numberline {7.2}Command line syntax}{14}
+\contentsline {subsection}{\numberline {7.3}Function syntax}{14}
+\contentsline {subsection}{\numberline {7.4}Output}{15}
+\contentsline {subsubsection}{\numberline {7.4.1}NetCDF}{15}
+\contentsline {subsubsection}{\numberline {7.4.2}RData}{15}
+\contentsline {section}{\numberline {A}BlobStats File Format}{16}

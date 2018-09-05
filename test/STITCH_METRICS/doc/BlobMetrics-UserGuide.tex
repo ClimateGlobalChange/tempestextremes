@@ -28,13 +28,13 @@
 
 \pagebreak
 
-\section{Minimum Requirements}
+\section{Minimum software and data requirements}
 \begin{itemize}
 \item R software (\texttt{https://www.r-project.org/}) and the following libraries:
 \begin{itemize}
-\item abind
-\item argparse
-\item RNetCDF (\texttt{https://journal.r-project.org/archive/2013/RJ-2013-023/RJ-2013-023.pdf})
+\item \texttt{abind}
+\item \texttt{argparse}
+\item \texttt{RNetCDF} (\texttt{https://journal.r-project.org/archive/2013/RJ-2013-023/RJ-2013-023.pdf})
 \end{itemize}
 \item StitchBlobs output (in the form of NetCDF files)
 \item BlobStats output (in the form of text files)
@@ -43,6 +43,7 @@
 If the required libraries have not yet been installed in R, then an internet connection will be necessary, as R will attempt to download the missing libraries from online repositories before running the code.
 
 \section{Usage}
+\subsection{Command line usage}
 The main control framework is run from the command line, with the following syntax:
 \begin{verbatim}
 Rscript --vanilla stitch_metric_framework.R [flags]
@@ -53,9 +54,62 @@ In order to view all possible options, run the above command with the \texttt{-h
 Rscript --vanilla stitch_metric_framework.R -h
 \end{verbatim}
 
-which will print out the list of optional flags and exit. These flags will be explained further in subsequent sections.
+which will print out the list of available flags and exit. These flags will be explained further in subsequent sections.
 
-These various tools can also be utilized in an interactive R session by opening R and loading the various functions from the source R scripts. For example, to read a list of BlobStats files into a single data table, type the following commands into R:
+\subsubsection{Namelists}
+Each utility must be used in conjunction with a namelist file, which will provide all of the necessary variables that are not specified in the command line. Example namelists are included in the directory with the R function source files.
+
+The \texttt{-nl} or \texttt{--namelist} flag specifies the master namelist (example \texttt{namelist\_master.R}), which contains the necessary variables for all of the framework utilities. However, each utility can be provided with a separate namelist file if desired (flags specified in subsequent sections), which will override inputs from the master namelist.
+
+For example, 
+
+\begin{verbatim}
+Rscript --vanilla stitch_metric_framework.R  --namelist namelist_master.R --readfiles --mergetable
+--summarize --namelistst namelist_summarize.R
+\end{verbatim}
+
+will use \texttt{namelist\_master.R} for the \texttt{readfiles} and \texttt{mergetable} utilities but \texttt{namelist\_summarize.R} for \texttt{--summarize}
+
+Each utility has certain mandatory variables. The \texttt{nrun\_*} variable specifies how many times the utility is to be run; if more than 1, then the variables must be specified as vectors, which have the syntax \texttt{c(VAR1,VAR2,VAR3...)}. For example, to read in data from 4 different datasets using \texttt{--readfiles}:
+
+\begin{verbatim}
+#Location of working directory
+work_dir<-"~/tempestextremes/test/STITCH_METRICS"
+#Location where the input data files are stored
+input_dir<-"~/tempestextremes/test/STITCH_METRICS"
+#Location where the output data files are stored
+output_dir<-"~/tempestextremes/test/STITCH_METRICS"
+
+#This will be run 4 times 
+nrun_rf<-4
+##################################
+###USER-DEFINED###
+#Input file names
+list_files<-c("stitch_list","nostitch_list","merra_list","merra_nolist")
+#output file names
+list_rnames<-c("table_estitch.RData","table_enostitch.RData",
+"table_mstitch.RData","table_mnostitch.RData")
+#Data frame variable names
+list_dfnames<-c("df_estitch","df_enostitch","df_mstitch","df_mnostitch")
+##################################
+
+nhrs<-6
+varname<-c("ERA","ERA","MERRA","MERRA")
+filename_stitchblobs<-""
+filelist_stitchblobs<-paste(input_dir,list_files,sep="/")
+rfn_stitch<-paste(output_dir,list_rnames,sep="/")
+df_stitchname<-list_dfnames
+txt_stitch<-""
+csv_stitch<-""
+\end{verbatim}
+
+Note that some variables, such as \texttt{nhrs} and \texttt{txt\_stitch}, have only one input rather than a vector of 4 values. That value will be used for all runs.
+
+The \texttt{paste} function appends the appropriate directory to the vectors of input and output file names.
+
+
+\subsection{Interactive R Usage}
+These various tools can also be utilized in an interactive R session by opening R and loading the various functions from the source R scripts. For example, to read a list of BlobStats files into a single \texttt{data.frame}, type the following commands into R:
 
 \begin{verbatim}
 source("read_stitch.R")
@@ -65,41 +119,37 @@ table_stats<-read_stats_to_table(file_list,6,var="TM90")
 
 The \texttt{source} command reads in all of the commands from the R script \texttt{read\_stitch.R}, which loads the function \texttt{read\_stats\_to\_table}. This function takes an existing text file (\texttt{list\_of\_blobfiles.txt}) containing a list of BlobStats file names, loads the file names into a vector of strings, and reads all of those files into a data frame that is named \texttt{table\_stats}. \texttt{6} refers to the number of hours per time step in the original data and \texttt{TM90} refers to the block detection algorithm (Tibaldi and Molteni 1990) that was used to produce input files for StitchBlobs. 
 
-\section{Read BlobStats files into a single table}\label{readtable}
-This utility takes each BlobStats file and reads the information into a single combined data frame. The columns of the data frame depend upon the included variables in the BlobStats output. Possible variables include \texttt{minlat, minlon, maxlat, maxlon, centlat, centlon,} and \texttt{area} and are specified when running BlobStats. There is optional functionality to save the output to one of three file types (RData, text, or CSV).
+\section{Read BlobStats files into a single table}\label{readfiles}
+This utility takes each BlobStats file and reads the information into a single combined data frame. The columns of the data frame depend upon the included variables in the BlobStats output. Possible variables include \texttt{minlat, minlon, maxlat, maxlon, centlat, centlon,} and \texttt{area} and are specified when running BlobStats. There is optional functionality to save this output to one of three file types (RData, text, or CSV).
 
-\subsection{Caveat}
-There are some instances where multiple blobs will merge into a single blob at a later date, or a single blob will split off into multiple blobs (this was noted in Sinclair 1995). This can cause BlobStats to produce latitude/longitude blob extents which are much larger than those of each individual blob, and the centroid coordinate will subsequently ``jump'' a noticeable distance from one time step to the next. 
-
-While these merged blobs only made up a tiny subset of instances in our own dataset, we recognize that this data might skew results with respect to distribution of block size or centroid coordinate; therefore, there is a separate \texttt{DetectBlobs} binary which will produce output that is very similar to \texttt{StitchBlobs} output, but does not stitch the blobs together across the time axis. 
+\subsection{Requirements}
+Text files containing output from BlobStats. The format of these files is explained in more detail in Appendix \ref{blobformat}.
 
 \subsection{Command line syntax}
 \begin{verbatim}
-Rscript --vanilla stitch_metric_framework.R [-rf] [-fn or -fl FILE] [-th TIMERES] 
-
-(optional)
-[-an ALGORITHM] [--rtable OUTPUT] [--texttable OUTPUT] [--csvtable OUTPUT]
+Rscript --vanilla stitch_metric_framework.R [-rf] [-nl or -nlrf FILE]
 \end{verbatim}
 
 The following flags are required:
 \begin{itemize}
 \item[] \texttt{-rf} (\texttt{--readfiles}) \\ Tell program to read in BlobStats data
-\item[]\texttt{-fn} (\texttt{--filename}) or \texttt{-fl} (\texttt{--filelist}) \texttt{FILE}\\ Name of single input BlobStats output, or a text file containing a list of BlobStats file names.
-\item[]\texttt{-th} (\texttt{--thourly}) \texttt{TIMERES}\\ Time resolution in terms of hours (i.e. 6 for 6 hourly)
+\item[]\texttt{-nl} (\texttt{--namelist}) or \texttt{-nlrf} (\texttt{--namelistrf}) \texttt{FILE}\\ Name of namelist file
 \end{itemize}
 
-The following flags are optional:
+\subsubsection{Required namelist variables}
 \begin{itemize}
-\item[]\texttt{-an} (\texttt{--algname}) \texttt{ALGORITHM}\\ Name of the objective blocking detection algorithm used to produce input files for StitchBlobs. Recommended to use this flag if you will be looking at outputs from multiple algorithms, as it will help to differentiate between datasets if you combine multiple data frames into a single file (see Section \ref{combinetable}).
-\item[] \texttt{--rtable OUTPUT}\\ File name for output RData file. The result will be an RData table containing the data frame \texttt{df\_tot}.
-\item[] \texttt{--texttable OUTPUT}\\ File name for output text file with tab-separated columns.
-\item[] \texttt{--csvtable OUTPUT}\\File name for output CSV file. 
+\item[] \texttt{nrun\_rf}\\ Number of times to run \texttt{--readfiles}
+\item[] \texttt{nhrs}\\Number of hours per time step in data files (i.e. 6 is 6 hourly)
+\item[] \texttt{filename\_stitchblobs} or \texttt{filelist\_stitchblobs}\\ Single file containing BlobStats data or a text file containing a list of file names. Please use one or the other--- set the unused variable to a blank string (\texttt{""})
+\item[] \texttt{rfn\_stitch, txt\_stitch, csv\_stitch}\\ Optional output file names in RData, text, or CSV format (store the respective variable as a blank string to suppress output for that particular file format)
+\item[] \texttt{df\_stitchname}\\Optional variable name for the output data frame in the RData file. Defaults to \texttt{df\_tot} if string is left blank.
 \end{itemize}
+
 \subsection{Function syntax}
 
 To load and use  this function in an interactive R session, do
 \begin{verbatim}
-source("read_stitch.R")
+source("readfiles.R")
 desired_name<-read_stats_to_table(flist,nhrs,..)
 \end{verbatim}
 
@@ -119,7 +169,7 @@ The following arguments are optional:
 
 \subsection{Output}\label{tableoutput}
 
-An example output data table looks like this in the R console:
+An example output \texttt{data.frame} looks like this in the R console:
 \begin{verbatim}
              datehour minlat maxlat minlon maxlon centlat centlon    area  area_km bnum var
 1 1980-12-01 00:00:00     50     72    187    218    61.0   202.5 0.08299 42330251    1 TM90
@@ -131,52 +181,45 @@ An example output data table looks like this in the R console:
 \end{verbatim}
 
 \begin{itemize}
-\item[]\texttt{datehour}\\The date string in the format \texttt{YYYY-MM-DD-HH}
+\item[]\texttt{datehour}\\The date string in the format \texttt{YYYY-MM-DD HH:MM:SS}
 \item[] \texttt{minlat, maxlat, minlon, maxlon, centlat, centlon}\\ Latitude and longitude coordinates for the block's extent and centroid
 \item[] \texttt{area}\\ Fractional area of the block
 \item[] \texttt{area\_km}\\area of the block in km$^2$
-\item[] \texttt{var}\\ Algorithm name specified either by the \texttt{-an} flag in the console or \texttt{var} in the function (default \texttt{VAR})
+\item[] \texttt{var}\\ Algorithm name specified either by the \texttt{--algname} flag in the console or \texttt{var} in the function (default \texttt{VAR})
 \item[] \texttt{bnum} \\The blob ID number as specified in the BlobStats file
 \item[] \texttt{file} \\name of the BlobStats file which contains the specified blob information
 \end{itemize}
 
-
-
 \section{Read previously created data table(s) into an R session}\label{combinetable}
-This utility reads previously created data tables into the R session, combining tables into one single table. This function is particularly useful if attempting to examine data from multiple detection algorithms. There is optional functionality to save the output to one of three file types (RData, text, or CSV).
+This utility reads output  generated in Section \ref{readfiles} into the R session and produces a single output \texttt{data.frame}. This function is particularly useful if attempting to examine data from multiple detection algorithms. There is optional functionality to save the output to one of three file types (RData, text, or CSV).
+
+\subsection{Requirements}
+Data tables produced using the procedure outlined in Section \ref{readfiles}. The tables can be in RData, text, or CSV file format.
+
 \subsection{Command line syntax}
 \begin{verbatim}
-Rscript --vanilla stitch_metric_framework.R [-rt] [-fn or -fl FILE] 
-[--isr or --istext or --iscsv]
-
-
-(optional)
-[--rtable OUTPUT] [--texttable OUTPUT] [--csvtable OUTPUT]
+Rscript --vanilla stitch_metric_framework.R [-rt] [-nl or -nlrt FILE] 
 \end{verbatim}
 
 The following flags are required:
 \begin{itemize}
 \item[] \texttt{-rt} (\texttt{--readtable}) \\ Tell program to read in BlobStats data
-\item[]\texttt{-fn} (\texttt{--filename}) or \texttt{-fl} (\texttt{--filelist}) \texttt{FILE}\\ Name of single file containing output from \texttt{--readfiles}, or a text file containing a list of files with output from \texttt{--readfiles}.
-\item[]\texttt{--isr}\\Boolean telling the program that the input is in RData format
-\item[]\texttt{--istext}\\Boolean telling the program that the input is in text file format
-\item[] \texttt{--iscsv}\\Boolean telling the program that the input is in CSV format
+\item[]\texttt{-nl} (\texttt{--namelist}) or \texttt{-nlrt} (\texttt{--namelistrt}) \texttt{FILE}\\ Name of namelist file
 \end{itemize}
 
-Only specify one of the Boolean flags! (This program currently does not have the capability to handle multiple formats.)
+\subsubsection{Required namelist variables}
 
-The following flags are optional:
 \begin{itemize}
-\item[] \texttt{--rtable OUTPUT}\\ File name for output RData file. The result will be an RData table containing the data frame \texttt{df\_data}.
-\item[] \texttt{--texttable OUTPUT}\\ File name for output text file with tab-separated columns.
-\item[] \texttt{--csvtable OUTPUT}\\File name for output CSV file. 
+\item[] \texttt{nrun\_rt}\\ Number of times to run \texttt{--readtable}
+\item[] \texttt{ftype\_rt}\\ Input file type (\texttt{"R"}, \texttt{"text"}, or \texttt{"CSV"})
+\item[] \texttt{filename\_read} or \texttt{filelist\_read}\\ Single file or list of files containing \texttt{--readfiles} output
+\item[] \texttt{rfn\_combine, txt\_combine, csv\_combine}\\Optional output file names in RData, text, or CSV format (store the respective variable as a blank string to suppress output for that particular file format)
+\item[] \texttt{df\_combinename}\\Optional variable name for the output data frame in the RData file. Defaults to \texttt{df\_data} if string is left blank.
 \end{itemize}
-
-
 \subsection{Function syntax}
 To load this function in an interactive R session, do
 \begin{verbatim}
-source("combine_tables.R")
+source("readtable.R")
 desired_name<-combine_dfs(flist,ftype,...)
 \end{verbatim}
 
@@ -194,55 +237,93 @@ The following arguments are optional:
 \end{itemize}
 
 \subsection{Output}
-The output is identical to that seen in Section \ref{tableoutput}, but column values for the \texttt{var} column might vary.
+The output is identical to that seen in Section \ref{tableoutput}, but there might be multiple values for the \texttt{var} column if combining tables with data from different algorithms.
 
-\section{Create a per-blob summary table}
-This utility reads in a data table (using the method outlined in Section \ref{combinetable}) and creates a table that provides per-blob information on quantities such a the blob's starting and ending centroid coordinates, the blob's duration in days, and others described in more detail below.  There is optional functionality to save the output to one of three file types (RData, text, or CSV).
+\section{Handling instances of merging/splitting blobs}\label{mergesection}
+There are some instances where multiple blobs will merge into a single blob at a later date, or a single blob will split off into multiple blobs (this was noted in Sinclair 1995). This can cause BlobStats to produce latitude/longitude blob extents which are much larger than those of each individual blob, and the centroid coordinate will subsequently ``jump'' a noticeable distance from one time step to the next. 
+
+The DetectBlobs binary in TempestExtremes  will produce output that is very similar to StitchBlobs output, but provides latitude/longitude extents for each unique feature; blobs which split off from larger features have their own separate identifier.
 
 
-\subsection{Command line syntax}
-The \texttt{-st} flag is combined with either the \texttt{--readfiles} (Section \ref{readtable}) or \texttt{--readtable} (Section \ref{combinetable} 
-) commands.
+For example, here is output from StitchBlobs for one blob over 24 hours:
+\begin{verbatim}
+           datehour minlat maxlat minlon maxlon centlat centlon    area  area_km var bnum
+1980-12-01 00:00:00     50     72    187    218    61.0   202.5 0.08299 42330251   Z    1
+1980-12-01 06:00:00     50     74    187    222    62.0   204.5 0.08980 45803790   Z    1
+1980-12-01 12:00:00     45     75    139    226    60.0   182.5 0.12303 62753232   Z    1
+1980-12-01 18:00:00     43     75    138    231    59.0   184.5 0.13999 71403925   Z    1
+\end{verbatim}
+
+Here  is corresponding output from DetectBlobs:
 
 \begin{verbatim}
-Rscript --vanilla stitch_metric_framework.R [-st] [options from --readfiles or --readtable]
+           datehour minlat maxlat minlon maxlon centlat centlon    area  area_km var bnum
+1980-12-01 00:00:00     50     72    187    218    61.0   202.5 0.08299 42330251   Z    1
+1980-12-01 06:00:00     50     74    187    222    62.0   204.5 0.08980 45803790   Z    2
+1980-12-01 12:00:00     50     75    187    226    62.5   206.5 0.09634 49139611   Z    3
+1980-12-01 12:00:00     45     55    139    155    50.0   147.0 0.02670 13618721   Z    4
+1980-12-01 18:00:00     49     75    186    231    62.0   208.5 0.10133 51684833   Z    5
+1980-12-01 18:00:00     43     57    138    157    50.0   147.5 0.03866 19719092   Z    6
+\end{verbatim}
 
+Note that at times 12Z and 18Z, the detected blob in the StitchBlobs dataset (\texttt{bnum 1}) is actually comprised of two  blobs, because the smaller blob (\texttt{bnum 4} and \texttt{6} in the DetectBlobs dataset) is separate from the larger blob (\texttt{3} and \texttt{5} in the DetectBlobs output) at these time steps, but the smaller blob merges into the larger blob at a later time.
+
+%\begin{verbatim}
+%           datehour minlat maxlat minlon maxlon centlat centlon    area   area_km var bnum bnum2
+%1980-12-01 00:00:00     50     72    187    218    61.0   202.5 0.08299  42330251   Z    1     1
+%1980-12-01 06:00:00     50     74    187    222    62.0   204.5 0.08980  45803790   Z    1     1
+%1980-12-01 12:00:00     45     55    139    155    50.0   147.0 0.02670  13618721   Z    1     4
+%1980-12-01 12:00:00     50     75    187    226    62.5   206.5 0.09634  49139611   Z    1     3
+%1980-12-01 18:00:00     43     57    138    157    50.0   147.5 0.03866  19719092   Z    1     6
+%1980-12-01 18:00:00     49     75    186    231    62.0   208.5 0.10133  51684833   Z    1     5
+%...
+%1980-12-04 18:00:00     50     62    188    215    56.0   201.5 0.04389  22386730   Z    1    30
+%1980-12-04 18:00:00     38     69    137    181    53.5   159.0 0.13772  70246079   Z    1    29
+%1980-12-05 00:00:00     38     70    138    215    54.0   176.5 0.19310  98493450   Z    1     1
+%1980-12-05 06:00:00     38     70    138    216    54.0   177.0 0.20088 102461751   Z    1     1
+%\end{verbatim}
+
+While these merged blobs only made up a small subset of instances in our own dataset, we recognize that this data might skew results with respect to distribution of block size or centroid coordinate; therefore, we provide this extra functionality to distinguish between the individual blobs within the larger detected region. The summarization utility (Section \ref{summarysection}), which provides information on each unique block's size, speed, etc will note any instances in which there is blob merging. The user can then choose to keep or omit blobs in which there was merging.
+
+\subsection{Requirements}
+Separate files or file lists for StitchBlobs and DetectBlobs data. If using the interactive R session, two separate data tables must first be produced using the method outlined in Section \ref{readfiles} or Section \ref{combinetable}). 
+
+\subsection{Command line syntax}
+\begin{verbatim}
+Rscript --vanilla stitch_metric_framework.R [-mt] [-nl or -nlmt FILE]
 \end{verbatim}
 
 The following flags are required:
 \begin{itemize}
-\item[] \texttt{-st} (\texttt{--summarize})\\ Tell program to summarize the data table output(s) from reading in BlobStats data.
-\item[] \texttt{-rt}  (\texttt{--readfiles}) or \texttt{-rt} (\texttt{--readtable})\\ Tell program to read in BlobStats data.
-\item[]\texttt{-fn} (\texttt{--filename}) or \texttt{-fl} (\texttt{--filelist}) \texttt{FILE}\\ Name of single file, or a text file containing a list of files.
+\item[] \texttt{-mt} (\texttt{--mergetable}) \\ Tell program to merge the data from StitchBlobs and DetectBlobs
+\item[]\texttt{-nl} (\texttt{--namelist}) or \texttt{-nlmt} (\texttt{--namelistmt}) \texttt{FILE}\\ Name of namelist file
 \end{itemize}
 
-If using the \texttt{--readtable} option:\begin{itemize}
-\item[]\texttt{--isr}\\Boolean telling the program that the input is in RData format
-\item[]\texttt{--istext}\\Boolean telling the program that the input is in text file format
-\item[] \texttt{--iscsv}\\Boolean telling the program that the input is in CSV format
-\end{itemize}
+\subsubsection{Required namelist variables}
 
-Only specify one of the Boolean flags! (This program currently does not have the capability to handle multiple formats.)
-
-The following flags are optional:
 \begin{itemize}
-\item[] \texttt{--rsumm OUTPUT}\\ File name for output RData file. The result will be an RData table containing the data frame \texttt{df\_summ}.
-\item[] \texttt{--textsumm OUTPUT}\\ File name for output text file with tab-separated columns.
-\item[] \texttt{--csvsumm OUTPUT}\\File name for output CSV file. 
+\item[]\texttt{nrun\_mt}\\ Number of times to run \texttt{--mergetable}
+\item[] \texttt{ftype\_mt}\\ Input file type (\texttt{"R"}, \texttt{"text"}, or \texttt{"CSV"})
+\item[] \texttt{stitch\_file} or \texttt{stitch\_list}\\ Single file or list of files containing  data from StitchBlobs (generated using either \texttt{--readfiles} or \texttt{--readtable})
+\item[] \texttt{detect\_file} or \texttt{detct\_list}\\ Single file or list of files containing  data from DetectBlobs (generated using either \texttt{--readfiles} or \texttt{--readtable})
+\item[] \texttt{rfn\_merged, txt\_merged, csv\_merged}\\Optional output file names in RData, text, or CSV format (store the respective variable as a blank string to suppress output for that particular file format)
+\item[] \texttt{df\_merged}\\Optional variable name for the output data frame in the RData file. Defaults to \texttt{df\_merged} if string is left blank.
 \end{itemize}
-
 \subsection{Function syntax}
+
+
 To load this function in an interactive R session, do
 \begin{verbatim}
-source("summ_table.R")
-desired_name<-gen_summary_table(df_in,...)
+source("mergetable.R")
+desired_name<-merge_dfs(df_stitch,df_nostitch,...)
 \end{verbatim}
 
-which will summarize each unique blob in the input \texttt{data.frame} object and produce an output \texttt{data.frame} object with the variable name \texttt{desired\_name}.
+which will produce a \texttt{data.frame} object with the variable name \texttt{desired\_name}. Note that \texttt{df\_stitch} and \texttt{df\_nostitch} will need to be created using either \texttt{read\_table} or \texttt{combine\_tables}.
 
 The following arguments are required:
 \begin{itemize}
-\item[] \texttt{df\_in}\\ Name of the input data frame (create using methods from Section \ref{readtable} or \ref{combinetable}).
+\item[] \texttt{df\_stitch}\\ a data frame (created using \texttt{read\_table} or \texttt{combine\_tables}) containing BlobStats output with StitchBlobs data
+\item[] \texttt{df\_nostitch}\\ a data frame (created using \texttt{read\_table} or \texttt{combine\_tables}) containing BlobStats output with DetectBlobs data
 \end{itemize}
 
 The following arguments are optional:
@@ -251,23 +332,177 @@ The following arguments are optional:
 \end{itemize}
 
 \subsection{Output}
-An example summary table looks like this in the R console:
+
+The output \texttt{data.frame} looks similar to one returned by the first two methods, with the exception of an additional \texttt{bnum2} variable. When \texttt{bnum=bnum2}, the latitude/longitude extent is encompassing a single blob.
+
 \begin{verbatim}
-            startdate             enddate duration_days start_centlat start_centlon end_centlat
-1 1980-12-01 00:00:00 1980-12-13 18:00:00         12.75          61.0         202.5        57.0
-2 1980-12-14 06:00:00 1980-12-29 18:00:00         15.50          43.5         239.5        57.0
-
-  end_centlon  dist_km zonal_dist_km zonal_speed_kph min_area  max_area avg_area bnum
-1       152.5 2825.715     2795.8618        9.136803 24503497 105945491 48812899    1
-2       144.0 6377.548     6282.5810       16.888658 13394293  93958976 48812899    2
-
-                         file
-1 ERA_1980_DJF_NP_Z_stats.txt
-2 ERA_1980_DJF_NP_Z_stats.txt
+           datehour minlat maxlat minlon maxlon centlat centlon    area   area_km var bnum bnum2
+1980-03-06 00:00:00     34     42    191    206    38.0   198.5 0.02822  14394019   Z    1     1
 \end{verbatim}
 
+When the two do not match, there are multiple blobs contained within the latitude/longitude extent of the original StitchBlobs output.
+
+\begin{verbatim}
+           datehour minlat maxlat minlon maxlon centlat centlon    area   area_km var bnum bnum2
+1980-03-08 18:00:00     39     45    136    156    42.0   146.0 0.02500  12751612   Z    1    13
+1980-03-08 18:00:00     32     51    194    222    41.5   208.0 0.07581  38667988   Z    1    12
+\end{verbatim}
+
+\section{Create a per-blob summary table}\label{summarysection}
+This utility reads in a data frame with per-timestep information and creates a table that provides per-blob information on quantities such a the blob's starting and ending centroid coordinates, the blob's duration in days, and others described in more detail below.  There is optional functionality to save the output to one of three file types (RData, text, or CSV). If desired, blobs which are comprised of multiple blobs that merge into a single blob are omitted.
+
+\subsection{Requirements}
+
+
+\subsection{Command line syntax}
+
+\begin{verbatim}
+Rscript --vanilla stitch_metric_framework.R [-st] [-nl or -nlst FILE]
+\end{verbatim}
+
+The following flags are required:
+\begin{itemize}
+\item[] \texttt{-st} (\texttt{--summarize})\\ Tell program to summarize each unique blob's data
+\item[]\texttt{-nl} (\texttt{--namelist}) or \texttt{-nlst} (\texttt{--namelistst}) \texttt{FILE}\\ Name of namelist file
+\end{itemize}
+
+\subsubsection{Required namelist variables}
+\begin{itemize}
+\item[]\texttt{nrun\_st}\\ Number of times to run \texttt{--summarize}
+\item[] \texttt{ftype\_st}\\ Input file type (\texttt{"R"}, \texttt{"text"}, or \texttt{"CSV"})
+\item[] \texttt{filename\_summ} or \texttt{filelist\_summ}\\ Single file or list of files containing  data from StitchBlobs (generated using either \texttt{--readfiles} or \texttt{--readtable})
+\item[] \texttt{keep\_merge}\\ Keep or omit blobs which are comprised of multiple blobs? If \texttt{TRUE}, all blobs are kept; if \texttt{FALSE}, blobs where the \texttt{merged} column has a value of \texttt{YES} are omitted from the output.
+\item[] \texttt{rfn\_summ, txt\_summ, csv\_summ}\\Optional output file names in RData, text, or CSV format (store the respective variable as a blank string to suppress output for that particular file format)
+\item[] \texttt{df\_summ}\\Optional variable name for the output data frame in the RData file. Defaults to \texttt{df\_summ} if string is left blank.
+\end{itemize}
+
+\subsection{Function syntax}
+To load this function in an interactive R session, do
+\begin{verbatim}
+source("summarize.R")
+desired_name<-gen_summary_table(df_in,...)
+\end{verbatim}
+
+which will summarize each unique blob in the input \texttt{data.frame} object and produce an output \texttt{data.frame} object with the variable name \texttt{desired\_name}. Note that \texttt{df\_in} will need to be created using either \texttt{read\_table} or \texttt{combine\_tables}.
+
+The following arguments are required:
+\begin{itemize}
+\item[] \texttt{df\_in}\\ Name of the input data frame (create using methods from Section \ref{readfiles} or \ref{combinetable}).
+\end{itemize}
+
+The following arguments are optional:
+\begin{itemize}
+\item[] \texttt{keep\_merge} \\ Default is \texttt{TRUE}; if set to \texttt{FALSE}, the final data table will not contain merged blobs.
+\item[] \texttt{rfn, textfn, csvfn}\\Strings specifying output file names for RData, text, and CSV file formats. If left blank, the function will merely return the \texttt{data.frame} object to the console.
+\end{itemize}
+
+\subsection{Output}
+An example summary table looks like this in the R console:
+\begin{verbatim}
+             startdate             enddate duration_days merged start_centlat
+1  1980-03-06 00:00:00 1980-03-14 12:00:00          8.50    YES          38.0
+2  1980-03-17 06:00:00 1980-03-26 00:00:00          8.75     NO          39.5
+
+   start_centlon end_centlat end_centlon   dist_km zonal_dist_km
+1          198.5        43.5       194.0  719.2533      379.0267
+2          204.0        39.0       208.5  391.4136      387.4485
+
+   zonal_speed_kph min_area  max_area avg_area var bnum
+1        1.8579740 12751612  75295717 32349835   Z    1
+2        1.8449929 15500859  35505588 32349835   Z    2
+\end{verbatim}
+
+\begin{itemize}
+\item[]\texttt{startdate, enddate}\\The date string in the format \texttt{YYYY-MM-DD HH:MM:SS}
+\item[] \texttt{duration\_days}\\ Number of days that block persists
+\item[] \texttt{merged}\\ Checks whether or not the block extent is the result of multiple blobs merging (see Section \ref{mergesection}). If this value is \texttt{YES}, then it is recommended to check the per-timestep information in order to see when and where the blobs merge, as well as how it affects the calculation of the block size and centroid.
+\item[] \texttt{start\_centlat, start\_centlon, end\_centlat, end\_centlon}\\ start and end coordinates of block centroid.
+\item[] \texttt{dist\_km}\\ Great circle distance from start to end coordinates.
+\item[] \texttt{zonal\_dist\_km} \\ Only the zonal component of the distance between the start and end coordinates (calculated using the start and end longitude coordinates of the centroid and the midpoint of the start and end latitude coordinates).
+\item[] \texttt{zonal\_speed\_kph} \\Average speed, in km/hr, of the block's movement. Calculated as distance over duration.
+\item[] \texttt{min\_area, max\_area, avg\_area} \\ Various information for the block size, in km$^2$
+\item[] \texttt{var}\\Algorithm name (as provided previously when reading in the BlobStats data)
+\item[] \texttt{bnum}\\ The block ID number from BlobStats (might differ from the ID number of DetectBlobs output)
+\end{itemize}
+
+
+\section{Reading in NetCDF data}
+
+This utility reads data from NetCDF files into arrays in R, combining data from multiple files if desired. There is an optional utility to read in only a geographical subset of the data, as well as the ability to save the specified variables to either a single NetCDF output file or an Rdata file.
+
+\subsection{Requirements}
+NetCDF files with the desired variables. Note that if reading multiple files into a single session, they should all contain the variables that are specified in the command line or function call, otherwise the utility will throw an exception. 
+
+If the dataset is very large, it might cause R to crash due to memory constraints (although this is dependent upon the available system memory--- this scenario is more likely to happen on personal computers). It is recommended to split the data up by time or regional subsets if this is likely to be a problem.
+
+\subsection{Command line syntax}
+
+\begin{verbatim}
+Rscript --vanilla stitch_metric_framework.R [-rn] [-nl or -nlrn FILE]
+\end{verbatim}
+
+The following flags are required:
+
+\begin{itemize}
+\item[] \texttt{-rn (--readnetcdf)}\\Tell program to read NetCDF data into R.
+\item[] \texttt{-fn (--filename)} or \texttt{-fl (--filelist) FILE}\\ Name of single file, or a text file containing a list of NetCDF files.
+\item[] \texttt{-vl (--varlist) VARLIST}\\ List of input variable names to be read into R, in the format \texttt{VAR1,VAR2,VAR3} with commas (but no spaces) separating the variable names.
+\end{itemize}
+
+
+\subsection{Function syntax}
+
+To load this function in an interactive R session, do\begin{verbatim}
+source("read_netCDF_to_R.R")
+vlist<-c("VAR1","VAR2","VAR3")
+vars_output<-read_netcdf(flist,vlist,...)
+\end{verbatim}
+
+The folllowing arguments are required:
+\begin{itemize}
+\item[] \texttt{flist}\\ Vector containing input NetCDF file names
+\item[] \texttt{vlist}\\Vector containing variable names that will be read into R
+\end{itemize}
+
+which will read all of the NetCDF variables into R matrices and return a \texttt{list} object with the name \texttt{vars\_output} containing all of the resulting output variables, as well as the axes for time, latitude, longitude, etc. 
+
+The following arguments are optional:
+\begin{itemize}
+\item[] \texttt{olist}\\ Vector containing variable names of output variables (default is the input variable list)
+\item[] \texttt{timename, levname, latname, lonname}\\ Names of the axis variables (defaults are \texttt{"time", "lev", "lat", "lon"})
+\item[] \texttt{minlat, maxlat, minlon, maxlon, minlev, maxlev}\\ Coordinates of lat/lon extent and vertical levels, if subsetting. Default is \texttt{NULL}.
+\item[]\texttt{ncout, rdataout}\\ Strings specifying output file names for NetCDF and RData file formats. If left blank, the function will return a \texttt{list} object that contains all of the variables. 
+\end{itemize}
+
+
+
+\subsection{Output}
+
+If neither \texttt{ncout} nor \texttt{rdataout} are specified, the function returns a \texttt{list} object (here named \texttt{vars\_output} as per the example).
+
+Each variable stored within \texttt{vars\_output} can be accessed via \texttt{vars\_output[["VAR"]]}. In order to turn the \texttt{vars\_output} object into distinct R variables that are accessible from the global environment, do the following:
+
+\begin{verbatim}
+list_variables<-names(vars_output)
+for (v in list_variables){
+    assign(v,vars_output[[v]])
+}
+remove(vars_output)
+\end{verbatim}
+\texttt{list\_variables} is a vector of names of all of the variables that are contained within \texttt{vars\_output}. This sequence of commands will store each variable in \texttt{vars\_output} in the global environment, then delete the \texttt{list} object (for space saving purposes).
+\subsubsection{NetCDF}
+The returned NetCDF will contain the variables specified by the user, with axes \texttt{time\_axis, lat\_axis, lon\_axis} and, optionally, \texttt{lev\_axis} (not all variables are on multiple vertical levels). Currently, the output NetCDF does not contain the metadata from the original file, although this might change in the future.
+
+\texttt{time\_axis} is in units of \texttt{hours since 1800-01-01 00:00} regardless of the original time units. 
+
+\subsubsection{RData}
+
+The RData file contains the axis variables (\texttt{time\_axis, lev\_axis, lat\_axis, lon\_axis}), a vector of string date times (\texttt{time\_format}), and the variables specified within the variable list. 
+
+\pagebreak
+
 \begin{appendix}
-\section{BlobStats File Format}
+\section{BlobStats File Format}\label{blobformat}
 Each BlobStats file is formatted as follows:\begin{itemize}
 \item[] Line 1: Date of first time step in format \texttt{YYYY-MM-DD}
 \item[] Line 2: Tab-separated column names 

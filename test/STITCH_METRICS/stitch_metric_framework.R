@@ -4,159 +4,295 @@ suppressPackageStartupMessages(require("argparse"))
 #Line #2: name of columns
 
 parser<-ArgumentParser()
-#Takes either a list or a single file
-#parser$add_argument("-v","--verbose",help="Print each table to the screen.",action="store_true")
-parser$add_argument("-fn","--filename",help="Name of input file",default="")
-parser$add_argument("-fl","--filelist",help="Name of input list of files",default="")
+#The namelist file provides all of the arguments
+#Either use the master namelist file or the individual namelist files
+parser$add_argument("-nl","--namelist",help="Master namelist for all flags.",default="")
+
 #Most basic function: read BlobStats output to a data table------
 parser$add_argument("-rf","--readfiles",help="Tell program to read in BlobStats data",action="store_true")
-#Currently: manually specify time resolution
-parser$add_argument("-th","--thourly",help="Time resolution (i.e. 6 for 6 hourly)",default="")
-parser$add_argument("-an","--algname",help="Type of blocking algorithm used",default="")
-parser$add_argument("--rtable",help="Name of output RData file for --readfiles or --readtable",default="")
-parser$add_argument("--texttable",help="Name of output text file for --readfiles or --readtable",default="")
-parser$add_argument("--csvtable",help="Name of output CSV file for --readfiles or --readtable",default="")
-
+parser$add_argument("-nlrf","--namelistrf",help="Namelist file name (mandatory) for --readfiles",default="")
+#parser$add_argument("-th","--thourly",help="Time resolution (i.e. 6 for 6 hourly)",default="")
 #Read in existing file(s) (need to specify type using one of above flags)--------
 parser$add_argument("-rt","--readtable",help="Read in existing data file(s) from previous --readfiles output",action="store_true")
-parser$add_argument("--isr",help="Tells --readtable that input is in RData format",action="store_true")
-parser$add_argument("--istext",help="Tells --readtable that input is in text format",action="store_true")
-parser$add_argument("--iscsv",help="Tells --readtable that input is in CSV format",action="store_true")
+parser$add_argument("-nlrt","--namelistrt",help="Namelist file name (mandatory) for --readtable",default="")
+#Merge StitchBlobs and DetectBlobs outputs--------
+parser$add_argument("-mt","--mergetable",help="Combine outputs from StitchBlobs and DetectBlobs into a table with individual blob information",action="store_true")
+parser$add_argument("-nlmt","--namelistmt",help="Namelist file name (mandatory) for --mergetable",default="")
 #Make a summary table----------
 parser$add_argument("-st","--summarize",help="Make a summary table of the BlobStats data",action="store_true")
-parser$add_argument("--rsumm",help="Name of output RData file for --summarize",default="")
-parser$add_argument("--textsumm",help="Name of output text file for --summarize",default="")
-parser$add_argument("--csvsumm",help="Name of output CSV file for --summarize",default="")
+parser$add_argument("-nlst","--namelistst",help="Namelist file name (mandatory) for --summarize",default="")
 #Read in NetCDFs----------
 parser$add_argument("-rn","--readnetcdf",help="Read in NetCDF files",action="store_true")
-parser$add_argument("-vl","--varlist",help="List of input NetCDF variable(s) in format VAR1,VAR2,VAR3 (no spaces between commas)",default="")
-parser$add_argument("-ovl","--outvarlist",help="Optional list of output variable names corresponding to --varlist inputs",default="")
-parser$add_argument("--outnetcdf",help="Name of output NetCDF file for --readnetcdf",default="")
-parser$add_argument("--outrdata",help="Name of output RData file for --readnetcdf",default="")
-parser$add_argument("--subset",help="Subset the lat/lon extent",action="store_true")
-parser$add_argument("--minlat",help="Minimum latitude value",default=NULL)
-parser$add_argument("--maxlat",help="Maximum latitude value",default=NULL)
-parser$add_argument("--minlon",help="Leftmost longitude value",default=NULL)
-parser$add_argument("--maxlon",help="Rightmost longitude value",default=NULL)
-parser$add_argument("--minlev",help="Minimum level value",default=NULL)
-parser$add_argument("--maxlev",help="Maximum level value",default=NULL)
-parser$add_argument("--timename",help="Name of NetCDF time variable",default="time")
-parser$add_argument("--levname",help="Name of NetCDF level variable",default="lev")
-parser$add_argument("--latname",help="Name of NetCDF latitude variable",default="lat")
-parser$add_argument("--lonname",help="Name of NetCDF longitude variable",default="lon")
+parser$add_argument("-nlrn","--namelistrn",help="Namelist file name (mandatory) for --readnetcdf",default="")
+
 #Combine Rdata files into a single Rdata file
 #parser$add_argument("-cd","--combinedata",help="Combine RData files into a single output RData file",action="store_true")
 
 #Intercomparison of datasets---------
-parser$add_argument("-pr","--probability",help="Probability of co-occurrence between two .",default="")
+parser$add_argument("-ps","--probsim",help="Probability of co-occurrence between two datasets and spatial similarity between individual blobs.",action="store_true")
+
 
 #NOW PARSE ALL THE ARGUMENTS--------------
 args<-parser$parse_args()
 
-#Data frames for holding the info
-df_data<-data.frame(NULL)
-df_summ<-data.frame(NULL)
-list_vars<-list()
-#MOST BASIC OPTION: PARSE BLOBSTATS---------
-if (args$readfiles){
-  source("read_stitch.R")
-  if (args$filename=="" & args$filelist==""){
-    stop("Need to either provide a filename (-fn) or list of filenames (-fl).")
-  }
-  if (args$thourly==""){
-    stop("Need to provide time resolution (-th).")
-  }
-
-  #Vector to hold the BlobStats filenames
-  blobstats_vec<-c()
-  #Number of time steps
-  nhrs<-as.numeric(args$thourly)
-
-  #Single file
-  if (args$filename!=""){
-    blobstats_vec<-c(args$filename)
-  }
-  #List of files
-  if (args$filelist!=""){
-    fns<-readLines(args$filelist)
-    blobstats_vec<-c(blobstats_vec,fns)
-  }
-  df_data<-read_stats_to_table(blobstats_vec,nhrs,args$algname,
-                               args$rtable,args$texttable,args$csvtable)
+parse_namelist<-function(var,i){
+  var_out<-ifelse(length(var)==1,var,var[i])
+  return(var_out)
 }
+#MOST BASIC OPTION: PARSE BLOBSTATS---------
+#This will read input from StitchBlobs, input from DetectBlobs, or both
+if (args$readfiles){
+  if (args$namelistrf=="" & args$namelist==""){
+    stop("Must provide the namelist file for --readfiles.")
+  }
+  
+  nl_readfiles<-ifelse(args$namelistrf!="",args$namelistrf,args$namelist)
+  source(nl_readfiles)
+  setwd(work_dir)
+  
+  source("readfiles.R")
+
+  for (i in 1:nrun_rf){
+    
+    nhrs_i<-nhrs[i]
+    varname_i<-parse_namelist(varname,i)
+    filename_stitchblobs_i<-parse_namelist(filename_stitchblobs,i)
+    filelist_stitchblobs_i<-parse_namelist(filelist_stitchblobs,i)
+    rfn_stitch_i<-parse_namelist(rfn_stitch,i)
+    df_stitchname_i<-parse_namelist(df_stitchname,i)
+    txt_stitch_i<-parse_namelist(txt_stitch,i)
+    csv_stitch_i<-parse_namelist(csv_stitch,i)
+    
+    if (filename_stitchblobs_i=="" & filelist_stitchblobs_i==""){
+      stop("Need to either provide a filename (filename_stitchblobs) or list of filenames (filelist_stitchblobs) in the namelist.")
+    }
+    
+    #Vector to hold the BlobStats filenames
+    blobstats_vec<-c()
+    #Single file
+    if (filename_stitchblobs_i!=""){
+      blobstats_vec<-c(filename_stitchblobs_i)
+    }
+    #List of files
+    if (filelist_stitchblobs_i!=""){
+      fns<-readLines(filelist_stitchblobs_i)
+      blobstats_vec<-c(blobstats_vec,fns)
+    }
+    df_stitch<-read_stats_to_table(blobstats_vec,nhrs_i,varname_i,
+                                   rfn_stitch_i,txt_stitch_i,csv_stitch_i,
+                                   df_stitchname_i)
+  }
+
+  
+}
+
 
 #READ IN EXISTING DATA FROM PREVIOUS SESSION (FORMATTED USING ABOVE TOOL)-----
 if (args$readtable){
-  if (!args$rfile && !args$textfile && !args$csvfile){
-    stop("Need to specify the format of the input data: RData (--rfile), text (--textfile), or CSV (--csvfile)")
+  
+  if (args$namelistrt=="" & args$namelist==""){
+    stop("Must provide the namelist file for --readtable.")
   }
-  if (args$filename=="" & args$filelist==""){
-    stop("Need to either provide a filename (-fn) or list of filenames (-fl).")
-  }
-  dat_vec<-c()
-  #Single file
-  if (args$filename!=""){
-    dat_vec<-c(args$filename)
-  }
-  #List of files
-  if (args$filelist!=""){
-    fns<-readLines(args$filelist)
-    dat_vec<-c(dat_vec,fns)
+  nl_readtable<-ifelse(args$namelistrt!="",args$namelistrt,args$namelist)
+  source(nl_readtable)
+  setwd(work_dir)
+  source("readtable.R")
+  
+  for (i in 1:nrun_rt){
+    ftype_rt_i=parse_namelist(ftype_rt,i)
+    filename_read_i<-parse_namelist(filename_read,i)
+    filelist_read_i<-parse_namelist(filelist_read,i)
+    rfn_combine_i<-parse_namelist(rfn_combine,i)
+    df_combinename_i<-parse_namelist(df_combinename,i)
+    txt_combine_i<-parse_namelist(txt_combine,i)
+    csv_combine_i<-parse_namelist(csv_combine,i)
+    
+    if (filename_read_i=="" & filelist_read_i==""){
+      stop("Need to either provide a filename (filename_read) or list of filenames (filelist_read) in the namelist.")
+    }
+    
+    dat_vec<-c()
+    #Single file
+    if (filename_read_i!=""){
+      dat_vec<-c(filename_read_i)
+    }
+    #List of files
+    if (filelist_read_i!=""){
+      fns<-readLines(filelist_read_i)
+      dat_vec<-c(dat_vec,fns)
+    }
+    
+    
+    #Read all files into a single large dataframe
+    df_data<-combine_dfs(dat_vec,ftype_rt_i,
+                         rfn_combine_i,txt_combine_i,csv_combine_i,
+                         df_combinename_i)
   }
   
-  ftype=""
-  if (args$isr){
-    ftype="R"
-  }else if (args$iscsv){
-    ftype="CSV"
-  }else if (args$istext){
-    ftype="text"
-  }
-  #Read all files into a single large dataframe
-  source("combine_tables.R")
-  df_data<-combine_dfs(dat_vec,ftype,args$rtable,args$texttable,args$csvtable)
-
 }
-#print(ncol(df_data))
+
+#MERGE STITCHBLOBS AND DETECTBLOBS OUTPUTS----------
+if (args$mergetable){
+  if (args$namelistmt=="" & args$namelist==""){
+    stop("Must provide the namelist file for --mergetable.")
+  }
+  
+  nl_mergetable<-ifelse(args$namelistmt!="",args$namelistmt,args$namelist)
+  source(nl_mergetable)
+  setwd(work_dir)
+  source("readtable.R")
+  source("mergetable.R")
+  for (i in 1:nrun_mt){
+    ftype_mt_i=parse_namelist(ftype_mt,i)
+    stitch_file_i<-parse_namelist(stitch_file,i)
+    detect_file_i<-parse_namelist(detect_file,i)
+    stitch_list_i<-parse_namelist(stitch_list,i)
+    detect_list_i<-parse_namelist(detect_list,i)
+    rfn_merged_i<-parse_namelist(rfn_merged,i)
+    df_merged_i<-parse_namelist(df_merged,i)
+    txt_merged_i<-parse_namelist(txt_merged,i)
+    csv_merged_i<-parse_namelist(csv_merged,i)
+    if (stitch_file_i=="" & stitch_list_i=="" ){
+      stop("Need to provide input StitchBlobs data.")
+    }
+    if (detect_file_i=="" & detect_list_i==""){
+      stop("Need to provide input DetectBlobs data.")
+    }
+    
+    #Make a list of the StitchBlobs files
+    stitchvec<-c()
+    if (stitch_file_i!=""){
+      stitchvec<-c(stitch_file_i)
+    }
+    if (stitch_list_i!=""){
+      fns<-readLines(stitch_list_i)
+      stitchvec<-c(stitchvec,fns)
+    }
+    detectvec<-c()
+    if (detect_file_i!=""){
+      detectvec<-c(detect_file_i)
+    }
+    if (detect_list_i!=""){
+      fns<-readLines(detect_list_i)
+      detectvec<-c(detectvec,fns)
+    }
+    if (length(stitchvec)<1 | length(detectvec)<1){
+      stop("Need to provide files from both StitchBlobs and DetectBlobs.")
+    }
+    
+    #Use the readtable function to load the data
+    
+    df_stitch<-combine_dfs(stitchvec,ftype_mt_i)
+    df_detect<-combine_dfs(detectvec,ftype_mt_i)
+    
+    df_merged<-merge_dfs(df_stitch,df_detect,rfn_merged_i,txt_merged_i,csv_merged_i,df_merged_i)
+    
+  }
+}
+
 #DATA PROCESSING: GENERATE SUMMARY TABLE-----
 if (args$summarize){
-  source("summ_table.R")
-  if (ncol(df_data)<1){
-    stop("Need to either read in BlobStats data (-rf) or an existing table (-rt)")
+  if (args$namelistst=="" & args$namelist==""){
+    stop("Must provide the namelist file for --summarize.")
   }
-  df_summ<-gen_summary_table(df_data,args$rsumm,args$textsumm,args$csvsumm)
+  
+  nl_summarize<-ifelse(args$namelistst!="",args$namelistst,args$namelist)
+  source(nl_summarize)
+  setwd(work_dir)
+  source("readtable.R")
+  source("summarize.R")
+  
+  for (i in 1:nrun_st){
+    df_input_summ<-data.frame(NULL)
+    
+    nrun_st_i<-parse_namelist(nrun_st,i)
+    ftype_st_i<-parse_namelist(ftype_st,i)
+    filename_summ_i<-parse_namelist(filename_summ,i)
+    filelist_summ_i<-parse_namelist(filelist_summ,i)
+    keepmerge_i<-parse_namelist(keepmerge,i)
+    rfn_summ_i<-parse_namelist(rfn_summ,i)
+    df_summ_i<-parse_namelist(df_summ,i)
+    txt_summ_i<-parse_namelist(txt_summ,i)
+    csv_summ_i<-parse_namelist(csv_summ,i)
+    
+
+      #Read in the existing data using combine_tables
+      #Create the file list
+      if (filename_summ_i=="" & filelist_summ_i==""){
+        stop("Need to provide either a filename (filename_summ) or a file list (filelist_summ) for --summarize.")
+      }
+      dat_vec<-c()
+      #Single file
+      if (filename_summ_i!=""){
+        dat_vec<-c(filename_summ_i)
+      }
+      #List of files
+      if (filelist_summ_i!=""){
+        fns<-readLines(filelist_summ_i)
+        dat_vec<-c(dat_vec,fns)
+      }
+      
+
+      df_input_summ<-combine_dfs(dat_vec,ftype_st_i)
+      df_summ<-gen_summary_table(df_input_summ,keepmerge_i,
+                                 rfn_summ_i,txt_summ_i,csv_summ_i,df_summ_i)
+  }
+
 }
-#READ IN NETCDFS FOR BLOBS, Z500, ETC-------
-#Either saves to RData or NetCDF
+
+#READ IN NETCDF DATA----------
 if (args$readnetcdf){
-  if (args$filename=="" & args$filelist==""){
-    stop("Need to specify either a file name (-fn) or file list (-fl) of netCDF files to read in.")
+  if (args$namelistrn=="" & args$namelist==""){
+    stop("Must provide the namelist file for --readnetcdf.")
   }
-
-  nlist<-c()
-  if (args$filename!=""){
-    nlist<-c(nlist,args$filename)
-  }
-  if (args$filelist!=""){
-    fns<-readLines(args$filelist)
-    nlist<-c(nlist,fns)
-  }
-  if (args$varlist==""){
-    stop("Need to specify the variable names of interest (-vl).")
-  }
-  vvec<-unlist(strsplit(args$varlist,split=","))
-  if (args$outvarlist!=""){
-    ovec<-unlist(strsplit(args$outvarlist,split=","))
-    if (length(vvec)!=length(ovec)){
-      stop("The length of the two variables lists does not match. Check --varlist and --outvarlist inputs.")
+  
+  nl_readnetcdf<-ifelse(args$namelistrn!="",args$namelistrn,args$namelist)
+  source(nl_readnetcdf)
+  setwd(work_dir)
+  source("readnetcdf.R")
+  for (i in 1:nrun_rn){
+    filename_netcdf_i<-parse_namelist(filename_netcdf,i)
+    filelist_netcdf_i<-parse_namelist(filelist_netcdf,i)
+    varvec_i<-unlist(parse_namelist(varvec,i))
+    outvec_i<-unlist(parse_namelist(outvec,i))
+    outrdata_i<-parse_namelist(outrdata,i)
+    outnetcdf_i<-parse_namelist(outnetcdf,i)
+    timename_i<-parse_namelist(timename,i)
+    levname_i<-parse_namelist(levname,i)
+    latname_i<-parse_namelist(latname,i)
+    lonname_i<-parse_namelist(lonname,i)
+    minlat_i<-parse_namelist(minlat,i)
+    maxlat_i<-parse_namelist(maxlat,i)
+    minlon_i<-parse_namelist(minlon,i)
+    maxlon_i<-parse_namelist(maxlon,i)
+    minlev_i<-parse_namelist(minlev,i)
+    maxlev_i<-parse_namelist(maxlev,i)
+    
+    if (filename_netcdf_i=="" & filelist_netcdf_i==""){
+      stop("Need to either provide a filename (filename_netcdf) or list of filenames (filelist_netcdf).")
     }
-  }else{
-    ovec<-vvcec
+    
+    dat_vec<-c()
+    #Single file
+    if (filename_netcdf_i!=""){
+      dat_vec<-c(filename_netcdf_i)
+    }
+    #List of files
+    if (filelist_netcdf_i!=""){
+      fns<-readLines(filelist_netcdf_i)
+      dat_vec<-c(dat_vec,fns)
+    }
+    
+    if (length(varvec_i)!=length(outvec_i)){
+      stop("Length of variable lists for inputs and outputs differ. Check input and output variable list strings.")
+    }
+    
+    vars_list<-read_netcdf(dat_vec,varvec,outvec,timename,levname,latname,lonname,
+                           minlat,maxlat,minlon,maxlon,
+                           minlev,maxlev,outnetcdf,outrdata)
+    
   }
-  #Read the NetCDF files to the workspace (or save to RData)
-  source("read_netCDF_to_R.R")
-  list_vars<-read_netcdf(nlist,vvec,ovec,args$timename,args$levname,args$latname,args$lonname,args$subset,args$minlat,args$maxlat,
-              args$minlon,args$maxlon,args$minlev,args$maxlev,args$outnetcdf,args$outrdata)
+  
+
+
 }
-
-
