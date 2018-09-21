@@ -34,6 +34,8 @@ gen_summary_table<-function(df_in,keep_merge=TRUE,
       for (b in unique(dsub$bnum)){
         dsub2<-df_in[(df_in$file==f & df_in$bnum==b & df_in$var==v),]
         dsub2<-dsub2[order(dsub2$datehour),]
+        
+        nhrs<-as.numeric(strftime(dsub2[2,"datehour"],format="%H"))-as.numeric(strftime(dsub2[1,"datehour"],format="%H"))
         merged_blob<-FALSE
         if (!is.null(dsub2$bnum2)){
           #Check if there are any instances in which bnum!=bnum2
@@ -52,8 +54,8 @@ gen_summary_table<-function(df_in,keep_merge=TRUE,
         diff_days<-as.numeric(difftime(as.Date(eline[1,"datehour"]),as.Date(sline[1,"datehour"]),units="days"))
         hs<-as.numeric(strftime(sline[1,"datehour"],format="%H"))
         he<-as.numeric(strftime(eline[1,"datehour"],format="%H"))
-        hdiff<-(he-hs)/24
-        df_summ[nline,"duration_days"]<-diff_days+hdiff
+        hdiff<-(he-hs + nhrs)/24
+        df_summ[nline,"duration_days"]<-diff_days+(hdiff)
         df_summ[nline,"merged"]<-ifelse(merged_blob==FALSE,"NO","YES")
         if (!is.null(dsub2$centlat) & !is.null(dsub2$centlon)){
           df_summ[nline,"start_centlat"]<-sline[1,"centlat"]

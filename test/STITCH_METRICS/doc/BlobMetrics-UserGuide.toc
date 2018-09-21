@@ -30,8 +30,9 @@
 \contentsline {section}{\numberline {7}Reading in NetCDF data}{13}
 \contentsline {subsection}{\numberline {7.1}Requirements}{13}
 \contentsline {subsection}{\numberline {7.2}Command line syntax}{14}
-\contentsline {subsection}{\numberline {7.3}Function syntax}{14}
+\contentsline {subsubsection}{\numberline {7.2.1}Required namelist variables}{14}
+\contentsline {subsection}{\numberline {7.3}Function syntax}{15}
 \contentsline {subsection}{\numberline {7.4}Output}{15}
-\contentsline {subsubsection}{\numberline {7.4.1}NetCDF}{15}
-\contentsline {subsubsection}{\numberline {7.4.2}RData}{15}
-\contentsline {section}{\numberline {A}BlobStats File Format}{16}
+\contentsline {subsubsection}{\numberline {7.4.1}NetCDF}{16}
+\contentsline {subsubsection}{\numberline {7.4.2}RData}{16}
+\contentsline {section}{\numberline {A}BlobStats File Format}{17}

@@ -156,21 +156,6 @@ prob_calc<-function(df,dfo,V1,V2){
   return(c(p1given2,p2given1))
 }
 
-# similarity_per_time<-function(df,dfo,V1,V2){
-#   for (d in sort(unique(dfo$datehour))){
-#     dfo_sub<-dfo[dfo$datehour==d,]
-#     df1_sub<-df[df$datehour==d & df$var==V1,]
-#     df2_sub<-df[df$datehour==d & df$var==V2,]
-#     nd1<-nrow(df1_sub)
-#     nd2<-nrow(df2_sub)
-#     V1b<-length(unique(dfo_sub$V1bnum2))
-#     V2b<-length(unique(dfo_sub$V2bnum2))
-#     #If there 
-#     if (nd1!=V1b | nd2!=V2b){
-#       print(sprintf("at %s df has %d for V1 and %d for V2, dfo has %d for V1 and %d for V2",d,nd1,nd2,V1b,V2b))
-#     }
-#   }
-# }
 
 #This function looks at overlaps between blobs that came from different StitchBlobs outputs
 #at the same time step. Requires 2 distinct variable names in the var column for the df

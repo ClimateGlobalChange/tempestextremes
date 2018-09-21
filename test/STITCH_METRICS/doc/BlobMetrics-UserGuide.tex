@@ -445,10 +445,23 @@ The following flags are required:
 
 \begin{itemize}
 \item[] \texttt{-rn (--readnetcdf)}\\Tell program to read NetCDF data into R.
-\item[] \texttt{-fn (--filename)} or \texttt{-fl (--filelist) FILE}\\ Name of single file, or a text file containing a list of NetCDF files.
-\item[] \texttt{-vl (--varlist) VARLIST}\\ List of input variable names to be read into R, in the format \texttt{VAR1,VAR2,VAR3} with commas (but no spaces) separating the variable names.
+\item[]\texttt{-nl} (\texttt{--namelist}) or \texttt{-nlrn} (\texttt{--namelistrn}) \texttt{FILE}\\ Name of namelist file
 \end{itemize}
 
+\subsubsection{Required namelist variables}
+\begin{itemize}
+\item[] \texttt{nrun\_rn}\\ Number of times to run \texttt{--readnetcdf}
+\item[] \texttt{filename\_netcdf} or \texttt{filelist\_netcdf} Single NetCDF file name or list of NetCDF file names
+\item[] \texttt{varvec}\\ Vector of variable names to be read to R in the format \texttt{c("VAR1","VAR2","VAR3"...)}
+\item[] \texttt{outvec}\\ Vector of output variable names (must be same length as \texttt{varvec}
+\item[] \texttt{outrdata, outnetcdf}\\ Optional output file names in RData or NetCDF format
+\item[] \texttt{timename}\\Name of time axis
+\item[] \texttt{levname}\\Name of vertical axis
+\item[] \texttt{latname}\\Name of latitude axis
+\item[] \texttt{lonname} \\Name of longitude axis
+\item[] \texttt{minlat, maxlat, minlon, maxlon} \\ subsetting boundaries for horizontal (lat/lon) direction; if not subsetting, set variable to blank string (\texttt{""})
+\item[] \texttt{minlev,maxlev}\\ If applicable, subsetting boundaries for the vertical axis. If subsetting to a single level (i.e. 500 mb) set both \texttt{minlev} and \texttt{maxlev} to that value. If vertical axis doesn't exist, set variable to blank string (\texttt{""})
+\end{itemize}
 
 \subsection{Function syntax}
 
@@ -470,7 +483,7 @@ The following arguments are optional:
 \begin{itemize}
 \item[] \texttt{olist}\\ Vector containing variable names of output variables (default is the input variable list)
 \item[] \texttt{timename, levname, latname, lonname}\\ Names of the axis variables (defaults are \texttt{"time", "lev", "lat", "lon"})
-\item[] \texttt{minlat, maxlat, minlon, maxlon, minlev, maxlev}\\ Coordinates of lat/lon extent and vertical levels, if subsetting. Default is \texttt{NULL}.
+\item[] \texttt{minlat, maxlat, minlon, maxlon, minlev, maxlev}\\ Coordinates of lat/lon extent and vertical levels, if subsetting. 
 \item[]\texttt{ncout, rdataout}\\ Strings specifying output file names for NetCDF and RData file formats. If left blank, the function will return a \texttt{list} object that contains all of the variables. 
 \end{itemize}
 

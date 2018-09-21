@@ -7,6 +7,8 @@ parser<-ArgumentParser()
 #The namelist file provides all of the arguments
 #Either use the master namelist file or the individual namelist files
 parser$add_argument("-nl","--namelist",help="Master namelist for all flags.",default="")
+#Does ALL the functions-- generates a report output
+parser$add_argument("-gr","--generatereport",help="Create a report for dataset intercomparison. Runs all functions and produces a summary file.",action="store_true")
 
 #Most basic function: read BlobStats output to a data table------
 parser$add_argument("-rf","--readfiles",help="Tell program to read in BlobStats data",action="store_true")
@@ -24,13 +26,9 @@ parser$add_argument("-nlst","--namelistst",help="Namelist file name (mandatory) 
 #Read in NetCDFs----------
 parser$add_argument("-rn","--readnetcdf",help="Read in NetCDF files",action="store_true")
 parser$add_argument("-nlrn","--namelistrn",help="Namelist file name (mandatory) for --readnetcdf",default="")
-
-#Combine Rdata files into a single Rdata file
-#parser$add_argument("-cd","--combinedata",help="Combine RData files into a single output RData file",action="store_true")
-
 #Intercomparison of datasets---------
 parser$add_argument("-ps","--probsim",help="Probability of co-occurrence between two datasets and spatial similarity between individual blobs.",action="store_true")
-
+parser$add_argument("-nlps","--namelistps",help="Namelist file name (mandatory) for --probsim",default="")
 
 #NOW PARSE ALL THE ARGUMENTS--------------
 args<-parser$parse_args()
@@ -267,7 +265,7 @@ if (args$readnetcdf){
     maxlon_i<-parse_namelist(maxlon,i)
     minlev_i<-parse_namelist(minlev,i)
     maxlev_i<-parse_namelist(maxlev,i)
-    
+
     if (filename_netcdf_i=="" & filelist_netcdf_i==""){
       stop("Need to either provide a filename (filename_netcdf) or list of filenames (filelist_netcdf).")
     }
@@ -287,12 +285,58 @@ if (args$readnetcdf){
       stop("Length of variable lists for inputs and outputs differ. Check input and output variable list strings.")
     }
     
-    vars_list<-read_netcdf(dat_vec,varvec,outvec,timename,levname,latname,lonname,
-                           minlat,maxlat,minlon,maxlon,
-                           minlev,maxlev,outnetcdf,outrdata)
+    vars_list<-read_netcdf(dat_vec,varvec_i,outvec_i,timename_i,levname_i,latname_i,lonname_i,
+                           minlat_i,maxlat_i,minlon_i,maxlon_i,
+                           minlev_i,maxlev_i,outnetcdf_i,outrdata_i)
     
   }
   
-
-
 }
+
+if (args$probsim){
+  if (args$namelistps=="" & args$namelist==""){
+    stop("Must provide the namelist file for --readnetcdf.")
+  }
+  
+  nl_prob<-ifelse(args$namelistps!="",args$namelistps,args$namelist)
+  source(nl_prob)
+  setwd(work_dir)
+  source("probsim.R")
+  for (i in 1:nrun_ps){
+    table_file_1_i<-parse_namelist(table_file_1,i)
+    table_file_2_i<-parse_namelist(table_file_2,i)
+    df_name_1_i<-parse_namelist(df_name_1,i)
+    df_name_2_i<-parse_namelist(df_name_2,i)
+    blob_file_1_i<-parse_namelist(blob_file_1,i)
+    blob_file_2_i<-parse_namelist(blob_file_2,i)
+    var_name_1_i<-parse_namelist(var_name_1,i)
+    var_name_2_i<-parse_namelist(var_name_2,i)
+    #Load the files-- careful not to overwrite!
+    load(table_file_1_i)
+    df1<-get(df_name_1_i)
+    df2<-NULL
+    if (table_file_2_i!=""){
+      load(table_file_2_i)
+      df2<-get(df_name_2_i)
+    }
+    #Load the blob files
+    #File 1
+    load(blob_file_1_i)
+    blob1<-get(var_name_1_i)
+    lat1<-lat_axis
+    lon1<-lon_axis
+    time1<-time_format
+    #File 2
+    load(blob_file_2_i)
+    blob2<-get(var_name_2_i)
+    lat2<-lat_axis
+    lon2<-lon_axis
+    time2<-time_format
+    
+    probs_and_sim<-
+    
+  }
+  
+}
+
+#Distribution of z500 anomalies, speed, duration, distance, 

@@ -68,6 +68,8 @@ df_merged<-"df_merged_ERA_MERRA"
 txt_merged<-""
 csv_merged<-""
 
+#THIS IS AN EXAMPLE OF A NAMELIST SECTION WHERE SUMMARIZE IS USED
+# TO SUMMARIZE THE MERGETABLE OUTPUT FROM THE PREVIOUS SECTION
 #SUMMARIZE----------
 nrun_st<-1
 ftype_st<-"R"
@@ -107,10 +109,13 @@ timename<-"time"
 levname<-"lev"
 latname<-"lat"
 lonname<-"lon"
+#Since this is in the Pacific, we want the longitude range to be in the 0 to 360 range
+#MERRA has a longitude axis from -180 to 180 while ERA has a longitude axis from 0 to 360
+transformto180<-FALSE
+transformto360<-TRUE
 minlat<-25
 maxlat<-75
 minlon<-130
-#MERRA goes from -180 to 180, ERA goes from 0 to 360!
-maxlon<-c(-90,270,270)
+maxlon<-270
 minlev<-c("","",500)
 maxlev<-c("","",500)

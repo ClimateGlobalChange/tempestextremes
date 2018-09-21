@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015) (preloaded format=pdflatex 2015.11.17)  4 SEP 2018 17:15
+This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015) (preloaded format=pdflatex 2015.11.17)  4 SEP 2018 18:19
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -334,31 +334,31 @@ Overfull \hbox (34.52515pt too wide) in paragraph at lines 349--349
 8.0 0.07581  38667988   Z    1    12[] 
  []
 
-[11] [12] [13] [14] [15]
-Overfull \hbox (113.27446pt too wide) in paragraph at lines 524--524
+[11] [12] [13] [14] [15] [16]
+Overfull \hbox (113.27446pt too wide) in paragraph at lines 537--537
 []\OT1/cmtt/m/n/10 1       50.00000        74.00000        187.00000       222.
 00000       62.00000        204.50000       0.00898[] 
  []
 
 
-Overfull \hbox (113.27446pt too wide) in paragraph at lines 524--524
+Overfull \hbox (113.27446pt too wide) in paragraph at lines 537--537
 []\OT1/cmtt/m/n/10 2       45.00000        75.00000        139.00000       226.
 00000       60.00000        182.50000       0.01230[] 
  []
 
 
-Overfull \hbox (113.27446pt too wide) in paragraph at lines 524--524
+Overfull \hbox (113.27446pt too wide) in paragraph at lines 537--537
 []\OT1/cmtt/m/n/10 53      39.00000        48.00000        226.00000       253.
 00000       43.50000        239.50000       0.00456[] 
  []
 
 
-Overfull \hbox (113.27446pt too wide) in paragraph at lines 524--524
+Overfull \hbox (113.27446pt too wide) in paragraph at lines 537--537
 []\OT1/cmtt/m/n/10 54      36.00000        49.00000        221.00000       254.
 00000       42.50000        237.50000       0.00751[] 
  []
 
-[16] (./BlobMetrics-UserGuide.aux) ) 
+[17] (./BlobMetrics-UserGuide.aux) ) 
 Here is how much of TeX's memory you used:
  2422 strings out of 493054
  33140 string characters out of 6134759
@@ -374,10 +374,10 @@ e1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2015/texmf-dist/fonts/type1
 /public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2015/texmf-dist/fonts/type1/pu
 blic/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2015/texmf-dist/fonts/type1/pub
 lic/amsfonts/cm/cmtt10.pfb>
-Output written on BlobMetrics-UserGuide.pdf (16 pages, 122997 bytes).
+Output written on BlobMetrics-UserGuide.pdf (17 pages, 124027 bytes).
 PDF statistics:
- 80 PDF objects out of 1000 (max. 8388607)
- 55 compressed objects within 1 object stream
+ 83 PDF objects out of 1000 (max. 8388607)
+ 57 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 500000)
  1 words of extra memory for PDF output out of 10000 (max. 10000000)
 

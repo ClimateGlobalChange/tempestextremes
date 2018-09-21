@@ -7,15 +7,31 @@ options(warn=-1)
 #The output is either 1) RData file with variable names that correspond to the original
 #2) A NetCDF file
 
-read_netcdf<-function(flist,vlist,olist=vlist,timename="time",levname="lev",latname="lat",lonname="lon",
-	minlat="",maxlat="",minlon="",maxlon="",minlev="",maxlev="",ncout="",rdataout=""){
+#Returns in the -180->180 range
+lon_convert<-function(lon){
+  distFrom180=lon-180.
+  return(ifelse(
+    distFrom180<0,
+    lon,
+    -(180-distFrom180)
+  ))
+}
+#Returns in the 0->360 range
+lon_convert2<-function(lon){
+  return(ifelse(lon<0,360+lon,lon))
+}
 
-  minlat<-ifelse(minlat=="",NULL,as.numeric(minlat))
-  maxlat<-ifelse(maxlat=="",NULL,as.numeric(maxlat))
-  minlon<-ifelse(minlon=="",NULL,as.numeric(minlon))
-  maxlon<-ifelse(maxlon=="",NULL,as.numeric(maxlon))
-  minlev<-ifelse(minlev=="",NULL,as.numeric(minlev))
-  maxlev<-ifelse(maxlev=="",NULL,as.numeric(maxlev))
+read_netcdf<-function(flist,vlist,olist=vlist,timename="time",levname="lev",latname="lat",lonname="lon",
+	minlat="",maxlat="",minlon="",maxlon="",minlev="",maxlev="",ncout="",rdataout="",
+	transformto180=FALSE,transformto360=FALSE){
+
+  minlat<-ifelse(minlat=="",NA,as.numeric(minlat))
+
+  maxlat<-ifelse(maxlat=="",NA,as.numeric(maxlat))
+  minlon<-ifelse(minlon=="",NA,as.numeric(minlon))
+  maxlon<-ifelse(maxlon=="",NA,as.numeric(maxlon))
+  minlev<-ifelse(minlev=="",NA,as.numeric(minlev))
+  maxlev<-ifelse(maxlev=="",NA,as.numeric(maxlev))
 	#Create a time axis for appending subsequent values
 	#time_axis<-c()
 	time_format<-c()
@@ -61,12 +77,17 @@ read_netcdf<-function(flist,vlist,olist=vlist,timename="time",levname="lev",latn
 		if (lat[1]-lat[2]>0){
 			POSTOP<-TRUE
 		}
-		
+		if (transformto180==TRUE){
+		  lon<-lon_convert(lon)
+		}
+		if (transformto360==TRUE){
+		  lon<-lon_convert2(lon)
+		}
 		#if (subset==TRUE){
 #			if (is.null(minlat) | is.null(maxlat) | is.null(minlon) | is.null(maxlon)){
 				#stop("Need to specify lat/lon boundaries for subset option.")
 #			}
-		if (is.null(minlat) & is.null(maxlat)){
+		if (is.na(minlat) & is.na(maxlat)){
 		  bi<-1
 		  ti<-length(lat)
 		}else{
@@ -81,7 +102,7 @@ read_netcdf<-function(flist,vlist,olist=vlist,timename="time",levname="lev",latn
 		lat_axis<-lat[lat_inds]
 		#print(lat_axis)
 		
-		if (is.null(minlon) & is.null(maxlon)){
+		if (is.na(minlon) & is.na(maxlon)){
 		  li<-1
 		  ri<-length(lon)
 		}else{
@@ -105,7 +126,7 @@ read_netcdf<-function(flist,vlist,olist=vlist,timename="time",levname="lev",latn
 		#Check if lev_axis is in the list of saved names
 		levpos<-which(saved_names=="lev_axis")
 		if (length(levpos)>0){
-		  if (!is.null(minlev) & !is.null(maxlev)){
+		  if (!is.na(minlev) & !is.na(maxlev)){
 		    #print(sprintf("subsetting level axis from %s to %s",minlev,maxlev))
 		    l1<-which(lev==minlev)
 		    l2<-which(lev==maxlev)
