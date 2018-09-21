@@ -20,10 +20,16 @@
 class NcFile;
 class NcVar;
 
+#include "TimeObj.h"
+
 #include <string>
+#include <vector>
 
 ////////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Copy NetCDF attribute metadata from one file to another.
+///	</summary>
 void CopyNcFileAttributes(
 	NcFile * fileIn,
 	NcFile * fileOut
@@ -31,6 +37,9 @@ void CopyNcFileAttributes(
 
 ////////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Copy NetCDF attribute metadata from one variable to another.
+///	</summary>
 void CopyNcVarAttributes(
 	NcVar * varIn,
 	NcVar * varOut
@@ -38,11 +47,26 @@ void CopyNcVarAttributes(
 
 ////////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Copy a NetCDF varaible from one file to another.
+///	</summary>
 void CopyNcVar(
 	NcFile & ncIn,
 	NcFile & ncOut,
 	const std::string & strVarName,
 	bool fCopyAttributes = true
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Read the time data from a NetCDF file.
+///	</summary>
+void ReadCFTimeDataFromNcFile(
+	NcFile * ncfile,
+	const std::string & strFilename,
+	std::vector<Time> & vecTimes,
+	bool fWarnOnMissingCalendar
 );
 
 ////////////////////////////////////////////////////////////////////////////////
