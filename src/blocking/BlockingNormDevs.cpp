@@ -48,6 +48,7 @@ int main(int argc, char **argv){
     bool appendBool;
     double anomVal,minThresh;
     int startday, endday;
+    size_t pos,len;
 
     BeginCommandLine()
       CommandLineString(fileName,"in","");
@@ -211,7 +212,6 @@ int main(int argc, char **argv){
       inTime->get(&(timeVals[0]),nTime);
 
       //Create output file that corresponds to IPV data
-
   
       std::string strOutFile;
       if (outputName != ""){
