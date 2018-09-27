@@ -7,6 +7,7 @@ parser<-ArgumentParser()
 #The namelist file provides all of the arguments
 #Either use the master namelist file or the individual namelist files
 parser$add_argument("-nl","--namelist",help="Master namelist for all flags.",default="")
+parser$add_argument"--parallel",help="Run task in parallel",action="store_true")
 #Does ALL the functions-- generates a report output
 parser$add_argument("-gr","--generatereport",help="Create a report for dataset intercomparison. Runs all functions and produces a summary file.",action="store_true")
 
@@ -37,6 +38,13 @@ parse_namelist<-function(var,i){
   var_out<-ifelse(length(var)==1,var,var[i])
   return(var_out)
 }
+
+if (parallel){
+  require(parallel)
+  num_cores<-detectCores()
+  
+}
+
 #MOST BASIC OPTION: PARSE BLOBSTATS---------
 #This will read input from StitchBlobs, input from DetectBlobs, or both
 if (args$readfiles){
@@ -52,7 +60,7 @@ if (args$readfiles){
 
   for (i in 1:nrun_rf){
     
-    nhrs_i<-nhrs[i]
+
     varname_i<-parse_namelist(varname,i)
     filename_stitchblobs_i<-parse_namelist(filename_stitchblobs,i)
     filelist_stitchblobs_i<-parse_namelist(filelist_stitchblobs,i)
@@ -76,7 +84,7 @@ if (args$readfiles){
       fns<-readLines(filelist_stitchblobs_i)
       blobstats_vec<-c(blobstats_vec,fns)
     }
-    df_stitch<-read_stats_to_table(blobstats_vec,nhrs_i,varname_i,
+    df_stitch<-read_stats_to_table(blobstats_vec,varname_i,
                                    rfn_stitch_i,txt_stitch_i,csv_stitch_i,
                                    df_stitchname_i)
   }
@@ -333,7 +341,7 @@ if (args$probsim){
     lon2<-lon_axis
     time2<-time_format
     
-    probs_and_sim<-
+   
     
   }
   

@@ -19,9 +19,6 @@ multiple_readfiles<-FALSE
 ###INPUT/OUTPUT SPECIFICATIONS###
 #################################
 
-#Number of hours per time step in the input data
-#Therefore, 6 is 6 hourly data
-nhrs<-6
 #The string that will go in the "var" column
 #Use this to distinguish between different datasets
 varname<-"ERA"
