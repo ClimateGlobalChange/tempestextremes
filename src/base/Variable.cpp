@@ -307,6 +307,9 @@ NcVar * Variable::GetFromNetCDF(
 			if (var->get_dim(0)->size() == 1) {
 				iTime = 0;
 				m_fNoTimeInNcFile = true;
+			} else if (iTime >= var->get_dim(0)->size()) {
+				_EXCEPTIONT("Requested time index larger than available in input files:\n"
+					"Likely mismatch in time dimension lengths among files");
 			}
 		}
 	}
