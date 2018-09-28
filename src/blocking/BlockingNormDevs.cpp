@@ -40,6 +40,7 @@ int main(int argc, char **argv){
     std::string threshName;
     std::string threshVarName;
     std::string tname,latname,lonname;
+    std::string insuff,outsuff;
     std::string normName;
     bool PVCalc;
     bool GHCalc;
@@ -47,6 +48,7 @@ int main(int argc, char **argv){
     bool appendBool;
     double anomVal,minThresh;
     int startday, endday;
+    size_t pos,len;
 
     BeginCommandLine()
       CommandLineString(fileName,"in","");
@@ -58,6 +60,8 @@ int main(int argc, char **argv){
       CommandLineString(threshName,"thresh","");
       CommandLineString(threshVarName,"threshname","");
       CommandLineString(normName,"normname","");
+      CommandLineString(insuff,"insuff",".nc");
+      CommandLineString(outsuff,"outsuff","_norm.nc");
       CommandLineBool(PVCalc,"pv");
       CommandLineBool(GHCalc,"z500");
       CommandLineBool(const_thresh,"const");
@@ -107,7 +111,9 @@ int main(int argc, char **argv){
      normName = "INT_ADZ";
    }
 
-
+   if (const_thresh){
+     outsuff = "norm_const.nc";
+   }
    std::cout<<"Opening file list."<<std::endl;
    //Create list of input files
     std::vector<std::string> InputFiles;
@@ -206,10 +212,16 @@ int main(int argc, char **argv){
       inTime->get(&(timeVals[0]),nTime);
 
       //Create output file that corresponds to IPV data
-
   
       std::string strOutFile;
-      std::string delim = ".";
+      if (outputName != ""){
+        strOutFile = outputName;
+      }else{
+        pos = InputFiles[x].find(insuff);
+        len = InputFiles[x].length();
+        strOutFile = InputFiles[x].replace(pos,len,outsuff.c_str());
+      }
+    /*  std::string delim = ".";
       size_t pos,len;
 
       if (outputName != ""){
@@ -223,7 +235,7 @@ int main(int argc, char **argv){
 
       if (const_thresh){
         strOutFile = strOutFile.replace(strOutFile.end()-3,strOutFile.end(),"_const.nc");
-      }
+      }*/
       if (appendBool){
         //Does this variable already exist within the file?
         NcVar *devIntOut = infile.get_var(normName.c_str());
