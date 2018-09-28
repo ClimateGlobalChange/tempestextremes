@@ -131,18 +131,11 @@ void AnnounceStartBlock(
 		fprintf(g_fpAnnounceOutput, "\n");
 	}
 
-	// Output buffer
+	// Build output string from variable argument list
 	char szBuffer[AnnouncementBufferSize];
-
 	va_list arguments;
-
-	// Initialize the argument list
 	va_start(arguments, szText);
-
-	// Write to string
 	vsprintf(szBuffer, szText, arguments);
-
-	// Cleans up the argument list
 	va_end(arguments);
 
 	// Output with proper indentation
@@ -172,7 +165,10 @@ void AnnounceStartBlock(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void AnnounceEndBlock(const char * szText) {
+void AnnounceEndBlock(
+	const char * szText,
+	...
+) {
 	// Do not remove a block at minimum indentation level
 	if (s_nIndentationLevel == 0) {
 		return;
@@ -193,15 +189,24 @@ void AnnounceEndBlock(const char * szText) {
 
 	// Check block flag
 	if (szText != NULL) {
+
+		// Build output string from variable argument list
+		char szBuffer[AnnouncementBufferSize];
+
+		va_list arguments;
+		va_start(arguments, szText);
+		vsprintf(szBuffer, szText, arguments);
+		va_end(arguments);
+
 		if (s_fBlockFlag) {
 			s_fBlockFlag = false;
 
 			fprintf(g_fpAnnounceOutput, ".. ");
-			fprintf(g_fpAnnounceOutput, "%s", szText);
+			fprintf(g_fpAnnounceOutput, "%s", szBuffer);
 			fprintf(g_fpAnnounceOutput, "\n");
 
 		} else {
-			Announce(szText);
+			Announce(szBuffer);
 		}
 	}
 

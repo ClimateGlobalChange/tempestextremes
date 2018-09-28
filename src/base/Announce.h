@@ -71,7 +71,7 @@ void AnnounceStartBlock(int iVerbosity, const char * szText);
 ///	<summary>
 ///		End an announcement block.
 ///	</summary>
-void AnnounceEndBlock(const char * szText);
+void AnnounceEndBlock(const char * szText, ...);
 
 ///	<summary>
 ///		End an announcement block.
