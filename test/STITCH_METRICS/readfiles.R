@@ -12,6 +12,9 @@ read_stats_to_table<-function(flist,var="",
     if (length(fl)>1){
       #First line: Column names
       varnames<-unlist(strsplit(fl[1],split=","))
+      if (length(varnames)<2){
+        stop(sprintf("Check that file %s has the correct headers",f))
+      }
       tname<-varnames[1]
       varnames<-varnames[2:length(varnames)]
       fdat<-fl[2:length(fl)]
@@ -34,7 +37,7 @@ read_stats_to_table<-function(flist,var="",
           hr<-as.integer(as.numeric(date_vec[4])/(60*60))
           df_tot[nline,"datehour"]<-sprintf("%s %02d:00:00",d,hr)
           
-          for (v in 2:length(varnames)){
+          for (v in 1:length(varnames)){
             df_tot[nline,varnames[v]]<-as.numeric(df_line[1,v])
           }
           if (!is.null(df_line[1,"area"])){

@@ -83,12 +83,12 @@ interp_pt<-function(x, y, df, lon2, lat2){
 similarity_weighted<-function(arr1,arr2,lats,lons,lats2=NULL,lons2=NULL,regrid=FALSE){
   #print(dim(arr1))
   #print(dim(arr2))
-  #print("Melting arr 1")
+ # print("Melting arr 1")
   longdata1<-melt(arr1,value.name = "V1")
   longdata1$V1[longdata1$V1>0]<-1
 	longdata1$lon<-lons[longdata1$Var1]
   longdata1$lat<-lats[longdata1$Var2]
-  #print("Melting arr2")
+ # print("Melting arr2")
   longdata2<-melt(arr2,value.name="V2")
   longdata2$V2[longdata2$V2>0]<-1
 	if (is.null(lons2)){
@@ -139,14 +139,15 @@ similarity_weighted<-function(arr1,arr2,lats,lons,lats2=NULL,lons2=NULL,regrid=F
 prob_calc<-function(df,dfo,V1,V2){
   V1count<-nrow(df[df$var==V1,])
   V2count<-nrow(df[df$var==V2,])
-  #print(sprintf("V1: %d, V2:%d",V1count,V2count))
+  print(sprintf("V1: %d, V2:%d",V1count,V2count))
   V12count<-0
   for (d in sort(unique(dfo$datehour))){
     dsub<-dfo[dfo$datehour==d,]
+    print(dsub)
     nV1<-length(unique(dsub$V1bnum2))
     nV2<-length(unique(dsub$V2bnum2))
     nV12<-nrow(dsub)
-    #print(sprintf("V1: %d V2: %d, V12: %d",nV1,nV2,nV12))
+    print(sprintf("V1: %d V2: %d, V12: %d",nV1,nV2,nV12))
     V12count<-V12count+min(nV1,nV2,nV12)
   }
   p1given2<-V12count/V2count
@@ -155,14 +156,69 @@ prob_calc<-function(df,dfo,V1,V2){
   #print(p2given1)
   return(c(p1given2,p2given1))
 }
+#Finds the Pearson pattern correlation between the averaged climatologies of the two datasets
+pearson_arr<-function(arr1,arr2,lat1,lat2,lon1,lon2,interp=FALSE,centered=FALSE){
+  
+  longdata1<-melt(arr1,value.name="V1")
+  longdata1$lon<-lon1[longdata1$Var1]
+  longdata1$lat<-lat1[longdata1$Var2]
+  
+  
+  longdata2<-melt(arr2,value.name="V2")
+  longdata2$lon<-lon2[longdata2$Var1]
+  longdata2$lat<-lat2[longdata2$Var2]
+  if (interp==TRUE){
+    
+    temp<-merge(longdata1[,c("lon","lat","V1")],longdata2[,c("lon","lat","V2")],by=c("lon","lat"),all=T)
+    temp_noV1<-temp[!is.na(temp$V1),]
+    narows<-which(is.na(temp_noV1$V2))
+    
+    for (i in narows){
+      temp_noV1[i,"V2"]<-interp_pt(temp_noV1[i,"lon"],temp_noV1[i,"lat"],temp,lon2,lat2)
+    }
+    longdata<-temp_noV1
+  }else{
+    longdata<-merge(longdata1[,c("lon","lat","V1")],longdata2[,c("lon","lat","V2")],by=c("lon","lat"))
+  }
+  
+  #Create a cosine latitude column
+  longdata$coslat<-cos(longdata$lat*pi/180)
+  longdata$cosV1<-longdata$V1*longdata$coslat
+  longdata$cosV2<-longdata$V2*longdata$coslat
+  
+  Vproduct<-longdata$cosV1*longdata$cosV2
+  
+  V1bar<-mean(longdata$cosV1)
+  V2bar<-mean(longdata$cosV2)
+  
+  V1diff<-longdata$cosV1-V1bar
+  V2diff<-longdata$cosV2-V2bar
+  VdiffProduct<-V1diff*V2diff
+  
+  if (centered==TRUE){
+    r<-sum(VdiffProduct)/sqrt(sum(V1diff*V1diff)*sum(V2diff*V2diff))    
+  }else{
+    r<-sum(Vproduct)/sqrt(sum(longdata$cosV1*longdata$cosV1)*sum(longdata$cosV2*longdata$cosV2))
+  }
+  
+  return(r)
+}
 
+#Finds the index of closest value in a vector
+nearest_ind<-function(val,vec){
+  dist_vec<-abs(val-vec)
+  i<-which(dist_vec==min(dist_vec))
+  return(i[1])
+}
 
 #This function looks at overlaps between blobs that came from different StitchBlobs outputs
 #at the same time step. Requires 2 distinct variable names in the var column for the df
 # Will probably require RData file for the similarity calculations, too much of a pain
 # in the behind otherwise
-overlaps_calc<-function(df1,blobs1,time_format1,lat1,lon1,blobs2,df2=NULL,time_format2=NULL,lat2=NULL,lon2=NULL){
-	
+overlaps_calc<-function(df1,blobs1,time_format1,lat1,lon1,blobs2,
+                        df2=NULL,time_format2=NULL,lat2=NULL,lon2=NULL,
+                        rfn_ps="",txt_overlaps="",txt_ps="",regrid=FALSE){
+
 	df_overlaps<-data.frame(NULL)
 	#Default assumption that all of the data is contained within a single data frame
 	df_analyze<-df1
@@ -241,10 +297,14 @@ overlaps_calc<-function(df1,blobs1,time_format1,lat1,lon1,blobs2,df2=NULL,time_f
 	df_analyze<-df_analyze[df_analyze$datehour %in% time_intersect,]
 	
 	nr<-1
+	
+	time1_inds<-c()
+	time2_inds<-c()
+	
 	for (d in sort(unique(time_intersect))){
 		dsub<-df_analyze[df_analyze$datehour==d,]
 		dsub<-dsub[!duplicated(dsub),]
-		
+    print(dsub)
 		#How many unique types of blob variables are there at the time?
 		varname<-as.character(sort(unique(as.character(dsub$var))))
 		nvar<-length(varname)
@@ -252,15 +312,17 @@ overlaps_calc<-function(df1,blobs1,time_format1,lat1,lon1,blobs2,df2=NULL,time_f
 			df1<-dsub[dsub$var==V1,]
 			df2<-dsub[dsub$var==V2,]
 			d1i<-which(time_format1==d)
+			time1_inds<-c(time1_inds,d1i)
 			d2i<-which(time_format2==d)
+			time2_inds<-c(time2_inds,d2i)
 			#Loop through the variables
 			for (b1 in 1:nrow(df1)){
 				#Find the blob boundaries
-				it1<-which(lat1==df1[b1,"maxlat"])
-				ib1<-which(lat1==df1[b1,"minlat"])
-				il1<-which(lon1==df1[b1,"minlon"])
-				ir1<-which(lon1==df1[b1,"maxlon"])
-				#print(sprintf("%d %d %d %d",it1,ib1,il1,ir1))
+				it1<-nearest_ind(df1[b1,"maxlat"],lat1)
+				ib1<-nearest_ind(df1[b1,"minlat"],lat1)
+				il1<-nearest_ind(df1[b1,maxlon_analyze],lon1)
+				ir1<-nearest_ind(df1[b1,minlon_analyze],lat1)
+				#print(sprintf("Bounds (index) for V1: %d %d %d %d",it1,ib1,il1,ir1))
 				#Grab the time slice
 				v1slice<-blobs1[,,d1i]
 				#Zero out everything but the blob in the longitude direction
@@ -268,15 +330,16 @@ overlaps_calc<-function(df1,blobs1,time_format1,lat1,lon1,blobs2,df2=NULL,time_f
 				#Zero out everything but the blob in the latitude direction
 				v1slice[,c(1:min(it1,ib1),max(it1,ib1):dim(blobs1)[2])]<-0
 				for (b2 in 1:nrow(df2)){
-					it2<-which(lat2==df2[b2,"maxlat"])
-					ib2<-which(lat2==df2[b2,"minlat"])
-					il2<-which(lon2==df2[b2,"minlon"])
-					ir2<-which(lon2==df2[b2,"maxlon"])
-					#print(sprintf("%d %d %d %d",it2,ib2,il2,ir2))
+				  #print(sprintf("B1,B2: %d %d",b1,b2))
+				  it2<-nearest_ind(df2[b2,"maxlat"],lat2)
+				  ib2<-nearest_ind(df2[b2,"minlat"],lat2)
+				  il2<-nearest_ind(df2[b2,maxlon_analyze],lon2)
+				  ir2<-nearest_ind(df2[b2,minlon_analyze],lat2)
+					#print(sprintf("Bounds (index) for V2: %d %d %d %d",it2,ib2,il2,ir2))
 					v2slice<-blobs2[,,d2i]
 					v2slice[c(1:min(il2,ir2),max(il2,ir2):dim(blobs2)[1]),]<-0
 					v2slice[,c(1:min(it2,ib2),max(it2,ib2):dim(blobs2)[2])]<-0
-					s12<-similarity_weighted(v1slice,v2slice,lat1,lon1_analyze,lat2,lon2_analyze)
+					s12<-similarity_weighted(v1slice,v2slice,lat1,lon1_analyze,lat2,lon2_analyze,regrid)
 					if (s12>0){
 					  df_overlaps[nr,"datehour"]<-d
 					  df_overlaps[nr,"similarity"]<-s12
@@ -299,10 +362,34 @@ overlaps_calc<-function(df1,blobs1,time_format1,lat1,lon1,blobs2,df2=NULL,time_f
   probs<-prob_calc(df_analyze,df_overlaps,V1,V2)
   p1given2<-probs[1]
   p2given1<-probs[2]
-  saved_names<-c("V1","V2","p1given2","p2given1", "df_overlaps","df_analyze")
+  sim_25<-quantile(df_overlaps$similarity,0.25)
+  sim_50<-quantile(df_overlaps$similarity,0.5)
+  sim_75<-quantile(df_overlaps$similarity,0.75)
+  
+  #Find the averaged blocking climatologies of the two datasets
+  
+  
+  saved_names<-c("V1","V2","p1given2","p2given1", "df_overlaps")
   return_list<-list()
   for (v in saved_names){
     return_list[[v]]<-get(v)
+  }
+  if (rfn_ps!=""){
+    save(list=saved_names,file=rfn_ps)
+  }
+  if (txt_overlaps!=""){
+    write.table(df_overlaps,file=txt_overlaps,sep="\t",row.names=FALSE,quote=FALSE)
+  }
+  if (txt_ps!=""){
+    sink(txt_ps)
+    cat(sprintf("Variable 1: %s \n",V1))
+    cat(sprintf("Variable 2: %s \n",V2))
+    cat(sprintf("Probability of %s given %s: %f \n",V1,V2,p1given2))
+    cat(sprintf("Probability of %s given %s: %f \n",V2,V1,p2given1))
+    cat(sprintf("25th percentile similarity value: %f \n",sim_25))
+    cat(sprintf("50th percentile similarity value: %f \n",sim_50))
+    cat(sprintf("75th percentile similarity value: %f \n",sim_75))
+    sink()
   }
   return(return_list)
 }

@@ -7,30 +7,34 @@
 #Location of working directory
 work_dir<-"~/tempestextremes/test/STITCH_METRICS"
 #Location where the input data files are stored
-input_dir<-"/group/paullricgrp2/ERA_MCP/ERA_BLOB"
+input_dir<-"~/BLOBSTATS_FILES/MERRA"
 #Location where the output data files are stored
-output_dir<-"/group/paullricgrp2/ERA_MCP/ERA_BLOB"
+output_dir<-"~/BLOBSTATS_FILES/MERRA"
 
 #THIS IS AN EXAMPLE OF A NAMELIST SECTION WHERE THE READFILES OPERATION IS RUN 4 TIMES
 #The analysis is broken up by region because otherwise it will take too long!
-SECTOR=c("NA", "NC", "NP", "SA", "SI" ,"SP")
+#We're looking at Northern Hemisphere Pacific and Southern Hemisphere Pacific
+#Winter is DJF in NH and JJA in SH
+SECTOR=c("NA", "SP")
+SEASON=c("DJF","JJA")
 #READFILES-------------
-nrun_rf<-12
+nrun_rf<-4
 ###USER-DEFINED###
-#This will be run 12 times 
-stitch_search_str<-sprintf("%s/ERA*%s_Z_stats.txt",input_dir,SECTOR)
-nostitch_search_str<-sprintf("%s/ERA*%s_Z_stats_nostitch.txt",input_dir,SECTOR)
+#This will be run 4 times 
+stitch_search_str<-sprintf("%s/MERRA*_%s_%s_Z_stats.txt",input_dir,SEASON,SECTOR)
+nostitch_search_str<-sprintf("%s/MERRA*%s_%s_Z_stats_nostitch.txt",input_dir,SEASON,SECTOR)
 search_str<-c(stitch_search_str,nostitch_search_str)
 
-list_files<-c(sprintf("%s/ERA_stitch_list_%s",input_dir,SECTOR),sprintf("%s/ERA_nostitch_list_%s",input_dir,SECTOR))
-list_rnames<-c(sprintf("%s/ERA_%s_stitchtable.Rdata",output_dir,SECTOR),sprintf("%s/ERA_%s_nostitchtable.Rdata",output_dir,SECTOR))
+list_files<-c(sprintf("%s/MERRA_stitch_list_%s",input_dir,SECTOR),sprintf("%s/MERRA_nostitch_list_%s",input_dir,SECTOR))
+list_rnames<-c(sprintf("%s/MERRA_%s_%s_stitchtable.Rdata",output_dir,SEASON,SECTOR),
+               sprintf("%s/MERRA_%s_%s_nostitchtable.Rdata",output_dir,SEASON,SECTOR))
 list_dfnames<-"table_out"
-for (i in length(list_files)){
+for (i in 1:length(list_files)){
   system(sprintf("ls %s > %s",search_str[i],list_files[i]))
 }
 #################
 
-varname<-rep("ERA",12)
+varname<-rep("MERRA",4)
 filename_stitchblobs<-""
 filelist_stitchblobs<-list_files
 rfn_stitch<-list_rnames
@@ -41,57 +45,59 @@ csv_stitch<-""
 #THIS IS AN EXAMPLE OF A NAMELIST SECTION WHERE THE READTABLE OPERATION COMBINES 
 #THE STITCH AND THE NOSTITCH DATA INTO TWO DISTINCT TABLES
 # THEREFORE THE OPERATION IS RUN TWICE
+#(THIS IS OLD INPUT AND DOES NOT MATCH UP WITH PREVIOUS SECTION)
 
 #READTABLE-------------
 nrun_rt<-2
 #USER-DEFINED
 #Write the file names above to lists for the StitchBlobs and DetectBlobs outputs
 #File names
-stitch_rlist<-paste(input_dir,"stitch_files_list",sep="/")
-nostitch_rlist<-paste(input_dir,"nostitch_files_list",sep="/")
-#Write to file
-writeLines(rfn_stitch[c(1,3)],stitch_rlist)
-writeLines(rfn_stitch[c(2,4)],nostitch_rlist)
-#Names of output files
-list_out<-c("table_stitch.RData","table_nostitch.RData")
-############
-
-ftype_rt="R"
-filename_read<-""
-filelist_read<-c(stitch_rlist,nostitch_rlist)
-rfn_combine<-paste(output_dir,list_out,sep="/")
-df_combinename<-c("df_stitch_ERA_MERRA","df_nostitch_ERA_MERRA")
-txt_combine<-""
-csv_combine<-""
+# stitch_rlist<-paste(input_dir,"stitch_files_list",sep="/")
+# nostitch_rlist<-paste(input_dir,"nostitch_files_list",sep="/")
+# #Write to file
+# writeLines(rfn_stitch[c(1,3)],stitch_rlist)
+# writeLines(rfn_stitch[c(2,4)],nostitch_rlist)
+# #Names of output files
+# list_out<-c("table_stitch.RData","table_nostitch.RData")
+# ############
+# 
+# ftype_rt="R"
+# filename_read<-""
+# filelist_read<-c(stitch_rlist,nostitch_rlist)
+# rfn_combine<-paste(output_dir,list_out,sep="/")
+# df_combinename<-c("df_stitch_ERA_MERRA","df_nostitch_ERA_MERRA")
+# txt_combine<-""
+# csv_combine<-""
 
 #THIS IS AN EXAMPLE OF A NAMELIST SECTION WHERE MERGETABLE IS USED
-#TO COMBINE STITCHBLOBS AND DETECTBLOBS OUTPUTS FROM BOTH ERA AND MERRA
-#INTO ONE FILE
-#NOTE THAT THE FILE NAMES FROM READTABLE WERE USED 
-#TO DEFINE THE VARIABLES HERE
+#TO COMBINE STITCHBLOBS AND DETECTBLOBS OUTPUTS 
+
+#USER-DEFINED
+#WE WILL BE WRITING TWO MERGED FILES FOR EACH OF THE TWO BASINS
+
 
 #MERGETABLE------------
-nrun_mt<-1
+nrun_mt<-2
 ftype_mt="R"
-stitch_file<-rfn_combine[1]
-detect_file<-rfn_combine[2]
+stitch_file<-list_rnames[1:2]
+detect_file<-list_rnames[3:4]
 stitch_list<-""
 detect_list<-""
-rfn_merged<-paste(output_dir,"table_merged.RData",sep="/")
-df_merged<-"df_merged_ERA_MERRA"
+rfn_merged<-sprintf("%s/MERRA_%s_%s_merged_table.RData",output_dir,SEASON,SECTOR)
+df_merged_name<-"df_merged"
 txt_merged<-""
 csv_merged<-""
 
 #THIS IS AN EXAMPLE OF A NAMELIST SECTION WHERE SUMMARIZE IS USED
 # TO SUMMARIZE THE MERGETABLE OUTPUT FROM THE PREVIOUS SECTION
 #SUMMARIZE----------
-nrun_st<-1
+nrun_st<-2
 ftype_st<-"R"
 filename_summ<-rfn_merged
 filelist_summ<-""
 keepmerge<-TRUE
-rfn_summ<-paste(output_dir,"table_summ.RData",sep="/")
-df_summ<-"df_summ_ERA_MERRA"
+rfn_summ<-sprintf("%s/MERRA_%s_%s_summ_table.RData",output_dir,SEASON,SECTOR)
+df_summ_name<-"df_summ"
 txt_summ<-""
 csv_summ<-""
 
@@ -100,31 +106,36 @@ csv_summ<-""
 #The min and max boundaries are defined per region below
 
 #READNETCDF-------------
-nrun_rn<-3
+nrun_rn<-2
 ########################
 #USER DEFINED#
-
-
-
-###################################################################
+netcdf_search_str<-sprintf("%s/MERRA*_%s_comb_Z_blobs.nc",input_dir,SEASON)
+list_netcdf_files<-sprintf("%s/bloblist_%s",input_dir,SEASON)
+for (i in 1:length(list_netcdf_files)){
+  system(sprintf("ls %s > %s",netcdf_search_str,list_netcdf_files[i]))
+}
+rfiles_blobdata<-sprintf("%s/MERRA_%s_%s_blobdata.RData",output_dir,SEASON,SECTOR)
+########################
 
 filename_netcdf<-""
-filelist_netcdf<-""
-varvec<-list(blob_vars,blob_vars,wind_vars)
+filelist_netcdf<-list_netcdf_files
+varvec<-c("Z_BLOB")
 outvec<-varvec
-outrdata<-c("blob_data_MERRA.RData","blob_data_ERA.RData","wind_data.RData")
+outrdata<-rfiles_blobdata
 outnetcdf<-""
 timename<-"time"
 levname<-"lev"
 latname<-"lat"
 lonname<-"lon"
-#Since this is in the Pacific, we want the longitude range to be in the 0 to 360 range
-#MERRA has a longitude axis from -180 to 180 while ERA has a longitude axis from 0 to 360
+#Subsetting the regions/seasons in both instances
+#For MERRA, need to change axis in order to match ERA
 transformto180<-FALSE
 transformto360<-TRUE
-minlat<-25
-maxlat<-75
-minlon<-130
-maxlon<-270
-minlev<-c("","",500)
-maxlev<-c("","",500)
+minlat<-c(25,-75)
+maxlat<-c(75,-25)
+minlon<-c(250,120)
+maxlon<-c(50,310)
+minlev<-""
+maxlev<-""
+
+#THIS IS AN EXAMPLE OF A NAMELIST SECTION WHERE TWO DATASETS ARE COMPARED

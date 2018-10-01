@@ -217,9 +217,11 @@ read_netcdf<-function(flist,vlist,olist=vlist,timename="time",levname="lev",latn
 
 		}
 		close.nc(ncfile_out)
+		print(sprintf("Wrote %s to file",ncout))
 	}
 	if (rdataout!=""){
 		save(list=save_variables,file=rdataout)
+	  print(sprintf("Wrote %s to file",rdataout))
 	}
 
 	if (rdataout=="" & ncout==""){

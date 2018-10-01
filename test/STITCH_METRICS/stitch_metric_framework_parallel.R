@@ -7,8 +7,7 @@ parser<-ArgumentParser()
 #The namelist file provides all of the arguments
 #Either use the master namelist file or the individual namelist files
 parser$add_argument("-nl","--namelist",help="Master namelist for all flags.",default="")
-#parser$add_argument("--parallel",help="Run task in parallel",action="store_true")
-parser$add_argument("--setup",help="Get all of the necessary libraries for running this code",action="store_true")
+parser$add_argument("-pp","--parallel_process",help="Run task in parallel",action="store_true")
 #Does ALL the functions-- generates a report output
 parser$add_argument("-gr","--generatereport",help="Create a report for dataset intercomparison. Runs all functions and produces a summary file.",action="store_true")
 
@@ -29,18 +28,11 @@ parser$add_argument("-nlst","--namelistst",help="Namelist file name (mandatory) 
 parser$add_argument("-rn","--readnetcdf",help="Read in NetCDF files",action="store_true")
 parser$add_argument("-nlrn","--namelistrn",help="Namelist file name (mandatory) for --readnetcdf",default="")
 #Intercomparison of datasets---------
-parser$add_argument("-ic","--intercomparison",help="Pearson correlation, probability of co-occurrence between two datasets, and spatial similarity between individual blobs.",action="store_true")
-parser$add_argument("-nlic","--namelistic",help="Namelist file name (mandatory) for --intercomparison",default="")
+parser$add_argument("-ps","--probsim",help="Probability of co-occurrence between two datasets and spatial similarity between individual blobs.",action="store_true")
+parser$add_argument("-nlps","--namelistps",help="Namelist file name (mandatory) for --probsim",default="")
 
 #NOW PARSE ALL THE ARGUMENTS--------------
 args<-parser$parse_args()
-
-if (args$setup){
-  req_libs<-c("knitr","markdown","reshape2","abind","RNetCDF")
-  for (r in req_libs){
-    install.packages(r, repos='http://cran.us.r-project.org')
-  }
-}
 
 parse_namelist<-function(var,i){
   var_out<-ifelse(length(var)==1,var,var[i])
@@ -157,7 +149,7 @@ if (args$mergetable){
     stitch_list_i<-parse_namelist(stitch_list,i)
     detect_list_i<-parse_namelist(detect_list,i)
     rfn_merged_i<-parse_namelist(rfn_merged,i)
-    df_merged_name_i<-parse_namelist(df_merged_name,i)
+    df_merged_i<-parse_namelist(df_merged,i)
     txt_merged_i<-parse_namelist(txt_merged,i)
     csv_merged_i<-parse_namelist(csv_merged,i)
     if (stitch_file_i=="" & stitch_list_i=="" ){
@@ -189,10 +181,11 @@ if (args$mergetable){
     }
     
     #Use the readtable function to load the data
+    
     df_stitch<-combine_dfs(stitchvec,ftype_mt_i)
     df_detect<-combine_dfs(detectvec,ftype_mt_i)
     
-    df_merged<-merge_dfs(df_stitch,df_detect,rfn_merged_i,txt_merged_i,csv_merged_i,df_merged_name_i)
+    df_merged<-merge_dfs(df_stitch,df_detect,rfn_merged_i,txt_merged_i,csv_merged_i,df_merged_i)
     
   }
 }
@@ -218,7 +211,7 @@ if (args$summarize){
     filelist_summ_i<-parse_namelist(filelist_summ,i)
     keepmerge_i<-parse_namelist(keepmerge,i)
     rfn_summ_i<-parse_namelist(rfn_summ,i)
-    df_summ_name_i<-parse_namelist(df_summ_name,i)
+    df_summ_i<-parse_namelist(df_summ,i)
     txt_summ_i<-parse_namelist(txt_summ,i)
     csv_summ_i<-parse_namelist(csv_summ,i)
     
@@ -242,7 +235,7 @@ if (args$summarize){
 
       df_input_summ<-combine_dfs(dat_vec,ftype_st_i)
       df_summ<-gen_summary_table(df_input_summ,keepmerge_i,
-                                 rfn_summ_i,txt_summ_i,csv_summ_i,df_summ_name_i)
+                                 rfn_summ_i,txt_summ_i,csv_summ_i,df_summ_i)
   }
 
 }
@@ -274,8 +267,6 @@ if (args$readnetcdf){
     maxlon_i<-parse_namelist(maxlon,i)
     minlev_i<-parse_namelist(minlev,i)
     maxlev_i<-parse_namelist(maxlev,i)
-    transformto180_i<-parse_namelist(transformto180,i)
-    transformto360_i<-parse_namelist(transformto360,i)
 
     if (filename_netcdf_i=="" & filelist_netcdf_i==""){
       stop("Need to either provide a filename (filename_netcdf) or list of filenames (filelist_netcdf).")
@@ -298,23 +289,22 @@ if (args$readnetcdf){
     
     vars_list<-read_netcdf(dat_vec,varvec_i,outvec_i,timename_i,levname_i,latname_i,lonname_i,
                            minlat_i,maxlat_i,minlon_i,maxlon_i,
-                           minlev_i,maxlev_i,outnetcdf_i,outrdata_i,
-                           transformto180_i,transformto360_i)
+                           minlev_i,maxlev_i,outnetcdf_i,outrdata_i)
     
   }
   
 }
 
-if (args$intercomparison){
-  if (args$namelistic=="" & args$namelist==""){
-    stop("Must provide the namelist file for --intercomparison.")
+if (args$probsim){
+  if (args$namelistps=="" & args$namelist==""){
+    stop("Must provide the namelist file for --readnetcdf.")
   }
   
-  nl_prob<-ifelse(args$namelistic!="",args$namelistic,args$namelist)
+  nl_prob<-ifelse(args$namelistps!="",args$namelistps,args$namelist)
   source(nl_prob)
   setwd(work_dir)
   source("probsim.R")
-  for (i in 1:nrun_ic){
+  for (i in 1:nrun_ps){
     table_file_1_i<-parse_namelist(table_file_1,i)
     table_file_2_i<-parse_namelist(table_file_2,i)
     df_name_1_i<-parse_namelist(df_name_1,i)
@@ -323,10 +313,6 @@ if (args$intercomparison){
     blob_file_2_i<-parse_namelist(blob_file_2,i)
     var_name_1_i<-parse_namelist(var_name_1,i)
     var_name_2_i<-parse_namelist(var_name_2,i)
-    regrid_i<-parse_namelist(regrid,i)
-    rfn_ps_i<-parse_namelist(rfn_ps,i)
-    txt_overlaps_i<-parse_namelist(txt_overlaps,i)
-    txt_ps_i<-parse_namelist(txt_ps,i)
     #Load the files-- careful not to overwrite!
     load(table_file_1_i)
     df1<-get(df_name_1_i)
@@ -349,9 +335,10 @@ if (args$intercomparison){
     lon2<-lon_axis
     time2<-time_format
     
-    probsim<-overlaps_calc(df1,blob1,time1,lat1,lon1,blob2,
-                           df2,time2,lat2,lon2,rfn_ps_i,txt_overlaps_i,txt_ps_i,regrid_i)
+   
     
   }
   
 }
+
+#Distribution of z500 anomalies, speed, duration, distance, 

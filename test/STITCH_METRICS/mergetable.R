@@ -17,6 +17,7 @@ lon_convert2<-function(lon){
 merge_dfs<-function(df_stitch,df_nostitch,rfn="",textfn="",csvfn="",df_merged_name="",
                     byvec=c("datehour","area","var")){
   df_merged_name<-ifelse(df_merged_name=="","df_merged",df_merged_name)
+
 	df_names<-names(df_stitch)
 	#This data frame only has common rows
 	df_comm<-merge(df_stitch,df_nostitch,by=byvec)
@@ -104,9 +105,11 @@ merge_dfs<-function(df_stitch,df_nostitch,rfn="",textfn="",csvfn="",df_merged_na
 	}
 	if (textfn!=""){
 	  write.table(df_final,file=textfn,sep="\t",row.names=FALSE,quote=FALSE)
+	  print(sprintf("Wrote %s to file",textfn))
 	}
 	if (csvfn!=""){
 	  write.csv(df_final,file=csvfn,row.names=FALSE,quote=FALSE)
+	  print(sprintf("Wrote %s to file",csvfn))
 	}
 	#Return the merged data frame
 	return(df_final)
