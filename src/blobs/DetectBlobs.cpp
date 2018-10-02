@@ -868,7 +868,7 @@ try {
 
 	// Get time dimension over all files
 	DataVector<double> dTime;
-	GetAllTimes(vecInputFiles, dTime);
+	GetAllTimes(vecInputFiles, dTime,timename);
 
 	int nTime = dTime.GetRows();
 
