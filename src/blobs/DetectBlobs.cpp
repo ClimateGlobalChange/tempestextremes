@@ -697,6 +697,10 @@ try {
 	// Threshold commands
 	std::string strThresholdCmd;
 
+        std::string latname;
+	std::string lonname;
+	std::string timename;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -711,6 +715,9 @@ try {
 		CommandLineDouble(dMaxLat, "maxlat", 90.0);
 		CommandLineDouble(dMinLon, "minlon", 0.0);
 		CommandLineDouble(dMaxLon, "maxlon", 360.0);
+		CommandLineString(latname, "latname", "lat");
+		CommandLineString(lonname, "lonname", "lon");
+		CommandLineString(timename,"timename", "time");
 		CommandLineString(strThresholdCmd, "thresholdcmd", "");
 
 		ParseCommandLine(argc, argv);
@@ -802,22 +809,22 @@ try {
 		}
 
 		// Get latitude/longitude dimensions
-		NcDim * dimLat = ncInput.get_dim("lat");
+		NcDim * dimLat = ncInput.get_dim(latname.c_str());
 		if (dimLat == NULL) {
 			_EXCEPTIONT("No dimension \"lat\" found in input file");
 		}
 
-		NcDim * dimLon = ncInput.get_dim("lon");
+		NcDim * dimLon = ncInput.get_dim(lonname.c_str());
 		if (dimLon == NULL) {
 			_EXCEPTIONT("No dimension \"lon\" found in input file");
 		}
 
-		NcVar * varLat = ncInput.get_var("lat");
+		NcVar * varLat = ncInput.get_var(latname.c_str());
 		if (varLat == NULL) {
 			_EXCEPTIONT("No variable \"lat\" found in input file");
 		}
 
-		NcVar * varLon = ncInput.get_var("lon");
+		NcVar * varLon = ncInput.get_var(lonname.c_str());
 		if (varLon == NULL) {
 			_EXCEPTIONT("No variable \"lon\" found in input file");
 		}
@@ -901,7 +908,7 @@ try {
 		}
 
 		// Get current time dimension
-		NcDim * dimTime = ncInput.get_dim("time");
+		NcDim * dimTime = ncInput.get_dim(timename.c_str());
 
 		int nLocalTimes = dimTime->size();
 
@@ -1518,13 +1525,13 @@ try {
 	{
 		NcFile ncInput(vecInputFiles[0].c_str());
 
-		NcVar * varLat = ncInput.get_var("lat");
-		NcVar * varLon = ncInput.get_var("lon");
+		NcVar * varLat = ncInput.get_var(latname.c_str());
+		NcVar * varLon = ncInput.get_var(lonname.c_str());
 
 		CopyNcVarAttributes(varLat, varOutputLat);
 		CopyNcVarAttributes(varLon, varOutputLon);
 
-		NcVar * varTime = ncInput.get_var("time");
+		NcVar * varTime = ncInput.get_var(timename.c_str());
 		if (varTime != NULL) {
 			CopyNcVarAttributes(varTime, varOutputTime);
 		}
