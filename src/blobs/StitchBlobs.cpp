@@ -701,6 +701,7 @@ try {
 	std::string latname;
 	std::string lonname;
 	std::string timename;
+	std::string OutTimeUnits;
 
 	// Parse the command line
 	BeginCommandLine()
@@ -719,6 +720,7 @@ try {
 		CommandLineString(latname, "latname","lat");
 		CommandLineString(lonname, "lonname","lon");
 		CommandLineString(timename, "timename", "time");
+		CommandLineString(OutTimeUnits,"outtimeunits","hours since 1800-01-01 00:00");
 		CommandLineString(strThresholdCmd, "thresholdcmd", "");
 
 		ParseCommandLine(argc, argv);
@@ -868,10 +870,34 @@ try {
 	}
 
 	// Get time dimension over all files
-	DataVector<double> dTime;
-	GetAllTimes(vecInputFiles, dTime,timename);
+	//OutTimeUnits is either predetermined or set at the command line
+	std::vector<double> timeDim;
+	std::vector<Time> tempTime;
+	double newTimeDouble;
+	for (int x=0; x<vecInputFiles.size(); x++){
+		//Read the time into a vector of Time objects
+		NcFile inputFile(vecInputFiles[x].c_str());
+		if ( !inputFile.is_valid()){
+			_EXCEPTION1("Unable to open input file %s",
+			vecInputFiles[x].c_str());
+		}
+		ReadCFTimeDataFromNcFile(& inputFile,
+					vecInputFiles[x].c_str(),
+					tempTime,
+					true);
+		//We have the Time objects
+		for (int t=0; t<tempTime.size(); t++){
+			newTimeDouble = tempTime[t].GetCFCompliantUnitsOffsetDouble(OutTimeUnits);
+			timeDim.push_back(newTimeDouble);
+		}
+	}
+	int nTime = timeDim.size();
+	std::cout<<"timeDim is "<<nTime<<" long"<<std::endl;
 
-	int nTime = dTime.GetRows();
+//	DataVector<double> dTime;
+
+//	GetAllTimes(vecInputFiles, dTime,timename);
+//	int nTime = dTime.GetRows();
 
 	// Allocate indicator data
 	DataMatrix<int> dataIndicator(nLat, nLon);
@@ -1514,8 +1540,8 @@ try {
 	}
 
 	varOutputTime->set_cur((long)0);
-	varOutputTime->put(dTime, nTime);
-
+//	varOutputTime->put(dTime, nTime);
+	varOutputTime->put(&(timeDim[0]),nTime);
 	varOutputLat->set_cur((long)0);
 	varOutputLat->put(dataLatDeg, nLat);
 
@@ -1537,7 +1563,10 @@ try {
 			CopyNcVarAttributes(varTime, varOutputTime);
 		}
 	}
-
+	//Change the time units to the preset
+	NcAtt * oldUnits = varOutputTime->get_att("units");
+	oldUnits->remove();
+	varOutputTime->add_att("units",OutTimeUnits.c_str());
 	NcVar * varData =
 		ncOutput.add_var(
 			strOutputVariable.c_str(),
