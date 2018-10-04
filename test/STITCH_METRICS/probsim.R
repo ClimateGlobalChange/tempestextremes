@@ -132,8 +132,14 @@ similarity_weighted<-function(arr1,arr2,lats,lons,lats2=NULL,lons2=NULL,regrid=F
   
   sum_iw<-sum(intersect_12$V1_w)
   sum_uw<-sum(union_12$VU_w)
-  #print(sprintf("Weighted sums are %f and %f",sum_iw,sum_uw))
-  return(sum_iw/sum_uw)
+  print(sprintf("Weighted sums are %f and %f",sum_iw,sum_uw))
+  if (abs(sum_uw)<0.00000000001){
+    ratio<-0
+  }else{
+    ratio<-sum_iw/sum_uw
+  }
+  print(sprintf("ratio is %f",ratio))
+  return(ratio)
 }
 #Finds the probability of overlap using the original data frame and the data frame of overlaps
 prob_calc<-function(df,dfo,V1,V2){
@@ -320,9 +326,9 @@ overlaps_calc<-function(df1,blobs1,time_format1,lat1,lon1,blobs2,
 				#Find the blob boundaries
 				it1<-nearest_ind(df1[b1,"maxlat"],lat1)
 				ib1<-nearest_ind(df1[b1,"minlat"],lat1)
-				il1<-nearest_ind(df1[b1,maxlon_analyze],lon1)
-				ir1<-nearest_ind(df1[b1,minlon_analyze],lat1)
-				#print(sprintf("Bounds (index) for V1: %d %d %d %d",it1,ib1,il1,ir1))
+				il1<-nearest_ind(df1[b1,maxlon_analyze],lon1_analyze)
+				ir1<-nearest_ind(df1[b1,minlon_analyze],lon1_analyze)
+				print(sprintf("Bounds (index) for V1: %d %d %d %d",it1,ib1,il1,ir1))
 				#Grab the time slice
 				v1slice<-blobs1[,,d1i]
 				#Zero out everything but the blob in the longitude direction
@@ -333,9 +339,9 @@ overlaps_calc<-function(df1,blobs1,time_format1,lat1,lon1,blobs2,
 				  #print(sprintf("B1,B2: %d %d",b1,b2))
 				  it2<-nearest_ind(df2[b2,"maxlat"],lat2)
 				  ib2<-nearest_ind(df2[b2,"minlat"],lat2)
-				  il2<-nearest_ind(df2[b2,maxlon_analyze],lon2)
-				  ir2<-nearest_ind(df2[b2,minlon_analyze],lat2)
-					#print(sprintf("Bounds (index) for V2: %d %d %d %d",it2,ib2,il2,ir2))
+				  il2<-nearest_ind(df2[b2,maxlon_analyze],lon2_analyze)
+				  ir2<-nearest_ind(df2[b2,minlon_analyze],lon2_analyze)
+					print(sprintf("Bounds (index) for V2: %d %d %d %d",it2,ib2,il2,ir2))
 					v2slice<-blobs2[,,d2i]
 					v2slice[c(1:min(il2,ir2),max(il2,ir2):dim(blobs2)[1]),]<-0
 					v2slice[,c(1:min(it2,ib2),max(it2,ib2):dim(blobs2)[2])]<-0

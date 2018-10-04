@@ -338,16 +338,16 @@ if (args$intercomparison){
     #Load the blob files
     #File 1
     load(blob_file_1_i)
-    blob1<-get(var_name_1_i)
+    blob1<-get(var_name_1_i)[,,1:90]
     lat1<-lat_axis
     lon1<-lon_axis
-    time1<-time_format
+    time1<-time_format[1:90]
     #File 2
     load(blob_file_2_i)
-    blob2<-get(var_name_2_i)
+    blob2<-get(var_name_2_i)[,,1:90]
     lat2<-lat_axis
     lon2<-lon_axis
-    time2<-time_format
+    time2<-time_format[1:90]
     
     probsim<-overlaps_calc(df1,blob1,time1,lat1,lon1,blob2,
                            df2,time2,lat2,lon2,rfn_ps_i,txt_overlaps_i,txt_ps_i,regrid_i)

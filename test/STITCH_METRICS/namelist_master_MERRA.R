@@ -7,9 +7,9 @@
 #Location of working directory
 work_dir<-"~/tempestextremes/test/STITCH_METRICS"
 #Location where the input data files are stored
-input_dir<-"~/BLOBSTATS_FILES/ERA"
+input_dir<-"~/BLOBSTATS_FILES/MERRA"
 #Location where the output data files are stored
-output_dir<-"~/BLOBSTATS_FILES/ERA"
+output_dir<-"~/BLOBSTATS_FILES/MERRA"
 
 #THIS IS AN EXAMPLE OF A NAMELIST SECTION WHERE THE READFILES OPERATION IS RUN 4 TIMES
 #The analysis is broken up by region because otherwise it will take too long!
@@ -21,20 +21,20 @@ SEASON=c("DJF","JJA")
 nrun_rf<-4
 ###USER-DEFINED###
 #This will be run 4 times 
-stitch_search_str<-sprintf("%s/ERA*_%s_%s_Z_stats.txt",input_dir,SEASON,SECTOR)
-nostitch_search_str<-sprintf("%s/ERA*%s_%s_Z_stats_nostitch.txt",input_dir,SEASON,SECTOR)
+stitch_search_str<-sprintf("%s/MERRA*_%s_%s_Z_stats.txt",input_dir,SEASON,SECTOR)
+nostitch_search_str<-sprintf("%s/MERRA*%s_%s_Z_stats_nostitch.txt",input_dir,SEASON,SECTOR)
 search_str<-c(stitch_search_str,nostitch_search_str)
 
-list_files<-c(sprintf("%s/ERA_stitch_list_%s",input_dir,SECTOR),sprintf("%s/ERA_nostitch_list_%s",input_dir,SECTOR))
-list_rnames<-c(sprintf("%s/ERA_%s_%s_stitchtable.Rdata",output_dir,SEASON,SECTOR),
-               sprintf("%s/ERA_%s_%s_nostitchtable.Rdata",output_dir,SEASON,SECTOR))
+list_files<-c(sprintf("%s/MERRA_stitch_list_%s",input_dir,SECTOR),sprintf("%s/MERRA_nostitch_list_%s",input_dir,SECTOR))
+list_rnames<-c(sprintf("%s/MERRA_%s_%s_stitchtable.Rdata",output_dir,SEASON,SECTOR),
+               sprintf("%s/MERRA_%s_%s_nostitchtable.Rdata",output_dir,SEASON,SECTOR))
 list_dfnames<-"table_out"
 for (i in 1:length(list_files)){
   system(sprintf("ls %s > %s",search_str[i],list_files[i]))
 }
 #################
 
-varname<-rep("ERA",4)
+varname<-rep("MERRA",4)
 filename_stitchblobs<-""
 filelist_stitchblobs<-list_files
 rfn_stitch<-list_rnames
@@ -83,7 +83,7 @@ stitch_file<-list_rnames[1:2]
 detect_file<-list_rnames[3:4]
 stitch_list<-""
 detect_list<-""
-rfn_merged<-sprintf("%s/ERA_%s_%s_merged_table.RData",output_dir,SEASON,SECTOR)
+rfn_merged<-sprintf("%s/MERRA_%s_%s_merged_table.RData",output_dir,SEASON,SECTOR)
 df_merged_name<-"df_merged"
 txt_merged<-""
 csv_merged<-""
@@ -96,7 +96,7 @@ ftype_st<-"R"
 filename_summ<-rfn_merged
 filelist_summ<-""
 keepmerge<-TRUE
-rfn_summ<-sprintf("%s/ERA_%s_%s_summ_table.RData",output_dir,SEASON,SECTOR)
+rfn_summ<-sprintf("%s/MERRA_%s_%s_summ_table.RData",output_dir,SEASON,SECTOR)
 df_summ_name<-"df_summ"
 txt_summ<-""
 csv_summ<-""
@@ -109,12 +109,12 @@ csv_summ<-""
 nrun_rn<-2
 ########################
 #USER DEFINED#
-netcdf_search_str<-sprintf("%s/ERA*_%s_comb_Z_blobs.nc",input_dir,SEASON)
+netcdf_search_str<-sprintf("%s/MERRA*_%s_comb_Z_blobs.nc",input_dir,SEASON)
 list_netcdf_files<-sprintf("%s/bloblist_%s",input_dir,SEASON)
 for (i in 1:length(list_netcdf_files)){
   system(sprintf("ls %s > %s",netcdf_search_str[i],list_netcdf_files[i]))
 }
-rfiles_blobdata<-sprintf("%s/ERA_%s_%s_blobdata.RData",output_dir,SEASON,SECTOR)
+rfiles_blobdata<-sprintf("%s/MERRA_%s_%s_blobdata.RData",output_dir,SEASON,SECTOR)
 ########################
 
 filename_netcdf<-""
