@@ -64,6 +64,8 @@ inline static bool IsInteger(const std::string &str) {
 ///////////////////////////////////////////////////////////////////////////////
 
 inline static bool IsFloat(const std::string &str) {
+	bool fIsFloat = false;
+	bool fHasExponent = false;
 	bool fHasDecimal = false;
 	for(size_t i = 0; i < str.length(); i++) {
 		if ((str[i] < '0') || (str[i] > '9')) {
@@ -71,8 +73,27 @@ inline static bool IsFloat(const std::string &str) {
 				if (fHasDecimal) {
 					return false;
 				}
+				if (fHasExponent) {
+					return false;
+				}
 				fHasDecimal = true;
 				continue;
+			}
+			if (str[i] == 'e') {
+				if (fHasExponent) {
+					return false;
+				}
+				fHasExponent = true;
+				continue;
+			}
+			if ((str[i] == '-') || (str[i] == '+')) {
+				if (i == 0) {
+					continue;
+				} else if (str[i-1] == 'e') {
+					continue;
+				} else {
+					return false;
+				}
 			}
 			if (str[i] == 'f') {
 				if (i != str.length()-1) {
@@ -80,9 +101,12 @@ inline static bool IsFloat(const std::string &str) {
 				}
 			}
 			return false;
+
+		} else {
+			fIsFloat = true;
 		}
 	}
-	return true;
+	return fIsFloat;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

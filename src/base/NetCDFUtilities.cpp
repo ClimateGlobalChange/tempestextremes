@@ -116,7 +116,8 @@ void CopyNcVar(
 	NcFile & ncIn,
 	NcFile & ncOut,
 	const std::string & strVarName,
-	bool fCopyAttributes
+	bool fCopyAttributes,
+	bool fCopyData
 ) {
 	if (!ncIn.is_valid()) {
 		_EXCEPTIONT("Invalid input file specified");
@@ -209,8 +210,10 @@ void CopyNcVar(
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
 		}
 
-		var->get(&(data[0]), &(counts[0]));
-		varOut->put(&(data[0]), &(counts[0]));
+		if (fCopyData) {
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
 	}
 
 	// ncInt type
@@ -227,8 +230,10 @@ void CopyNcVar(
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
 		}
 
-		var->get(&(data[0]), &(counts[0]));
-		varOut->put(&(data[0]), &(counts[0]));
+		if (fCopyData) {
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
 	}
 
 	// ncFloat type
@@ -245,8 +250,10 @@ void CopyNcVar(
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
 		}
 
-		var->get(&(data[0]), &(counts[0]));
-		varOut->put(&(data[0]), &(counts[0]));
+		if (fCopyData) {
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
 	}
 
 
@@ -264,8 +271,10 @@ void CopyNcVar(
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
 		}
 
-		var->get(&(data[0]), &(counts[0]));
-		varOut->put(&(data[0]), &(counts[0]));
+		if (fCopyData) {
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
 	}
 
 	// Check output variable exists

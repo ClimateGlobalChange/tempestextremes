@@ -22,6 +22,7 @@
 #include "DataMatrix.h"
 #include "ArgumentTree.h"
 #include "STLStringHelper.h"
+#include "NodeFileUtilities.h"
 
 #include "netcdfcpp.h"
 
@@ -32,662 +33,6 @@
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
 #endif
-
-///////////////////////////////////////////////////////////////////////////////
-
-enum InputFileType {
-	InputFileTypeDCU,
-	InputFileTypeSN
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		A map from Times to file lines, used for StitchNodes formatted output.
-///	</summary>
-typedef std::map<Time, std::vector< std::pair<int, int> > > TimeToPathNodeMap;
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		A class containing a list of strings for each column data header.
-///	</summary>
-class ColumnDataHeader {
-
-public:
-	///	<summary>
-	///		Parse the format string for the column data header.
-	///	</summary>
-	void Parse(
-		const std::string & strFormat
-	) {
-		m_vecColumnHeader.clear();
-		if (strFormat.length() == 0) {
-			return;
-		}
-
-		int iLast = 0;
-		for (int i = 0; i < strFormat.length(); i++) {
-			if (strFormat[i] == ',') {
-				m_vecColumnHeader.push_back(
-					strFormat.substr(iLast, i-iLast));
-				iLast = i+1;
-			}
-		}
-		m_vecColumnHeader.push_back(
-			strFormat.substr(iLast, strFormat.length()-iLast));
-	}
-
-	///	<summary>
-	///		Size of the header.
-	///	</summary>
-	size_t size() const {
-		return m_vecColumnHeader.size();
-	}
-
-	///	<summary>
-	///		Get the specified index of the column data header.
-	///	</summary>
-	const std::string & operator[](const int & ix) const {
-		return m_vecColumnHeader[ix];
-	}
-
-	///	<summary>
-	///		Get the specified index of the column data header.
-	///	</summary>
-	std::string & operator[](const int & ix) {
-		return m_vecColumnHeader[ix];
-	}
-
-	///	<summary>
-	///		Find the specified string index from a string.
-	///	</summary>
-	int GetIndexFromString(const std::string & str) const {
-		for (int i = 0; i < m_vecColumnHeader.size(); i++) {
-			if (m_vecColumnHeader[i] == str) {
-				return i;
-			}
-		}
-		return (-1);
-	}
-
-	///	<summary>
-	///		Add a new header string.
-	///	</summary>
-	void push_back(const std::string & str) {
-		m_vecColumnHeader.push_back(str);
-	}
-
-protected:
-	///	<summary>
-	///		Column headers.
-	///	</summary>
-	std::vector<std::string> m_vecColumnHeader;
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-class ColumnData {
-
-public:
-	///	<summary>
-	///		Express this column data as a string.
-	///	</summary>
-	virtual std::string ToString() const {
-		return std::string("null");
-	}
-
-	///	<summary>
-	///		Return a duplicate of this ColumnData.
-	///	</summary>
-	virtual ColumnData * Duplicate() const {
-		return new ColumnData();
-	}
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-class ColumnDataString : public ColumnData {
-
-public:
-	///	<summary>
-	///		Default constructor.
-	///	</summary>
-	ColumnDataString() :
-		m_strData()
-	{ }
-
-	///	<summary>
-	///		Constructor with string initializer.
-	///	</summary>
-	ColumnDataString(
-		const std::string & strData
-	) {
-		m_strData = strData;
-	}
-
-public:
-	///	<summary>
-	///		Express this column data as a string.
-	///	</summary>
-	virtual std::string ToString() const {
-		return m_strData;
-	}
-
-	///	<summary>
-	///		Return a duplicate of this ColumnData.
-	///	</summary>
-	virtual ColumnData * Duplicate() const {
-		return new ColumnDataString(*this);
-	}
-
-public:
-	///	<summary>
-	///		The string object in this column data.
-	///	</summary>
-	std::string m_strData;
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-class ColumnDataDouble : public ColumnData {
-
-public:
-	///	<summary>
-	///		Default constructor.
-	///	</summary>
-	ColumnDataDouble()
-	{ }
-
-	///	<summary>
-	///		Constructor with double initializer.
-	///	</summary>
-	ColumnDataDouble(
-		const double & dData
-	) {
-		m_dData = dData;
-	}
-
-public:
-	///	<summary>
-	///		Express this column data as a string.
-	///	</summary>
-	virtual std::string ToString() const {
-		char szBuffer[32];
-		sprintf(szBuffer, "%3.6e", m_dData);
-		return std::string(szBuffer);
-	}
-
-	///	<summary>
-	///		Return a duplicate of this ColumnData.
-	///	</summary>
-	virtual ColumnData * Duplicate() const {
-		return new ColumnDataDouble(*this);
-	}
-
-public:
-	///	<summary>
-	///		The double in this ColumnData.
-	///	</summary>
-	double m_dData;
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-class ColumnDataRLLVelocity : public ColumnData {
-
-public:
-	///	<summary>
-	///		Express this column data as a string.
-	///	</summary>
-	virtual std::string ToString() const {
-		char szVelocity[100];
-		sprintf(szVelocity, "\"%3.6e %3.6e\"", m_dU, m_dV);
-		return szVelocity;
-	}
-
-	///	<summary>
-	///		Return a duplicate of this ColumnData.
-	///	</summary>
-	virtual ColumnData * Duplicate() const {
-		return new ColumnDataRLLVelocity(*this);
-	}
-
-public:
-	///	<summary>
-	///		Zonal velocity.
-	///	</summary>
-	double m_dU;
-
-	///	<summary>
-	///		Meridional velocity.
-	///	</summary>
-	double m_dV;
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-class ColumnDataRadialVelocityProfile : public ColumnData {
-
-public:
-	///	<summary>
-	///		Express this column data as a string.
-	///	</summary>
-	virtual std::string ToString() const {
-		char buf[100];
-		std::string strOut = "\"";
-		for (int i = 0; i < m_dUa.size(); i++) {
-			sprintf(buf, "%3.6e", m_dUa[i]);
-			strOut += buf;
-			if (i == m_dUa.size()-1) {
-				strOut += "\"";
-			} else {
-				strOut += ",";
-			}
-		}
-		return strOut;
-	}
-
-	///	<summary>
-	///		Return a duplicate of this ColumnData.
-	///	</summary>
-	virtual ColumnData * Duplicate() const {
-		return new ColumnDataRadialVelocityProfile(*this);
-	}
-
-public:
-	///	<summary>
-	///		Vector of radial coordinates.
-	///	</summary>
-	std::vector<double> m_dR;
-
-	///	<summary>
-	///		Vector of azimuthal velocities.
-	///	</summary>
-	std::vector<double> m_dUa;
-
-	///	<summary>
-	///		Vector of radial velocities.
-	///	</summary>
-	std::vector<double> m_dUr;
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		A struct for expressing one node along a path.
-///	</summary>
-class PathNode {
-	public:
-		///	<summary>
-		///		Constructor.
-		///	</summary>
-		PathNode() :
-			m_gridix(0),
-			m_time()
-		{ }
-
-		///	<summary>
-		///		Destructor.
-		///	</summary>
-		~PathNode() {
-			for (int i = 0; i < m_vecColumnData.size(); i++) {
-				delete m_vecColumnData[i];
-			}
-		}
-
-		///	<summary>
-		///		Push back a ColumnData object into column.
-		///	</summary>
-		void PushColumnData(
-			ColumnData * pcdat
-		) {
-			m_vecColumnData.push_back(pcdat);
-		}
-
-		///	<summary>
-		///		Push back a string object into column.
-		///	</summary>
-		void PushColumnDataString(
-			const std::string & strString
-		) {
-			m_vecColumnData.push_back(
-				new ColumnDataString(strString));
-		}
-
-		///	<summary>
-		///		Duplicate data from given index.
-		///	</summary>
-		void Duplicate(
-			int ix
-		) {
-			if ((ix < 0) || (ix >= m_vecColumnData.size())) {
-				_EXCEPTIONT("Index out of range");
-			}
-			m_vecColumnData.push_back(
-				m_vecColumnData[ix]->Duplicate());
-		}
-
-		///	<summary>
-		///		Get column data as integer.
-		///	</summary>
-		int GetColumnDataAsInteger(
-			const ColumnDataHeader & cdh,
-			const std::string & strColumn
-		) {
-			if (STLStringHelper::IsInteger(strColumn)) {
-				return atoi(strColumn.c_str());
-			}
-
-			int ix = cdh.GetIndexFromString(strColumn);
-			if (ix == (-1)) {
-				_EXCEPTION1("Invalid column header \"%s\"", strColumn.c_str());
-			}
-			std::string str = m_vecColumnData[ix]->ToString();
-			if (!STLStringHelper::IsInteger(str)) {
-				_EXCEPTIONT("Column header \"%s\" cannot be cast to type integer");
-			}
-			return atoi(str.c_str());
-		}
-
-		///	<summary>
-		///		Get column data as double.
-		///	</summary>
-		double GetColumnDataAsDouble(
-			const ColumnDataHeader & cdh,
-			const std::string & strColumn
-		) {
-			if (STLStringHelper::IsFloat(strColumn)) {
-				return atof(strColumn.c_str());
-			}
-
-			int ix = cdh.GetIndexFromString(strColumn);
-			if (ix == (-1)) {
-				_EXCEPTION1("Invalid column header \"%s\"", strColumn.c_str());
-			}
-			std::string str = m_vecColumnData[ix]->ToString();
-			if (!STLStringHelper::IsFloat(str)) {
-				_EXCEPTIONT("Column header \"%s\" cannot be cast to type integer");
-			}
-			return atof(str.c_str());
-		}
-
-	public:
-		///	<summary>
-		///		Index on the grid of this point.
-		///	</summary>
-		size_t m_gridix;
-
-		///	<summary>
-		///		Time associated with this node.
-		///	</summary>
-		Time m_time;
-
-		///	<summary>
-		///		Array of column data associated with this node and time.
-		///	</summary>
-		std::vector<ColumnData *> m_vecColumnData;
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		A struct for expressing a path.
-///	</summary>
-class Path {
-	public:
-		///	<summary>
-		///		Duplicate the given data column across all PathNodes.
-		///	</summary>
-		void Duplicate(
-			int ix
-		) {
-			for (int j = 0; j < m_vecPathNodes.size(); j++) {
-				m_vecPathNodes[j].Duplicate(ix);
-			}
-		}
-
-	public:
-		///	<summary>
-		///		Start time of the path.
-		///	</summary>
-		Time m_timeStart;
-
-		///	<summary>
-		///		Array of PathNodes in the path.
-		///	</summary>
-		std::vector<PathNode> m_vecPathNodes;
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-class PathVector : public std::vector<Path> {
-
-	public:
-		///	<summary>
-		///		Duplicate the given data column across all Paths
-		///	</summary>
-		void Duplicate(
-			int ix
-		) {
-			for (int p = 0; p < size(); p++) {
-				(*this)[p].Duplicate(ix);
-			}
-		}
-
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Read in a node file and parse it into a PathVector.
-///	</summary>
-void ParseNodeFile(
-	const std::string & strNodeFile,
-	InputFileType iftype,
-	const ColumnDataHeader & cdh,
-	const SimpleGrid & grid,
-	const AutoCurator & autocurator,
-	PathVector & pathvec,
-	TimeToPathNodeMap & mapTimeToPathNode
-) {
-	// String buffer
-	std::string strBuffer;
-
-	// Coordinate buffer
-	std::vector<int> coord;
-	coord.resize(grid.m_nGridDim.size());
-
-	// Clear the PathVector
-	pathvec.clear();
-
-	// Clear the TimeToPathNodeMap
-	mapTimeToPathNode.clear();
-
-	// Open the file as an input stream
-	std::ifstream ifInput(strNodeFile);
-	if (!ifInput.is_open()) {
-		_EXCEPTION1("Unable to open input file \"%s\"", strNodeFile.c_str());
-	}
-
-	// Loop through all lines
-	int iLine = 1;
-	for (;;) {
-
-		int nCount = 0;
-		Time time;
-
-		// Read header lines
-		{
-			getline(ifInput, strBuffer);
-			if (ifInput.eof()) {
-				break;
-			}
-
-			std::istringstream iss(strBuffer);
-
-			// DetectCyclonesUnstructured output
-			if (iftype == InputFileTypeDCU) {
-				int iYear;
-				int iMonth;
-				int iDay;
-				int iHour;
-
-				iss >> iYear;
-				iss >> iMonth;
-				iss >> iDay;
-				iss >> nCount;
-				iss >> iHour;
-
-				if (iss.eof()) {
-					_EXCEPTION2("Format error on line %i of \"%s\"",
-						iLine, strNodeFile.c_str());
-				}
-
-				time = Time(
-					iYear,
-					iMonth-1,
-					iDay-1,
-					3600 * iHour,
-					0,
-					autocurator.GetCalendarType());
-
-			// StitchNodes output
-			} else if (iftype == InputFileTypeSN) {
-				std::string strStart;
-				int iYear;
-				int iMonth;
-				int iDay;
-				int iHour;
-
-				iss >> strStart;
-				iss >> nCount;
-				iss >> iYear;
-				iss >> iMonth;
-				iss >> iDay;
-				iss >> iHour;
-
-				if (iss.bad()) {
-					_EXCEPTION2("Format error on line %i of \"%s\"",
-						iLine, strNodeFile.c_str());
-				}
-
-				pathvec.resize(pathvec.size() + 1);
-				pathvec[pathvec.size()-1].m_timeStart =
-					Time(
-						iYear,
-						iMonth-1,
-						iDay-1,
-						3600 * iHour,
-						0,
-						autocurator.GetCalendarType());
-
-				pathvec[pathvec.size()-1].m_vecPathNodes.resize(nCount);
-			}
-
-			iLine++;
-		}
-
-		// Read contents under each header line
-		for (int i = 0; i < nCount; i++) {
-
-			getline(ifInput, strBuffer);
-			if (ifInput.eof()) {
-				break;
-			}
-
-			std::istringstream iss(strBuffer);
-
-			for (int n = 0; n < grid.m_nGridDim.size(); n++) {
-				iss >> coord[n];
-				if ((coord[n] < 0) || (coord[n] >= grid.m_nGridDim[n])) {
-					_EXCEPTION2("Coordinate index out of range on line %i of \"%s\"",
-						coord[n], strNodeFile.c_str());
-				}
-			}
-			if (iss.eof()) {
-				_EXCEPTION2("Format error on line %i of \"%s\"",
-					iLine, strNodeFile.c_str());
-			}
-
-			std::string strBuf;
-			std::vector<std::string> vecDelimitedOutput;
-			for (;;) {
-				iss >> strBuf;
-				vecDelimitedOutput.push_back(strBuf);
-				if (iss.eof()) {
-					break;
-				}
-			}
-
-			int nOutputSize = vecDelimitedOutput.size();
-
-			if (cdh.size() != nOutputSize-4) {
-				_EXCEPTION3("Mismatch between column label length (%i)"
-					" and node file columns on line %i of \"%s\"",
-					static_cast<int>(cdh.size()), iLine, strNodeFile.c_str());
-			}
-
-			// StitchNodes format input
-			if (iftype == InputFileTypeSN) {
-				PathNode & pathnode =
-					pathvec[pathvec.size()-1].m_vecPathNodes[i];
-
-				if (nOutputSize < 4) {
-					_EXCEPTION2("Format error on line %i of \"%s\"",
-						iLine, strNodeFile.c_str());
-				}
-
-				// Store time
-				int iYear = std::stoi(vecDelimitedOutput[nOutputSize-4]);
-				int iMonth = std::stoi(vecDelimitedOutput[nOutputSize-3]);
-				int iDay = std::stoi(vecDelimitedOutput[nOutputSize-2]);
-				int iHour = std::stoi(vecDelimitedOutput[nOutputSize-1]);
-
-				time = Time(
-					iYear,
-					iMonth-1,
-					iDay-1,
-					3600 * iHour,
-					0,
-					autocurator.GetCalendarType());
-
-				pathnode.m_time = time;
-
-				// Store coordinate
-				if (coord.size() == 1) {
-					pathnode.m_gridix = coord[0];
-				} else if (coord.size() == 2) {
-					pathnode.m_gridix = coord[0] + grid.m_nGridDim[1] * coord[1];
-				} else {
-					_EXCEPTIONT("Undefined behavior for SimpleGrid dimensionality > 2");
-				}
-
-				// Store all other data as strings
-				for (int i = 0; i < nOutputSize-4; i++) {
-					pathnode.PushColumnDataString(
-						vecDelimitedOutput[i]);
-				}
-
-				// Because nodes in StitchNodes format output are not ordered in
-				// time, efficient data I/O requires us to reorganize the input
-				// lines by time.
-				TimeToPathNodeMap::iterator iter =
-					mapTimeToPathNode.find(time);
-				if (iter == mapTimeToPathNode.end()) {
-					iter = mapTimeToPathNode.insert(
-						TimeToPathNodeMap::value_type(
-							time, std::vector< std::pair<int,int> >())).first;
-				}
-				iter->second.push_back(
-					std::pair<int,int>(
-						static_cast<int>(pathvec.size()-1),i));
-			}
-
-			iLine++;
-		}
-	}
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -919,6 +264,14 @@ void SumRadius(
 ) {
 	// Get the radius 
 	double dRadius = pathnode.GetColumnDataAsDouble(cdh, strRadius);
+
+	if (dRadius == 0.0) {
+		pathnode.PushColumnData(
+			new ColumnDataDouble(0.0));
+	} else {
+		pathnode.PushColumnData(
+			new ColumnDataDouble(1.0));
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1178,12 +531,6 @@ try {
 	// Append output to input file
 	bool fOutputAppend;
 
-	// Append trajectory velocities
-	bool fAppendTrajectoryVelocity;
-
-	// Variables for calculating radial wind profile
-	std::string strRadialWindProfileVars;
-
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in_file", "");
@@ -1203,9 +550,6 @@ try {
 		CommandLineString(strCalculate, "calculate", "");
 		CommandLineString(strAppend, "append", "");
 
-		//CommandLineBool(fAppendTrajectoryVelocity, "append_traj_vel");
-		//CommandLineStringD(strRadialWindProfileVars, "radial_wind_profile", "", "(U,V,bins,bin_width[,opts])");
-
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
 
@@ -1218,20 +562,20 @@ try {
 	AutoCurator autocurator;
 
 	// Check arguments
-	if ((strInputData.length() == 0) && (strInputDataList.length() == 0)) {
-		_EXCEPTIONT("No input data file (--in_data) or (--in_data_list)"
-			" specified");
-	}
-	if ((strInputData.length() != 0) && (strInputDataList.length() != 0)) {
-		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list)"
-			" may be specified");
-	}
 	if ((strInputFile.length() == 0) && (strInputFileList.length() == 0)) {
 		_EXCEPTIONT("No input file (--in_file) or (--in_file_list)"
 			" specified");
 	}
 	if ((strInputFile.length() != 0) && (strInputFileList.length() != 0)) {
 		_EXCEPTIONT("Only one of (--in_file) or (--in_file_list)"
+			" may be specified");
+	}
+	if ((strInputData.length() == 0) && (strInputDataList.length() == 0)) {
+		_EXCEPTIONT("No input data file (--in_data) or (--in_data_list)"
+			" specified");
+	}
+	if ((strInputData.length() != 0) && (strInputDataList.length() != 0)) {
+		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list)"
 			" may be specified");
 	}
 
@@ -1243,15 +587,6 @@ try {
 		iftype = InputFileTypeSN;
 	} else {
 		_EXCEPTIONT("Invalid --in_file_type, expected \"SN\" or \"DCU\"");
-	}
-
-	// Radial wind profile can only be calculated with StitchNodes output
-	if ((fAppendTrajectoryVelocity) && (iftype != InputFileTypeSN)) {
-		_EXCEPTIONT("--append_traj_vel can only be used with --in_file_type SN");
-	}
-
-	if ((strRadialWindProfileVars != "") && (iftype != InputFileTypeSN)) {
-		_EXCEPTIONT("--radial_wind_profile can only be used with --in_file_type SN");
 	}
 
 	// Parse in_fmt string
@@ -1307,7 +642,7 @@ try {
 		const std::vector<std::string> & vecFiles = autocurator.GetFilenames();
 
 		if (vecFiles.size() < 1) {
-			_EXCEPTIONT("No data files specified");
+			_EXCEPTIONT("No data files specified; unable to generate grid");
 		}
 
 		NcFile ncFile(vecFiles[0].c_str());
@@ -1346,13 +681,6 @@ try {
 			vecInputFiles.push_back(strFileLine);
 		}
 	}
-/*
-	// Parse radial input parameters
-	RadialProfileCalculator radprofcalc;
-	if (strRadialWindProfileVars != "") {
-		radprofcalc.Parse(varreg, strRadialWindProfileVars);
-	}
-*/
 
 	// A map from Times to file lines, used for StitchNodes formatted output
 	TimeToPathNodeMap mapTimeToPathNode;
@@ -1372,7 +700,7 @@ try {
 			iftype,
 			cdhInput,
 			grid,
-			autocurator,
+			autocurator.GetCalendarType(),
 			pathvec,
 			mapTimeToPathNode);
 		AnnounceEndBlock("Done");
@@ -1587,19 +915,13 @@ try {
 				AnnounceEndBlock("Done");
 				continue;
 			}
-
+/*
 			// sum_radius
 			if ((*pargtree)[2] == "sum_radius") {
 				if (pargfunc->size() != 2) {
 					_EXCEPTIONT("Syntax error: Function \"sum_radius\" "
 						"requires two arguments:\n"
 						"lastwhere(<field>, <radius>)");
-				}
-
-				// Get arguments
-				int ix = cdhInput.GetIndexFromString((*pargfunc)[0]);
-				if (ix == (-1)) {
-					_EXCEPTION1("Invalid column header \"%s\"", (*pargfunc)[0].c_str());
 				}
 
 				// Parse variable
@@ -1644,8 +966,14 @@ try {
 							(*pargfunc)[1]);
 					}
 				}
-			}
 
+				// Add new variable to ColumnDataHeader
+				cdhInput.push_back((*pargtree)[0]);
+
+				AnnounceEndBlock("Done");
+				continue;
+			}
+*/
 			// Unknown operation
 			Announce(NULL);
 			AnnounceEndBlock("WARNING: Unknown function \"%s\" no operation performed",

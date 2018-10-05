@@ -20,7 +20,8 @@ EXEC_FILES= AppendNodeData.cpp \
             DetectCyclonesUnstructured.cpp \
 			HistogramNodes.cpp \
             StitchNodes.cpp \
-			NodeFileEditor.cpp
+			NodeFileEditor.cpp \
+			NodeFileFilter.cpp
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 
