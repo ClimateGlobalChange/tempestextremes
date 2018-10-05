@@ -328,7 +328,8 @@ void GetInputFileList(
 ///	</summary>
 void GetAllTimes(
 	const std::vector<std::string> & vecInputFiles,
-	DataVector<double> & dataTimes
+	DataVector<double> & dataTimes,
+	std::string timename
 ) {
 	std::vector<double> vecTimes;
 
@@ -339,14 +340,14 @@ void GetAllTimes(
 				vecInputFiles[f].c_str());
 		}
 
-		NcDim * dimTime = ncFile.get_dim("time");
+		NcDim * dimTime = ncFile.get_dim(timename.c_str());
 		if (dimTime == NULL) {
-			_EXCEPTIONT("No dimension \"time\" found in input file");
+			_EXCEPTIONT("GetAllTimes: No time dimension found in input file");
 		}
 
 		int nTime = dimTime->size();
 
-		NcVar * varTime = ncFile.get_var("time");
+		NcVar * varTime = ncFile.get_var(timename.c_str());
 		if (varTime == NULL) {
 			for (int t = 0; t < nTime; t++) {
 				vecTimes.push_back(static_cast<double>(t));
@@ -358,8 +359,8 @@ void GetAllTimes(
 
 			varTime->get(dTime, nTime);
 			for (int t = 0; t < nTime; t++) {
-			//	vecTimes.push_back(dTime[t]);
-			vecTimes.push_back(dTime[t] + (double)(1440 * f));
+				vecTimes.push_back(dTime[t]);
+			//vecTimes.push_back(dTime[t] + (double)(1440 * f));
 			}
 		}
 	}
