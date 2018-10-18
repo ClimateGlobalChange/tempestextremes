@@ -78,9 +78,15 @@ void ParseNodeFile(
 				iss >> iMonth;
 				iss >> iDay;
 				iss >> nCount;
+
+				if (!iss.good()) {
+					_EXCEPTION2("Format error on line %i of \"%s\"",
+						iLine, strNodeFile.c_str());
+				}
+
 				iss >> iHour;
 
-				if (iss.eof()) {
+				if (!iss.eof()) {
 					_EXCEPTION2("Format error on line %i of \"%s\"",
 						iLine, strNodeFile.c_str());
 				}
@@ -106,9 +112,19 @@ void ParseNodeFile(
 				iss >> iYear;
 				iss >> iMonth;
 				iss >> iDay;
+
+				if (!iss.good()) {
+					_EXCEPTION2("Format error on line %i of \"%s\"",
+						iLine, strNodeFile.c_str());
+				}
+
 				iss >> iHour;
 
-				if (iss.bad()) {
+				if (strStart != "start") {
+					_EXCEPTION2("Format error on line %i of \"%s\"",
+						iLine, strNodeFile.c_str());
+				}
+				if (!iss.eof()) {
 					_EXCEPTION2("Format error on line %i of \"%s\"",
 						iLine, strNodeFile.c_str());
 				}
@@ -156,7 +172,7 @@ void ParseNodeFile(
 			for (;;) {
 				iss >> strBuf;
 				vecDelimitedOutput.push_back(strBuf);
-				if (iss.eof()) {
+				if ((iss.eof()) || (strBuf.length() == 0)) {
 					break;
 				}
 			}
