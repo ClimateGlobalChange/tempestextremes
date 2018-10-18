@@ -363,13 +363,16 @@ void Variable::LoadGridData(
 	int iTime
 ) {
 	// Check if data already loaded
+	if (iTime == (-2)) {
+		_EXCEPTIONT("Invalid time index");
+	}
 	if (iTime == m_iTime) {
 		if (m_data.GetRows() != grid.GetSize()) {
 			_EXCEPTIONT("Logic error");
 		}
 		return;
 	}
-	if (m_fNoTimeInNcFile) {
+	if ((m_fNoTimeInNcFile) && (m_iTime != (-2))) {
 		if (m_data.GetRows() != grid.GetSize()) {
 			_EXCEPTIONT("Logic error");
 		}
