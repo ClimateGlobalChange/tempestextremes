@@ -29,11 +29,11 @@
 #include <fstream>
 #include <queue>
 #include <set>
-
+/*
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
 #endif
-
+*/
 ///////////////////////////////////////////////////////////////////////////////
 
 void CalculateRadialProfile(
@@ -470,7 +470,7 @@ void CalculateStormVelocity(
 ///////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char** argv) {
-
+/*
 #if defined(TEMPEST_MPIOMP)
 	// Initialize MPI
 	MPI_Init(&argc, &argv);
@@ -483,13 +483,13 @@ int main(int argc, char** argv) {
 		return (-1);
 	}
 #endif
-
+*/
 	// Turn off fatal errors in NetCDF
 	NcError error(NcError::silent_nonfatal);
-
+/*
 	// Enable output only on rank zero
 	AnnounceOnlyOutputOnRankZero();
-
+*/
 try {
 
 	// Input text file
@@ -1045,10 +1045,11 @@ try {
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());
 }
-
+/*
 #if defined(TEMPEST_MPIOMP)
 	// Deinitialize MPI
 	MPI_Finalize();
 #endif
+*/
 }
 
