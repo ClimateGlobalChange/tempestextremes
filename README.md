@@ -4,7 +4,7 @@ TempestExtremes
 Author:  Paul Ullrich
 Email:   paullrich@ucdavis.edu
 
-Copyright 2000-2017 Paul Ullrich
+Copyright 2000-2018 Paul Ullrich
 
 This file is distributed as part of the Tempest source code package.
 Permission is granted to use, copy, modify and distribute this
