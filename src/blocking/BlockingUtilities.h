@@ -151,7 +151,13 @@ double replaceMissingFloat(int currA,
                            int aLen,
                            int bLen
 );
-		
+double replaceMissingFloat2D(int currA,
+                           int currB,
+                           double valThresh,
+                           DataMatrix<double> VarMat,
+                           int aLen,
+                           int bLen
+);		
 //Used in BlockingPV. Input lat, lon, and pressure variables
 //and returns the variables necessary to calculate PV (dlat,
 //dlon, vector of coriolis parameter values,etc)

@@ -1,7 +1,7 @@
 require(knitr)
 require(markdown)
 require(rmarkdown)
-
+require(reshape2)
 #Returns in the -180->180 range
 lon_convert<-function(lon){
   distFrom180=lon-180.
@@ -16,34 +16,82 @@ lon_convert2<-function(lon){
   return(ifelse(lon<0,360+lon,lon))
 }
 
-#Load the two datasets
-V1<-"ERA"
-V2<-"MERRA"
+source("~/tempestextremes/test/STITCH_METRICS/namelist_report_JJA_SP.R")
+#Generate the title string based on the variables
 
-title_string<-sprintf("Comparison of blocking data from %s and %s",V1,V2)
+title_string<-paste("Comparison of blocking data for ",Varnames[1])
+for (t in 2:length(Varnames)){
+  title_string<-paste(title_string, Varnames[t], sep=", ")
+}
+
+
 md_file<-"~/tempestextremes/test/STITCH_METRICS/report_template.Rmd"
 
-#Data tables for V1 and V2
-load("table_merged.RData")
-#This is the per-timestep data
-df_table<-get(df_name)
-#This is the summarized data
-#MAKE A NOTE TO ADD THE DF NAME TO THE R FILE
-load("table_summ.RData")
-df_summ<-df_summ_ERA_MERRA
+avgdata<-data.frame(x=numeric(),y=numeric(),value=numeric(),
+                     VAR=character(),lon=numeric(),lat=numeric())
 
-#Load the blob data
-load("ERA_DJF.RData")
-ERA_lat<-lat_axis
-ERA_lon<-lon_axis
-ERA_BLOB[which(ERA_BLOB>0)]<-1
-V1_dens<-apply(ERA_BLOB,c(1,2),mean)
-load("MERRA_DJF.RData")
-MERRA_lat<-lat_axis
-MERRA_lon<-lon_axis
-MERRA_BLOB[which(MERRA_BLOB>0)]<-1
-V2_dens<-apply(MERRA_BLOB,c(1,2),mean)
+#Make a list object that will have all of the relevant data
+comparison_data<-list()
+for (i in 1:length(Varnames)){
+  comparison_data$varname[i]<-Varnames[i]
+  #Load the merged table
+  load(mergefiles[i])
+  merge_dfname<-sprintf("V%d_merge",i)
+  assign(merge_dfname,get(df_name))
+  comparison_data$mergename[i]<-merge_dfname
+  #load the summary table
+  load(summfiles[i])
+  summ_dfname<-sprintf("V%d_summ",i)
+  assign(summ_dfname,df_summ)
+  comparison_data$summname[i]<-summ_dfname
+  #load the blob data
+  load(blobfiles[i])
+  assign(sprintf("lat%d",i),lat_axis)
+  assign(sprintf("lon%d",i),lon_axis)
+  assign(sprintf("time%d",i),time_format)
+  assign(sprintf("blob%d",i),get(blobname[i]))
+
+  #average the blob data
+  avgname<-sprintf("avgblob%d",i)
+  ablob<-apply(get(sprintf("blob%d",i)),c(1,2),mean)
+  #Add to the long table for plotting
+  temp<-melt(ablob,varnames=c("x","y"))
+  temp$VAR<-rep(Varnames[i],nrow(temp))
+  temp$lon<-lon_axis[temp$x]
+  temp$lat<-lat_axis[temp$y]
+  avgdata<-rbind(avgdata,temp)
+  assign(avgname,ablob)
+}
+
+avgdata$VAR<-factor(avgdata$VAR,levels=Varnames)
+
+#JRA is 1, ERA is 2, MERRA is 3, CFSR is 4
+#open the ic Rdata, calculate rmse, save dataset
+# 
+# saved_names<-c("V1","V2","p1given2","p2given1","sim_25","sim_50","sim_75",
+#                "df_overlaps","pearson_num","rmse_num")
+#   for (i in 1:4){
+#     avg1st<-get(sprintf("avgblob%d",i))
+#     lat1st<-get(sprintf("lat%d",i))
+#     lon1st<-get(sprintf("lon%d",i))
+#     for (j in 2:4){
+#       avg2nd<-get(sprintf("avgblob%d",j))
+#       lat2nd<-get(sprintf("lat%d",j))
+#       lon2nd<-get(sprintf("lon%d",j))
+#       if (i<j){
+#         #The filename
+#         fname<-sprintf("~/BLOBSTATS_FILES/JJA_SP_ic_%s_%s.RData",Varnames[i],Varnames[j])
+#         fname2<-sprintf("~/BLOBSTATS_FILES/JJA_SP_ic_%s_%s_2.RData",Varnames[i],Varnames[j])
+#         load(fname)
+#         rmse_num<-rmse_calc(avg1st,avg2nd,lat1st,lat2nd,lon1st,lon2nd,interp=T)
+#         save(list=saved_names,file=fname2)
+#       }
+#     }
+#   }
+
+
+
 
 #Generate the report from the template
-rmarkdown::render(md_file,output_file="test.html")
+rmarkdown::render(md_file,output_file=output_name)
 

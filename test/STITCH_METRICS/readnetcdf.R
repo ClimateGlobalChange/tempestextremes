@@ -21,6 +21,13 @@ lon_convert2<-function(lon){
   return(ifelse(lon<0,360+lon,lon))
 }
 
+#Finds the index of closest value in a vector
+nearest_ind<-function(val,vec){
+  dist_vec<-abs(val-vec)
+  i<-which(dist_vec==min(dist_vec))
+  return(i[1])
+}
+
 read_netcdf<-function(flist,vlist,olist=vlist,timename="time",levname="lev",latname="lat",lonname="lon",
 	minlat="",maxlat="",minlon="",maxlon="",minlev="",maxlev="",ncout="",rdataout="",
 	transformto180=FALSE,transformto360=FALSE){
@@ -91,8 +98,8 @@ read_netcdf<-function(flist,vlist,olist=vlist,timename="time",levname="lev",latn
 		  bi<-1
 		  ti<-length(lat)
 		}else{
-		  bi<-which(lat==minlat)
-		  ti<-which(lat==maxlat)
+		  bi<-nearest_ind(minlat,lat)
+		  ti<-nearest_ind(maxlat,lat)
 		}
 		if (length(bi)<1 | length(ti)<1){
 		  stop("Can't find specified min and max latitude coordinates.")
@@ -106,8 +113,9 @@ read_netcdf<-function(flist,vlist,olist=vlist,timename="time",levname="lev",latn
 		  li<-1
 		  ri<-length(lon)
 		}else{
-		  li<-which(lon==minlon)
-		  ri<-which(lon==maxlon)
+		  li<-nearest_ind(minlon,lon)
+		  ri<-nearest_ind(maxlon,lon)
+		  #print(sprintf("Subsetting bounds to %f, %f",lon[li],lon[ri]))
 		}
 		if (length(li)<1 | length(ri)<1){
 		  stop("Can't find specified min and max longitude coordinates.")

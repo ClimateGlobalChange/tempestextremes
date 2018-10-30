@@ -55,7 +55,7 @@ gen_summary_table<-function(df_in,keep_merge=TRUE,
         hs<-as.numeric(strftime(sline[1,"datehour"],format="%H"))
         he<-as.numeric(strftime(eline[1,"datehour"],format="%H"))
         hdiff<-(he-hs + nhrs)/24
-        df_summ[nline,"duration_days"]<-diff_days+(hdiff)
+        df_summ[nline,"duration_days"]<-diff_days+(hdiff)+1
         df_summ[nline,"merged"]<-ifelse(merged_blob==FALSE,"NO","YES")
         if (!is.null(dsub2$centlat) & !is.null(dsub2$centlon)){
           df_summ[nline,"start_centlat"]<-sline[1,"centlat"]

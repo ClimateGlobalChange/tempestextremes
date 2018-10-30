@@ -521,6 +521,41 @@ double replaceMissingFloat(int currA,
   return(newCurrVal);
 }
 
+double replaceMissingFloat2D(int currA,
+                           int currB,
+                           double valThresh,
+                           DataMatrix<double> VarMat,
+                           int aLen,
+                           int bLen
+){
+  double currVal = VarMat[currA][currB];
+  //Point left
+  int leftB = currB-1;
+  double leftVal = VarMat[currA][leftB];
+  while (std::fabs(leftVal) > valThresh){
+    leftB-=1;
+    if (leftB < 1){
+      break;
+    }
+    leftVal = VarMat[currA][leftB];
+  }
+  //Point right
+  int rightB = currB+1;
+  double rightVal = VarMat[currA][rightB];
+  while (std::fabs(rightVal)>valThresh){
+    rightB+=1;
+    if (rightB > (bLen-1)){
+      break;
+    }
+    rightVal = VarMat[currA][rightB];
+  }
+
+  //Interpolate!
+  double newCurrVal = ((double)(rightB-currB)/(double)(rightB-leftB))*leftVal + \
+     ((double)(currB-leftB)/(double)(rightB-leftB))*rightVal;
+  return(newCurrVal);
+}
+
 //Used in BlockingPV. Input lat, lon, and pressure variables
 //and returns the variables necessary to calculate PV (dlat,
 //dlon, vector of coriolis parameter values,etc)

@@ -39,7 +39,7 @@ gen_summary_table<-function(df_in,rfn="",textfn="",csvfn=""){
       he<-as.numeric(strftime(eline[1,"datehour"],format="%H"))
       hdiff<-(he-hs)/24
       #print(hdiff)
-      df_summ[nline,"duration_days"]<-diff_days+hdiff
+      df_summ[nline,"duration_days"]<-diff_days+hdiff+1
       if (!is.null(dsub2$centlat) & !is.null(dsub2$centlon)){
         df_summ[nline,"start_centlat"]<-sline[1,"centlat"]
         df_summ[nline,"start_centlon"]<-sline[1,"centlon"]
