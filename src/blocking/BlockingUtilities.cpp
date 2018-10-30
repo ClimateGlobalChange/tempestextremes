@@ -497,7 +497,7 @@ double replaceMissingFloat(int currA,
   //Point left
   int leftB = currB-1;
   double leftVal = VarMat[currP][currA][leftB];
-  while (std::fabs(leftVal) > valThresh){
+  while (std::fabs(leftVal) >= std::fabs(valThresh)){
     leftB-=1;
     if (leftB < 1){
       break;
@@ -507,7 +507,7 @@ double replaceMissingFloat(int currA,
   //Point right
   int rightB = currB+1;
   double rightVal = VarMat[currP][currA][rightB];
-  while (std::fabs(rightVal)>valThresh){
+  while (std::fabs(rightVal)>= std::fabs(valThresh)){
     rightB+=1;
     if (rightB > (bLen-1)){
       break;
@@ -532,7 +532,7 @@ double replaceMissingFloat2D(int currA,
   //Point left
   int leftB = currB-1;
   double leftVal = VarMat[currA][leftB];
-  while (std::fabs(leftVal) > valThresh){
+  while (std::fabs(leftVal) >=std::fabs(valThresh)){
     leftB-=1;
     if (leftB < 1){
       break;
@@ -542,7 +542,7 @@ double replaceMissingFloat2D(int currA,
   //Point right
   int rightB = currB+1;
   double rightVal = VarMat[currA][rightB];
-  while (std::fabs(rightVal)>valThresh){
+  while (std::fabs(rightVal)>=std::fabs(valThresh)){
     rightB+=1;
     if (rightB > (bLen-1)){
       break;
