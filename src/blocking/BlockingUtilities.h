@@ -151,7 +151,13 @@ double replaceMissingFloat(int currA,
                            int aLen,
                            int bLen
 );
-		
+double replaceMissingFloat2D(int currA,
+                           int currB,
+                           double valThresh,
+                           DataMatrix<double> VarMat,
+                           int aLen,
+                           int bLen
+);		
 //Used in BlockingPV. Input lat, lon, and pressure variables
 //and returns the variables necessary to calculate PV (dlat,
 //dlon, vector of coriolis parameter values,etc)
@@ -339,5 +345,28 @@ void calcDevsGH(bool leap,
 //Function that calculates TM blocking index
 
 
+
+void PV_calc2(
+        int nPlev,
+        int nLat,
+        int nLon,
+        DataMatrix3D<double>UMat,
+        DataMatrix3D<double>VMat,
+        DataMatrix3D<double> PTMat,
+        DataMatrix3D<double> RVMat,
+        DataVector<double>pVec,
+        DataVector<double> coriolis,
+        DataVector<double>cosphi,
+        double dphi,
+        double dlambda,
+        double lat_res,
+        double lon_res,
+        DataMatrix3D<double> &PVMat,
+  DataMatrix3D<double> &dpt_dp,
+  DataMatrix3D<double> &du_dp,
+  DataMatrix3D<double> &dv_dp,
+  DataMatrix3D<double> &dpt_dphi,
+  DataMatrix3D<double> &dpt_dl
+);
 
 #endif
