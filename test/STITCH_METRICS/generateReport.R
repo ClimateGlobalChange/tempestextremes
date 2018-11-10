@@ -16,7 +16,7 @@ lon_convert2<-function(lon){
   return(ifelse(lon<0,360+lon,lon))
 }
 
-source("~/tempestextremes/test/STITCH_METRICS/namelist_report_JJA_SP.R")
+#source("~/tempestextremes/test/STITCH_METRICS/namelist_report_JJA_SP.R")
 #Generate the title string based on the variables
 
 title_string<-paste("Comparison of blocking data for ",Varnames[1])
@@ -64,33 +64,6 @@ for (i in 1:length(Varnames)){
 }
 
 avgdata$VAR<-factor(avgdata$VAR,levels=Varnames)
-
-#JRA is 1, ERA is 2, MERRA is 3, CFSR is 4
-#open the ic Rdata, calculate rmse, save dataset
-# 
-# saved_names<-c("V1","V2","p1given2","p2given1","sim_25","sim_50","sim_75",
-#                "df_overlaps","pearson_num","rmse_num")
-#   for (i in 1:4){
-#     avg1st<-get(sprintf("avgblob%d",i))
-#     lat1st<-get(sprintf("lat%d",i))
-#     lon1st<-get(sprintf("lon%d",i))
-#     for (j in 2:4){
-#       avg2nd<-get(sprintf("avgblob%d",j))
-#       lat2nd<-get(sprintf("lat%d",j))
-#       lon2nd<-get(sprintf("lon%d",j))
-#       if (i<j){
-#         #The filename
-#         fname<-sprintf("~/BLOBSTATS_FILES/JJA_SP_ic_%s_%s.RData",Varnames[i],Varnames[j])
-#         fname2<-sprintf("~/BLOBSTATS_FILES/JJA_SP_ic_%s_%s_2.RData",Varnames[i],Varnames[j])
-#         load(fname)
-#         rmse_num<-rmse_calc(avg1st,avg2nd,lat1st,lat2nd,lon1st,lon2nd,interp=T)
-#         save(list=saved_names,file=fname2)
-#       }
-#     }
-#   }
-
-
-
 
 #Generate the report from the template
 rmarkdown::render(md_file,output_file=output_name)

@@ -97,6 +97,9 @@ Blocking frequency
 
 
 ```{r blockingavg,fig.height=5,fig.width=12}
+
+#We want the number of columns for the plots to be max 4 (more than that looks ugly...)
+ncols_plot<-ifelse(nvars<=4,nvars,4)
 breaks<-c(0.01,seq(0.02,0.26,0.02))
 labs<-breaks
 labs[1:5]<-rep("",5)

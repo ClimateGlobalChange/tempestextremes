@@ -8,6 +8,12 @@
 # This will help deal with cases where two blobs
 # merge into a single blob at a later time 
 
+#REPORT HEADER: ANY TEXT THAT YOU WANT TO GO AT THE TOP OF THE REPORT
+#NOTE: must be in quotes. Careful of any special characters
+metadata_datasets="This is the results summary for DJF NA (December 1980-February 2010). 
+JRA is 1.25x1.25 degree, ERA is 1x1 degree, MERRA is 0.5x0.625 degree, and CFSR is 0.5x0.5 degree"
+#This is the number of years in your dataset!
+nyears<-nyears<-2004-1980+1
 ###########
 #FILE INFO
 #Will always output RData files
@@ -18,7 +24,7 @@ output_txt<-FALSE
 output_csv<-FALSE
 
 #Use DetectBlobs inputs?
-use_detectblob<-TRUE
+use_detectblob<-FALSE
 
 #Names of the datasets, which will be used to differentiate between them
 #in the tables
