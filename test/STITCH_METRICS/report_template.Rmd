@@ -1,0 +1,182 @@
+---
+output: html_document
+tables: yes
+params:
+  date: !r Sys.Date()
+  set_title: !r title_string
+title: "`r params$set_title`"
+date: "`r params$date`"
+---
+
+```{r setup,echo=FALSE,message=FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+require(ggplot2)
+require(reshape2)
+require(gtable)
+require(grid)
+nvars<-length(Varnames)
+```
+
+`r metadata_datasets`
+
+#Initial summary information
+
+
+```{r print_table, results="asis"}
+data_table<-data.frame(NULL)
+
+df_merge_all<-data.frame(NULL)
+df_summ_all<-data.frame(NULL)
+
+for (i in 1:nvars){
+  df_summ<-get(sprintf("V%d_summ",i))
+  df_summ_all<-rbind(df_summ_all,df_summ)
+  df_merge<-get(sprintf("V%d_merge",i))
+  df_merge_all<-rbind(df_merge_all,df_merge)
+  df_dates<-unique(as.Date(df_merge$datehour))
+  data_table["Number of unique blobs",i]<-nrow(df_summ)
+  data_table["Number of merged blobs",i]<-nrow(df_summ[df_summ$merged=="YES",])
+  data_table["Maximum blocking frequency",i]<-sprintf("%.4f",max(get(sprintf("avgblob%d",i))))
+  data_table["Number of blocked days",i]<-length(df_dates)
+  data_table["Average number of blocked days (divided by number of years)",i]<-sprintf("%.2f",length(df_dates)/nyears)
+  data_table["Interquartile range of duration (days)",i]<-paste(sprintf("%.2f",quantile(df_summ$duration_days,c(0.25,0.75))),collapse=" ")
+  data_table["Interquartile range of speed (km/hr)",i]<-paste(sprintf("%.2f",quantile(df_summ$zonal_speed_kph,c(0.25,0.75))),collapse=" ")
+    data_table["Interquartile range of blob size (10^6 km^2)",i]<-paste(sprintf("%.2f",quantile(df_merge$area_km/(10^6),c(0.25,0.75))),collapse=" ")
+}
+df_merge_all$var<-factor(df_merge_all$var,levels=Varnames)
+df_summ_all$var<-factor(df_summ_all$var,levels=Varnames)
+colnames(data_table)<-Varnames
+print(kable(data_table))
+```
+
+#Some charts
+
+
+```{r trajectories}
+# df_summ_nomerge<-df_summ_all[df_summ_all$merged=="NO",]
+# 
+# #Get the unique bnums
+# df_segments<-data.frame(centlon=numeric(),centlat=numeric(),bnum=numeric(),var=character(),stringsAsFactors = F)
+# bnum<-1
+# for (v in unique(df_summ_nomerge$var)){
+#   df_sub1<-df_summ_nomerge[df_summ_nomerge$var==v,]
+#   #For each file in the dataset
+#   for (f in unique(df_sub1$file)){
+#     df_sub2<-df_sub1[df_sub1$file==f,]
+#     #for each bnum
+#     for (b in unique(df_sub2$bnum)){
+#       #Get the corresponding per timestep info
+#       df_timestep<-df_merge_all[df_merge_all$var==v & df_merge_all$file==f & df_merge_all$bnum==b,]
+#       #Sort by the datetime
+#       df_sorted<-df_timestep[order(df_timestep$datehour),c("centlon","centlat")]
+#       df_lonchange<-diff(df_sorted$centlon)
+#       if (any(abs(df_lonchange)>90)){
+#         #Convert longitude axis
+#         #if 0 to 360, convert to -180/180
+#         df_sorted$centlon<-ifelse(any(df_sorted$centlon>180),lon_convert(df_sorted$centlon),lon_convert2(df_sorted$centlon))
+#       }
+#       latstart<-df_sorted$centlat[1]
+#       lonstart<-df_sorted$centlon[1]
+#       df_sorted$centlat<-df_sorted$centlat-latstart
+#       df_sorted$centlon<-df_sorted$centlon-lonstart
+#       df_sorted$bnum<-rep(bnum,nrow(df_sorted))
+#       df_sorted$var<-rep(v,nrow(df_sorted))
+#       
+#       df_segments<-rbind(df_segments,df_sorted)
+#       bnum<-bnum+1
+#     }
+#   }
+# }
+# 
+# g<-ggplot(data=df_segments) + 
+#   geom_line(aes(x=centlon,y=centlat,group=bnum,color=var),alpha=0.5)
+# print(g)
+```
+
+Blocking frequency
+
+
+```{r blockingavg,fig.height=5,fig.width=12}
+breaks<-c(0.01,seq(0.02,0.26,0.02))
+labs<-breaks
+labs[1:5]<-rep("",5)
+labs[7:10]<-rep("",4)
+labs[12:length(labs)]<-rep("",3)
+cols<-colorRampPalette(c("yellow","green","blue","purple","red"))(length(breaks))
+g<-ggplot(data=avgdata,aes(x=lon,y=lat)) +
+  coord_cartesian(expand=F) +
+  facet_grid(~VAR) +
+  geom_raster(aes(x=lon,y=lat,fill=value),interpolate = T) +
+  geom_contour(aes(z=value),breaks=breaks) +
+  scale_fill_gradientn(breaks=breaks,limits=c(min(breaks),max(breaks)),colors=cols,labels=labs)
+  
+
+print(g)
+```
+
+```{r make_dist_charts,message=FALSE}
+
+#First, melt the summary table
+longdata<-melt(df_summ_all[,c("duration_days","zonal_speed_kph","var")],id.vars = c("var"))
+longdata2<-melt(df_merge_all[c("var","area_km")])
+longdata2$value<-longdata2$value/(10^6)
+longdata<-rbind(longdata,longdata2)
+
+g1<-ggplot(data=subset(longdata,longdata$variable=="duration_days"),aes(x=value,group=var,color=var)) + 
+  geom_density() +
+  #theme(legend.position = "none") +
+  labs(x = "Duration (days)")
+print(g1)
+g2<-ggplot(data=subset(longdata,longdata$variable=="zonal_speed_kph"),aes(x=value,group=var,color=var)) + 
+  geom_density() +
+  #theme(legend.position = "none") +
+  labs(x = "Zonal speed (kph)")
+print(g2)
+g3<-ggplot(data=subset(longdata,longdata$variable=="area_km"),aes(x=value,group=var,color=var)) + 
+  geom_density() +
+  labs(x = "Area (10^6 km^2)")
+print(g3)
+
+# g11<-ggplotGrob(g1)
+# g21<-ggplotGrob(g2)
+# g31<-ggplotGrob(g3)
+# g<-cbind(g11,g21,g31,size="last")
+# grid.newpage()
+# grid.draw(g)
+```
+
+#Intercomparison of datasets
+
+```{r probsim,results="asis"}
+#Make a table with the Pearson correlation
+numcombos<-factorial(nvars)/(factorial(nvars-2)*factorial(2))
+data_table2<-data.frame(NULL)
+
+data_overlaps<-data.frame(NULL)
+vnames<-c()
+for (i in 1:length(icfiles)){
+  load(icfiles[i])
+  varname<-sprintf("%s and %s",V1,V2)
+  vnames<-c(vnames,varname)
+  df_overlaps$var<-rep(varname,nrow(df_overlaps))
+  data_overlaps<-rbind(data_overlaps,df_overlaps)
+  
+  rname<-sprintf("%s (V1) and %s (V2)",V1,V2)
+  data_table2[rname,"Pearson correlation"]<-sprintf("%.4f",pearson_num)
+  data_table2[rname,"Root mean square error"]<-rmse_num
+  data_table2[rname,"Interquartile range of spatial similarity"]<-sprintf("%.2f %.2f",sim_25,sim_75)
+  data_table2[rname,"Probability of V1 given V2"]<-sprintf("%.4f",p1given2)
+  data_table2[rname,"Probability of V2 given V1"]<-sprintf("%.4f",p2given1)
+}
+data_overlaps$var<-factor(data_overlaps$var,levels=vnames)
+print(kable(data_table2,full_width=F))
+
+```
+
+```{r sim_chart}
+dplot<-data_overlaps[,c("var","similarity")]
+gsim<-ggplot(data=dplot,aes(x=similarity,group=var,color=var)) +
+  geom_density() + 
+  labs(x="Spatial similarity value")
+print(gsim)
+```
