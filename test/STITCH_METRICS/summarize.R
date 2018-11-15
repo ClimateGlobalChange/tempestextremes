@@ -96,12 +96,15 @@ gen_summary_table<-function(df_in,keep_merge=TRUE,
   if (rfn!=""){
     assign(df_summ_name,df_summ)
     save(list=c(df_summ_name),file=rfn) 
+    print(sprintf("Wrote file %s",rfn))
   }
   if (textfn!=""){
     write.table(df_summ,file=textfn,sep="\t",row.names=FALSE,quote=FALSE)
+    print(sprintf("Wrote file %s",textfn))
   }
   if (csvfn!=""){
     write.csv(df_summ,file=csvfn,row.names=FALSE,quote=FALSE)
+    print(sprintf("Wrote file %s",csvfn))
   }
   #print("Returning summary table")
   return(df_summ)

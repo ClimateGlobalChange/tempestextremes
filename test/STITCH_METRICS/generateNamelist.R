@@ -30,6 +30,7 @@ csv_readname<-ifelse(output_csv==TRUE,sprintf("%s/%s/%s_%s_%s.csv",
                                                suffix_table),"")
 #collapsed strings for output
 var_string<-paste(var_inputs,collapse="\",\"")
+res_string<-paste(resolutions,collapse="\",\"")
 flist_string<-paste(flist,collapse="\",\"")
 rdata_readstring<-paste(rdata_readname,collapse="\",\"")
 csv_readstring<-ifelse(csv_readname=="","\"\"",paste(csv_readname,collapse="\",\""))
@@ -79,17 +80,17 @@ txt_summstring<-ifelse(txt_summname=="","\"\"",paste(txt_summname,collapse="\",\
 
 #READNETCDF
 #Collapse the netcdf list 
-stitchblob_string<-paste(stitchblob_lists,collapse="\",\"")
+stitchblob_string<-paste(sprintf("%s/%s",input_dir,stitchblob_lists),collapse="\",\"")
 varvec_string<-paste(varvec,collapse="\",\"")
 rdata_blobname<-sprintf("%s/%s/%s_%s_blobdata.RData",output_dir,output_subdir,
                         output_prefix,Varnames)
 rdata_blobstring<-paste(rdata_blobname,collapse="\",\"")
 TF180<-ifelse(transformto180==TRUE,"TRUE","FALSE")
 TF360<-ifelse(transformto360==TRUE,"TRUE","FALSE")
-
+TFregrid<-ifelse(regridto1degree==TRUE,"TRUE","FALSE")
 #INTERCOMPARISON
 nvars<-length(Varnames)
-numcombos<-factorial(nvars)/(factorial(nvars-2)*factorial(2))
+
 table1<-c()
 table2<-c()
 blob1<-c()
@@ -131,15 +132,16 @@ for (i in 1:length(Varnames)){
   }
 }
 
-table1_string<-paste(table1,collapse="\",\"")
-table2_string<-paste(table2,collapse="\",\"")
-blob1_string<-paste(blob1,collapse="\",\"")
-blob2_string<-paste(blob2,collapse="\",\"")
-var1_string<-paste(var1,collapse="\",\"")
-var2_string<-paste(var2,collapse="\",\"")
-icname_string<-paste(icnames,collapse="\",\"")
-txtico_string<-paste(txtico,collapse="\",\"")
-txticp_string<-paste(txticp,collapse="\",\"")
+numcombos<-length(blob1)
+table1_string<-paste(table1,collapse="\",\n\"")
+table2_string<-paste(table2,collapse="\",\n\"")
+blob1_string<-paste(blob1,collapse="\",\n\"")
+blob2_string<-paste(blob2,collapse="\",\n\"")
+var1_string<-paste(var1,collapse="\",\n\"")
+var2_string<-paste(var2,collapse="\",\n\"")
+icname_string<-paste(icnames,collapse="\",\n\"")
+txtico_string<-paste(txtico,collapse="\",\n\"")
+txticp_string<-paste(txticp,collapse="\",\n\"")
 df_icname<-ifelse(use_detectblob==TRUE,"df_merged","df_blob_per_timestep")
 
 #Generating the report!!
@@ -156,10 +158,12 @@ print(sprintf("Writing namelist %s",fname_namelist_out))
 sink(fname_namelist_out,split=T)
 cat(sprintf("work_dir<-\"%s\" \n",work_dir))
 cat(sprintf("output_dir<-\"%s/%s\" \n",output_dir,output_subdir))
+cat(sprintf("resolutions<-c(\"%s\")\n\n",res_string))
 cat("#READFILES SPECS----------\n")
 cat(sprintf("nrun_rf<-%d \n",nrun_rf))
 cat(sprintf("varname<-c(\"%s\") \n",var_string))
 cat(sprintf("filelist_stitchblobs<-c(\"%s\") \n",flist_string))
+cat("filename_stitchblobs<-\"\"\n")
 cat(sprintf("rfn_stitch<-c(\"%s\") \n",rdata_readstring))
 cat("df_stitchname<-\"df_blob_per_timestep\" \n")
 if(txt_readname==""){
@@ -222,7 +226,7 @@ cat("filename_netcdf<-\"\"\n")
 cat(sprintf("filelist_netcdf<-c(\"%s\")\n",stitchblob_string))
 cat(sprintf("varvec<-c(\"%s\")\n",varvec_string))
 cat("outvec<-varvec\n")
-cat("outrdata<-c(\"%s\")\n",rdata_blobstring)
+cat(sprintf("outrdata<-c(\"%s\")\n",rdata_blobstring))
 cat("outnetcdf<-\"\"\n")
 cat(sprintf("timename<-\"%s\"\n",timename))
 cat("levname<-\"lev\"\n")
@@ -236,6 +240,7 @@ cat(sprintf("minlon<-%f\n",minlon))
 cat(sprintf("maxlon<-%f\n",maxlon))
 cat("minlev<-\"\"\n")
 cat("maxlev<-\"\"\n")
+cat(sprintf("regridto1degree<-%s\n",TFregrid))
 cat("\n")
 
 cat("#INTERCOMPARE SPECS----------\n")
@@ -244,7 +249,7 @@ cat(sprintf("table_file_1<-c(\"%s\")\n",table1_string))
 cat(sprintf("table_file_2<-c(\"%s\")\n",table2_string))
 cat(sprintf("df_name_1<-\"%s\"\n",df_icname))
 cat(sprintf("df_name_2<-\"%s\"\n",df_icname))
-cat("regrid<-TRUE\n")
+cat("regrid<-FALSE\n")
 cat(sprintf("blob_file_1<-c(\"%s\")\n",blob1_string))
 cat(sprintf("var_name_1<-c(\"%s\")\n",var1_string))
 cat(sprintf("blob_file_2<-c(\"%s\")\n",blob2_string))

@@ -50,7 +50,9 @@ for (i in 1:length(Varnames)){
   assign(sprintf("lon%d",i),lon_axis)
   assign(sprintf("time%d",i),time_format)
   assign(sprintf("blob%d",i),get(blobname[i]))
-
+  temp_var<-get(sprintf("blob%d",i))
+  temp_var[which(temp_var>0)]<-1
+  assign(sprintf("blob%d",i),temp_var)
   #average the blob data
   avgname<-sprintf("avgblob%d",i)
   ablob<-apply(get(sprintf("blob%d",i)),c(1,2),mean)

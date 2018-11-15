@@ -276,6 +276,7 @@ if (args$readnetcdf){
     maxlev_i<-parse_namelist(maxlev,i)
     transformto180_i<-parse_namelist(transformto180,i)
     transformto360_i<-parse_namelist(transformto360,i)
+    regridto1degree_i<-parse_namelist(regridto1degree,i)
 
     if (filename_netcdf_i=="" & filelist_netcdf_i==""){
       stop("Need to either provide a filename (filename_netcdf) or list of filenames (filelist_netcdf).")
@@ -288,6 +289,7 @@ if (args$readnetcdf){
     }
     #List of files
     if (filelist_netcdf_i!=""){
+      print(sprintf("Reading list %s",filelist_netcdf_i))
       fns<-readLines(filelist_netcdf_i)
       dat_vec<-c(dat_vec,fns)
     }
@@ -299,7 +301,7 @@ if (args$readnetcdf){
     vars_list<-read_netcdf(dat_vec,varvec_i,outvec_i,timename_i,levname_i,latname_i,lonname_i,
                            minlat_i,maxlat_i,minlon_i,maxlon_i,
                            minlev_i,maxlev_i,outnetcdf_i,outrdata_i,
-                           transformto180_i,transformto360_i)
+                           transformto180_i,transformto360_i,regridto1degree_i)
     
   }
   

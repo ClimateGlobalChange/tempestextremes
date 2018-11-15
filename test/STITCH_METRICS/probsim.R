@@ -13,85 +13,7 @@ lon_convert<-function(lon){
 lon_convert2<-function(lon){
   return(ifelse(lon<0,360+lon,lon))
 }
-#Interpolates point either along x, y, or bilinearly
-#Note that it ALWAYS interpolates from 2's grid to 1's grid
-# interp_pt<-function(x, y, df, lon2, lat2){
-#   #Grab the 4 points and their values from the lon2 and lat2 axis
-#   #Find the closest x value on the lon2 axis
-#   #print(sprintf("x: %f y: %f",x,y))
-#   xdist<-sqrt((x-lon2)^2)
-#   xi<-which(xdist==min(xdist))
-#   #print(sprintf("xi: %d",xi))
-#   if (length(xi)>1){
-#     #These will be the left and right points
-#     xl<-round(lon2[xi[1]],3)
-#     xr<-round(lon2[xi[2]],3)
-#   }else{
-#     #Is this point to the right or left of x?
-#     #It's to the right
-#     if (lon2[xi]>x){
-#       if (xi==1){
-#         xr<-round(x,3)
-#         xl<-round(x,3)
-#       }
-#       else{
-#         xr<-round(lon2[xi],3)
-#         xl<-round(lon2[xi-1],3)
-#       }
-#       #it's to the left
-#     }else if (lon2[xi]<x){
-#       xl<-round(lon2[xi],3)
-#       xr<-round(lon2[xi+1],3)
-#     }else if(lon2[xi]==x){
-#       xl<-round(x,3)
-#       xr<-round(x,3)
-#     } 
-#   }
-#   #print(sprintf("xl,xr: %f,%f",xl,xr))
-#   #Now the y points
-#   ydist<-sqrt((y-lat2)^2)
-#   yi<-which(ydist==min(ydist))
-#   #print(sprintf("yi: %d",yi))
-#   if (length(yi)>1){
-#     yb<-round(lat2[yi[1]],3)
-#     yt<-round(lat2[yi[2]],3)
-#   }else{
-#     #It's above the y point
-#     if (lat2[yi]>y){
-#       yt<-round(lat2[yi],3)
-#       yb<-round(lat2[yi-1],3)
-#     }else if (lat2[yi]<y){
-#       yb<-round(lat2[yi],3)
-#       yt<-round(lat2[yi+1],3)
-#     }else if (lat2[yi]==y){
-#       yb<-round(y,3)
-#       yt<-round(y,3)
-#     }
-#   }
-#   #print(sprintf("yt,yb: %f,%f",yt,yb))
-#   #Get the distance from the interpolated point and average
-#   ipt<-0
-#   if (xl==xr && yt==yb){
-#     #print("same point")
-#     ipt<-df[df$lon==xl & df$lat==yt,"V1"]
-#   }else if (xl==xr){
-#     #Only interpolate in the y direction
-#     #print("Interpolating y only")
-#     ipt<-((yt-y)/(yt-yb))*df[df$lon==x & df$lat==yb,"V2"] + ((y-yb)/(yt-yb))*df[df$lon==x & df$lat==yt,"V2"]
-#   }else if (yt==yb){
-#     #Only interpolate in the x direction
-#     #print("Interpolating x only")
-#     ipt<-((xr-x)/(xr-xl))*df[df$lon==xl & df$lat==y,"V2"] + ((x-xl)/(xr-xl))*df[df$lon==xr & df$lat==y,"V2"]
-#   }else{
-#     #print("Interpolating both x and y")
-#     p11<-df[df$lon==xl & df$lat==yb,"V2"]
-#     p12<-df[df$lon==xl & df$lat==yt,"V2"]
-#     p21<-df[df$lon==xr & df$lat==yb,"V2"]
-#     p22<-df[df$lon==xr & df$lat==yt,"V2"]
-#     ipt<-(1/((xr-xl)*(yt-yb)))*(p11*(xr-x)*(yt-y) + p21*(x-xl)*(yt-y) + p12*(xr-x)*(y-yt) + p22*(x-xl)*(y-yb))
-#   }
-#   return(ipt)
-# }
+
 
 linint<-function(from_arr,from_lat,from_lon,to_lat,to_lon){
   to_lon<-round(to_lon,3)
@@ -100,84 +22,16 @@ linint<-function(from_arr,from_lat,from_lon,to_lat,to_lon){
   from_lat<-round(from_lat,3)
   dx<-to_lon[2]-to_lon[1]
   dy<-to_lat[2]-to_lat[1]
-  print(sprintf("%f %f",dx,dy))
+  #print(sprintf("%f %f",dx,dy))
   new_grid<-bilinear.grid(x=from_lon,y=from_lat,z=from_arr,
                           xlim=range(to_lon),ylim=range(to_lat),
                           dx=dx,dy=dy)
-  #print(dim(new_grid$z))
-  #print(dim(from_arr))
   return(new_grid$z)
 }
 
 #Finds the spatial similarity between two blobs
-similarity_weighted_old<-function(arr1,arr2,lats,lons,lats2=NULL,lons2=NULL,regrid=FALSE){
-  longdata1<-melt(arr1,value.name = "V1")
-  longdata1$V1[longdata1$V1>0]<-1
-	longdata1$lon<-round(lons[longdata1$Var1],3)
-  longdata1$lat<-round(lats[longdata1$Var2],3)
- # print("Melting arr2")
-  longdata2<-melt(arr2,value.name="V2")
-  longdata2$V2[longdata2$V2>0]<-1
-	if (is.null(lons2)){
-		longdata2$lon<-round(lons[longdata2$Var1],3)
-	}else{
-		longdata2$lon<-round(lons2[longdata2$Var1],3)
-	}
-	if (is.null(lats2)){
-		longdata2$lat<-round(lats[longdata2$Var2],3)
-	}else{
-		longdata2$lat<-round(lats2[longdata2$Var2],3)
-	}
-  #NOTE THAT REGRID WILL ALWAYS BE FROM 2 TO 1
-  if (regrid==TRUE){
-    #Find lat/lon missing pairs
-    #Basically wherever V2 is NA
-    temp<-merge(longdata1[,c("lon","lat","V1")],longdata2[,c("lon","lat","V2")],by=c("lon","lat"),all=T)
-    #Omit all instances where the coarser grid is NA
-    temp_noV1<-temp[!is.na(temp$V1),]
-    #Get all the row numbers where there's an NA
-    narows<-which(is.na(temp_noV1$V2))
-    # for (i in narows){
-    #   temp_noV1[i,"V2"]<-interp_pt(temp_noV1[i,"lon"],temp_noV1[i,"lat"],temp,lons2,lats2)
-    # }
-    temp_noV1[narows,"V2"]<-sapply(narows,function(i){
-      interp_pt(temp_noV1[i,"lon"],temp_noV1[i,"lat"],temp,lons2,lats2)
-    })
-    temp_noV1$V2<-ifelse(temp_noV1$V2>0.3,1,0)
-    longdata<-temp_noV1
-  }else{
-    longdata<-merge(longdata1[,c("lon","lat","V1")],longdata2[,c("lon","lat","V2")],by=c("lon","lat"))
-  }
-  #print(longdata)
-
-  longdata$V1_w<-longdata$V1*cos(longdata$lat*pi/180)
-  longdata$V2_w<-longdata$V2*cos(longdata$lat*pi/180)
-  intersect_12<-longdata[longdata$V1>0 & longdata$V2>0,]
-  ncommon<-nrow(intersect_12)
-  
-  union_12<-longdata[longdata$V1>0 | longdata$V2>0,]
-  union_12$VU_w<-cos(union_12$lat*pi/180)
-  nunion<-nrow(union_12)
-  #print(sprintf("There are %d common points for union (%d points)",ncommon,nunion))
-  
-  sum_iw<-sum(intersect_12$V1_w)
-  sum_uw<-sum(union_12$VU_w)
-  print(sprintf("Weighted sums are %f and %f",sum_iw,sum_uw))
-  if (abs(sum_uw)<0.00000000001){
-    ratio<-0
-  }else{
-    ratio<-sum_iw/sum_uw
-  }
-  print(sprintf("ratio is %f",ratio))
-  return(ratio)
-}
-
 similarity_weighted<-function(arr1,arr2,lats,lons,lats2=NULL,lons2=NULL,regrid=FALSE){
-  longdata1<-melt(arr1,value.name = "V1")
-  longdata1$V1<-ifelse(longdata1$V1>0,1,0)
-  longdata1$lon<-round(lons[longdata1$Var1],3)
-  longdata1$lat<-round(lats[longdata1$Var2],3)
-  
+
   if (is.null(lats2)){
     lats2<-lats
   }
@@ -186,15 +40,26 @@ similarity_weighted<-function(arr1,arr2,lats,lons,lats2=NULL,lons2=NULL,regrid=F
   }
  
   if (regrid==TRUE){
-    arr2_analyze<-linint(arr2,lats2,lons2,lats,lons)
+    min_lat<-as.integer(min(lats))
+    max_lat<-as.integer(max(lats))
+    min_lon<-as.integer(min(lons))
+    max_lon<-as.integer(max(lons))
+    lat_interp<-seq(min_lat,max_lat)
+    lon_interp<-seq(min_lon,max_lon)
+    arr1_analyze<-linint(arr1,lats,lons,lat_interp,lon_interp)
+    arr2_analyze<-linint(arr2,lats2,lons2,lat_interp,lon_interp)
   }else{
+    arr1_analyze<-arr1
     arr2_analyze<-arr2
   }
+
+  longdata1<-melt(arr1_analyze,value.name = "V1")
+  longdata1$V1<-ifelse(longdata1$V1>0.5,1,0)
+  longdata1$lon<-round(lons[longdata1$Var1],3)
+  longdata1$lat<-round(lats[longdata1$Var2],3)
   
-  #print(dim(arr1))
-  #print(dim(arr2_analyze))
   longdata2<-melt(arr2_analyze,value.name="V2")
-  longdata2$V2<-ifelse(longdata2$V2>0.3,1,0)
+  longdata2$V2<-ifelse(longdata2$V2>0.5,1,0)
   longdata2$lon<-round(lons[longdata2$Var1],3)
   longdata2$lat<-round(lats[longdata2$Var2],3)
   longdata<-merge(longdata1,longdata2,by=c("lon","lat"))
@@ -208,7 +73,6 @@ similarity_weighted<-function(arr1,arr2,lats,lons,lats2=NULL,lons2=NULL,regrid=F
   union_12<-longdata[longdata$V1>0 | longdata$V2>0,]
   union_12$VU_w<-cos(union_12$lat*pi/180)
   nunion<-nrow(union_12)
-  #print(sprintf("There are %d common points for union (%d points)",ncommon,nunion))
   
   sum_iw<-sum(intersect_12$V1_w)
   sum_uw<-sum(union_12$VU_w)
@@ -226,7 +90,6 @@ similarity_weighted<-function(arr1,arr2,lats,lons,lats2=NULL,lons2=NULL,regrid=F
 prob_calc<-function(df,dfo,V1,V2){
   V1count<-nrow(df[df$var==V1,])
   V2count<-nrow(df[df$var==V2,])
-  #print(sprintf("V1: %d, V2:%d",V1count,V2count))
   V12count<-0
   for (d in sort(unique(dfo$datehour))){
     dsub<-dfo[dfo$datehour==d,]
@@ -234,13 +97,10 @@ prob_calc<-function(df,dfo,V1,V2){
     nV1<-length(unique(dsub$V1bnum2))
     nV2<-length(unique(dsub$V2bnum2))
     nV12<-nrow(dsub)
-    #print(sprintf("V1: %d V2: %d, V12: %d",nV1,nV2,nV12))
     V12count<-V12count+min(nV1,nV2,nV12)
   }
   p1given2<-V12count/V2count
-  #print(p1given2)
   p2given1<-V12count/V1count
-  #print(p2given1)
   return(c(p1given2,p2given1))
 }
 #Finds the Pearson pattern correlation between the averaged climatologies of the two datasets
@@ -307,9 +167,6 @@ rmse_calc<-function(arr1,arr2,lat1,lat2,lon1,lon2,interp=FALSE){
   longdata$cosV2<-longdata$V2*longdata$coslat
   
   diff_data2<-(longdata$cosV1-longdata$cosV2)^2
-  #print(length(diff_data2))
-  #rint(nrow(longdata))
-  #print(range(diff_data2))
   ame<-sum(abs(longdata$cosV1-longdata$cosV2))/nrow(longdata)
   rmse<-sqrt(sum(diff_data2)/length(diff_data2))
   print(sprintf("AME is %f and RMSE is %f",ame,rmse))
@@ -522,7 +379,7 @@ overlaps_calc<-function(df1,blobs1,time_format1,lat1,lon1,blobs2,
   
   
   saved_names<-c("V1","V2","p1given2","p2given1","sim_25","sim_50","sim_75",
-                 "df_overlaps","pearson_num","rmse_num")
+                 "df_overlaps","pearson_num","rmse_num","df_analyze")
   return_list<-list()
   for (v in saved_names){
     return_list[[v]]<-get(v)

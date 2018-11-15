@@ -34,6 +34,7 @@ for (i in 1:nvars){
   df_merge<-get(sprintf("V%d_merge",i))
   df_merge_all<-rbind(df_merge_all,df_merge)
   df_dates<-unique(as.Date(df_merge$datehour))
+  data_table["Spatial resolution",i]<-resolutions[i]
   data_table["Number of unique blobs",i]<-nrow(df_summ)
   data_table["Number of merged blobs",i]<-nrow(df_summ[df_summ$merged=="YES",])
   data_table["Maximum blocking frequency",i]<-sprintf("%.4f",max(get(sprintf("avgblob%d",i))))
@@ -93,7 +94,7 @@ print(kable(data_table))
 # print(g)
 ```
 
-Blocking frequency
+Blocking frequency: 
 
 
 ```{r blockingavg,fig.height=5,fig.width=12}
@@ -108,11 +109,17 @@ labs[12:length(labs)]<-rep("",3)
 cols<-colorRampPalette(c("yellow","green","blue","purple","red"))(length(breaks))
 g<-ggplot(data=avgdata,aes(x=lon,y=lat)) +
   coord_cartesian(expand=F) +
-  facet_grid(~VAR) +
+  facet_wrap(~VAR,ncol=ncols_plot) +
   geom_raster(aes(x=lon,y=lat,fill=value),interpolate = T) +
   geom_contour(aes(z=value),breaks=breaks) +
   scale_fill_gradientn(breaks=breaks,limits=c(min(breaks),max(breaks)),colors=cols,labels=labs)
   
+
+for (j in 1:length(lon1)){
+  for (k in 1:length(lat1)){
+    
+  }
+}
 
 print(g)
 ```
@@ -150,36 +157,247 @@ print(g3)
 
 #Intercomparison of datasets
 
-```{r probsim,results="asis"}
-#Make a table with the Pearson correlation
-numcombos<-factorial(nvars)/(factorial(nvars-2)*factorial(2))
-data_table2<-data.frame(NULL)
+###Wilcoxon signed rank test
 
-data_overlaps<-data.frame(NULL)
-vnames<-c()
-for (i in 1:length(icfiles)){
-  load(icfiles[i])
-  varname<-sprintf("%s and %s",V1,V2)
-  vnames<-c(vnames,varname)
-  df_overlaps$var<-rep(varname,nrow(df_overlaps))
-  data_overlaps<-rbind(data_overlaps,df_overlaps)
-  
-  rname<-sprintf("%s (V1) and %s (V2)",V1,V2)
-  data_table2[rname,"Pearson correlation"]<-sprintf("%.4f",pearson_num)
-  data_table2[rname,"Root mean square error"]<-rmse_num
-  data_table2[rname,"Interquartile range of spatial similarity"]<-sprintf("%.2f %.2f",sim_25,sim_75)
-  data_table2[rname,"Probability of V1 given V2"]<-sprintf("%.4f",p1given2)
-  data_table2[rname,"Probability of V2 given V1"]<-sprintf("%.4f",p2given1)
+```{r wilcox_test}
+
+for (i in 1:length(Varnames)){
+  var1<-Varnames[i]
+  for (j in 1:length(Varnames)){
+    var2<-Varnames[j]
+    if (j>i){
+      #Create subsets
+    }
+  }
 }
-data_overlaps$var<-factor(data_overlaps$var,levels=vnames)
-print(kable(data_table2,full_width=F))
 
 ```
 
+```{r probsim,results="asis"}
+#Make a table with the Pearson correlation
+ numcombos<-factorial(nvars)/(factorial(nvars-2)*factorial(2))
+ data_table2<-data.frame(NULL)
+#
+ data_overlaps<-data.frame(NULL)
+ vnames<-c()
+
+ pearson_mat<-matrix(nrow=nvars,ncol=nvars)
+ rmse_mat<-matrix(nrow=nvars,ncol=nvars)
+ prob_mat<-matrix(nrow=nvars,ncol=nvars)
+ sim_mat<-matrix(nrow=nvars,ncol=nvars)
+ 
+ colnames(pearson_mat)<-Varnames
+ rownames(pearson_mat)<-Varnames
+ colnames(rmse_mat)<-Varnames
+ rownames(rmse_mat)<-Varnames
+  colnames(prob_mat)<-Varnames
+ rownames(prob_mat)<-Varnames
+   colnames(sim_mat)<-Varnames
+ rownames(sim_mat)<-Varnames
+# 
+#   
+ for (i in 1:length(icfiles)){
+   load(icfiles[i])
+   varname<-sprintf("%s and %s",V1,V2)
+   iindex=which(Varnames==V1)
+   jindex=which(Varnames==V2)
+
+   pearson_mat[jindex,iindex]<-pearson_num
+   rmse_mat[jindex,iindex]<-rmse_num
+   prob_mat[iindex,jindex]<-p1given2
+   prob_mat[jindex,iindex]<-p2given1
+   sim_mat[jindex,iindex]<-sim_50
+   vnames<-c(vnames,varname)
+   df_overlaps$var<-rep(varname,nrow(df_overlaps))
+   data_overlaps<-rbind(data_overlaps,df_overlaps)
+
+   rname<-sprintf("%s (V1) and %s (V2)",V1,V2)
+   data_table2[rname,"Pearson correlation"]<-sprintf("%.4f",pearson_num)
+   data_table2[rname,"Root mean square error"]<-rmse_num
+   data_table2[rname,"Interquartile range of spatial similarity"]<-sprintf("%.2f %.2f",sim_25,sim_75)
+   data_table2[rname,"Probability of V1 given V2"]<-sprintf("%.4f",p1given2)
+   data_table2[rname,"Probability of V2 given V1"]<-sprintf("%.4f",p2given1)
+ }
+ pear<-melt(pearson_mat,na.rm=T)
+ res<-melt(rmse_mat,na.rm = T)
+ prob<-melt(prob_mat,na.rm=T)
+ sim<-melt(sim_mat,na.rm=T)
+ 
+  mr<-round(max(res$value),4)
+  mm<-mr/2
+  
+
+ 
+
+ 
+
+
+# data_overlaps$var<-factor(data_overlaps$var,levels=vnames)
+# print(kable(data_table2,full_width=F))
+
+```
+###Pearson Pattern Correlation
+
+This chart shows the Pearson pattern correlation values between the average blocking patterns of the various models. The scale is from 0 to 1, but it should be noted that this metric will have a high correlation value even if the magnitudes of corresponding grid points differ.
+
+```{r pearson_chart}
+ pear_g<-ggplot(data=pear,aes(x=Var1,y=Var2,fill=round(value,3))) +
+  geom_tile(color="white") +
+  scale_fill_gradient2(low="blue",high="red",mid="white",
+                       midpoint=0.5,limit=c(0,1),name="Pearson Pattern Correlation") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1,
+                                   size = 10, hjust = 1))+
+  coord_fixed() +
+  geom_text(aes(Var1, Var2, label = round(value,4)), color = "black", size = 2) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    legend.justification = c(1, 0),
+    legend.position = c(0.6, 0.7),
+    legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                               title.position = "top", title.hjust = 0.5))
+ print(pear_g)
+```
+
+### Root Mean Square Error
+
+This chart shows the root mean square error (RMSE) between the averaged blocking patterns of the various models. The scale varies depending on the distribution of error values, but here there is a max value of `r mr`. Consider the order of magnitude between the error and the original data when interpreting these results; for example, if the blocking frequency of the averaged pattern is in the 0.1-0.2 range and the RMSE is in the 0.001 range, the RMSE is two orders of magnitude smaller than the data and we can assume that the averaged blocking patterns are very similar. If the RMSE is in the 0.01-0.02 range, then the error approaches non-negligible.
+
+```{r rmse}
+
+  res_g<-ggplot(data=res,aes(x=Var1,y=Var2,fill=round(value,4))) +
+  geom_tile(color="white") +
+  scale_fill_gradient2(low="blue",high="red",mid="white",
+                       midpoint=mm,limit=c(0,mr),name="RMSE") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1,
+                                   size = 10, hjust = 1))+
+  coord_fixed() +
+  geom_text(aes(Var1, Var2, label = round(value,3)), color = "black", size = 2) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    legend.justification = c(1, 0),
+    legend.position = c(0.6, 0.7),
+    legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                               title.position = "top", title.hjust = 0.5))
+ print(res_g)
+```
+
+###Probability of Co-occurrence
+
+This chart shows the probability of co-occurrence, where the upper triangle is the probability of the y-axis variable given the x-axis variable ($P(y|x)$) and the lower triangle is the probability of the x-axis variable given the y-axis variable ($P(x|y)$). The scale is from 0 to 1.
+
+```{r probability}
+ 
+  prob_g<-ggplot(data=prob,aes(x=Var1,y=Var2,fill=round(value,3))) +
+  geom_tile(color="white") +
+  scale_fill_gradient2(low="blue",high="red",mid="white",
+                       midpoint=0.5,limit=c(0,1),name="Probability of\n Co-occurrence") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1,
+                                   size = 10, hjust = 1))+
+  coord_fixed() +
+  geom_text(aes(Var1, Var2, label = round(value,3)), color = "black", size = 2) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank()) +#,
+    #legend.justification = c(1, 0),
+    #legend.position = c(0.6, 0.7),
+    #legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                               title.position = "top", title.hjust = 0.5))
+ print(prob_g)
+```
+
+###Spatial Similarity
+
+Spatial similarity is the amount of commonly detected blocked area as defined by blocks from two datasets that are present in the same time step and have at least some overlap. Perfect agreement would have a value of 1. These charts show the 50th percentile similarity values (top) as well as the distribution of similarity values (bottom). The scale is from 0 to 1.
+
 ```{r sim_chart}
+ 
+   sim_g<-ggplot(data=sim,aes(x=Var1,y=Var2,fill=round(value,3))) +
+  geom_tile(color="white") +
+  scale_fill_gradient2(low="blue",high="red",mid="white",
+                       midpoint=0.5,limit=c(0,1),name="Spatial Similarity\n(50th %ile)") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1,
+                                   size = 10, hjust = 1))+
+  coord_fixed() +
+  geom_text(aes(Var1, Var2, label = round(value,3)), color = "black", size = 2) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    legend.justification = c(1, 0),
+    legend.position = c(0.6, 0.7),
+    legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                               title.position = "top", title.hjust = 0.5))
+ print(sim_g)
+
 dplot<-data_overlaps[,c("var","similarity")]
 gsim<-ggplot(data=dplot,aes(x=similarity,group=var,color=var)) +
-  geom_density() + 
-  labs(x="Spatial similarity value")
+  geom_density() +
+  theme(legend.position = "none")
+  #labs(x="Spatial similarity value")
 print(gsim)
+```
+
+```{r sim_example}
+df_sim<-data_overlaps[order(data_overlaps$datehour),c("datehour","var","similarity")]
+candidate_dates<-c()
+for (d in unique(df_sim$datehour)){
+  df_sim_sub<-df_sim[df_sim$datehour==d,]
+  if (nrow(df_sim_sub)>(nvars-4)){
+    candidate_dates<-c(candidate_dates,d)
+  }
+}
+
+#Try the first date
+dsub<-df_sim[df_sim$datehour==candidate_dates[1],]
+contplot<-NULL
+model_cols<-colorRampPalette(c("green","blue","purple"))(length(Varnames)-4)
+rean_cols<-colorRampPalette(c("red","pink"))(4)
+color_cols<-c(model_cols,rean_cols)
+for (i in 1:length(Varnames)){
+  btemp<-get(sprintf("blob%d",i))
+  ttemp<-get(sprintf("time%d",i))
+  tindex<-which(ttemp==candidate_dates[1])
+  bsub<-btemp[,,tindex]
+  bmelt<-melt(bsub)
+  bmelt$var<-rep(Varnames[i],nrow(bmelt))
+  #bmelt$col<-rep(cols[i],nrow(bmelt))
+  contplot<-rbind(contplot,bmelt)
+  
+}
+contplot$lon<-lon_axis[contplot$Var1]
+contplot$lat<-lat_axis[contplot$Var2]
+contplot$var<-factor(contplot$var,levels=Varnames)
+names(color_cols)<-levels(contplot$var)
+
+gcont<-ggplot(data=contplot,aes(x=lon,y=lat,color=var)) +
+  geom_contour(aes(z=value)) +
+  scale_color_manual(values=color_cols)
+  
+#print(gcont)
+
 ```
