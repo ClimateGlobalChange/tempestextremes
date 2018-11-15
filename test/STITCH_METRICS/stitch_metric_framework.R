@@ -31,16 +31,11 @@ parser$add_argument("-nlrn","--namelistrn",help="Namelist file name (mandatory) 
 #Intercomparison of datasets---------
 parser$add_argument("-ic","--intercomparison",help="Pearson correlation, probability of co-occurrence between two datasets, and spatial similarity between individual blobs.",action="store_true")
 parser$add_argument("-nlic","--namelistic",help="Namelist file name (mandatory) for --intercomparison",default="")
-
+#Generate report
+parser$add_argument("-gr","--genreport",help="Generate a summary report on blocking data for specified datasets",action="store_true")
+parser$add_argument("-nlgr","--namelistgr",help="namelist file name (mandatory) for --genreport",default="")
 #NOW PARSE ALL THE ARGUMENTS--------------
 args<-parser$parse_args()
-
-if (args$setup){
-  req_libs<-c("knitr","markdown","reshape2","abind","RNetCDF")
-  for (r in req_libs){
-    install.packages(r, repos='http://cran.us.r-project.org')
-  }
-}
 
 parse_namelist<-function(var,i){
   var_out<-ifelse(length(var)==1,var,var[i])
@@ -315,7 +310,7 @@ if (args$intercomparison){
   nl_prob<-ifelse(args$namelistic!="",args$namelistic,args$namelist)
   source(nl_prob)
   setwd(work_dir)
-  source("probsim.R")
+  source("intercomparison.R")
   for (i in 1:nrun_ic){
     table_file_1_i<-parse_namelist(table_file_1,i)
     table_file_2_i<-parse_namelist(table_file_2,i)
