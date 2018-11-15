@@ -121,6 +121,7 @@ int main(int argc, char ** argv){
     //Part 1: Calculating the average
     for (int x=0; x<nFiles; x++){
       NcFile readin(vecFiles[x].c_str());
+      std::cout<<"Opening file "<<vecFiles[x].c_str()<<std::endl;
       if (!readin.is_valid()){
         _EXCEPTION1("Unable to open file %s for reading",vecFiles[x].c_str());
       }
@@ -176,7 +177,7 @@ int main(int argc, char ** argv){
               currDev = inputData[a][b]-avgValue;
               storeMat[dayIndex][a][b]+= (currDev*currDev);
               countsMat[dayIndex][a][b]+= 1.;
-           /*   if (a==70 && b==300){
+          /*    if (a==20 && b==20){
               std::cout<<"DEBUG: t is "<<t<<" and dayIndex is "<<dayIndex<<", avg value is "\
                 <<avgValue<<", dev is "<<currDev<<", just added "<<currDev*currDev<<\
                 ", countsMat is now "<<countsMat[dayIndex][a][b]<<std::endl;
@@ -194,9 +195,9 @@ int main(int argc, char ** argv){
       for (int a=0;a<latLen;a++){
         for (int b=0;b<lonLen;b++){
           storeMat[d][a][b]=(1.5*std::sqrt(storeMat[d][a][b]/countsMat[d][a][b]));
-        /*  if (a==70 && b==300){
-          std::cout<<"DEBUG: for d="<<d<<", storeMat is "<<storeMat[d][a][b]<<std::endl;
-          }*/
+    //      if (a==20 && b==20){
+      //    std::cout<<"DEBUG: for d="<<d<<", storeMat is "<<storeMat[d][a][b]<<std::endl;
+        //  }
 	}
       }
     }
@@ -230,11 +231,10 @@ int main(int argc, char ** argv){
     counts->set_cur(0,0,0);
     counts->put(&(countsMat[0][0][0]),dLen,latLen,lonLen);
 */
- /*   NcVar *checkThresh = fileout.add_var("THRESHOLD",ncDouble,outTime,outLat,outLon);
+/*   NcVar *checkThresh = fileout.add_var("THRESHOLD",ncDouble,outTime,outLat,outLon);
     checkThresh->set_cur(0,0,0);
     checkThresh->put(&(storeMat[0][0][0]),dLen,latLen,lonLen);		
 */
-
     std::cout<<"calculating DFT of threshold"<<std::endl;
     //First, try zonal average
     std::vector<double>zonalDaily(lonLen);
@@ -257,12 +257,17 @@ int main(int argc, char ** argv){
     //Add on a lat average
     //Do separate averages for NH and SH
     //Find index for equator
-    int eqIndex;
+    int eqIndex=9999999;
     for (int e=0; e<latLen; e++){
       if (std::fabs(latVec[e])<0.0001){
         eqIndex = e;
         break;
       }
+    }
+    if (std::fabs(eqIndex-9999999)<0.0001){
+//      std::cout<<"Couldn't find 0 latitude, finding closest one"<<std::endl;
+      eqIndex = (int)(latLen/2);
+//      std::cout<<"index is "<<eqIndex<<std::endl;
     }
     int lat1 = latVec[0];
     //Case 1: lat vector goes from NH to SH

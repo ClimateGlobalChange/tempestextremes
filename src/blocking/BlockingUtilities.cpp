@@ -129,7 +129,139 @@ int DayInYear(int nMonth, int nDay){
 //takes a time value (in units of hours or 
 //days since reference date) and returns 4
 //integer values: year, month, day, and hour
+
 void ParseTimeDouble(
+        const std::string & strTimeUnits,
+        const std::string & strTimeCalendar,
+        double dTime,
+        int & nDateYear,
+        int & nDateMonth,
+        int & nDateDay,
+        int & nDateHour
+) {
+        // Get calendar type
+        Time::CalendarType cal;
+        if ((strTimeCalendar.length() >= 6) &&
+                (strncmp(strTimeCalendar.c_str(), "noleap", 6) == 0)
+        ) {
+                cal = Time::CalendarNoLeap;
+
+        } else if (
+                (strTimeCalendar.length() >= 8) &&
+                (strncmp(strTimeCalendar.c_str(), "standard", 8) == 0)
+        ) {
+                cal = Time::CalendarStandard;
+
+        }else if (
+                (strTimeCalendar.length() >= 8) &&
+                (strncmp(strTimeCalendar.c_str(), "gregorian", 8) == 0)
+        ) {
+                cal = Time::CalendarStandard;
+
+        }else if (
+                (strTimeCalendar.length() >= 8) &&
+                (strncmp(strTimeCalendar.c_str(), "proleptic_gregorian", 8) == 0)
+        ) {
+                cal = Time::CalendarStandard;
+
+        } else if (
+                (strTimeCalendar.length() >= 7) &&
+                (strncmp(strTimeCalendar.c_str(), "360_day", 8) == 0)
+        ) {
+                cal = Time::Calendar360Day;
+        } else if (
+                (strTimeCalendar.length() >= 7) &&
+                (strncmp(strTimeCalendar.c_str(), "365_day", 8) == 0)
+
+       ) {
+                cal = Time::CalendarNoLeap;
+        } else {
+                _EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
+        }
+       // Time format is "days since ..."
+        if ((strTimeUnits.length() >= 11) &&
+            (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
+        ) {
+                std::string strSubStr = strTimeUnits.substr(11);
+                Time time(cal);
+                time.FromFormattedString(strSubStr);
+
+                int nDays = static_cast<int>(dTime);
+                time.AddDays(nDays);
+
+                int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
+                time.AddSeconds(nSeconds);
+
+              /*  Announce("Time (YMDS): %i %i %i %i",
+                                time.GetYear(),
+                                time.GetMonth(),
+                                time.GetDay(),
+                                time.GetSecond());
+
+*/
+                nDateYear = time.GetYear();
+                nDateMonth = time.GetMonth();
+                nDateDay = time.GetDay();
+                nDateHour = time.GetSecond() / 3600;
+
+                //printf("%s\n", strSubStr.c_str());
+
+        // Time format is "hours since ..."
+        } else if (
+            (strTimeUnits.length() >= 12) &&
+            (strncmp(strTimeUnits.c_str(), "hours since ", 12) == 0)
+        ) {
+                std::string strSubStr = strTimeUnits.substr(12);
+                Time time(cal);
+                time.FromFormattedString(strSubStr);
+
+                time.AddHours(static_cast<int>(dTime));
+
+  /*              Announce("Time (YMDS): %i %i %i %i",
+                                time.GetYear(),
+                                time.GetMonth(),
+                                time.GetDay(),
+                                time.GetSecond());
+*/
+                nDateYear = time.GetYear();
+                nDateMonth = time.GetMonth();
+                nDateDay = time.GetDay();
+                nDateHour = time.GetSecond() / 3600;
+
+                //printf("%s\n", strSubStr.c_str());
+
+       // Time format is "minutes since ..."
+        } else if (
+            (strTimeUnits.length() >= 14) &&
+            (strncmp(strTimeUnits.c_str(), "minutes since ", 14) == 0)
+        ) {
+                std::string strSubStr = strTimeUnits.substr(14);
+                Time time(cal);
+                time.FromFormattedString(strSubStr);
+
+                time.AddMinutes(static_cast<int>(dTime));
+
+  /*              Announce("Time (YMDS): %i %i %i %i",
+                                time.GetYear(),
+                                time.GetMonth(),
+                                time.GetDay(),
+                                time.GetSecond());
+*/
+                nDateYear = time.GetYear();
+                nDateMonth = time.GetMonth();
+                nDateDay = time.GetDay();
+                nDateHour = time.GetSecond() / 3600;
+
+                //printf("%s\n", strSubStr.c_str());
+
+        } else {
+                _EXCEPTIONT("Unknown \"time::units\" format");
+        }
+        //_EXCEPTION();
+}
+
+
+/*void ParseTimeDouble(
 	const std::string & strTimeUnits,
 	const std::string & strTimeCalendar,
 	double dTime,
@@ -212,7 +344,7 @@ void ParseTimeDouble(
 		_EXCEPTIONT("Unknown \"time::units\" format");
 	}
 }
-
+*/
 bool sequentialFiles(
   int prevYear,
   int prevMonth,
@@ -1086,7 +1218,8 @@ void calcDevs( bool latNorm,
               NcVar *avgIPV,
               NcVar *inTime,
               NcVar *avgTime,
-              NcVar *lat){
+              NcVar *lat,
+              double missingNo){
 
   int nTime,nLat,nLon,avgDay;
   double pi = std::atan(1.)*4.;
@@ -1156,6 +1289,11 @@ void calcDevs( bool latNorm,
         sineRatio = num/denom;
         for (int b=0; b<nLon; b++){
           inputVal = IPVMat[a][b];
+          if (std::fabs(inputVal)>=(std::fabs(missingNo)-1)){
+            std::cout<<"Replacing value "<<inputVal<<std::endl;
+            inputVal = replaceMissingFloat2D(a,b,missingNo,IPVMat,nLat,nLon);
+            std::cout<<"New value is "<<inputVal<<std::endl;
+          }
           if (ZtoGH=="T"){
             inputVal /= 9.8;
           }

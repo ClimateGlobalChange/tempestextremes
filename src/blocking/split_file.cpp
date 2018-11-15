@@ -52,62 +52,106 @@ void replace_date(std::string str,
 
 void add_vars_to_file(NcFile & infile,
                       NcFile & outfile,
+                      int ndims,
                       int newTLen1,
                       int pos0,
+                      std::string timename,
+                      std::string levname,
+                      std::string latname,
+                      std::string lonname,
                       std::vector<std::string> vars){
-  NcVar * timeVar = infile.get_var("time");
-  NcVar * latVar = infile.get_var("lat");
+  NcVar * timeVar = infile.get_var(timename.c_str());
+  NcVar * latVar = infile.get_var(latname.c_str());
   int nLat = latVar ->get_dim(0)->size();
-  NcVar * lonVar = infile.get_var("lon");
+  NcVar * lonVar = infile.get_var(lonname.c_str());
+  NcVar * levvar = infile.get_var(levname.c_str());
+  NcVar * lev1var = NULL;
+  NcDim * lev1 = NULL;
   int nLon = lonVar ->get_dim(0)->size();
+  int nLev = 0;
+  if (levvar != NULL){
+    nLev = levvar->get_dim(0)->size();
+    std::cout<<"nLev is "<<nLev<<std::endl;
+  }
 
   DataVector<double> t1(newTLen1);
   timeVar->set_cur((long) pos0);
   timeVar->get(&(t1[0]),newTLen1);
 
 
-  NcDim * time1 = outfile.add_dim("time", newTLen1);
-  NcDim * lat1 = outfile.add_dim("lat", nLat);
-  NcDim * lon1 = outfile.add_dim("lon",nLon);
+  NcDim * time1 = outfile.add_dim(timename.c_str(), newTLen1);
+  if (nLev >0){
+    NcDim * lev1 = outfile.add_dim(levname.c_str(),nLev);
+  }
+  NcDim * lat1 = outfile.add_dim(latname.c_str(), nLat);
+  NcDim * lon1 = outfile.add_dim(lonname.c_str(),nLon);
 
-  NcVar * t1var = outfile.add_var("time", ncDouble, time1);
+  NcVar * t1var = outfile.add_var(timename.c_str(), ncDouble, time1);
   t1var->set_cur((long) 0);
   t1var->put(&(t1[0]),newTLen1);
   CopyNcVarAttributes(timeVar,t1var);
 
-  NcVar * lat1var = outfile.add_var("lat", ncDouble,lat1);
-  copy_dim_var(latVar,lat1var);
-  NcVar * lon1var = outfile.add_var("lon",ncDouble,lon1);
-  copy_dim_var(lonVar,lon1var);
-
-  DataMatrix3D<double> vMat(newTLen1,nLat,nLon);
-  for (int v=0; v<vars.size(); v++){
-    NcVar * invar = infile.get_var(vars[v].c_str());
-    invar->set_cur(pos0,0,0);
-    invar->get(&(vMat[0][0][0]),newTLen1,nLat,nLon);
-    NcVar * outvar = outfile.add_var(vars[v].c_str(), ncDouble, time1,lat1,lon1);
-    outvar->set_cur(0,0,0);
-    outvar->put(&(vMat[0][0][0]),newTLen1,nLat,nLon);
+  if (nLev > 0){
+    NcVar * lev1var = outfile.add_var(levname.c_str(), ncDouble,lev1);
+    copy_dim_var(levvar,lev1var);
   }
 
+  NcVar * lat1var = outfile.add_var(latname.c_str(), ncDouble,lat1);
+  copy_dim_var(latVar,lat1var);
+  NcVar * lon1var = outfile.add_var(lonname.c_str(),ncDouble,lon1);
+  copy_dim_var(lonVar,lon1var);
+
+  if (nLev>0){
+    DataMatrix4D<double> vMat(newTLen1,nLev,nLat,nLon);
+    for (int v=0; v<vars.size(); v++){
+      NcVar * invar = infile.get_var(vars[v].c_str());
+      invar->set_cur(pos0,0,0,0);
+      std::cout<<"Setting t to "<<pos0<<std::endl;
+      invar->get(&(vMat[0][0][0][0]),newTLen1,nLev,nLat,nLon);
+      NcVar * outvar = outfile.add_var(vars[v].c_str(), ncDouble, time1,lev1,lat1,lon1);
+      outvar->set_cur(0,0,0,0);
+      outvar->put(&(vMat[0][0][0][0]),newTLen1,nLev,nLat,nLon);
+    }
+  }else{
+    DataMatrix3D<double> vMat(newTLen1,nLat,nLon);
+    for (int v=0; v<vars.size(); v++){
+      NcVar * invar = infile.get_var(vars[v].c_str());
+      invar->set_cur(pos0,0,0);
+      invar->get(&(vMat[0][0][0]),newTLen1,nLat,nLon);
+      NcVar * outvar = outfile.add_var(vars[v].c_str(), ncDouble, time1,lat1,lon1);
+      outvar->set_cur(0,0,0);
+      outvar->put(&(vMat[0][0][0]),newTLen1,nLat,nLon);
+    }
+  }
 }
 
 
 
 int main(int argc, char ** argv ){
-
+  try{
   std::string fName;
   std::string fOut1;
   std::string fOut2;
   bool rename_f;
   std::string varlist;
+  int splitYear, splitMonth, splitDay, splitHour;
+  std::string timename,levname,latname,lonname;
 
   BeginCommandLine()
     CommandLineString(fName,"in","");
     CommandLineString(fOut1,"out1","");
     CommandLineString(fOut2,"out2","");
-    CommandLineBool(rename_f,"rename");
+//    CommandLineBool(rename_f,"rename");
     CommandLineString(varlist,"vars","");
+    CommandLineInt(splitYear,"year",0);
+    CommandLineInt(splitMonth,"month",0);
+    CommandLineInt(splitDay,"day",0);
+    CommandLineInt(splitHour,"hour",0);
+    CommandLineString(timename,"timename","time");
+    CommandLineString(levname,"levname","lev");
+    CommandLineString(latname,"latname","lat");
+    CommandLineString(lonname,"lonname","lon");
+
     ParseCommandLine(argc,argv);
   EndCommandLine(argv)
 
@@ -115,8 +159,11 @@ int main(int argc, char ** argv ){
     _EXCEPTIONT("Need to provide list of variables to split (--vars).");
   }
 
-  if ((!rename_f) && (fOut1 == "")){
+/*  if ((!rename_f) && (fOut1 == "")){
     _EXCEPTIONT("Need to either specify --rename or provide a new filename for out1.");
+  }*/
+  if (fOut1 == "" && fOut2 == ""){
+    _EXCEPTIONT("Need to provide output file names for the two new files (--out1 and --out2).");
   }
 
   //Split var list  
@@ -135,18 +182,27 @@ int main(int argc, char ** argv ){
     std::cout<<"Vector contains string "<<varVec[v].c_str()<<std::endl;
   }
 
-
+ 
 
   //Open the input file and the time variable
   NcFile infile(fName.c_str());
-  NcVar *timeVar = infile.get_var("time");
-  NcVar *latVar = infile.get_var("lat");
-  NcVar *lonVar = infile.get_var("lon");
+  int ndims = infile.num_dims();
+  std::cout<<"Input file has "<<ndims<<" dimensions."<<std::endl;
 
-  int nTime = infile.get_dim("time")->size();
-  int nLat = infile.get_dim("lat")->size();
-  int nLon = infile.get_dim("lon")->size();
-  
+  NcVar *timeVar = infile.get_var(timename.c_str());
+  NcVar *latVar = infile.get_var(latname.c_str());
+  NcVar *lonVar = infile.get_var(lonname.c_str());
+  NcVar *levVar = infile.get_var(levname.c_str());  
+
+
+  int nTime = infile.get_dim(timename.c_str())->size();
+  int nLat = infile.get_dim(latname.c_str())->size();
+  int nLon = infile.get_dim(lonname.c_str())->size();
+  int nLev = 0;
+  if (levVar != NULL){
+    nLev = infile.get_dim(levname.c_str())->size();
+  }
+
   DataVector<double> timeVec(nTime);
   timeVar ->set_cur((long) 0);
   timeVar ->get(&(timeVec[0]),nTime);
@@ -163,23 +219,36 @@ int main(int argc, char ** argv ){
   int dateDay = 0;
   int dateHour = 0;
 
-  int monthStartIndex = 0;
+  int cutIndex = -1000;
 
   for (int t=0; t<nTime; t++){
     ParseTimeDouble(strTimeUnits,strCalendar,timeVec[t],\
       dateYear,dateMonth,dateDay,dateHour);
-    if (dateDay == 1 && dateHour == 0){
+  /*  if (dateDay == 1 && dateHour == 0){
       monthStartIndex = t;
       std::cout<< "found month start index at t="<<t<<std::endl;
       break;
+    }*/
+    if (dateYear == splitYear && dateMonth == splitMonth && \
+          dateDay == splitDay && dateHour == splitHour){
+      cutIndex = t;
+      break;
     }
   }
-
-  if (monthStartIndex<1){
+  std::cout<<"Cut index is "<<cutIndex<<std::endl;
+  if (cutIndex<0){
     _EXCEPTIONT("Check file-- no beginning month date found.");
   }  
+  //use ncks to split the files
+  std::string cmd1 = "ncks -d " + timename + ",0," + std::to_string(cutIndex-1) + " " + fName + " " + fOut1;
+  std::string cmd2 = "ncks -d " + timename + ","+ std::to_string(cutIndex) + ", " + fName + " " + fOut2;
+  system(cmd1.c_str());
+  system(cmd2.c_str());
+
+// std::cout<<cmd1.c_str()<<std::endl;
+// std::cout<<cmd2<<std::endl;
   //create the output file names
-  int year1=0;
+ /* int year1=0;
   int month1=0;
   int day1=0;
   int hour1=0;
@@ -199,10 +268,12 @@ int main(int argc, char ** argv ){
     year2=year1;
     month2=month1+1;
   }
+*/
+
 
 //Deal with the file names for the new and old files
   
-  if (rename_f){
+/*  if (rename_f){
     std::string fNew;
 
     std::string fname_copy = fName;
@@ -218,10 +289,10 @@ int main(int argc, char ** argv ){
   }
   if (fOut1 == ""){
     fOut1 = fName;
-  }
+  }*/
 
   //Dimensions of split time
-  int newTLen1 = monthStartIndex;
+/*  int newTLen1 = cutIndex;
   int newTLen2 = nTime-newTLen1;
   std::cout<<"New time dimensions are "<<newTLen1<<" and "<<newTLen2<<std::endl;
 
@@ -231,17 +302,19 @@ int main(int argc, char ** argv ){
   timeVar->get(&(t1[0]),newTLen1);
 
   DataVector<double> t2(newTLen2);
-  timeVar->set_cur((long) monthStartIndex);
+  timeVar->set_cur((long) cutIndex);
   timeVar->get(&(t2[0]),newTLen2);
 
 
   //Now create the new files
   NcFile file1(fOut1.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
-  add_vars_to_file(infile,file1,newTLen1,0,varVec);
+  add_vars_to_file(infile,file1, ndims,newTLen1,0,timename,levname,latname,lonname,varVec);
   NcFile file2(fOut2.c_str(), NcFile::Replace, NULL, 0, NcFile::Offset64Bits);
-  add_vars_to_file(infile,file2,newTLen2,newTLen1,varVec);
+  add_vars_to_file(infile,file2,ndims,newTLen2,newTLen1,timename,levname,latname,lonname,varVec);
+*/
 
-
-  
-
+  }
+  catch(Exception &e){
+    std::cout<<e.ToString()<<std::endl;
+  }
 }
