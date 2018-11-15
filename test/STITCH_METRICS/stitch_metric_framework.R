@@ -8,7 +8,7 @@ parser<-ArgumentParser()
 #Either use the master namelist file or the individual namelist files
 parser$add_argument("-nl","--namelist",help="Master namelist for all flags.",default="")
 #parser$add_argument("--parallel",help="Run task in parallel",action="store_true")
-parser$add_argument("--setup",help="Get all of the necessary libraries for running this code",action="store_true")
+parser$add_argument("--setup",help="Generate the master namelist",action="store_true")
 #Does ALL the functions-- generates a report output
 parser$add_argument("-gr","--generatereport",help="Create a report for dataset intercomparison. Runs all functions and produces a summary file.",action="store_true")
 

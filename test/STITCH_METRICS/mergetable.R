@@ -102,6 +102,7 @@ merge_dfs<-function(df_stitch,df_nostitch,rfn="",textfn="",csvfn="",df_merged_na
 	  assign(df_merged_name,df_final)
 	  assign("df_name",df_merged_name)
 	  save(list=c(df_merged_name,"df_name"),file=rfn) 
+	  print(sprintf("Wrote %s to file",rfn))
 	}
 	if (textfn!=""){
 	  write.table(df_final,file=textfn,sep="\t",row.names=FALSE,quote=FALSE)

@@ -381,7 +381,7 @@ color_cols<-c(model_cols,rean_cols)
 for (i in 1:length(Varnames)){
   btemp<-get(sprintf("blob%d",i))
   ttemp<-get(sprintf("time%d",i))
-  tindex<-which(ttemp==candidate_dates[1])
+  tindex<-which(ttemp==candidate_dates[20])
   bsub<-btemp[,,tindex]
   bmelt<-melt(bsub)
   bmelt$var<-rep(Varnames[i],nrow(bmelt))
