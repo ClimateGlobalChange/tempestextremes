@@ -5,11 +5,11 @@ ifelse(!dir.exists(file.path(dir_check)),dir.create(file.path(dir_check)),FALSE)
 fname_namelist_out<-sprintf("%s/%s",dir_check,fname_namelist)
 #READFILES
 if (!use_detectblob){
-  flist<-sprintf("%s/%s",input_dir,stitch_lists)
+  flist<-sprintf("%s",stitch_lists)
   var_inputs<-Varnames
   suffix_table<-rep("stitchtable",length(stitch_lists))
 }else{
-  flist<-sprintf("%s/%s",input_dir,c(stitch_lists,detect_lists))
+  flist<-sprintf("%s",c(stitch_lists,detect_lists))
   var_inputs<-c(Varnames,Varnames)
   suff1<-rep("stitchtable",length(stitch_lists))
   suff2<-rep("nostitchtable",length(detect_lists))
@@ -30,7 +30,7 @@ csv_readname<-ifelse(output_csv==TRUE,sprintf("%s/%s/%s_%s_%s.csv",
                                                suffix_table),"")
 #collapsed strings for output
 var_string<-paste(var_inputs,collapse="\",\"")
-res_string<-paste(resolutions,collapse="\",\"")
+res_string<-ifelse(!exists("resolutions"),"",paste(resolutions,collapse="\",\""))
 flist_string<-paste(flist,collapse="\",\"")
 rdata_readstring<-paste(rdata_readname,collapse="\",\"")
 csv_readstring<-ifelse(csv_readname=="","\"\"",paste(csv_readname,collapse="\",\""))
@@ -80,7 +80,7 @@ txt_summstring<-ifelse(txt_summname=="","\"\"",paste(txt_summname,collapse="\",\
 
 #READNETCDF
 #Collapse the netcdf list 
-stitchblob_string<-paste(sprintf("%s/%s",input_dir,stitchblob_lists),collapse="\",\"")
+stitchblob_string<-paste(sprintf("%s",stitchblob_lists),collapse="\",\"")
 varvec_string<-paste(varvec,collapse="\",\"")
 rdata_blobname<-sprintf("%s/%s/%s_%s_blobdata.RData",output_dir,output_subdir,
                         output_prefix,Varnames)
@@ -158,7 +158,9 @@ print(sprintf("Writing namelist %s",fname_namelist_out))
 sink(fname_namelist_out,split=T)
 cat(sprintf("work_dir<-\"%s\" \n",work_dir))
 cat(sprintf("output_dir<-\"%s/%s\" \n",output_dir,output_subdir))
-cat(sprintf("resolutions<-c(\"%s\")\n\n",res_string))
+if (res_string!=""){
+  cat(sprintf("resolutions<-c(\"%s\")\n\n",res_string))  
+}
 cat("#READFILES SPECS----------\n")
 cat(sprintf("nrun_rf<-%d \n",nrun_rf))
 cat(sprintf("varname<-c(\"%s\") \n",var_string))
@@ -234,10 +236,26 @@ cat(sprintf("latname<-\"%s\"\n",latname))
 cat(sprintf("lonname<-\"%s\"\n",lonname))
 cat(sprintf("transformto180<-%s\n",TF180))
 cat(sprintf("transformto360<-%s\n",TF360))
-cat(sprintf("minlat<-%f\n",minlat))
-cat(sprintf("maxlat<-%f\n",maxlat))
-cat(sprintf("minlon<-%f\n",minlon))
-cat(sprintf("maxlon<-%f\n",maxlon))
+if (exists("minlat")){
+  cat(sprintf("minlat<-%f\n",minlat))  
+}else{
+  cat("minlat<-\"\"\n")
+}
+if (exists("maxlat")){
+  cat(sprintf("maxlat<-%f\n",maxlat))
+}else{
+  cat("maxlat<-\"\"\n")
+}
+if (exists("minlon")){
+  cat(sprintf("minlon<-%f\n",minlon))  
+}else{
+  cat("minlon<-\"\"\n")
+}
+if (exists("maxlon")){
+  cat(sprintf("maxlon<-%f\n",maxlon))  
+}else{
+  cat("maxlon<-\"\"\n")
+}
 cat("minlev<-\"\"\n")
 cat("maxlev<-\"\"\n")
 cat(sprintf("regridto1degree<-%s\n",TFregrid))
@@ -270,3 +288,5 @@ cat(sprintf("blobfiles<-c(\"%s\")\n",rdata_blobstring))
 cat(sprintf("blobname<-c(\"%s\")\n",varvec_string))
 cat(sprintf("icfiles<-c(\"%s\")\n",icname_string))
 sink()
+
+print(sprintf("Wrote namelist file %s",fname_namelist_out))

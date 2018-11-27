@@ -7,10 +7,11 @@ parser<-ArgumentParser()
 #The namelist file provides all of the arguments
 #Either use the master namelist file or the individual namelist files
 parser$add_argument("-nl","--namelist",help="Master namelist for all flags.",default="")
-#parser$add_argument("--parallel",help="Run task in parallel",action="store_true")
-parser$add_argument("--setup",help="Generate the master namelist",action="store_true")
+parser$add_argument("-gn","--generatenl",help="Generate the master namelist",action="store_true")
+parser$add_argument("-sl","--setuplist",help="Setup file name file name (mandatory) for --generatenl",default="")
+#parser$add_argument("-nls","--namelistset",help="File with namelist generation specifications (see namelist_full.R for an example of what is required)",default="")
 #Does ALL the functions-- generates a report output
-parser$add_argument("-gr","--generatereport",help="Create a report for dataset intercomparison. Runs all functions and produces a summary file.",action="store_true")
+#parser$add_argument("-gr","--generatereport",help="Create a report for dataset intercomparison. Runs all functions and produces a summary file.",action="store_true")
 
 #Most basic function: read BlobStats output to a data table------
 parser$add_argument("-rf","--readfiles",help="Tell program to read in BlobStats data",action="store_true")
@@ -40,6 +41,18 @@ args<-parser$parse_args()
 parse_namelist<-function(var,i){
   var_out<-ifelse(length(var)==1,var,var[i])
   return(var_out)
+}
+
+#Generate the namelist for running all of the calculations
+if (args$generatenl){
+  if (args$setuplist==""){
+    stop("Provide the name of the setup list file.")
+  }
+  
+  source(args$setuplist)
+  setwd(work_dir)
+  print("sourcing GenerateNamelist")
+  source("generateNamelist.R")
 }
 
 #MOST BASIC OPTION: PARSE BLOBSTATS---------
