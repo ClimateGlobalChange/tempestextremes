@@ -1,0 +1,27 @@
+\contentsline {section}{\numberline {1}Minimum software and data requirements}{3}
+\contentsline {section}{\numberline {2}Usage}{3}
+\contentsline {subsection}{\numberline {2.1}Command line usage}{3}
+\contentsline {subsubsection}{\numberline {2.1.1}Namelists}{3}
+\contentsline {subsection}{\numberline {2.2}Example workflow: running BlobMetrics for the first time}{4}
+\contentsline {section}{\numberline {3}BlobMetrics Utilities}{6}
+\contentsline {subsection}{\numberline {3.1}Read BlobStats files into a single table (\texttt {--readfiles})}{6}
+\contentsline {subsubsection}{\numberline {3.1.1}Requirements}{6}
+\contentsline {subsubsection}{\numberline {3.1.2}Command line syntax}{6}
+\contentsline {subsubsection}{\numberline {3.1.3}Output}{6}
+\contentsline {subsection}{\numberline {3.2}Handling instances of merging/splitting blobs (\texttt {--mergetable)}}{7}
+\contentsline {subsubsection}{\numberline {3.2.1}Requirements}{8}
+\contentsline {subsubsection}{\numberline {3.2.2}Command line syntax}{8}
+\contentsline {subsubsection}{\numberline {3.2.3}Output}{8}
+\contentsline {subsection}{\numberline {3.3}Create a per-blob summary table (\texttt {--summarize})}{8}
+\contentsline {subsubsection}{\numberline {3.3.1}Requirements}{9}
+\contentsline {subsubsection}{\numberline {3.3.2}Command line syntax}{9}
+\contentsline {subsubsection}{\numberline {3.3.3}Output}{9}
+\contentsline {subsection}{\numberline {3.4}Reading in NetCDF data (\texttt {--readnetcdf})}{10}
+\contentsline {subsubsection}{\numberline {3.4.1}Requirements}{10}
+\contentsline {subsubsection}{\numberline {3.4.2}Command line syntax}{10}
+\contentsline {subsubsection}{\numberline {3.4.3}Output}{11}
+\contentsline {subsection}{\numberline {3.5}Comparing two datasets (\texttt {--intercomparison})}{11}
+\contentsline {subsubsection}{\numberline {3.5.1}Requirements}{11}
+\contentsline {subsubsection}{\numberline {3.5.2}Command line syntax}{11}
+\contentsline {subsubsection}{\numberline {3.5.3}Output}{11}
+\contentsline {section}{\numberline {A}BlobStats File Format}{13}
