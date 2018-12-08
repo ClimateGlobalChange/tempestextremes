@@ -19,22 +19,22 @@ parser$add_argument("-nlrf","--namelistrf",help="Namelist file name (mandatory) 
 #parser$add_argument("-th","--thourly",help="Time resolution (i.e. 6 for 6 hourly)",default="")
 #Read in existing file(s) (need to specify type using one of above flags)--------
 parser$add_argument("-rt","--readtable",help="Read in existing data file(s) from previous --readfiles output",action="store_true")
-parser$add_argument("-nlrt","--namelistrt",help="Namelist file name (mandatory) for --readtable",default="")
+parser$add_argument("-nlrt","--namelistrt",help="Namelist file name for --readtable",default="")
 #Merge StitchBlobs and DetectBlobs outputs--------
 parser$add_argument("-mt","--mergetable",help="Combine outputs from StitchBlobs and DetectBlobs into a table with individual blob information",action="store_true")
-parser$add_argument("-nlmt","--namelistmt",help="Namelist file name (mandatory) for --mergetable",default="")
+parser$add_argument("-nlmt","--namelistmt",help="Namelist file name for --mergetable",default="")
 #Make a summary table----------
 parser$add_argument("-st","--summarize",help="Make a summary table of the BlobStats data",action="store_true")
-parser$add_argument("-nlst","--namelistst",help="Namelist file name (mandatory) for --summarize",default="")
+parser$add_argument("-nlst","--namelistst",help="Namelist file name for --summarize",default="")
 #Read in NetCDFs----------
 parser$add_argument("-rn","--readnetcdf",help="Read in NetCDF files",action="store_true")
-parser$add_argument("-nlrn","--namelistrn",help="Namelist file name (mandatory) for --readnetcdf",default="")
+parser$add_argument("-nlrn","--namelistrn",help="Namelist file name for --readnetcdf",default="")
 #Intercomparison of datasets---------
 parser$add_argument("-ic","--intercomparison",help="Pearson correlation, probability of co-occurrence between two datasets, and spatial similarity between individual blobs.",action="store_true")
-parser$add_argument("-nlic","--namelistic",help="Namelist file name (mandatory) for --intercomparison",default="")
+parser$add_argument("-nlic","--namelistic",help="Namelist file name for --intercomparison",default="")
 #Generate report
 parser$add_argument("-gr","--genreport",help="Generate a summary report on blocking data for specified datasets",action="store_true")
-parser$add_argument("-nlgr","--namelistgr",help="namelist file name (mandatory) for --genreport",default="")
+parser$add_argument("-nlgr","--namelistgr",help="namelist file name for --genreport",default="")
 #NOW PARSE ALL THE ARGUMENTS--------------
 args<-parser$parse_args()
 
@@ -43,7 +43,7 @@ parse_namelist<-function(var,i){
   return(var_out)
 }
 
-#Generate the namelist for running all of the calculations
+##Generate the namelist for running all of the calculations-------------
 if (args$generatenl){
   if (args$setuplist==""){
     stop("Provide the name of the setup list file.")
@@ -315,6 +315,7 @@ if (args$readnetcdf){
   
 }
 
+#COMPARE TWO DATASETS--------------------------------
 if (args$intercomparison){
   if (args$namelistic=="" & args$namelist==""){
     stop("Must provide the namelist file for --intercomparison.")
@@ -365,3 +366,21 @@ if (args$intercomparison){
   }
   
 }
+
+#GENERATE A REPORT WITH ALL OF THE PROVIDED DATA
+if (args$genreport){
+  if (args$namelistgr=="" & args$namelist==""){
+    stop("Must provide the namelist file for --genreport.")
+  }
+  nl_report<-ifelse(args$namelistgr!="",args$namelistgr,args$namelist)
+  source(nl_report)
+  setwd(work_dir)
+  source("generateReport.R")
+}
+
+
+
+
+
+
+

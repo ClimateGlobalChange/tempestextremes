@@ -34,12 +34,13 @@ for (i in 1:nvars){
   df_merge<-get(sprintf("V%d_merge",i))
   df_merge_all<-rbind(df_merge_all,df_merge)
   df_dates<-unique(as.Date(df_merge$datehour))
-  if (exists(resolutions)){
+  if (exists("resolutions")){
     data_table["Spatial resolution",i]<-resolutions[i]    
   }
   data_table["Number of unique blobs",i]<-nrow(df_summ)
   data_table["Number of merged blobs",i]<-nrow(df_summ[df_summ$merged=="YES",])
   data_table["Maximum blocking frequency",i]<-sprintf("%.4f",max(get(sprintf("avgblob%d",i))))
+    data_table["Interquartile range of blob centroid latitude",i]<-paste(sprintf("%.2f",quantile(df_merge$centlat,c(0.25,0.75))),collapse=" ")
   data_table["Number of blocked days",i]<-length(df_dates)
   data_table["Average number of blocked days (divided by number of years)",i]<-sprintf("%.2f",length(df_dates)/nyears)
   data_table["Interquartile range of duration (days)",i]<-paste(sprintf("%.2f",quantile(df_summ$duration_days,c(0.25,0.75))),collapse=" ")

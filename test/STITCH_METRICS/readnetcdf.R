@@ -234,8 +234,8 @@ read_netcdf<-function(flist,vlist,olist=vlist,timename="time",levname="lev",latn
           #print("Will only regrid for 3 dimension variables.")
         }
       }
-      new_var[which(new_var>=0.5)]<-1
-      new_var[which(new_var<0.5)]<-0
+      new_var[which(new_var>0)]<-1
+      #new_var[which(new_var<0.5)]<-0
       assign(olist[i],new_var)
     }
     olist_fin<-c(olist,vlist_orig,"lat_axis_orig","lon_axis_orig")

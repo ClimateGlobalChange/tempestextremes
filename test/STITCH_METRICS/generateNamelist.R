@@ -17,6 +17,9 @@ if (!use_detectblob){
 }
 nrun_rf<-length(flist)
 #Will always output RData files
+if (length(var_inputs)!=nrun_rf | length(suffix_table)!=nrun_rf){
+  stop("Make sure that the lengths of the Varnames, stitch_lists, and (if applicable) detect_lists vectors match!")
+}
 rdata_readname<-sprintf("%s/%s/%s_%s_%s.RData",output_dir,output_subdir,
                         output_prefix,var_inputs,suffix_table)
 #optional txt/csv files

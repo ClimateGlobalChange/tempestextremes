@@ -25,7 +25,7 @@ for (t in 2:length(Varnames)){
 }
 
 
-md_file<-"~/tempestextremes/test/STITCH_METRICS/report_template.Rmd"
+md_file<-"report_template.Rmd"
 
 avgdata<-data.frame(x=numeric(),y=numeric(),value=numeric(),
                      VAR=character(),lon=numeric(),lat=numeric())

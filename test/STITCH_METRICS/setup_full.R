@@ -22,15 +22,6 @@ etc retains all time steps."
 #This is the number of years in your dataset! (Integer)
 nyears<-2004-1980+1
 
-##########################################
-#USER_DEFINED
-#Search string for stitch files
-stitch_searchstring<-"*DJF_NP*stats.txt"
-nostitch_searchstring<-"*DJF_NP*stats_nostitch.txt"
-netcdf_searchstring<-"*DJF_NP*blobs.nc"
-netcdf2_searchstring<-"*DJF*blobs.nc"
-#########################################
-
 ###########
 #FILE INFO
 #Will always output RData files
@@ -77,18 +68,27 @@ fname_namelist<-"DJF_NP_namelist_master_test.R"
 #USER_DEFINED
 #Make the lists on the fly using the search strings above!
 ##########################
+
+#USER_DEFINED
+#Search string for stitch files
+stitch_searchstring<-"*DJF_NP*stats.txt"
+nostitch_searchstring<-"*DJF_NP*stats_nostitch.txt"
+netcdf_searchstring<-"*DJF_NP*blobs.nc"
+netcdf2_searchstring<-"*DJF*blobs.nc"
+
+
 #Input directory
 input_directory<-"~/BLOBSTATS_FILES"
-stitchlist_fnames<-sprintf("%s/%s_stitch_list_NA",Varnames,Varnames)
-nostitch_fnames<-sprintf("%s/%s_nostitch_list_NA",Varnames,Varnames)
-netlist_fnames<-sprintf("%s/bloblist_DJF",Varnames)
+stitchlist_fnames<-sprintf("%s/%s/%s_stitch_list_NA",input_directory,Varnames,Varnames)
+nostitch_fnames<-sprintf("%s/%s/%s_nostitch_list_NA",input_directory,Varnames,Varnames)
+netlist_fnames<-sprintf("%s/%s/bloblist_DJF",input_directory,Varnames)
 for (i in 1:length(stitchlist_fnames)){
-  system(sprintf("ls %s/%s/%s > %s/%s",input_directory,Varnames[i],stitch_searchstring,output_dir,stitchlist_fnames[i]))
-  system(sprintf("ls %s/%s/%s > %s/%s",input_directory,Varnames[i],nostitch_searchstring,output_dir,nostitch_fnames[i]))
+  system(sprintf("ls %s/%s/%s > %s",input_directory,Varnames[i],stitch_searchstring,stitchlist_fnames[i]))
+  system(sprintf("ls %s/%s/%s > %s",input_directory,Varnames[i],nostitch_searchstring,nostitch_fnames[i]))
   if (Varnames[i]!="MERRA" & Varnames[i]!="ERA" & Varnames[i]!="JRA" & Varnames[i]!="CFSR"){
-    system(sprintf("ls %s/%s/%s > %s/%s",input_directory,Varnames[i],netcdf_searchstring,output_dir,netlist_fnames[i]))    
+    system(sprintf("ls %s/%s/%s > %s",input_directory,Varnames[i],netcdf_searchstring,netlist_fnames[i]))    
   }else{
-    system(sprintf("ls %s/%s/%s > %s/%s",input_directory,Varnames[i],netcdf2_searchstring,output_dir,netlist_fnames[i]))
+    system(sprintf("ls %s/%s/%s > %s",input_directory,Varnames[i],netcdf2_searchstring,netlist_fnames[i]))
   }
 
 }
