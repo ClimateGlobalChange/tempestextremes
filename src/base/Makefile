@@ -14,7 +14,12 @@ FILES= Announce.cpp \
        NetCDFUtilities.cpp \
        TimeObj.cpp \
        Variable.cpp \
-       kdtree.cpp
+	   DataOp.cpp \
+       kdtree.cpp \
+	   SimpleGridUtilities.cpp \
+	   AutoCurator.cpp \
+	   ArgumentTree.cpp \
+	   NodeFileUtilities.cpp
 
 LIB_TARGET= libextremesbase.a
 

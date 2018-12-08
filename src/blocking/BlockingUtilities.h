@@ -301,7 +301,8 @@ void calcDevs(bool latNorm,
               NcVar *avgIPV,
               NcVar *inTime,
               NcVar *avgTime,
-              NcVar *lat);
+              NcVar *lat,
+              double missingNo);
 							
 /*void calcSmoothedDevs( NcVar *outADev,
 											int nTime,

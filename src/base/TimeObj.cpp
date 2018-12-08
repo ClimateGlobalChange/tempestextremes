@@ -128,7 +128,7 @@ bool Time::operator>(const Time & time) const {
 
 void Time::VerifyTime() {
 
-	// Calendar with no leap years
+	// Verification only for known CalendarTypes
 	if ((m_eCalendarType == CalendarNoLeap) || 
 		(m_eCalendarType == CalendarStandard) ||
 		(m_eCalendarType == CalendarGregorian) ||
@@ -168,10 +168,6 @@ void Time::VerifyTime() {
 		if ((m_iMicroSecond < 0) || (m_iMicroSecond >= 1000000)) {
 			_EXCEPTIONT("MicroSecond out of range");
 		}
-
-	// Operation not permitted on this CalendarType
-	} else {
-		_EXCEPTIONT("Invalid CalendarType");
 	}
 }
 
@@ -179,7 +175,7 @@ void Time::VerifyTime() {
 
 void Time::NormalizeTime() {
 
-	// Calendar with no leap years
+	// Normalization only for known CalendarTypes
 	if ((m_eCalendarType == CalendarNoLeap) || 
 		(m_eCalendarType == CalendarStandard) ||
 		(m_eCalendarType == CalendarGregorian) ||
@@ -296,10 +292,6 @@ void Time::NormalizeTime() {
 			_EXCEPTION5("Logic error: %i %i %i %i %i",
 				m_iYear, m_iMonth, m_iDay, m_iSecond, m_iMicroSecond);
 		}
-
-	// Operation not permitted on this CalendarType
-	} else {
-		_EXCEPTIONT("Invalid CalendarType");
 	}
 }
 

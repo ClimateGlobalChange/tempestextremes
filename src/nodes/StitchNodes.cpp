@@ -2,10 +2,10 @@
 ///
 ///	\file    StitchNodes.cpp
 ///	\author  Paul Ullrich
-///	\version October 1st, 2014
+///	\version August 14, 2018
 ///
 ///	<remarks>
-///		Copyright 2000-2014 Paul Ullrich
+///		Copyright 2000-2018 Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -146,7 +146,7 @@ void ParseInput(
 
 			ParseVariableList(strLine, vecTimes[iTime]);
 
-			if (vecTimes[iTime].size() != 5) {
+			if (vecTimes[iTime].size() < 5) {
 				_EXCEPTION1("Malformed time string:\n%s", strLine.c_str());
 			}
 
@@ -210,7 +210,7 @@ void ParseInput(
 
 	// Insufficient candidate information
 	if (fWarnInsufficientCandidateInfo) {
-		Announce("WARNING: One or more candidates do not have match"
+		Announce("WARNING: One or more candidates do not have matching"
 				" --format entries");
 	}
 }
@@ -248,7 +248,7 @@ public:
 	) {
 		m_iTime[0] = iTime0;
 		m_iTime[1] = iTime1;
-		
+
 		m_iCandidate[0] = iCandidate0;
 		m_iCandidate[1] = iCandidate1;
 	}
@@ -1003,13 +1003,18 @@ try {
 		for (int i = 0; i < vecPaths.size(); i++) {
 			int iStartTime = vecPaths[i].m_iTimes[0];
 
-			fprintf(fp, "start\t");
-			fprintf(fp, "%li\t", vecPaths[i].m_iTimes.size());
-			for (int j = 0; j < vecTimes[iStartTime].size(); j++) {
+			fprintf(fp, "start");
+			fprintf(fp, "\t%li", vecPaths[i].m_iTimes.size());
+
+			int jEnd = vecTimes[iStartTime].size();
+			if (jEnd > 5) {
+				jEnd = 5;
+			}
+			for (int j = 0; j < jEnd; j++) {
 				if (j == 3) {
 					continue;
 				}
-				fprintf(fp, "%s\t", vecTimes[iStartTime][j].c_str());
+				fprintf(fp, "\t%s", vecTimes[iStartTime][j].c_str());
 			}
 			fprintf(fp, "\n");
 
@@ -1017,16 +1022,15 @@ try {
 				int iTime = vecPaths[i].m_iTimes[t];
 				int iCandidate = vecPaths[i].m_iCandidates[t];
 
-				fprintf(fp, "\t");
 				for (int j = 0; j < vecCandidates[iTime][iCandidate].size(); j++) {
-					fprintf(fp, "%s\t",
+					fprintf(fp, "\t%s",
 						vecCandidates[iTime][iCandidate][j].c_str());
 				}
-				for (int j = 0; j < vecTimes[iTime].size(); j++) {
+				for (int j = 0; j < jEnd; j++) {
 					if (j == 3) {
 						continue;
 					}
-					fprintf(fp, "%s\t", vecTimes[iTime][j].c_str());
+					fprintf(fp, "\t%s", vecTimes[iTime][j].c_str());
 				}
 				fprintf(fp, "\n");
 			}

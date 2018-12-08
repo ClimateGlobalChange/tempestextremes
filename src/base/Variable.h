@@ -21,12 +21,52 @@
 
 #include "DataVector.h"
 #include "SimpleGrid.h"
+#include "DataOp.h"
 
 #include <vector>
 
 ///////////////////////////////////////////////////////////////////////////////
 
-typedef std::vector<NcFile *> NcFileVector;
+class NcFileVector : public std::vector<NcFile *> {
+private:
+	///	<summary>
+	///		Copy constructor.
+	///	</summary>
+	NcFileVector(const NcFileVector & vecFiles) {
+	}
+
+	///	<summary>
+	///		Assignment operator.
+	///	</summary>
+	NcFileVector & operator= (const NcFileVector & vecFiles) {
+		return (*this);
+	}
+
+public:
+	///	<summary>
+	///		Default constructor.
+	///	</summary>
+	NcFileVector() :
+		std::vector<NcFile *>()
+	{ }
+
+	///	<summary>
+	///		Destructor.
+	///	</summary>
+	~NcFileVector() {
+		NcFileVector::clear();
+	}
+
+	///	<summary>
+	///		Clear the contents of this NcFileVector.
+	///	</summary>
+	void clear() {
+		for (int i = 0; i < size(); i++) {
+			(*this)[i]->close();
+			delete (*this)[i];
+		}
+	}
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -36,11 +76,22 @@ typedef std::vector<Variable> VariableVector;
 
 typedef int VariableIndex;
 
-typedef std::vector<VariableIndex> VariableIndexVector;
+class VariableIndexVector : public std::vector<VariableIndex> {};
 
 ///////////////////////////////////////////////////////////////////////////////
 
 class VariableRegistry {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	VariableRegistry();
+
+	///	<summary>
+	///		Destructor.
+	///	</summary>
+	~VariableRegistry();
 
 public:
 	///	<summary>
@@ -59,11 +110,22 @@ public:
 	///	</summary>
 	void UnloadAllGridData();
 
+public:
+	///	<summary>
+	///		Get the DataOp with the specified name.
+	///	</summary>
+	DataOp * GetDataOp(const std::string & strName);
+
 private:
 	///	<summary>
 	///		Array of variables.
 	///	</summary>
 	VariableVector m_vecVariables;
+
+	///	<summary>
+	///		Map of data operators.
+	///	</summary>
+	DataOpManager m_domDataOp;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

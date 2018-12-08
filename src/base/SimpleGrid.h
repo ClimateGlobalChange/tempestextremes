@@ -25,6 +25,8 @@
 #include <fstream>
 #include <vector>
 
+#include "netcdfcpp.h"
+
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
@@ -53,6 +55,13 @@ public:
 		m_nGridDim.resize(2);
 		m_nGridDim[0] = nLat;
 		m_nGridDim[1] = nLon;
+
+		// Verify units of latitude and longitude
+		for (int j = 0; j < nLat; j++) {
+			if (fabs(vecLat[j]) > 0.5 * M_PI + 1.0e-12) {
+				_EXCEPTIONT("In SimpleGrid, latitude array must be given in radians");
+			}
+		}
 
 		int ixs = 0;
 		for (int j = 0; j < nLat; j++) {
@@ -83,6 +92,55 @@ public:
 		}
 		}
 
+	}
+
+	///	<summary>
+	///		Try to automatically generate the SimpleGrid from a NetCDF
+	///		file with latitude/longitude coordinates.
+	///	</summary>
+	void GenerateLatitudeLongitude(
+		NcFile * ncFile,
+		bool fRegional
+	) {
+		NcDim * dimLat = ncFile->get_dim("lat");
+		if (dimLat == NULL) {
+			_EXCEPTIONT("No dimension \"lat\" found in input file");
+		}
+
+		NcDim * dimLon = ncFile->get_dim("lon");
+		if (dimLon == NULL) {
+			_EXCEPTIONT("No dimension \"lon\" found in input file");
+		}
+
+		NcVar * varLat = ncFile->get_var("lat");
+		if (varLat == NULL) {
+			_EXCEPTIONT("No variable \"lat\" found in input file");
+		}
+
+		NcVar * varLon = ncFile->get_var("lon");
+		if (varLon == NULL) {
+			_EXCEPTIONT("No variable \"lon\" found in input file");
+		}
+
+		int nLat = dimLat->size();
+		int nLon = dimLon->size();
+
+		DataVector<double> vecLat(nLat);
+		varLat->get(vecLat, nLat);
+
+		for (int j = 0; j < nLat; j++) {
+			vecLat[j] *= M_PI / 180.0;
+		}
+
+		DataVector<double> vecLon(nLon);
+		varLon->get(vecLon, nLon);
+
+		for (int i = 0; i < nLon; i++) {
+			vecLon[i] *= M_PI / 180.0;
+		}
+
+		// Generate the SimpleGrid
+		GenerateLatitudeLongitude(vecLat, vecLon, fRegional);
 	}
 
 	///	<summary>
@@ -145,14 +203,55 @@ public:
 		return (m_vecConnectivity.size());
 	}
 
+	///	<summary>
+	///		Convert a coordinate to an index.
+	///	</summary>
+	int CoordinateVectorToIndex(
+		const std::vector<int> & coordvec
+	) {
+		if (m_nGridDim.size() == 0) {
+			_EXCEPTIONT("Invalid SimpleGrid");
+		}
+
+		if (coordvec.size() != m_nGridDim.size()) {
+			_EXCEPTIONT("Invalid coordinate vector");
+		}
+		if (coordvec.size() == 1) {
+			if (coordvec[0] >= m_nGridDim[0]) {
+				_EXCEPTIONT("Coordinate vector out of range");
+			}
+			return coordvec[0];
+		}
+		if (coordvec.size() == 2) {
+			if (coordvec[0] >= m_nGridDim[0]) {
+				_EXCEPTIONT("Coordinate vector out of range");
+			}
+			if (coordvec[1] >= m_nGridDim[1]) {
+				_EXCEPTIONT("Coordinate vector out of range");
+			}
+		}
+
+		int ix = 0;
+		int d = 1;
+		for (int i = 0; i < coordvec.size(); i++) {
+			if (coordvec[i] >= m_nGridDim[i]) {
+				_EXCEPTIONT("Coordinate vector out of range");
+			}
+			ix = ix + i * d;
+			d = d * m_nGridDim[i];
+		}
+
+		return ix;
+	}
+
 public:
 	///	<summary>
-	///		Longitude of each grid point.
+	///		Longitude of each grid point (in radians).
 	///	</summary>
 	DataVector<double> m_dLon;
 
 	///	<summary>
-	///		Latitude of each grid point.
+	///		Latitude of each grid point (in radians).
 	///	</summary>
 	DataVector<double> m_dLat;
 

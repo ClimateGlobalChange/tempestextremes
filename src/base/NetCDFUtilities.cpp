@@ -16,6 +16,7 @@
 
 #include "NetCDFUtilities.h"
 #include "Exception.h"
+#include "Announce.h"
 #include "DataVector.h"
 #include "netcdfcpp.h"
 
@@ -115,7 +116,8 @@ void CopyNcVar(
 	NcFile & ncIn,
 	NcFile & ncOut,
 	const std::string & strVarName,
-	bool fCopyAttributes
+	bool fCopyAttributes,
+	bool fCopyData
 ) {
 	if (!ncIn.is_valid()) {
 		_EXCEPTIONT("Invalid input file specified");
@@ -208,8 +210,10 @@ void CopyNcVar(
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
 		}
 
-		var->get(&(data[0]), &(counts[0]));
-		varOut->put(&(data[0]), &(counts[0]));
+		if (fCopyData) {
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
 	}
 
 	// ncInt type
@@ -226,8 +230,10 @@ void CopyNcVar(
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
 		}
 
-		var->get(&(data[0]), &(counts[0]));
-		varOut->put(&(data[0]), &(counts[0]));
+		if (fCopyData) {
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
 	}
 
 	// ncFloat type
@@ -244,8 +250,10 @@ void CopyNcVar(
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
 		}
 
-		var->get(&(data[0]), &(counts[0]));
-		varOut->put(&(data[0]), &(counts[0]));
+		if (fCopyData) {
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
 	}
 
 
@@ -263,8 +271,10 @@ void CopyNcVar(
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
 		}
 
-		var->get(&(data[0]), &(counts[0]));
-		varOut->put(&(data[0]), &(counts[0]));
+		if (fCopyData) {
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
 	}
 
 	// Check output variable exists
@@ -281,4 +291,106 @@ void CopyNcVar(
 
 ////////////////////////////////////////////////////////////////////////////////
 
+void ReadCFTimeDataFromNcFile(
+	NcFile * ncfile,
+	const std::string & strFilename,
+	std::vector<Time> & vecTimes,
+	bool fWarnOnMissingCalendar
+) {
+	// Empty existing Time vector
+	vecTimes.clear();
+
+	// Get time dimension
+	NcDim * dimTime = ncfile->get_dim("time");
+	if (dimTime == NULL) {
+		_EXCEPTION1("Dimension \"time\" not found in file \"%s\"",
+			strFilename.c_str());
+	}
+
+	// Get time variable
+	NcVar * varTime = ncfile->get_var("time");
+	if (varTime == NULL) {
+		_EXCEPTION1("Variable \"time\" not found in file \"%s\"",
+			strFilename.c_str());
+	}
+	if (varTime->num_dims() != 1) {
+		_EXCEPTION1("Variable \"time\" has more than one dimension in file \"%s\"",
+			strFilename.c_str());
+	}
+	if (strcmp(varTime->get_dim(0)->name(), "time") != 0) {
+		_EXCEPTION1("Variable \"time\" does not have dimension \"time\" in file \"%s\"",
+			strFilename.c_str());
+	}
+
+	// Calendar attribute
+	NcAtt * attTimeCal = varTime->get_att("calendar");
+	std::string strCalendar;
+	if (attTimeCal == NULL) {
+		if (fWarnOnMissingCalendar) {
+			Announce("WARNING: Variable \"time\" is missing \"calendar\" attribute; assuming \"standard\"");
+		}
+		strCalendar = "standard";
+	} else {
+		strCalendar = attTimeCal->as_string(0);
+	}
+	Time::CalendarType eCalendarType =
+		Time::CalendarTypeFromString(strCalendar);
+
+	// Units attribute
+	NcAtt * attTimeUnits = varTime->get_att("units");
+	if (attTimeUnits == NULL) {
+		_EXCEPTION1("Variable \"time\" is missing \"units\" attribute in file \"%s\"",
+			strFilename.c_str());
+	}
+	std::string strTimeUnits = attTimeUnits->as_string(0);
+
+	// Load in time data
+	DataVector<int> vecTimeInt;
+	DataVector<float> vecTimeFloat;
+	DataVector<double> vecTimeDouble;
+
+	if (varTime->type() == ncInt) {
+		vecTimeInt.Initialize(dimTime->size());
+		varTime->set_cur((long)0);
+		varTime->get(&(vecTimeInt[0]), dimTime->size());
+
+	} else if (varTime->type() == ncFloat) {
+		vecTimeFloat.Initialize(dimTime->size());
+		varTime->set_cur((long)0);
+		varTime->get(&(vecTimeFloat[0]), dimTime->size());
+
+	} else if (varTime->type() == ncDouble) {
+		vecTimeDouble.Initialize(dimTime->size());
+		varTime->set_cur((long)0);
+		varTime->get(&(vecTimeDouble[0]), dimTime->size());
+
+	} else {
+		_EXCEPTION1("Variable \"time\" has invalid type "
+			"(expected \"int\", \"float\" or \"double\")"
+			" in file \"%s\"", strFilename.c_str());
+	}
+
+	for (int t = 0; t < dimTime->size(); t++) {
+		Time time(eCalendarType);
+		if (varTime->type() == ncInt) {
+			time.FromCFCompliantUnitsOffsetInt(
+				strTimeUnits,
+				vecTimeInt[t]);
+
+		} else if (varTime->type() == ncFloat) {
+			time.FromCFCompliantUnitsOffsetDouble(
+				strTimeUnits,
+				static_cast<double>(vecTimeFloat[t]));
+
+		} else if (varTime->type() == ncDouble) {
+			time.FromCFCompliantUnitsOffsetDouble(
+				strTimeUnits,
+				vecTimeDouble[t]);
+		}
+
+		vecTimes.push_back(time);
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
 

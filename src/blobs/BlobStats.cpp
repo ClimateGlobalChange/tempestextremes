@@ -22,6 +22,7 @@
 
 #include "DataVector.h"
 #include "DataMatrix.h"
+#include "TimeObj.h"
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
@@ -105,6 +106,12 @@ try {
 	// Summary quantities
 	std::string strOutputQuantities;
 
+	// Output headers
+	bool fOutputHeaders;
+
+	// Output the full times rather than time indexes
+	bool fOutputFullTimes;
+
 	// Display help message
 	bool fHelp;
 
@@ -115,6 +122,8 @@ try {
 		CommandLineString(strOutputFile, "outfile", "");
 		CommandLineString(strInputVariable, "invar", "");
 		CommandLineString(strOutputQuantities, "out", "");
+		CommandLineBool(fOutputHeaders, "out_headers");
+		CommandLineBool(fOutputFullTimes, "out_fulltime");
 		CommandLineBool(fHelp, "help");
 
 		ParseCommandLine(argc, argv);
@@ -294,8 +303,20 @@ try {
 		_EXCEPTIONT("Error opening output file");
 	}
 
+	// Output header
+	if (fOutputHeaders) {
+		if (fOutputFullTimes) {
+			fprintf(fpout, "time,%s\n", strOutputQuantities.c_str());
+		} else {
+			fprintf(fpout, "time_ix,%s\n", strOutputQuantities.c_str());
+		}
+	}
+
 	// Loop through all files
 	for (int f = 0; f < nFiles; f++) {
+
+		// Time objects for each time in this file
+		std::vector<Time> vecFileTimes;
 
 		// Load in each file
 		NcFile ncInput(vecInputFiles[f].c_str());
@@ -311,6 +332,11 @@ try {
 		NcDim * dimTime = ncInput.get_dim("time");
 
 		int nLocalTimes = dimTime->size();
+
+		// Load in file times
+		if (fOutputFullTimes) {
+			ReadCFTimeDataFromNcFile(&ncInput, vecInputFiles[f], vecFileTimes, true);
+		}
 
 		// Load in indicator variable
 		NcVar * varIndicator = ncInput.get_var(strInputVariable.c_str());
@@ -433,7 +459,11 @@ try {
 
 				for (; iterTimes != iterBlobs->second.end(); iterTimes++) {
 
-					fprintf(fpout, "%i", iterTimes->first);
+					if (fOutputFullTimes) {
+						fprintf(fpout, "%s", vecFileTimes[iterTimes->first].ToShortString().c_str());
+					} else {
+						fprintf(fpout, "%i", iterTimes->first);
+					}
 
 					BlobQuantities & quants = iterTimes->second;
 					for (int i = 0; i < vecOutputVars.size(); i++) {

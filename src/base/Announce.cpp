@@ -100,10 +100,16 @@ void AnnounceOutputOnAllRanks() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void AnnounceStartBlock(const char * szText) {
+void AnnounceStartBlock(
+	const char * szText,
+	...
+) {
 
 	// Do not start a block at maximum indentation level
 	if (s_nIndentationLevel == MaximumIndentationLevel) {
+		return;
+	}
+	if (szText == NULL) {
 		return;
 	}
 
@@ -125,17 +131,20 @@ void AnnounceStartBlock(const char * szText) {
 		fprintf(g_fpAnnounceOutput, "\n");
 	}
 
-	// Add indentation
-	int i;
-	for (i = 0; i < s_nIndentationLevel; i++) {
+	// Build output string from variable argument list
+	char szBuffer[AnnouncementBufferSize];
+	va_list arguments;
+	va_start(arguments, szText);
+	vsprintf(szBuffer, szText, arguments);
+	va_end(arguments);
+
+	// Output with proper indentation
+	for (int i = 0; i < s_nIndentationLevel; i++) {
 		fprintf(g_fpAnnounceOutput, "..");
 	}
+	fprintf(g_fpAnnounceOutput, "%s", szBuffer);
 
-	// Output the text
-	if (szText != NULL) {
-		fprintf(g_fpAnnounceOutput, "%s", szText);
-		s_fBlockFlag = true;
-	}
+	s_fBlockFlag = true;
 	s_nIndentationLevel++;
 
 	fflush(g_fpAnnounceOutput);
@@ -156,7 +165,10 @@ void AnnounceStartBlock(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void AnnounceEndBlock(const char * szText) {
+void AnnounceEndBlock(
+	const char * szText,
+	...
+) {
 	// Do not remove a block at minimum indentation level
 	if (s_nIndentationLevel == 0) {
 		return;
@@ -177,15 +189,24 @@ void AnnounceEndBlock(const char * szText) {
 
 	// Check block flag
 	if (szText != NULL) {
+
+		// Build output string from variable argument list
+		char szBuffer[AnnouncementBufferSize];
+
+		va_list arguments;
+		va_start(arguments, szText);
+		vsprintf(szBuffer, szText, arguments);
+		va_end(arguments);
+
 		if (s_fBlockFlag) {
 			s_fBlockFlag = false;
 
 			fprintf(g_fpAnnounceOutput, ".. ");
-			fprintf(g_fpAnnounceOutput, "%s", szText);
+			fprintf(g_fpAnnounceOutput, "%s", szBuffer);
 			fprintf(g_fpAnnounceOutput, "\n");
 
 		} else {
-			Announce(szText);
+			Announce(szBuffer);
 		}
 	}
 

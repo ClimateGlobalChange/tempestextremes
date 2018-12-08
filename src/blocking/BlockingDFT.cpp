@@ -28,6 +28,7 @@ int main(int argc, char ** argv){
     std::string fileList, outFile,avgName,varName,  tname, levname, latname, lonname;
     int nWaves,startday,endday;
     bool is4D, ZtoGH, isHpa;
+    double missingNo;
     BeginCommandLine()
       CommandLineString(fileList,"inlist","");
       CommandLineString(outFile,"out","");
@@ -43,6 +44,7 @@ int main(int argc, char ** argv){
       CommandLineBool(is4D, "is4D");
       CommandLineBool(ZtoGH, "gh");
       CommandLineBool(isHpa,"hpa");
+      CommandLineDouble(missingNo,"missingnum",1e20);
       ParseCommandLine(argc,argv);
     EndCommandLine(argv)
     AnnounceBanner();
@@ -175,6 +177,11 @@ int main(int argc, char ** argv){
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
               inputVal = inputData[a][b];
+              if (std::fabs(inputVal)>= (std::fabs(missingNo)-1)){
+               // std::cout<<"Replacing value "<<inputVal<<std::endl;
+                inputVal = replaceMissingFloat2D(a,b,missingNo,inputData,latLen,lonLen);
+               // std::cout<<"New value is "<<inputVal<<std::endl;
+              }
               if (ZtoGH){
                 inputVal /= 9.8;
               }
