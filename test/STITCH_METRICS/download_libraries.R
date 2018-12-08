@@ -2,7 +2,7 @@
 
 
 req_libs<-c("abind","akima","argparse",
-            "ggplot2","gtable","grid",
+            "ggplot2","gtable",
             "knitr","markdown","ncdf4",
             "ncdf4.helpers","PCICt",
             "reshape2","RNetCDF","rmarkdown")
