@@ -9,10 +9,6 @@ parser<-ArgumentParser()
 parser$add_argument("-nl","--namelist",help="Master namelist for all flags.",default="")
 parser$add_argument("-gn","--generatenl",help="Generate the master namelist",action="store_true")
 parser$add_argument("-sl","--setuplist",help="Setup file name file name (mandatory) for --generatenl",default="")
-#parser$add_argument("-nls","--namelistset",help="File with namelist generation specifications (see namelist_full.R for an example of what is required)",default="")
-#Does ALL the functions-- generates a report output
-#parser$add_argument("-gr","--generatereport",help="Create a report for dataset intercomparison. Runs all functions and produces a summary file.",action="store_true")
-
 #Most basic function: read BlobStats output to a data table------
 parser$add_argument("-rf","--readfiles",help="Tell program to read in BlobStats data",action="store_true")
 parser$add_argument("-nlrf","--namelistrf",help="Namelist file name (mandatory) for --readfiles",default="")
@@ -32,6 +28,9 @@ parser$add_argument("-nlrn","--namelistrn",help="Namelist file name for --readne
 #Intercomparison of datasets---------
 parser$add_argument("-ic","--intercomparison",help="Pearson correlation, probability of co-occurrence between two datasets, and spatial similarity between individual blobs.",action="store_true")
 parser$add_argument("-nlic","--namelistic",help="Namelist file name for --intercomparison",default="")
+#Pearson and RMSE----------
+parser$add_argument("-pr","--pearsonrmse",help="Pearson correlation and RMSE",action="store_true")
+parser$add_argument("-nlpr","--namelistpr",help="Namelist file name for --pearsonrmse",default="")
 #Generate report
 parser$add_argument("-gr","--genreport",help="Generate a summary report on blocking data for specified datasets",action="store_true")
 parser$add_argument("-nlgr","--namelistgr",help="namelist file name for --genreport",default="")
@@ -366,6 +365,47 @@ if (args$intercomparison){
   }
   
 }
+
+if (args$pearsonrmse){
+  if (args$namelistpr=="" & args$namelist==""){
+    stop("Must provide the namelist file for --pearsonrmse.")
+  }
+  
+  nl_prob<-ifelse(args$namelistpr!="",args$namelistpr,args$namelist)
+  source(nl_prob)
+  setwd(work_dir)
+  source("pearsonrmse.R")
+  for (i in 1:nrun_pr){
+    blob_file_1_i<-parse_namelist(blob_file_1,i)
+    blob_file_2_i<-parse_namelist(blob_file_2,i)
+    var_name_1_i<-parse_namelist(var_name_1,i)
+    var_name_2_i<-parse_namelist(var_name_2,i)
+    regrid_i<-parse_namelist(regrid,i)
+    rfn_pr_i<-parse_namelist(rfn_pr,i)
+    txt_pr_i<-parse_namelist(txt_pr,i)
+    #Load the blob files
+    #File 1
+    load(blob_file_1_i)
+    blob1<-get(var_name_1_i)
+    lat1<-lat_axis
+    lon1<-lon_axis
+    time1<-time_format
+    #File 2
+    load(blob_file_2_i)
+    blob2<-get(var_name_2_i)
+    lat2<-lat_axis
+    lon2<-lon_axis
+    time2<-time_format
+    
+    pr<-pearson_rmse(var_name_1_i,var_name_2_i,blob1,time1,lat1,lon1,
+                     blob2,time2,lat2,lon2,regrid_i,useCommonTime,
+                     rfn_pr_i,txt_pr_i)
+    
+  }
+  
+}
+
+
 
 #GENERATE A REPORT WITH ALL OF THE PROVIDED DATA
 if (args$genreport){

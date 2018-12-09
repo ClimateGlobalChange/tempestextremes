@@ -48,7 +48,7 @@ resolutions<-c("3.3341x3.75","TM159 (0.75)","T85 (1.39)","T42 (2.79)",
                "T106 (1.12)","T106 (1.12)","1.9x2.5","0.5x0.5","1x1",
                "0.5x0.625","1.25x1.25")
 #Working directory (where all of the R functions are)
-work_dir<-"~/tempestextremes/test/STITCH_METRICS"
+work_dir<-"~/tempestextremes/src/blobmetrics"
 #Output directory (where all files will go)
 output_dir<-"~/BLOBSTATS_FILES"
 #Name of output subdirectory

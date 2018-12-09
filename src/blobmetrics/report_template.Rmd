@@ -23,6 +23,7 @@ nvars<-length(Varnames)
 
 
 ```{r print_table, results="asis"}
+
 data_table<-data.frame(NULL)
 
 df_merge_all<-data.frame(NULL)
@@ -37,12 +38,13 @@ for (i in 1:nvars){
   if (exists("resolutions")){
     data_table["Spatial resolution",i]<-resolutions[i]    
   }
+  data_table["Number of years in dataset",i]<-nyears[i]
   data_table["Number of unique blobs",i]<-nrow(df_summ)
   data_table["Number of merged blobs",i]<-nrow(df_summ[df_summ$merged=="YES",])
   data_table["Maximum blocking frequency",i]<-sprintf("%.4f",max(get(sprintf("avgblob%d",i))))
     data_table["Interquartile range of blob centroid latitude",i]<-paste(sprintf("%.2f",quantile(df_merge$centlat,c(0.25,0.75))),collapse=" ")
   data_table["Number of blocked days",i]<-length(df_dates)
-  data_table["Average number of blocked days (divided by number of years)",i]<-sprintf("%.2f",length(df_dates)/nyears)
+  data_table["Average number of blocked days (divided by number of years)",i]<-sprintf("%.2f",length(df_dates)/nyears[i])
   data_table["Interquartile range of duration (days)",i]<-paste(sprintf("%.2f",quantile(df_summ$duration_days,c(0.25,0.75))),collapse=" ")
   data_table["Interquartile range of speed (km/hr)",i]<-paste(sprintf("%.2f",quantile(df_summ$zonal_speed_kph,c(0.25,0.75))),collapse=" ")
     data_table["Interquartile range of blob size (10^6 km^2)",i]<-paste(sprintf("%.2f",quantile(df_merge$area_km/(10^6),c(0.25,0.75))),collapse=" ")
@@ -50,73 +52,76 @@ for (i in 1:nvars){
 df_merge_all$var<-factor(df_merge_all$var,levels=Varnames)
 df_summ_all$var<-factor(df_summ_all$var,levels=Varnames)
 colnames(data_table)<-Varnames
-print(kable(data_table))
+if (includeSummTable==TRUE){
+  print(kable(data_table))  
+}
+
 ```
 
 ```{r statistics_table}
 
-set.seed(100000000)
-#permutationping!
-#Pool the samples and resample
-#If the means are the same,
-
-#Make a table for T-test and Wilcoxon
-wilcox_mat<-matrix(nrow=nvars,ncol=nvars)
-t_mat<-matrix(nrow=nvars,ncol=nvars)
-b_mat<-matrix(nrow=nvars,ncol=nvars)
-
-colnames(wilcox_mat)<-Varnames
-rownames(wilcox_mat)<-Varnames
-colnames(t_mat)<-Varnames
-rownames(t_mat)<-Varnames
-colnames(b_mat)<-Varnames
-rownames(b_mat)<-Varnames
-
-wilcox_table<-NULL
-t_table<-NULL
-b_table<-NULL
-
-for (m in c("duration_days","zonal_speed_kph")){
-  df_sum_sub<-df_summ_all[,c("var",m)]
-  for (i in 1:length(Varnames)){
-    for (j in 1:length(Varnames)){
-      if (j>i){
-        var1<-Varnames[i]
-        df_sum_sub1<-df_sum_sub[df_sum_sub$var==var1,]
-        dist1<-df_sum_sub1[,m]
-        var2<-Varnames[j]
-        df_sum_sub2<-df_sum_sub[df_sum_sub$var==var2,]
-        dist2<-df_sum_sub2[,m]
-        all<-c(dist1,dist2)
-        ts<-median(dist1)-median(dist2)
-        k<-1:length(all)
-        reps<-c()
-        for (x in 1:5000){
-          n<-sample(k,size=min(length(dist1),length(dist2)),replace=F)
-          ps1<-all[n]
-          ps2<-all[-n]
-          reps[x]<-median(ps1)-median(ps2)
+if (includeDensityP==TRUE){
+  set.seed(100000000)
+  #permutation!
+  #Pool the samples and resample
+  #If the means are the same,
+  
+  #Make a table for T-test and Wilcoxon
+  wilcox_mat<-matrix(nrow=nvars,ncol=nvars)
+  t_mat<-matrix(nrow=nvars,ncol=nvars)
+  b_mat<-matrix(nrow=nvars,ncol=nvars)
+  
+  colnames(wilcox_mat)<-Varnames
+  rownames(wilcox_mat)<-Varnames
+  colnames(t_mat)<-Varnames
+  rownames(t_mat)<-Varnames
+  colnames(b_mat)<-Varnames
+  rownames(b_mat)<-Varnames
+  
+  wilcox_table<-NULL
+  t_table<-NULL
+  b_table<-NULL
+  
+  for (m in c("duration_days","zonal_speed_kph")){
+    df_sum_sub<-df_summ_all[,c("var",m)]
+    for (i in 1:length(Varnames)){
+      for (j in 1:length(Varnames)){
+        if (j>i){
+          var1<-Varnames[i]
+          df_sum_sub1<-df_sum_sub[df_sum_sub$var==var1,]
+          dist1<-df_sum_sub1[,m]
+          var2<-Varnames[j]
+          df_sum_sub2<-df_sum_sub[df_sum_sub$var==var2,]
+          dist2<-df_sum_sub2[,m]
+          all<-c(dist1,dist2)
+          ts<-median(dist1)-median(dist2)
+          k<-1:length(all)
+          reps<-c()
+          for (x in 1:5000){
+            n<-sample(k,size=min(length(dist1),length(dist2)),replace=F)
+            ps1<-all[n]
+            ps2<-all[-n]
+            reps[x]<-median(ps1)-median(ps2)
+          }
+          pv<-mean(abs(reps)>=abs(ts))
+          b_mat[j,i]<-pv
+          t<-t.test(dist1,dist2)
+          w<-wilcox.test(dist1,dist2)
+          wilcox_mat[j,i]<-w$p.value
+          t_mat[j,i]<-t$p.value
         }
-        pv<-mean(abs(reps)>=abs(ts))
-        b_mat[j,i]<-pv
-        t<-t.test(dist1,dist2)
-        w<-wilcox.test(dist1,dist2)
-        wilcox_mat[j,i]<-w$p.value
-        t_mat[j,i]<-t$p.value
       }
     }
+    temp<-melt(wilcox_mat,na.rm = T)
+    temp$metric<-rep(m,nrow(temp))
+    wilcox_table<-rbind(wilcox_table,temp)
+    temp<-melt(t_mat,na.rm = T)
+    temp$metric<-rep(m,nrow(temp))
+    t_table<-rbind(t_table,temp)
+    temp<-melt(b_mat,na.rm = T)
+    temp$metric<-rep(m,nrow(temp))
+    b_table<-rbind(b_table,temp)
   }
-  temp<-melt(wilcox_mat,na.rm = T)
-  temp$metric<-rep(m,nrow(temp))
-  wilcox_table<-rbind(wilcox_table,temp)
-  temp<-melt(t_mat,na.rm = T)
-  temp$metric<-rep(m,nrow(temp))
-  t_table<-rbind(t_table,temp)
-  temp<-melt(b_mat,na.rm = T)
-  temp$metric<-rep(m,nrow(temp))
-  b_table<-rbind(b_table,temp)
-}
-
   df_merge_sub<-df_merge_all[,c("var","area_km")]
   for (i in 1:length(Varnames)){
     for (j in 1:length(Varnames)){
@@ -155,17 +160,15 @@ for (m in c("duration_days","zonal_speed_kph")){
   temp<-melt(b_mat,na.rm = T)
   temp$metric<-rep("area_km",nrow(temp))
   b_table<-rbind(b_table,temp)
-
-
-
-
-
+  
   wilcox_table$test<-rep("wilcox",nrow(wilcox_table))
   t_table$test<-rep("t-test",nrow(t_table))
   b_table$test<-rep("permutation",nrow(b_table))
   longdata_tests<-rbind(wilcox_table,t_table)
   longdata_tests<-rbind(longdata_tests,b_table)
   longdata_tests$test<-factor(longdata_tests$test,levels=c("t-test","wilcox","permutation"))
+}
+
 ```
 
 ```{r probsim,results="asis"}
