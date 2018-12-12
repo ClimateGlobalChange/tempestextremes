@@ -19,10 +19,11 @@ nvars<-length(Varnames)
 
 `r metadata_datasets`
 
-#Initial summary information
+
 
 
 ```{r print_table, results="asis"}
+cat("###Initial summary information\n")
 
 data_table<-data.frame(NULL)
 
@@ -58,9 +59,9 @@ if (includeSummTable==TRUE){
 
 ```
 
-```{r statistics_table}
+```{r statistics_table,eval=includeDensityP}
 
-if (includeDensityP==TRUE){
+
   set.seed(100000000)
   #permutation!
   #Pool the samples and resample
@@ -167,124 +168,88 @@ if (includeDensityP==TRUE){
   longdata_tests<-rbind(wilcox_table,t_table)
   longdata_tests<-rbind(longdata_tests,b_table)
   longdata_tests$test<-factor(longdata_tests$test,levels=c("t-test","wilcox","permutation"))
-}
+
 
 ```
 
-```{r probsim,results="asis"}
+```{r probsim_load}
 #Make a table with the Pearson correlation
  numcombos<-factorial(nvars)/(factorial(nvars-2)*factorial(2))
- data_table2<-data.frame(NULL)
+ #data_table2<-data.frame(NULL)
 #
  data_overlaps<-data.frame(NULL)
  vnames<-c()
 
- pearson_mat<-matrix(nrow=nvars,ncol=nvars)
- rmse_mat<-matrix(nrow=nvars,ncol=nvars)
- prob_mat<-matrix(nrow=nvars,ncol=nvars)
- sim_mat<-matrix(nrow=nvars,ncol=nvars)
- 
- colnames(pearson_mat)<-Varnames
- rownames(pearson_mat)<-Varnames
- colnames(rmse_mat)<-Varnames
- rownames(rmse_mat)<-Varnames
-  colnames(prob_mat)<-Varnames
- rownames(prob_mat)<-Varnames
-   colnames(sim_mat)<-Varnames
- rownames(sim_mat)<-Varnames
-# 
-#   
- for (i in 1:length(icfiles)){
-   load(icfiles[i])
-   varname<-sprintf("%s and %s",V1,V2)
-   iindex=which(Varnames==V1)
-   jindex=which(Varnames==V2)
-
-   pearson_mat[jindex,iindex]<-pearson_num
-   rmse_mat[jindex,iindex]<-rmse_num
-   prob_mat[iindex,jindex]<-p1given2
-   prob_mat[jindex,iindex]<-p2given1
-   sim_mat[jindex,iindex]<-sim_50
-   vnames<-c(vnames,varname)
-   df_overlaps$var<-rep(varname,nrow(df_overlaps))
-   data_overlaps<-rbind(data_overlaps,df_overlaps)
-
-   rname<-sprintf("%s (V1) and %s (V2)",V1,V2)
-   data_table2[rname,"Pearson correlation"]<-sprintf("%.4f",pearson_num)
-   data_table2[rname,"Root mean square error"]<-rmse_num
-   data_table2[rname,"Interquartile range of spatial similarity"]<-sprintf("%.2f %.2f",sim_25,sim_75)
-   data_table2[rname,"Probability of V1 given V2"]<-sprintf("%.4f",p1given2)
-   data_table2[rname,"Probability of V2 given V1"]<-sprintf("%.4f",p2given1)
- }
- pear<-melt(pearson_mat,na.rm=T)
- res<-melt(rmse_mat,na.rm = T)
- prob<-melt(prob_mat,na.rm=T)
- sim<-melt(sim_mat,na.rm=T)
- 
-  mr<-round(max(res$value),4)
-  mm<-mr/2
+if (includePearson==TRUE | includeRMSE==TRUE){
+  pearson_mat<-matrix(nrow=nvars,ncol=nvars)  
+  rmse_mat<-matrix(nrow=nvars,ncol=nvars)
+   
+  colnames(pearson_mat)<-Varnames
+  rownames(pearson_mat)<-Varnames
+  colnames(rmse_mat)<-Varnames
+  rownames(rmse_mat)<-Varnames
+}
+if (includeProbability==TRUE | includeSpatialSimilarity==TRUE){
+  prob_mat<-matrix(nrow=nvars,ncol=nvars)
+  sim_mat<-matrix(nrow=nvars,ncol=nvars)  
   
+  colnames(prob_mat)<-Varnames
+  rownames(prob_mat)<-Varnames
+  colnames(sim_mat)<-Varnames
+  rownames(sim_mat)<-Varnames
+}
 
- 
+ for (i in 1:numcombos){
+   if (includeProbability==TRUE | includeSpatialSimilarity==TRUE){
+     load(icfiles[i])    
+     varname<-sprintf("%s and %s",V1,V2)
+     iindex=which(Varnames==V1)
+     jindex=which(Varnames==V2)
+     prob_mat[iindex,jindex]<-p1given2
+     prob_mat[jindex,iindex]<-p2given1
+     sim_mat[jindex,iindex]<-sim_50
+     df_overlaps$var<-rep(varname,nrow(df_overlaps))
+     data_overlaps<-rbind(data_overlaps,df_overlaps)
+   }
+   if (includePearson | includeRMSE){
+     load(rfn_pr[i])
+      varname<-sprintf("%s and %s",V1,V2)
+      iindex=which(Varnames==V1)
+      jindex=which(Varnames==V2)
+      pearson_mat[jindex,iindex]<-pearson_num
+      rmse_mat[jindex,iindex]<-rmse_num
+   }
+   vnames<-c(vnames,varname)
 
- 
 
-
+   #rname<-sprintf("%s (V1) and %s (V2)",V1,V2)
+   #data_table2[rname,"Pearson correlation"]<-sprintf("%.4f",pearson_num)
+   #data_table2[rname,"Root mean square error"]<-rmse_num
+   #data_table2[rname,"Interquartile range of spatial similarity"]<-sprintf("%.2f %.2f",sim_25,sim_75)
+   #data_table2[rname,"Probability of V1 given V2"]<-sprintf("%.4f",p1given2)
+   #data_table2[rname,"Probability of V2 given V1"]<-sprintf("%.4f",p2given1)
+ }
+ if (includePearson==TRUE|includeRMSE==TRUE){
+   pear<-melt(pearson_mat,na.rm=T)
+   #print(pear)
+   res<-melt(rmse_mat,na.rm = T)  
+   #print(res)
+   mr<-round(max(res$value),4)
+   mm<-mr/2
+ }
+  if (includeProbability==TRUE | includeSpatialSimilarity==TRUE){
+    prob<-melt(prob_mat,na.rm=T)
+    sim<-melt(sim_mat,na.rm=T)
+  }
 # data_overlaps$var<-factor(data_overlaps$var,levels=vnames)
 # print(kable(data_table2,full_width=F))
 
 ```
 
-#Some charts
 
+```{r blockingavg,fig.height=5,fig.width=12,eval=includeFrequencyPlots}
 
-```{r trajectories}
-# df_summ_nomerge<-df_summ_all[df_summ_all$merged=="NO",]
-# 
-# #Get the unique bnums
-# df_segments<-data.frame(centlon=numeric(),centlat=numeric(),bnum=numeric(),var=character(),stringsAsFactors = F)
-# bnum<-1
-# for (v in unique(df_summ_nomerge$var)){
-#   df_sub1<-df_summ_nomerge[df_summ_nomerge$var==v,]
-#   #For each file in the dataset
-#   for (f in unique(df_sub1$file)){
-#     df_sub2<-df_sub1[df_sub1$file==f,]
-#     #for each bnum
-#     for (b in unique(df_sub2$bnum)){
-#       #Get the corresponding per timestep info
-#       df_timestep<-df_merge_all[df_merge_all$var==v & df_merge_all$file==f & df_merge_all$bnum==b,]
-#       #Sort by the datetime
-#       df_sorted<-df_timestep[order(df_timestep$datehour),c("centlon","centlat")]
-#       df_lonchange<-diff(df_sorted$centlon)
-#       if (any(abs(df_lonchange)>90)){
-#         #Convert longitude axis
-#         #if 0 to 360, convert to -180/180
-#         df_sorted$centlon<-ifelse(any(df_sorted$centlon>180),lon_convert(df_sorted$centlon),lon_convert2(df_sorted$centlon))
-#       }
-#       latstart<-df_sorted$centlat[1]
-#       lonstart<-df_sorted$centlon[1]
-#       df_sorted$centlat<-df_sorted$centlat-latstart
-#       df_sorted$centlon<-df_sorted$centlon-lonstart
-#       df_sorted$bnum<-rep(bnum,nrow(df_sorted))
-#       df_sorted$var<-rep(v,nrow(df_sorted))
-#       
-#       df_segments<-rbind(df_segments,df_sorted)
-#       bnum<-bnum+1
-#     }
-#   }
-# }
-# 
-# g<-ggplot(data=df_segments) + 
-#   geom_line(aes(x=centlon,y=centlat,group=bnum,color=var),alpha=0.5)
-# print(g)
-```
-
-Blocking frequency: 
-
-
-```{r blockingavg,fig.height=5,fig.width=12}
-
-#We want the number of columns for the plots to be max 4 (more than that looks ugly...)
+  #We want the number of columns for the plots to be max 4 (more than that looks ugly...)
 ncols_plot<-ifelse(nvars<=4,nvars,4)
 breaks<-c(0.01,seq(0.02,0.26,0.02))
 labs<-breaks
@@ -297,16 +262,19 @@ g<-ggplot(data=avgdata,aes(x=lon,y=lat)) +
   facet_wrap(~VAR,ncol=ncols_plot) +
   geom_raster(aes(x=lon,y=lat,fill=value),interpolate = T) +
   geom_contour(aes(z=value),breaks=breaks) +
-  scale_fill_gradientn(breaks=breaks,limits=c(min(breaks),max(breaks)),colors=cols,labels=labs)
+  scale_fill_gradientn(breaks=breaks,limits=c(min(breaks),max(breaks)),colors=cols,labels=labs) +
+  ggtitle("Averaged blocking frequency")
   
 print(g)
+
 ```
 
-###Pearson Pattern Correlation
 
-This chart shows the Pearson pattern correlation values between the average blocking patterns of the various models. The scale is from 0 to 1, but it should be noted that this metric will have a high correlation value even if the magnitudes of corresponding grid points differ.
+```{r pearson_chart,eval=includePearson,results="asis"}
 
-```{r pearson_rmse_chart}
+cat("###Pearson Pattern Correlation
+
+This chart shows the Pearson pattern correlation values between the average blocking patterns of the various models. The scale is from 0 to 1, but it should be noted that this metric will have a high correlation value even if the magnitudes of corresponding grid points differ.\n")
 
  pear_g<-ggplot(data=pear,aes(x=Var1,y=Var2,fill=round(value,3))) +
   geom_tile(color="white") +
@@ -328,15 +296,17 @@ This chart shows the Pearson pattern correlation values between the average bloc
     legend.position = c(0.6, 0.7),
     legend.direction = "horizontal")+
   guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
-                               title.position = "top", title.hjust = 0.5))
+                               title.position = "top", title.hjust = 0.5))+
+   ggtitle("Pearson pattern correlation")
  print(pear_g)
 ```
 
-### Root Mean Square Error
 
-This chart shows the root mean square error (RMSE) between the averaged blocking patterns of the various models. The scale varies depending on the distribution of error values, but here there is a max value of `r mr`. Consider the order of magnitude between the error and the original data when interpreting these results; for example, if the blocking frequency of the averaged pattern is in the 0.1-0.2 range and the RMSE is in the 0.001 range, the RMSE is two orders of magnitude smaller than the data and we can assume that the averaged blocking patterns are very similar. If the RMSE is in the 0.01-0.02 range, then the error approaches non-negligible.
 
-```{r rmse}
+```{r rmse,eval=includeRMSE,results="asis"}
+cat("### Root Mean Square Error
+
+This chart shows the root mean square error (RMSE) between the averaged blocking patterns of the various models. The scale varies depending on the distribution of error values, but here there is a max value of `r mr`. Consider the order of magnitude between the error and the original data when interpreting these results; for example, if the blocking frequency of the averaged pattern is in the 0.1-0.2 range and the RMSE is in the 0.001 range, the RMSE is two orders of magnitude smaller than the data and we can assume that the averaged blocking patterns are very similar. If the RMSE is in the 0.01-0.02 range, then the error approaches non-negligible.\n")
 
   res_g<-ggplot(data=res,aes(x=Var1,y=Var2,fill=round(value,4))) +
   geom_tile(color="white") +
@@ -362,9 +332,11 @@ This chart shows the root mean square error (RMSE) between the averaged blocking
  print(res_g)
 ```
 
-###Block duration
 
-```{r duration_charts}
+
+```{r duration_charts,eval=includeDensityP,message=FALSE,results="asis"}
+cat("###Block duration\n")
+
 longdata<-melt(df_summ_all[,c("duration_days","zonal_speed_kph","var")],id.vars = c("var"))
 longdata2<-melt(df_merge_all[c("var","area_km")])
 longdata2$value<-longdata2$value/(10^6)
@@ -392,9 +364,10 @@ print(g1)
 
 ```
 
-###Block zonal speed
 
-```{r speed_charts}
+```{r speed_charts,eval=includeDensityP,message=FALSE,results="asis"}
+cat("###Block zonal speed\n")
+
 g2<-ggplot(data=subset(longdata,longdata$variable=="zonal_speed_kph"),aes(x=value,group=var,color=var)) + 
   geom_density() +
   #theme(legend.position = "none") +
@@ -414,9 +387,9 @@ print(g2)
  print(stats_g2)
 ```
 
-###Block size
+```{r area_charts,message=FALSE,eval=includeDensityP,results="asis"}
+cat("###Block size\n")
 
-```{r area_charts,message=FALSE}
 g3<-ggplot(data=subset(longdata,longdata$variable=="area_km"),aes(x=value,group=var,color=var)) + 
   geom_density() +
   labs(x = "Area (10^6 km^2)")
@@ -434,22 +407,13 @@ print(g3)
    ggtitle("Area (10^6 km^2)")
  print(stats_g3)
 
-# g11<-ggplotGrob(g1)
-# g21<-ggplotGrob(g2)
-# g31<-ggplotGrob(g3)
-# g<-cbind(g11,g21,g31,size="last")
-# grid.newpage()
-# grid.draw(g)
 ```
 
-#Intercomparison of datasets
+```{r probability,eval=includeProbability,results="asis"}
+cat("###Probability of Co-occurrence
 
-###Probability of Co-occurrence
+This chart shows the probability of co-occurrence, where the upper triangle is the probability of the y-axis variable given the x-axis variable ($P(y|x)$) and the lower triangle is the probability of the x-axis variable given the y-axis variable ($P(x|y)$). The scale is from 0 to 1.\n") 
 
-This chart shows the probability of co-occurrence, where the upper triangle is the probability of the y-axis variable given the x-axis variable ($P(y|x)$) and the lower triangle is the probability of the x-axis variable given the y-axis variable ($P(x|y)$). The scale is from 0 to 1.
-
-```{r probability}
- 
   prob_g<-ggplot(data=prob,aes(x=Var1,y=Var2,fill=round(value,3))) +
   geom_tile(color="white") +
   scale_fill_gradient2(low="blue",high="red",mid="white",
@@ -474,12 +438,10 @@ This chart shows the probability of co-occurrence, where the upper triangle is t
  print(prob_g)
 ```
 
-###Spatial Similarity
+```{r sim_chart,eval=includeSpatialSimilarity,results="asis"}
+cat("###Spatial Similarity
 
-Spatial similarity is the amount of commonly detected blocked area as defined by blocks from two datasets that are present in the same time step and have at least some overlap. Perfect agreement would have a value of 1. These charts show the 50th percentile similarity values (top) as well as the distribution of similarity values (bottom). The scale is from 0 to 1.
-
-```{r sim_chart}
- 
+Spatial similarity is the amount of commonly detected blocked area as defined by blocks from two datasets that are present in the same time step and have at least some overlap. Perfect agreement would have a value of 1. These charts show the 50th percentile similarity values (top) as well as the distribution of similarity values (bottom). The scale is from 0 to 1.\n") 
    sim_g<-ggplot(data=sim,aes(x=Var1,y=Var2,fill=round(value,3))) +
   geom_tile(color="white") +
   scale_fill_gradient2(low="blue",high="red",mid="white",
@@ -512,40 +474,40 @@ print(gsim)
 ```
 
 ```{r sim_example}
-df_sim<-data_overlaps[order(data_overlaps$datehour),c("datehour","var","similarity")]
-candidate_dates<-c()
-for (d in unique(df_sim$datehour)){
-  df_sim_sub<-df_sim[df_sim$datehour==d,]
-  if (nrow(df_sim_sub)>(nvars-4)){
-    candidate_dates<-c(candidate_dates,d)
-  }
-}
-
-#Try the first date
-dsub<-df_sim[df_sim$datehour==candidate_dates[1],]
-contplot<-NULL
-model_cols<-colorRampPalette(c("green","blue","purple"))(length(Varnames)-4)
-rean_cols<-colorRampPalette(c("red","pink"))(4)
-color_cols<-c(model_cols,rean_cols)
-for (i in 1:length(Varnames)){
-  btemp<-get(sprintf("blob%d",i))
-  ttemp<-get(sprintf("time%d",i))
-  tindex<-which(ttemp==candidate_dates[20])
-  bsub<-btemp[,,tindex]
-  bmelt<-melt(bsub)
-  bmelt$var<-rep(Varnames[i],nrow(bmelt))
-  #bmelt$col<-rep(cols[i],nrow(bmelt))
-  contplot<-rbind(contplot,bmelt)
-  
-}
-contplot$lon<-lon_axis[contplot$Var1]
-contplot$lat<-lat_axis[contplot$Var2]
-contplot$var<-factor(contplot$var,levels=Varnames)
-names(color_cols)<-levels(contplot$var)
-
-gcont<-ggplot(data=contplot,aes(x=lon,y=lat,color=var)) +
-  geom_contour(aes(z=value)) +
-  scale_color_manual(values=color_cols)
+# df_sim<-data_overlaps[order(data_overlaps$datehour),c("datehour","var","similarity")]
+# candidate_dates<-c()
+# for (d in unique(df_sim$datehour)){
+#   df_sim_sub<-df_sim[df_sim$datehour==d,]
+#   if (nrow(df_sim_sub)>(nvars-4)){
+#     candidate_dates<-c(candidate_dates,d)
+#   }
+# }
+# 
+# #Try the first date
+# dsub<-df_sim[df_sim$datehour==candidate_dates[1],]
+# contplot<-NULL
+# model_cols<-colorRampPalette(c("green","blue","purple"))(length(Varnames)-4)
+# rean_cols<-colorRampPalette(c("red","pink"))(4)
+# color_cols<-c(model_cols,rean_cols)
+# for (i in 1:length(Varnames)){
+#   btemp<-get(sprintf("blob%d",i))
+#   ttemp<-get(sprintf("time%d",i))
+#   tindex<-which(ttemp==candidate_dates[20])
+#   bsub<-btemp[,,tindex]
+#   bmelt<-melt(bsub)
+#   bmelt$var<-rep(Varnames[i],nrow(bmelt))
+#   #bmelt$col<-rep(cols[i],nrow(bmelt))
+#   contplot<-rbind(contplot,bmelt)
+#   
+# }
+# contplot$lon<-lon_axis[contplot$Var1]
+# contplot$lat<-lat_axis[contplot$Var2]
+# contplot$var<-factor(contplot$var,levels=Varnames)
+# names(color_cols)<-levels(contplot$var)
+# 
+# gcont<-ggplot(data=contplot,aes(x=lon,y=lat,color=var)) +
+#   geom_contour(aes(z=value)) +
+#   scale_color_manual(values=color_cols)
   
 #print(gcont)
 

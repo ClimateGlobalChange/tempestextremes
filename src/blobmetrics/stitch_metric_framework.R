@@ -378,6 +378,8 @@ if (args$pearsonrmse){
   for (i in 1:nrun_pr){
     blob_file_1_i<-parse_namelist(blob_file_1,i)
     blob_file_2_i<-parse_namelist(blob_file_2,i)
+    data_name_1_i<-parse_namelist(data_name_1,i)
+    data_name_2_i<-parse_namelist(data_name_2,i)
     var_name_1_i<-parse_namelist(var_name_1,i)
     var_name_2_i<-parse_namelist(var_name_2,i)
     regrid_i<-parse_namelist(regrid,i)
@@ -397,7 +399,7 @@ if (args$pearsonrmse){
     lon2<-lon_axis
     time2<-time_format
     
-    pr<-pearson_rmse(var_name_1_i,var_name_2_i,blob1,time1,lat1,lon1,
+    pr<-pearson_rmse(data_name_1_i,data_name_2_i,blob1,time1,lat1,lon1,
                      blob2,time2,lat2,lon2,regrid_i,useCommonTime,
                      rfn_pr_i,txt_pr_i)
     
