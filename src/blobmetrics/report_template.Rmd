@@ -14,6 +14,7 @@ require(ggplot2)
 require(reshape2)
 require(gtable)
 require(grid)
+require(scales)
 nvars<-length(Varnames)
 ```
 
@@ -234,8 +235,6 @@ if (includeProbability==TRUE | includeSpatialSimilarity==TRUE){
    #print(pear)
    res<-melt(rmse_mat,na.rm = T)  
    #print(res)
-   mr<-round(max(res$value),4)
-   mm<-mr/2
  }
   if (includeProbability==TRUE | includeSpatialSimilarity==TRUE){
     prob<-melt(prob_mat,na.rm=T)
@@ -262,7 +261,7 @@ g<-ggplot(data=avgdata,aes(x=lon,y=lat)) +
   facet_wrap(~VAR,ncol=ncols_plot,dir="v") +
   geom_raster(aes(x=lon,y=lat,fill=value),interpolate = T) +
   geom_contour(aes(z=value),breaks=breaks) +
-  scale_fill_gradientn(breaks=breaks,limits=c(min(breaks),max(breaks)),colors=cols,labels=labs) +
+  scale_fill_gradientn(breaks=breaks,limits=c(min(breaks),max(breaks)),colors=cols,labels=labs,oob=squish) +
   ggtitle("Averaged blocking frequency")
   
 print(g)
@@ -301,17 +300,17 @@ This chart shows the Pearson pattern correlation values between the average bloc
  print(pear_g)
 ```
 
-
-
 ```{r rmse,eval=includeRMSE,results="asis"}
 cat("### Root Mean Square Error
 
 This chart shows the root mean square error (RMSE) between the averaged blocking patterns of the various models. The scale varies depending on the distribution of error values, but here there is a max value of `r mr`. Consider the order of magnitude between the error and the original data when interpreting these results; for example, if the blocking frequency of the averaged pattern is in the 0.1-0.2 range and the RMSE is in the 0.001 range, the RMSE is two orders of magnitude smaller than the data and we can assume that the averaged blocking patterns are very similar. If the RMSE is in the 0.01-0.02 range, then the error approaches non-negligible.\n")
+   mr<-ifelse(includeFrequencyPlots==TRUE,round(max(avgdata$value)/10,3),0.02)
+   mm<-mr/2
 
   res_g<-ggplot(data=res,aes(x=Var1,y=Var2,fill=round(value,4))) +
   geom_tile(color="white") +
   scale_fill_gradient2(low="blue",high="red",mid="white",
-                       midpoint=mm,limit=c(0,mr),name="RMSE") +
+                       midpoint=mm,limit=c(0,mr),name="RMSE",oob=squish) +
   theme_minimal()+
   theme(axis.text.x = element_text(angle = 45, vjust = 1,
                                    size = 8, hjust = 1))+
@@ -332,8 +331,6 @@ This chart shows the root mean square error (RMSE) between the averaged blocking
  print(res_g)
 ```
 
-
-
 ```{r duration_charts,eval=includeDensityP,message=FALSE,results="asis"}
 cat("###Block duration\n")
 
@@ -342,6 +339,12 @@ longdata2<-melt(df_merge_all[c("var","area_km")])
 longdata2$value<-longdata2$value/(10^6)
 longdata<-rbind(longdata,longdata2)
 
+# breaks<-seq(0.05,1,0.05)
+# cols<-colorRampPalette(c("white","purple"))(length(breaks))
+# breaks<-c(0,breaks)
+# cols<-c("#00FF00",cols)
+# labs<-breaks
+# labs[2:(length(labs)-1)]<-rep("",(length(labs)-2))
 
 g1<-ggplot(data=subset(longdata,longdata$variable=="duration_days"),aes(x=value,group=var,color=var)) + 
   geom_density() +
@@ -352,8 +355,9 @@ print(g1)
  stats_g1<-ggplot(data=subset(longdata_tests,metric=="duration_days"),aes(x=Var1,y=Var2,fill=round(value,3))) +
  facet_grid(~test)+
   geom_tile(color="white") +
-  scale_fill_gradient2(low="blue",high="red",mid="white",
-                       midpoint=0.05,limit=c(0,1),name="p-value") +
+  scale_fill_gradientn(colours = c("purple","white","chartreuse4"), 
+                         values = rescale(c(0,0.06,1)),
+                         guide = "colorbar", limits=c(0,1),name="p-value")+
   theme_minimal()+
   theme(axis.text.x = element_text(angle = 45, vjust = 1,
                                    size = 8, hjust = 1))+
@@ -377,8 +381,9 @@ print(g2)
  stats_g2<-ggplot(data=subset(longdata_tests,metric=="zonal_speed_kph"),aes(x=Var1,y=Var2,fill=round(value,3))) +
  facet_grid(~test)+
   geom_tile(color="white") +
-  scale_fill_gradient2(low="blue",high="red",mid="white",
-                       midpoint=0.05,limit=c(0,1),name="p-value") +
+  scale_fill_gradientn(colours = c("purple","white","chartreuse4"), 
+                         values = rescale(c(0,0.06,1)),
+                         guide = "colorbar", limits=c(0,1),name="p-value")+
   theme_minimal()+
   theme(axis.text.x = element_text(angle = 45, vjust = 1,
                                    size = 8, hjust = 1))+
@@ -398,8 +403,9 @@ print(g3)
  stats_g3<-ggplot(data=subset(longdata_tests,metric=="area_km"),aes(x=Var1,y=Var2,fill=round(value,3))) +
  facet_grid(~test)+
   geom_tile(color="white") +
-  scale_fill_gradient2(low="blue",high="red",mid="white",
-                       midpoint=0.05,limit=c(0,1),name="p-value") +
+  scale_fill_gradientn(colours = c("purple","white","chartreuse4"), 
+                         values = rescale(c(0,0.06,1)),
+                         guide = "colorbar", limits=c(0,1),name="p-value")+
   theme_minimal()+
   theme(axis.text.x = element_text(angle = 45, vjust = 1,
                                    size = 8, hjust = 1))+
