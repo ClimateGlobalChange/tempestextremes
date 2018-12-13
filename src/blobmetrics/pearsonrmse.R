@@ -81,7 +81,7 @@ rmse_calc<-function(arr1,arr2,lat1,lat2,lon1,lon2,interp=FALSE){
   diff_data2<-(longdata$cosV1-longdata$cosV2)^2
   ame<-sum(abs(longdata$cosV1-longdata$cosV2))/nrow(longdata)
   rmse<-sqrt(sum(diff_data2)/length(diff_data2))
-  print(sprintf("AME is %f and RMSE is %f",ame,rmse))
+  #print(sprintf("AME is %f and RMSE is %f",ame,rmse))
   return(rmse)
 }
 

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015) (preloaded format=pdflatex 2015.11.17)  9 DEC 2018 15:44
+This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015) (preloaded format=pdflatex 2015.11.17)  12 DEC 2018 12:30
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -593,14 +593,13 @@ File: omscmr.fd 2014/09/29 v2.5h Standard LaTeX font definitions
 )
 LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <10> not available
 (Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 34.
- [3]
-<Framework_figure.pdf, id=20, 542.04509pt x 375.93048pt>
+ [3] [4]
+<Framework_figure.pdf, id=23, 542.04509pt x 375.93048pt>
 File: Framework_figure.pdf Graphic file (type pdf)
 
 <use Framework_figure.pdf>
 Package pdftex.def Info: Framework_figure.pdf used on input line 190.
 (pdftex.def)             Requested size: 469.47046pt x 325.59987pt.
- [4]
 LaTeX Font Info:    Font shape `OT1/cmtt/bx/n' in size <12> not available
 (Font)              Font shape `OT1/cmtt/m/n' tried instead on input line 194.
  [5 <./Framework_figure.pdf>]
@@ -736,25 +735,25 @@ Overfull \hbox (1.77568pt too wide) in paragraph at lines 645--645
  []
 
 [11] [12]
-Overfull \hbox (197.27373pt too wide) in paragraph at lines 675--675
+Overfull \hbox (197.27373pt too wide) in paragraph at lines 697--697
 []\OT1/cmtt/m/n/10 1992-03-13-43200        33.00000        43.00000        130.
 00000       142.00000       38.00000        136.00000       0.02783[] 
  []
 
 
-Overfull \hbox (197.27373pt too wide) in paragraph at lines 675--675
+Overfull \hbox (197.27373pt too wide) in paragraph at lines 697--697
 []\OT1/cmtt/m/n/10 1992-03-13-64800        33.00000        43.00000        130.
 00000       144.00000       38.00000        137.00000       0.03289[] 
  []
 
 
-Overfull \hbox (197.27373pt too wide) in paragraph at lines 675--675
+Overfull \hbox (197.27373pt too wide) in paragraph at lines 697--697
 []\OT1/cmtt/m/n/10 1992-03-24-64800        28.00000        36.00000        132.
 00000       149.00000       32.00000        140.50000       0.03461[] 
  []
 
 
-Overfull \hbox (197.27373pt too wide) in paragraph at lines 675--675
+Overfull \hbox (197.27373pt too wide) in paragraph at lines 697--697
 []\OT1/cmtt/m/n/10 1992-03-25-00000        27.00000        37.00000        131.
 00000       151.00000       32.00000        141.00000       0.04569[] 
  []
@@ -777,7 +776,7 @@ ublic/amsfonts/cm/cmr7.pfb></usr/local/texlive/2015/texmf-dist/fonts/type1/publ
 ic/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2015/texmf-dist/fonts/type1/publi
 c/amsfonts/cm/cmtt10.pfb></usr/local/texlive/2015/texmf-dist/fonts/type1/public
 /amsfonts/cm/cmtt12.pfb>
-Output written on BlobMetrics-UserGuide.pdf (13 pages, 138483 bytes).
+Output written on BlobMetrics-UserGuide.pdf (13 pages, 139189 bytes).
 PDF statistics:
  94 PDF objects out of 1000 (max. 8388607)
  69 compressed objects within 1 object stream

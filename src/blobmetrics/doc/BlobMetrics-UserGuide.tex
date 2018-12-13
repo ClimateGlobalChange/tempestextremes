@@ -119,13 +119,13 @@ Note that some of the libraries require compiling and installation might fail if
 Rscript --vanilla gen_blank_setupfile.R
 \end{verbatim}
 
-This will return the file \texttt{blank\_setupfile.R} with all of the required variables. Fill in the desired values and save the modified file with the desired filename.
+This will return the file \texttt{blank\_setupfile.R} with all of the required variables (an example of this file can be found in the \texttt{blobmetrics} directory). Fill in the desired values and save the modified file with the desired filename (see example file \texttt{setup\_full.R} in the \texttt{blobmetrics} directory).
 \item Generate the master namelist file:
 \begin{verbatim}
 Rscript --vanilla stitch_metric_framework.R -gn -sl [setup list file]
 \end{verbatim}
 
-It will create a new directory (if it doesn't yet exist) with the name specified in the setup file; the master namelist file can be found in this directory. 
+It will create a new directory (if it doesn't yet exist) with the name specified in the setup file; the master namelist file can be found in this directory. (See example \texttt{text}
 \item Run one or more of the desired utilities:
 \begin{verbatim}
 Rscript --vanilla stitch_metric_framework.R [flags] -nl [namelist]
@@ -644,10 +644,32 @@ The RData file contains the following variables:
 6834   181.875
 \end{verbatim}
 \item \texttt{p1given2} and \texttt{p2given1}: probability of co-occurrence for dataset 1 given dataset 2 and the reverse.
-\item \texttt{pearson\_num} and \texttt{rmse\_num}: the Pearson pattern correlation and RMSE coefficients.
 \item \texttt{sim\_25}, \texttt{sim\_50} and \texttt{sim\_75}: the 25th, 50th, and 75th percentile values of spatial similarity between the two datasets.
 \item \texttt{V1} and \texttt{V2}: The names of your variables for dataset 1 and dataset 2.
 \end{itemize}
+
+\subsection{Comparing the average blocking frequency of two datasets (\texttt{pearsonrmse})}
+This utility quantifies the agreement between two blocking frequency patterns. Note that the two datasets need to have the same grid spacing for this utility to work.
+
+\subsubsection{Requirements}
+
+Arrays from \texttt{--readnetcdf} in RData format.
+
+\subsubsection{Command line syntax}
+
+\begin{verbatim}
+Rscript --vanilla stitch_metric_framework.R [-pr] [-nl or -nlpr FILE]
+\end{verbatim}
+
+The following flags are required:
+
+\begin{itemize}
+\item[] \texttt{-pr (--pearsonrmse)}\\Tell program to compare the two datasets specified in the namelist.
+\item[]\texttt{-nl} (\texttt{--namelist}) or \texttt{-nlpr} (\texttt{--namelistpr}) \texttt{FILE}\\ Name of namelist file
+\end{itemize}
+
+\subsubsection{Output}
+
 
 \subsection{Create a summary report (\texttt{--genreport})}
 

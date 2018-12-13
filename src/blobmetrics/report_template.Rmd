@@ -259,7 +259,7 @@ labs[12:length(labs)]<-rep("",3)
 cols<-colorRampPalette(c("yellow","green","blue","purple","red"))(length(breaks))
 g<-ggplot(data=avgdata,aes(x=lon,y=lat)) +
   coord_cartesian(expand=F) +
-  facet_wrap(~VAR,ncol=ncols_plot) +
+  facet_wrap(~VAR,ncol=ncols_plot,dir="v") +
   geom_raster(aes(x=lon,y=lat,fill=value),interpolate = T) +
   geom_contour(aes(z=value),breaks=breaks) +
   scale_fill_gradientn(breaks=breaks,limits=c(min(breaks),max(breaks)),colors=cols,labels=labs) +
