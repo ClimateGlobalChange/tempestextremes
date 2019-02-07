@@ -129,7 +129,139 @@ int DayInYear(int nMonth, int nDay){
 //takes a time value (in units of hours or 
 //days since reference date) and returns 4
 //integer values: year, month, day, and hour
+
 void ParseTimeDouble(
+        const std::string & strTimeUnits,
+        const std::string & strTimeCalendar,
+        double dTime,
+        int & nDateYear,
+        int & nDateMonth,
+        int & nDateDay,
+        int & nDateHour
+) {
+        // Get calendar type
+        Time::CalendarType cal;
+        if ((strTimeCalendar.length() >= 6) &&
+                (strncmp(strTimeCalendar.c_str(), "noleap", 6) == 0)
+        ) {
+                cal = Time::CalendarNoLeap;
+
+        } else if (
+                (strTimeCalendar.length() >= 8) &&
+                (strncmp(strTimeCalendar.c_str(), "standard", 8) == 0)
+        ) {
+                cal = Time::CalendarStandard;
+
+        }else if (
+                (strTimeCalendar.length() >= 8) &&
+                (strncmp(strTimeCalendar.c_str(), "gregorian", 8) == 0)
+        ) {
+                cal = Time::CalendarStandard;
+
+        }else if (
+                (strTimeCalendar.length() >= 8) &&
+                (strncmp(strTimeCalendar.c_str(), "proleptic_gregorian", 8) == 0)
+        ) {
+                cal = Time::CalendarStandard;
+
+        } else if (
+                (strTimeCalendar.length() >= 7) &&
+                (strncmp(strTimeCalendar.c_str(), "360_day", 8) == 0)
+        ) {
+                cal = Time::Calendar360Day;
+        } else if (
+                (strTimeCalendar.length() >= 7) &&
+                (strncmp(strTimeCalendar.c_str(), "365_day", 8) == 0)
+
+       ) {
+                cal = Time::CalendarNoLeap;
+        } else {
+                _EXCEPTION1("Unknown calendar type \"%s\"", strTimeCalendar.c_str());
+        }
+       // Time format is "days since ..."
+        if ((strTimeUnits.length() >= 11) &&
+            (strncmp(strTimeUnits.c_str(), "days since ", 11) == 0)
+        ) {
+                std::string strSubStr = strTimeUnits.substr(11);
+                Time time(cal);
+                time.FromFormattedString(strSubStr);
+
+                int nDays = static_cast<int>(dTime);
+                time.AddDays(nDays);
+
+                int nSeconds = static_cast<int>(fmod(dTime, 1.0) * 86400.0);
+                time.AddSeconds(nSeconds);
+
+              /*  Announce("Time (YMDS): %i %i %i %i",
+                                time.GetYear(),
+                                time.GetMonth(),
+                                time.GetDay(),
+                                time.GetSecond());
+
+*/
+                nDateYear = time.GetYear();
+                nDateMonth = time.GetMonth();
+                nDateDay = time.GetDay();
+                nDateHour = time.GetSecond() / 3600;
+
+                //printf("%s\n", strSubStr.c_str());
+
+        // Time format is "hours since ..."
+        } else if (
+            (strTimeUnits.length() >= 12) &&
+            (strncmp(strTimeUnits.c_str(), "hours since ", 12) == 0)
+        ) {
+                std::string strSubStr = strTimeUnits.substr(12);
+                Time time(cal);
+                time.FromFormattedString(strSubStr);
+
+                time.AddHours(static_cast<int>(dTime));
+
+  /*              Announce("Time (YMDS): %i %i %i %i",
+                                time.GetYear(),
+                                time.GetMonth(),
+                                time.GetDay(),
+                                time.GetSecond());
+*/
+                nDateYear = time.GetYear();
+                nDateMonth = time.GetMonth();
+                nDateDay = time.GetDay();
+                nDateHour = time.GetSecond() / 3600;
+
+                //printf("%s\n", strSubStr.c_str());
+
+       // Time format is "minutes since ..."
+        } else if (
+            (strTimeUnits.length() >= 14) &&
+            (strncmp(strTimeUnits.c_str(), "minutes since ", 14) == 0)
+        ) {
+                std::string strSubStr = strTimeUnits.substr(14);
+                Time time(cal);
+                time.FromFormattedString(strSubStr);
+
+                time.AddMinutes(static_cast<int>(dTime));
+
+  /*              Announce("Time (YMDS): %i %i %i %i",
+                                time.GetYear(),
+                                time.GetMonth(),
+                                time.GetDay(),
+                                time.GetSecond());
+*/
+                nDateYear = time.GetYear();
+                nDateMonth = time.GetMonth();
+                nDateDay = time.GetDay();
+                nDateHour = time.GetSecond() / 3600;
+
+                //printf("%s\n", strSubStr.c_str());
+
+        } else {
+                _EXCEPTIONT("Unknown \"time::units\" format");
+        }
+        //_EXCEPTION();
+}
+
+
+/*void ParseTimeDouble(
 	const std::string & strTimeUnits,
 	const std::string & strTimeCalendar,
 	double dTime,
@@ -212,7 +344,7 @@ void ParseTimeDouble(
 		_EXCEPTIONT("Unknown \"time::units\" format");
 	}
 }
-
+*/
 bool sequentialFiles(
   int prevYear,
   int prevMonth,
@@ -497,7 +629,7 @@ double replaceMissingFloat(int currA,
   //Point left
   int leftB = currB-1;
   double leftVal = VarMat[currP][currA][leftB];
-  while (std::fabs(leftVal) > valThresh){
+  while (std::fabs(leftVal) >= std::fabs(valThresh)){
     leftB-=1;
     if (leftB < 1){
       break;
@@ -507,12 +639,47 @@ double replaceMissingFloat(int currA,
   //Point right
   int rightB = currB+1;
   double rightVal = VarMat[currP][currA][rightB];
-  while (std::fabs(rightVal)>valThresh){
+  while (std::fabs(rightVal)>= std::fabs(valThresh)){
     rightB+=1;
     if (rightB > (bLen-1)){
       break;
     }
     rightVal = VarMat[currP][currA][rightB];
+  }
+
+  //Interpolate!
+  double newCurrVal = ((double)(rightB-currB)/(double)(rightB-leftB))*leftVal + \
+     ((double)(currB-leftB)/(double)(rightB-leftB))*rightVal;
+  return(newCurrVal);
+}
+
+double replaceMissingFloat2D(int currA,
+                           int currB,
+                           double valThresh,
+                           DataMatrix<double> VarMat,
+                           int aLen,
+                           int bLen
+){
+  double currVal = VarMat[currA][currB];
+  //Point left
+  int leftB = currB-1;
+  double leftVal = VarMat[currA][leftB];
+  while (std::fabs(leftVal) >=std::fabs(valThresh)){
+    leftB-=1;
+    if (leftB < 1){
+      break;
+    }
+    leftVal = VarMat[currA][leftB];
+  }
+  //Point right
+  int rightB = currB+1;
+  double rightVal = VarMat[currA][rightB];
+  while (std::fabs(rightVal)>=std::fabs(valThresh)){
+    rightB+=1;
+    if (rightB > (bLen-1)){
+      break;
+    }
+    rightVal = VarMat[currA][rightB];
   }
 
   //Interpolate!
@@ -1051,7 +1218,8 @@ void calcDevs( bool latNorm,
               NcVar *avgIPV,
               NcVar *inTime,
               NcVar *avgTime,
-              NcVar *lat){
+              NcVar *lat,
+              double missingNo){
 
   int nTime,nLat,nLon,avgDay;
   double pi = std::atan(1.)*4.;
@@ -1121,6 +1289,11 @@ void calcDevs( bool latNorm,
         sineRatio = num/denom;
         for (int b=0; b<nLon; b++){
           inputVal = IPVMat[a][b];
+          if (std::fabs(inputVal)>=(std::fabs(missingNo)-1)){
+            std::cout<<"Replacing value "<<inputVal<<std::endl;
+            inputVal = replaceMissingFloat2D(a,b,missingNo,IPVMat,nLat,nLon);
+            std::cout<<"New value is "<<inputVal<<std::endl;
+          }
           if (ZtoGH=="T"){
             inputVal /= 9.8;
           }
@@ -1480,4 +1653,170 @@ void calcDevsGH(bool leap,
 */
 
 
+
+void PV_calc2(
+        int nPlev,
+        int nLat,
+        int nLon,
+	DataMatrix3D<double>UMat,
+	DataMatrix3D<double>VMat,
+	DataMatrix3D<double> PTMat,
+	DataMatrix3D<double> RVMat,
+        DataVector<double>pVec,	
+	DataVector<double> coriolis,
+        DataVector<double>cosphi,
+	double dphi,
+	double dlambda,
+        double lat_res,
+        double lon_res,
+	DataMatrix3D<double> &PVMat,
+  DataMatrix3D<double> &dpt_dp,
+  DataMatrix3D<double> &du_dp,
+  DataMatrix3D<double> &dv_dp,
+  DataMatrix3D<double> &dpt_dphi,
+  DataMatrix3D<double> &dpt_dl 
+){
+  double invdp,invdp1,invdp2;
+  double invdphi= 1.0/(2.0*dphi);
+  double invdlambda = 1.0/(2.0*dlambda);
+  double radius = 6371000.0;
+  double coef1,coef2,corvar;
+  double U1,U2,U3,V1,V2,V3;
+
+
+  //Matrices for the partials
+  //PT, U, V WRT P
+
+  invdp1 = 1.0/(2.0*(pVec[1]-pVec[0]));
+  invdp2 = 1.0/(2.0*(pVec[nPlev-1]-pVec[nPlev-2]));
+
+    for (int a=0; a<nLat; a++){
+      for (int b=0; b<nLon; b++){
+        U1=UMat[2][a][b];
+        if (std::fabs(U1)>1000.0){
+          U1 = replaceMissingFloat(a,b,2,1000.0,UMat,nLat,nLon);
+        }
+        U2=UMat[1][a][b];
+        if (std::fabs(U2)>1000.0){
+          U2 = replaceMissingFloat(a,b,1,1000.0,UMat,nLat,nLon);
+        }
+        U3=UMat[0][a][b];
+        if (std::fabs(U3)>1000.0){
+          U3 = replaceMissingFloat(a,b,0,1000.0,UMat,nLat,nLon);
+        }
+       
+        V1=VMat[2][a][b];
+        if (std::fabs(V1)>1000.0){
+          V1 = replaceMissingFloat(a,b,2,1000.0,VMat,nLat,nLon);
+        }
+        V2=VMat[1][a][b];
+        if (std::fabs(V2)>1000.0){
+          V2 = replaceMissingFloat(a,b,1,1000.0,VMat,nLat,nLon);
+        }
+        V3=VMat[0][a][b];
+        if (std::fabs(V3)>1000.0){
+          V3 = replaceMissingFloat(a,b,0,1000.0,VMat,nLat,nLon);
+        }
+      //0 case
+        dpt_dp[0][a][b] = (-PTMat[2][a][b]+4.0*PTMat[1][a][b]-3.0*PTMat[0][a][b])*invdp1;
+        du_dp[0][a][b] = (-U1+4.0*U2-3.0*U3)*invdp1;
+        dv_dp[0][a][b] = (-V1+4.0*V2-3.0*V3)*invdp1;          
+      //end case
+        U1=UMat[nPlev-1][a][b];
+        if (std::fabs(U1)>1000.0){
+          U1 = replaceMissingFloat(a,b,(nPlev-1),1000.0,UMat,nLat,nLon);
+        }
+        U2=UMat[nPlev-2][a][b];
+        if (std::fabs(U2)>1000.0){
+          U2 = replaceMissingFloat(a,b,(nPlev-2),1000.0,UMat,nLat,nLon);
+        }
+        U3=UMat[nPlev-3][a][b];
+        if (std::fabs(U3)>1000.0){
+          U3 = replaceMissingFloat(a,b,(nPlev-3),1000.0,UMat,nLat,nLon);
+        }
+       
+        V1=VMat[nPlev-1][a][b];
+        if (std::fabs(V1)>1000.0){
+          V1 = replaceMissingFloat(a,b,(nPlev-1),1000.0,VMat,nLat,nLon);
+        }
+        V2=VMat[nPlev-2][a][b];
+        if (std::fabs(V2)>1000.0){
+          V2 = replaceMissingFloat(a,b,nPlev-2,1000.0,VMat,nLat,nLon);
+        }
+        V3=VMat[nPlev-3][a][b];
+        if (std::fabs(V3)>1000.0){
+          V3 = replaceMissingFloat(a,b,nPlev-3,1000.0,VMat,nLat,nLon);
+        }
+        dpt_dp[nPlev-1][a][b] = (3.0*PTMat[nPlev-1][a][b]-4.0*PTMat[nPlev-2][a][b]\
+          +PTMat[nPlev-3][a][b])*invdp2;
+        du_dp[nPlev-1][a][b] = (3.0*U1-4.0*U2+U3)*invdp2;
+        dv_dp[nPlev-1][a][b] = (3.0*V2-4.0*V2+V3)*invdp2;
+        for (int p=1; p<(nPlev-1); p++){
+          U1=UMat[p+1][a][b];
+          if (std::fabs(U1)>1000.0){
+            U1 = replaceMissingFloat(a,b,(p+1),1000.0,UMat,nLat,nLon);
+          }
+          U2=UMat[p-1][a][b];
+          if (std::fabs(U2)>1000.0){
+            U2 = replaceMissingFloat(a,b,(p-1),1000.0,UMat,nLat,nLon);
+          }
+       
+          V1=VMat[p+1][a][b];
+          if (std::fabs(V1)>1000.0){
+            V1 = replaceMissingFloat(a,b,(p-1),1000.0,VMat,nLat,nLon);
+          }
+          V2=VMat[p-1][a][b];
+          if (std::fabs(V2)>1000.0){
+            V2 = replaceMissingFloat(a,b,(p-1),1000.0,VMat,nLat,nLon);
+          }
+          invdp = 1.0/(2.0*(pVec[p+1]-pVec[p]));
+          dpt_dp[p][a][b] = (PTMat[p+1][a][b]-PTMat[p-1][a][b])*invdp;
+          du_dp[p][a][b] = (U1-U2)*invdp;
+          dv_dp[p][a][b] = (V1-V2)*invdp;
+        }
+      }
+    }
+  
+  //PT WRT PHI
+  //end cases
+    for (int p=0; p<nPlev; p++){
+      for (int b=0; b<nLon; b++){
+        dpt_dphi[p][0][b]=(-PTMat[p][2][b]+4.0*PTMat[p][1][b]\
+          -3.0*PTMat[p][0][b])*invdphi;
+        dpt_dphi[p][nLat-1][b]=(3.0*PTMat[p][nLat-1][b]-4.0*PTMat[p][nLat-2][b]\
+          +PTMat[p][nLat-2][b])*invdphi;
+        for (int a=1; a<(nLat-1); a++){
+          dpt_dphi[p][a][b]=(PTMat[p][a+1][b]-PTMat[p][a-1][b])*invdphi;
+        }
+      }
+    }
+
+  //PT WRT LAMBDA
+  //end cases
+    for (int p=0; p<nPlev; p++){
+      for (int a=0; a<nLat; a++){
+        dpt_dl[p][a][0]=(PTMat[p][a][1]-PTMat[p][a][nLon-1])*invdlambda;
+        dpt_dl[p][a][nLon-1]=(PTMat[p][a][nLon-2]-PTMat[p][a][0])*invdlambda;
+        for (int b=1; b<(nLon-1); b++){
+          dpt_dl[p][a][b]=(PTMat[p][a][b+1]-PTMat[p][a][b-1])*invdlambda;
+        }
+      }
+    }
+  coef2 = 1.0/radius;
+  //PV Calculation!
+    for (int p=0; p<nPlev; p++){
+      for (int a=0; a<nLat; a++){
+        coef1 = 1.0/(radius*cosphi[a]);
+        corvar=coriolis[a];
+        for (int b=0; b<nLon; b++){
+          PVMat[p][a][b] = 9.80616*(coef1*dv_dp[p][a][b]*dpt_dl[p][a][b]\
+           -coef2*du_dp[p][a][b]*dpt_dphi[p][a][b]\
+           -(corvar+RVMat[p][a][b])*dpt_dp[p][a][b]);
+           if (std::fabs(PVMat[p][a][b])>10){
+             std::cout<<"Questionable value at p="<<p<<", a="<<a<<", b="<<b<<std::endl;
+           }
+        }
+      }
+    }
+} 
 

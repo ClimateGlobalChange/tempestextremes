@@ -59,6 +59,7 @@ int main(int argc, char **argv){
     size_t pos,len;
     std::string delim = ".";
     int tSteps;
+    double missingNo;
 
     BeginCommandLine()
       CommandLineString(fileName, "in","");
@@ -83,6 +84,7 @@ int main(int argc, char **argv){
       CommandLineString(prevFile,"prev","");
       CommandLineString(nextFile,"next","");
       CommandLineInt(tSteps,"nt",0);
+      CommandLineDouble(missingNo,"missingnum",1e20);
       ParseCommandLine(argc, argv);
     EndCommandLine(argv);
     AnnounceBanner();
@@ -301,6 +303,8 @@ int main(int argc, char **argv){
             z++;
           }
         }
+      }else{
+        outputTime = timeVals;
       }
       
       //Create output file that corresponds to IPV data
@@ -339,15 +343,15 @@ int main(int argc, char **argv){
       
       if (PVCalc){
 	calcDevs(false,ZGHval,fourDval,pIndex, tSteps, nOutTime, strTimeUnits, strCalendar, \
-        varData, devOut, AvarData, inTime, avgTimeVals, inLat);
+        varData, devOut, AvarData, inTime, avgTimeVals, inLat,missingNo);
       }
       else if (GHCalc){
         calcDevs(true,ZGHval,fourDval,pIndex,tSteps, nOutTime, strTimeUnits, strCalendar,\
-          varData, devOut,AvarData,inTime, avgTimeVals,inLat);
+          varData, devOut,AvarData,inTime, avgTimeVals,inLat,missingNo);
       }
       else{
         calcDevs(false,ZGHval,fourDval,pIndex, tSteps, nOutTime, strTimeUnits, strCalendar, \
-        varData, devOut, AvarData, inTime, avgTimeVals, inLat);
+        varData, devOut, AvarData, inTime, avgTimeVals, inLat,missingNo);
       }
 			outfile.close();
     }
