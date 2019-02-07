@@ -679,6 +679,9 @@ try {
 	// Minimum number of timesteps for blob
 	int nMinTime;
 
+	// Minimum percentage overlap between blobs
+	double dPercentOverlap;
+
 	// Minimum latitude for detections
 	double dMinLat;
 
@@ -712,6 +715,7 @@ try {
 		CommandLineString(strOutputVariable, "outvar", "");
 		CommandLineInt(nMinBlobSize, "minsize", 1);
 		CommandLineInt(nMinTime, "mintime", 1);
+		CommandLineDouble(dPercentOverlap, "pct_overlap", 0.0)
 		CommandLineBool(fRegional, "regional");
 		CommandLineDouble(dMinLat, "minlat", -90.0);
 		CommandLineDouble(dMaxLat, "maxlat", 90.0);
@@ -762,6 +766,12 @@ try {
 	}
 
 	int nFiles = vecInputFiles.size();
+
+	// Convert percent overlap into a decimal value
+	if ((dPercentOverlap < 0.0) || (dPercentOverlap > 100.0)) {
+		_EXCEPTIONT("--pct_overlap must take on values between 0 and 100");
+	}
+	dPercentOverlap /= 100.0;
 
 	// Parse the threshold string
 	std::vector<BlobThresholdOp> vecThresholdOp;
@@ -870,12 +880,13 @@ try {
 	}
 
 	// Get time dimension over all files
-	//OutTimeUnits is either predetermined or set at the command line
-	std::vector<double> timeDim;
-	std::vector<Time> tempTime;
+	// OutTimeUnits is either predetermined or set at the command line
+	std::vector<double> dTimeDim;
+	std::vector<Time> timeTemp;
 	double newTimeDouble;
-	for (int x=0; x<vecInputFiles.size(); x++){
-		//Read the time into a vector of Time objects
+	for (int x = 0; x < vecInputFiles.size(); x++){
+
+		// Read the time into a vector of Time objects
 		NcFile inputFile(vecInputFiles[x].c_str());
 		if ( !inputFile.is_valid()){
 			_EXCEPTION1("Unable to open input file %s",
@@ -883,16 +894,16 @@ try {
 		}
 		ReadCFTimeDataFromNcFile(& inputFile,
 					vecInputFiles[x].c_str(),
-					tempTime,
+					timeTemp,
 					true);
-		//We have the Time objects
-		for (int t=0; t<tempTime.size(); t++){
-			newTimeDouble = tempTime[t].GetCFCompliantUnitsOffsetDouble(OutTimeUnits);
-			timeDim.push_back(newTimeDouble);
+
+		// Convert the Time objects to doubles
+		for (int t = 0; t < timeTemp.size(); t++){
+			newTimeDouble = timeTemp[t].GetCFCompliantUnitsOffsetDouble(OutTimeUnits);
+			dTimeDim.push_back(newTimeDouble);
 		}
 	}
-	int nTime = timeDim.size();
-	std::cout<<"timeDim is "<<nTime<<" long"<<std::endl;
+	int nTime = dTimeDim.size();
 
 //	DataVector<double> dTime;
 
@@ -1293,6 +1304,26 @@ try {
 					continue;
 				}
 
+				// Verify that blobs meet percentage overlap criteria
+				if (dPercentOverlap != 0.0) {
+					double dCurrentArea = 0.0;
+					double dOverlapArea = 0.0;
+					for (; iter != vecBlobs[p].end(); iter++) {
+						dCurrentArea += dCellArea[iter->lat];
+						if (vecPrevBlobs[q].find(*iter) !=
+							vecPrevBlobs[q].end()
+						) {
+							dOverlapArea += dCellArea[iter->lat];
+						}
+					}
+					if (dCurrentArea == 0.0) {
+						_EXCEPTIONT("Logic error");
+					}
+					if (dOverlapArea < dCurrentArea * dPercentOverlap) {
+						continue;
+					}
+				}
+
 				// Insert bidirectional edge in graph
 				multimapTagGraph.insert(
 					std::pair<Tag, Tag>(
@@ -1541,7 +1572,7 @@ try {
 
 	varOutputTime->set_cur((long)0);
 //	varOutputTime->put(dTime, nTime);
-	varOutputTime->put(&(timeDim[0]),nTime);
+	varOutputTime->put(&(dTimeDim[0]),nTime);
 	varOutputLat->set_cur((long)0);
 	varOutputLat->put(dataLatDeg, nLat);
 
