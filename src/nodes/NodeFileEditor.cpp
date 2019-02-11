@@ -34,6 +34,7 @@
 #include <mpi.h>
 #endif
 */
+
 ///////////////////////////////////////////////////////////////////////////////
 
 void CalculateRadialProfile(
@@ -469,6 +470,127 @@ void CalculateStormVelocity(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void MaxClosedContourDelta(
+	VariableRegistry & varreg,
+	NcFileVector & vecFiles,
+	const SimpleGrid & grid,
+	const ColumnDataHeader & cdh,
+	int iTime,
+	PathNode & pathnode,
+	VariableIndex varix,
+	std::string strRadius
+) {
+	// Get radius
+	double dRadius = pathnode.GetColumnDataAsDouble(cdh, strRadius);
+
+	// Check arguments
+	if (dRadius <= 0.0) {
+		_EXCEPTIONT("\nNonpositive value of <radius> argument given");
+	}
+	if (dRadius > 180.0) {
+		_EXCEPTIONT("\n<radius> must be no larger than 180 (degrees)");
+	}
+
+	// Get the center grid index
+	const int ix0 = pathnode.m_gridix;
+
+	// Load the variable data
+	Variable & var = varreg.Get(varix);
+	var.LoadGridData(varreg, vecFiles, grid, iTime);
+	const DataVector<float> & dataState = var.GetData();
+
+	// Maximum closed contour delta
+	double dMaxDelta = 0.0;
+
+	// Value of the field at the index point
+	double dValue0 = dataState[ix0];
+
+	// Central lat/lon and Cartesian coord
+	double dLon0 = grid.m_dLon[ix0];
+	double dLat0 = grid.m_dLat[ix0];
+
+	// Priority queue mapping deltas to indices
+	std::map<double, int> mapPriorityQueue;
+	mapPriorityQueue.insert(
+		std::pair<double, int>(0.0, ix0));
+
+	// Queue of nodes that remain to be visited
+	std::queue<int> queueNodes;
+	for (int n = 0; n < grid.m_vecConnectivity[ix0].size(); n++) {
+		queueNodes.push(grid.m_vecConnectivity[ix0][n]);
+	}
+
+	// Set of nodes that have already been visited
+	std::set<int> setNodesVisited;
+
+	// Loop through all latlon elements
+	while (mapPriorityQueue.size() != 0) {
+		std::map<double, int>::iterator iter = mapPriorityQueue.begin();
+
+		const double dDelta = iter->first;
+		const int ix = iter->second;
+
+		mapPriorityQueue.erase(iter);
+
+		setNodesVisited.insert(ix);
+
+		// Add all neighbors of this point
+		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+			int ixNeighbor = grid.m_vecConnectivity[ix][n];
+			if (setNodesVisited.find(ixNeighbor) != setNodesVisited.end()) {
+				continue;
+			}
+
+			double dValue = dataState[ixNeighbor];
+			mapPriorityQueue.insert(
+				std::pair<double, int>(
+					dValue - dValue0, ixNeighbor));
+		}
+
+		// Don't perform calculation on central node
+		if (ix == ix0) {
+			continue;
+		}
+
+		// lat/lon and Cartesian coords of this point
+		double dLat = grid.m_dLat[ix];
+		double dLon = grid.m_dLon[ix];
+
+		// Great circle distance to this element (in degrees)
+		double dR =
+			sin(dLat0) * sin(dLat)
+			+ cos(dLat0) * cos(dLat) * cos(dLon - dLon0);
+
+		if (dR >= 1.0) {
+			dR = 0.0;
+		} else if (dR <= -1.0) {
+			dR = 180.0;
+		} else {
+			dR = 180.0 / M_PI * acos(dR);
+		}
+		if (dR != dR) {
+			_EXCEPTIONT("NaN value detected");
+		}
+
+		if (dR >= dRadius) {
+			break;
+		}
+
+		// Store new maximum delta
+		if (dDelta > dMaxDelta) {
+			dMaxDelta = dDelta;
+		}
+	}
+
+	// Store the maximum closed contour delta as new column data
+	ColumnDataDouble * pdat =
+		new ColumnDataDouble(dMaxDelta);
+
+	pathnode.PushColumnData(pdat);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 /*
 #if defined(TEMPEST_MPIOMP)
@@ -624,6 +746,7 @@ try {
 			if (strFileLine[0] == '#') {
 				continue;
 			}
+			Announce(strFileLine.c_str());
 			autocurator.IndexFiles(strFileLine);
 		}
 	}
@@ -906,6 +1029,64 @@ try {
 						// Add this data to the pathnode
 						pathnode.PushColumnData(
 							new ColumnDataDouble(pdat->m_dR[j]));
+					}
+				}
+
+				// Add new variable to ColumnDataHeader
+				cdhInput.push_back((*pargtree)[0]);
+
+				AnnounceEndBlock("Done");
+				continue;
+			}
+
+			// max_closed_contour_delta
+			if ((*pargtree)[2] == "max_closed_contour_delta") {
+				if (pargfunc->size() != 2) {
+					_EXCEPTIONT("Syntax error: Function \"max_closed_contour_delta\" "
+						"requires four arguments:\n"
+						"max_closed_contour_delta(<variable>, <radius>)");
+				}
+
+				// Parse variable
+				Variable var;
+				var.ParseFromString(varreg, (*pargfunc)[0]);
+				VariableIndex varix = varreg.FindOrRegister(var);
+
+				// Loop through all Times
+				TimeToPathNodeMap::iterator iterPathNode =
+					mapTimeToPathNode.begin();
+				for (; iterPathNode != mapTimeToPathNode.end(); iterPathNode++) {
+					const Time & time = iterPathNode->first;
+
+					// Unload data from the VariableRegistry
+					varreg.UnloadAllGridData();
+
+					// Open NetCDF files with data at this time
+					NcFileVector vecncDataFiles;
+					int iTime;
+					autocurator.Find(time, vecncDataFiles, iTime);
+					if (vecncDataFiles.size() == 0) {
+						_EXCEPTION1("Time (%s) does not exist in input data fileset",
+							time.ToString().c_str());
+					}
+
+					// Loop through all PathNodes which need calculating at this Time
+					for (int i = 0; i < iterPathNode->second.size(); i++) {
+						int iPath = iterPathNode->second[i].first;
+						int iPathNode = iterPathNode->second[i].second;
+
+						PathNode & pathnode =
+							pathvec[iPath].m_vecPathNodes[iPathNode];
+
+						MaxClosedContourDelta(
+							varreg,
+							vecncDataFiles,
+							grid,
+							cdhInput,
+							iTime,
+							pathnode,
+							varix,
+							(*pargfunc)[1]);
 					}
 				}
 
