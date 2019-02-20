@@ -35,6 +35,11 @@ void ParseNodeFile(
 	// String buffer
 	std::string strBuffer;
 
+	// Only support grids of dimension 1 or 2
+	if ((grid.m_nGridDim.size() < 1) || (grid.m_nGridDim.size() > 2)) {
+		_EXCEPTIONT("Grid dimension out of range:  Only grids of dimension 1 or 2 supported");
+	}
+
 	// Coordinate buffer
 	std::vector<int> coord;
 	coord.resize(grid.m_nGridDim.size());
@@ -157,11 +162,25 @@ void ParseNodeFile(
 
 			for (int n = 0; n < grid.m_nGridDim.size(); n++) {
 				iss >> coord[n];
-				if ((coord[n] < 0) || (coord[n] >= grid.m_nGridDim[n])) {
-					_EXCEPTION2("Coordinate index out of range on line %i of \"%s\"",
-						coord[n], strNodeFile.c_str());
-				}
 			}
+
+			// Note that for 2D grids the coordinate indices are swapped
+			if (coord.size() == 1) {
+				if ((coord[0] < 0) || (coord[0] >= grid.m_nGridDim[0])) {
+					_EXCEPTION2("Coordinate index out of range on line %i of \"%s\"",
+						iLine, strNodeFile.c_str());
+				}
+			} else if (coord.size() == 2) {
+				if ((coord[0] < 0) || (coord[0] >= grid.m_nGridDim[1]) ||
+				    (coord[1] < 0) || (coord[1] >= grid.m_nGridDim[0])
+				) {
+					_EXCEPTION2("Coordinate index out of range on line %i of \"%s\"",
+						iLine, strNodeFile.c_str());
+				}
+			} else {
+				_EXCEPTION();
+			}
+
 			if (iss.eof()) {
 				_EXCEPTION2("Format error on line %i of \"%s\"",
 					iLine, strNodeFile.c_str());
