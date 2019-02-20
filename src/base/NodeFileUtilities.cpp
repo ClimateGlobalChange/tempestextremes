@@ -239,6 +239,11 @@ void ParseNodeFile(
 					_EXCEPTIONT("Undefined behavior for SimpleGrid dimensionality > 2");
 				}
 
+				if ((pathnode.m_gridix < 0) || (pathnode.m_gridix > grid.GetSize())) {
+					_EXCEPTION2("Coordinate index out of range on line %i of \"%s\"",
+						iLine, strNodeFile.c_str());
+				}
+
 				// Store all other data as strings
 				for (int i = 0; i < nOutputSize-4; i++) {
 					pathnode.PushColumnDataString(
