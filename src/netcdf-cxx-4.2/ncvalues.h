@@ -18,6 +18,7 @@
 // Documentation warned this might change and now it has, for
 // consistency with C interface 
 typedef signed char ncbyte;
+typedef unsigned char ncubyte;
 
 #define NC_UNSPECIFIED ((nc_type)0)
 
@@ -30,6 +31,9 @@ typedef int nclong;
 #define	NC_VERBOSE	2
 #endif
 
+typedef long long ncint64;
+typedef unsigned long long ncuint64;
+
 enum NcType 
 {
   ncNoType = NC_UNSPECIFIED, 
@@ -39,7 +43,13 @@ enum NcType
   ncInt = NC_INT,
   ncLong = NC_LONG,		// deprecated, someday want to use for 64-bit ints
   ncFloat = NC_FLOAT, 
-  ncDouble = NC_DOUBLE
+  ncDouble = NC_DOUBLE,
+  ncUByte = NC_UBYTE,
+  ncUShort = NC_USHORT,
+  ncUInt = NC_UINT,
+  ncInt64 = NC_INT64,
+  ncUInt64 = NC_UINT64,
+  ncString = NC_STRING
 };
 
 #define ncBad_ncbyte ncBad_byte
@@ -51,6 +61,11 @@ static const int ncBad_int = NC_FILL_INT;
 static const long ncBad_long = FILL_LONG; // deprecated
 static const float ncBad_float = NC_FILL_FLOAT;
 static const double ncBad_double = NC_FILL_DOUBLE;
+static const ncubyte ncBad_ubyte = NC_FILL_UBYTE;
+static const unsigned short ncBad_ushort = NC_FILL_USHORT;
+static const unsigned int ncBad_uint = NC_FILL_UINT;
+static const ncint64 ncBad_ncint64 = NC_FILL_INT64;
+static const ncuint64 ncBad_ncuint64 = NC_FILL_UINT64;
 
 // macros to glue tokens together to form new names (used to be in generic.h)
 #define name2(a,b) a ## b
@@ -84,6 +99,8 @@ class NcVal(TYPE) : public NcValues					      \
     virtual long as_long( long n ) const;				      \
     virtual float as_float( long n ) const;				      \
     virtual double as_double( long n ) const;				      \
+	virtual ncint64 as_ncint64( long n ) const;                     \
+	virtual ncuint64 as_ncuint64( long n ) const;                   \
     virtual char* as_string( long n ) const;				      \
     virtual int invalid( void ) const;					      \
   private:								      \
@@ -100,6 +117,8 @@ class NcVal(TYPE) : public NcValues					      \
 #define _nc__long ncLong
 #define _nc__float ncFloat
 #define _nc__double ncDouble
+#define _nc__ncint64 ncInt64
+#define _nc__ncuint64 ncUInt64
 #define NcValuesimplement(TYPE)						      \
 NcVal(TYPE)::NcVal(TYPE)( void )					      \
 	: NcValues(NcTypeEnum(TYPE), 0), the_values(0)			      \
@@ -226,10 +245,22 @@ inline double NcVal(TYPE)::as_double( long n ) const			      \
     return (double) the_values[n];				              \
 }
 
+#define as_ncint64_implement(TYPE)					      \
+inline ncint64 NcVal(TYPE)::as_ncint64( long n ) const			      \
+{									      \
+    return (ncint64) the_values[n];				              \
+}
+
+#define as_ncuint64_implement(TYPE)					      \
+inline ncuint64 NcVal(TYPE)::as_ncuint64( long n ) const			      \
+{									      \
+    return (ncuint64) the_values[n];				              \
+}
+
 #define as_string_implement(TYPE)					      \
 char* NcVal(TYPE)::as_string( long n ) const				      \
 {									      \
-    char* s = new char[32];                                                   \
+    char* s = new char[64];                                                   \
     std::ostringstream ostr;                                                  \
     ostr << the_values[n];                                            \
     ostr.str().copy(s, std::string::npos);                                               \
@@ -259,6 +290,8 @@ class NcValues			// ABC for value blocks
     virtual long as_long( long n ) const = 0;     // nth value as long
     virtual float as_float( long n ) const = 0;   // nth value as floating-point
     virtual double as_double( long n ) const = 0; // nth value as double
+    virtual ncint64 as_ncint64( long n ) const = 0; // nth value as ncint64
+    virtual ncuint64 as_ncuint64( long n ) const = 0; // nth value as ncuint64
     virtual char* as_string( long n ) const = 0;  // value as string
     
   protected:
@@ -275,5 +308,7 @@ declare(NcValues,nclong)
 declare(NcValues,long)
 declare(NcValues,float)
 declare(NcValues,double)
+declare(NcValues,ncint64)
+declare(NcValues,ncuint64)
 
 #endif

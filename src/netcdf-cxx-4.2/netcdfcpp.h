@@ -86,6 +86,8 @@ class NcFile
     NcBool add_att( NcToken attname, int );
     NcBool add_att( NcToken attname, float );
     NcBool add_att( NcToken attname, double );
+    NcBool add_att( NcToken attname, ncint64 );
+    NcBool add_att( NcToken attname, ncuint64 );
     NcBool add_att( NcToken attname, const char*);       // string attribute
     NcBool add_att( NcToken attname, int, const char* ); // vector attributes
     NcBool add_att( NcToken attname, int, const ncbyte* );
@@ -94,6 +96,8 @@ class NcFile
     NcBool add_att( NcToken attname, int, const int* );
     NcBool add_att( NcToken attname, int, const float* );
     NcBool add_att( NcToken attname, int, const double* );
+    NcBool add_att( NcToken attname, int, const ncint64* );
+    NcBool add_att( NcToken attname, int, const ncuint64* );
 
     enum FillMode {
         Fill = NC_FILL,                    // prefill (default)
@@ -194,6 +198,8 @@ class NcTypedComponent
     virtual long as_long( long n ) const;        // nth value as long
     virtual float as_float( long n ) const;      // nth value as floating-point
     virtual double as_double( long n ) const;    // nth value as double
+    virtual ncint64 as_ncint64( long n ) const;    // nth value as ncint64
+    virtual ncuint64 as_ncuint64( long n ) const;    // nth value as ncuint64
     virtual char* as_string( long n ) const;     // nth value as string
 
   protected:
@@ -244,6 +250,10 @@ class NcVar : public NcTypedComponent
                 long c0=0, long c1=0, long c2=0, long c3=0, long c4=0 );
     NcBool put( const double* vals,
                 long c0=0, long c1=0, long c2=0, long c3=0, long c4=0 );
+    NcBool put( const ncint64* vals,
+                long c0=0, long c1=0, long c2=0, long c3=0, long c4=0 );
+    NcBool put( const ncuint64* vals,
+                long c0=0, long c1=0, long c2=0, long c3=0, long c4=0 );
 
     // Put n-dimensional arrays, starting at [0, 0, ..., 0] by default,
     // may be reset with set_cur().
@@ -254,6 +264,8 @@ class NcVar : public NcTypedComponent
     NcBool put( const long* vals, const long* counts );
     NcBool put( const float* vals, const long* counts );
     NcBool put( const double* vals, const long* counts );
+    NcBool put( const ncint64* vals, const long* counts );
+    NcBool put( const ncuint64* vals, const long* counts );
 
     // Get scalar or 1, ..., 5 dimensional arrays by providing enough
     // arguments.  Arguments are edge lengths, and their number must not
@@ -273,6 +285,10 @@ class NcVar : public NcTypedComponent
                 long c2=0, long c3=0, long c4=0 ) const;
     NcBool get( double* vals, long c0=0, long c1=0,
                 long c2=0, long c3=0, long c4=0 ) const; 
+    NcBool get( ncint64* vals, long c0=0, long c1=0,
+                long c2=0, long c3=0, long c4=0 ) const; 
+    NcBool get( ncuint64* vals, long c0=0, long c1=0,
+                long c2=0, long c3=0, long c4=0 ) const; 
 
     // Get n-dimensional arrays, starting at [0, 0, ..., 0] by default,
     // may be reset with set_cur().
@@ -283,6 +299,8 @@ class NcVar : public NcTypedComponent
     NcBool get( long* vals, const long* counts ) const;
     NcBool get( float* vals, const long* counts ) const;
     NcBool get( double* vals, const long* counts ) const;
+    NcBool get( ncint64* vals, const long* counts ) const;
+    NcBool get( ncuint64* vals, const long* counts ) const;
 
     NcBool set_cur(long c0=-1, long c1=-1, long c2=-1,
                          long c3=-1, long c4=-1);
@@ -296,6 +314,8 @@ class NcVar : public NcTypedComponent
     NcBool add_att( NcToken, long );
     NcBool add_att( NcToken, float );
     NcBool add_att( NcToken, double );
+    NcBool add_att( NcToken, ncint64 );
+    NcBool add_att( NcToken, ncuint64 );
     NcBool add_att( NcToken, const char* );      // string attribute
     NcBool add_att( NcToken, int, const char* ); // vector attributes
     NcBool add_att( NcToken, int, const ncbyte* );
@@ -304,6 +324,8 @@ class NcVar : public NcTypedComponent
     NcBool add_att( NcToken, int, const long* );
     NcBool add_att( NcToken, int, const float* );
     NcBool add_att( NcToken, int, const double* );
+    NcBool add_att( NcToken, int, const ncint64* );
+    NcBool add_att( NcToken, int, const ncuint64* );
 
     NcBool rename( NcToken newname );
 
@@ -327,6 +349,8 @@ class NcVar : public NcTypedComponent
     NcBool put_rec( const long* vals );
     NcBool put_rec( const float* vals );
     NcBool put_rec( const double* vals );
+    NcBool put_rec( const ncint64* vals );
+    NcBool put_rec( const ncuint64* vals );
 
     // Put a dimension slice worth of data in current dimension slice
     NcBool put_rec( NcDim* d, const ncbyte* vals );
@@ -336,6 +360,8 @@ class NcVar : public NcTypedComponent
     NcBool put_rec( NcDim* d, const long* vals );
     NcBool put_rec( NcDim* d, const float* vals );
     NcBool put_rec( NcDim* d, const double* vals );
+    NcBool put_rec( NcDim* d, const ncint64* vals );
+    NcBool put_rec( NcDim* d, const ncuint64* vals );
 
     // Put a record's worth of data in specified record
     NcBool put_rec( const ncbyte* vals, long rec );
@@ -345,6 +371,8 @@ class NcVar : public NcTypedComponent
     NcBool put_rec( const long* vals, long rec );
     NcBool put_rec( const float* vals, long rec );
     NcBool put_rec( const double* vals, long rec );
+    NcBool put_rec( const ncint64* vals, long rec );
+    NcBool put_rec( const ncuint64* vals, long rec );
 
     // Put a dimension slice worth of data in specified dimension slice
     NcBool put_rec( NcDim* d, const ncbyte* vals, long slice );
@@ -354,6 +382,8 @@ class NcVar : public NcTypedComponent
     NcBool put_rec( NcDim* d, const long* vals, long slice );
     NcBool put_rec( NcDim* d, const float* vals, long slice );
     NcBool put_rec( NcDim* d, const double* vals, long slice );
+    NcBool put_rec( NcDim* d, const ncint64* vals, long slice );
+    NcBool put_rec( NcDim* d, const ncuint64* vals, long slice );
 
     // Get first record index corresponding to specified key value(s)
     long get_index( const ncbyte* vals );
@@ -363,6 +393,8 @@ class NcVar : public NcTypedComponent
     long get_index( const long* vals );
     long get_index( const float* vals );
     long get_index( const double* vals );
+    long get_index( const ncint64* vals );
+    long get_index( const ncuint64* vals );
 
     // Get first index of specified dimension corresponding to key values
     long get_index( NcDim* d, const ncbyte* vals );
@@ -372,6 +404,8 @@ class NcVar : public NcTypedComponent
     long get_index( NcDim* d, const long* vals );
     long get_index( NcDim* d, const float* vals );
     long get_index( NcDim* d, const double* vals );
+    long get_index( NcDim* d, const ncint64* vals );
+    long get_index( NcDim* d, const ncuint64* vals );
 
     // Set current record
     void set_rec ( long rec );

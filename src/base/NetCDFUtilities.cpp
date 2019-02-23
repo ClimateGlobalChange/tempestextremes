@@ -256,10 +256,29 @@ void CopyNcVar(
 		}
 	}
 
-
 	// ncDouble type
 	if (var->type() == ncDouble) {
 		DataVector<double> data;
+		data.Initialize(nDataSize);
+
+		varOut =
+			ncOut.add_var(
+				var->name(), var->type(),
+				dimOut.size(), (const NcDim**)&(dimOut[0]));
+
+		if (varOut == NULL) {
+			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
+		}
+
+		if (fCopyData) {
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
+	}
+
+	// ncInt64 type
+	if (var->type() == ncInt64) {
+		DataVector<ncint64> data;
 		data.Initialize(nDataSize);
 
 		varOut =
@@ -348,6 +367,7 @@ void ReadCFTimeDataFromNcFile(
 	DataVector<int> vecTimeInt;
 	DataVector<float> vecTimeFloat;
 	DataVector<double> vecTimeDouble;
+	DataVector<ncint64> vecTimeInt64;
 
 	if (varTime->type() == ncInt) {
 		vecTimeInt.Initialize(dimTime->size());
@@ -364,9 +384,14 @@ void ReadCFTimeDataFromNcFile(
 		varTime->set_cur((long)0);
 		varTime->get(&(vecTimeDouble[0]), dimTime->size());
 
+	} else if (varTime->type() == ncInt64) {
+		vecTimeInt64.Initialize(dimTime->size());
+		varTime->set_cur((long)0);
+		varTime->get(&(vecTimeInt64[0]), dimTime->size());
+
 	} else {
 		_EXCEPTION1("Variable \"time\" has invalid type "
-			"(expected \"int\", \"float\" or \"double\")"
+			"(expected \"int\", \"int64\", \"float\" or \"double\")"
 			" in file \"%s\"", strFilename.c_str());
 	}
 
@@ -386,6 +411,12 @@ void ReadCFTimeDataFromNcFile(
 			time.FromCFCompliantUnitsOffsetDouble(
 				strTimeUnits,
 				vecTimeDouble[t]);
+
+		} else if (varTime->type() == ncInt64) {
+			time.FromCFCompliantUnitsOffsetInt(
+				strTimeUnits,
+				(int)(vecTimeInt64[t]));
+
 		}
 
 		vecTimes.push_back(time);

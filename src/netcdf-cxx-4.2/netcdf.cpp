@@ -215,6 +215,8 @@ NcFile_add_scalar_att(int)
 NcFile_add_scalar_att(long)
 NcFile_add_scalar_att(float)
 NcFile_add_scalar_att(double)
+NcFile_add_scalar_att(ncint64)
+NcFile_add_scalar_att(ncuint64)
 NcFile_add_scalar_att(const char*)
 
 #define NcFile_add_vector_att(TYPE)					      \
@@ -230,6 +232,8 @@ NcFile_add_vector_att(int)
 NcFile_add_vector_att(long)
 NcFile_add_vector_att(float)
 NcFile_add_vector_att(double)
+NcFile_add_vector_att(ncint64)
+NcFile_add_vector_att(ncuint64)
 
 NcBool NcFile::set_fill( FillMode a_mode )
 {
@@ -546,6 +550,8 @@ NcTypedComponent_as(nclong)
 NcTypedComponent_as(long)
 NcTypedComponent_as(float)
 NcTypedComponent_as(double)
+NcTypedComponent_as(ncint64)
+NcTypedComponent_as(ncuint64)
 
 char* NcTypedComponent::as_string( long n ) const
 {
@@ -570,6 +576,12 @@ NcValues* NcTypedComponent::get_space( long numVals ) const
 	break;
       case ncDouble:
 	valp = new NcValues_double(numVals);
+	break;
+	  case ncInt64:
+	valp = new NcValues_ncint64(numVals);
+	break;
+	  case ncUInt64:
+	valp = new NcValues_ncuint64(numVals);
 	break;
       case ncInt:
 	valp = new NcValues_int(numVals);
@@ -647,13 +659,15 @@ long* NcVar::edges( void ) const	// edge lengths (dimension sizes)
 int NcVar::num_atts( void ) const // handles variable and global atts
 {
     int natt = 0;
-    if (the_file->is_valid())
-      if (the_id == ncGlobal)
-	natt = the_file->num_atts();
-      else
-	NcError::set_err(
+    if (the_file->is_valid()) {
+      if (the_id == ncGlobal) {
+        natt = the_file->num_atts();
+      } else {
+    NcError::set_err(
 			 nc_inq_varnatts(the_file->id(), the_id, &natt)
 			 );
+      }
+    }
     return natt;
 }
 
@@ -709,6 +723,18 @@ NcValues* NcVar::values( void ) const
 				    (double *)valp->base())
 				  );
 	break;
+	case ncInt64:
+	status = NcError::set_err(
+				  nc_put_vara_longlong(the_file->id(), the_id, crnr, edgs, 
+				    (long long *)valp->base())
+				  );
+    break;
+	case ncUInt64:
+	status = NcError::set_err(
+				  nc_put_vara_ulonglong(the_file->id(), the_id, crnr, edgs, 
+				    (unsigned long long *)valp->base())
+				  );
+    break;
     case ncInt:
 	status = NcError::set_err(
 				  nc_get_vara_int(the_file->id(), the_id, crnr, edgs, 
@@ -822,6 +848,18 @@ NcValues* NcVar::get_rec(NcDim* rdim, long slice)
 				    (double *)valp->base())
 				  );
 	break;
+    case ncInt64:
+	status = NcError::set_err(
+				  nc_get_vara_longlong(the_file->id(), the_id, start, edge, 
+				 (long long *)valp->base())
+				  );
+	break;
+    case ncUInt64:
+	status = NcError::set_err(
+				  nc_get_vara_ulonglong(the_file->id(), the_id, start, edge, 
+				 (unsigned long long *)valp->base())
+				  );
+	break;
     case ncInt:
 	status = NcError::set_err(
 				  nc_get_vara_int(the_file->id(), the_id, start, edge, 
@@ -907,6 +945,8 @@ NcVar_put_rec(int)
 NcVar_put_rec(long)
 NcVar_put_rec(float)
 NcVar_put_rec(double)
+NcVar_put_rec(ncint64)
+NcVar_put_rec(ncuint64)
 
 long NcVar::rec_size(void) {
     return rec_size(get_dim(0));
@@ -962,11 +1002,13 @@ NcVar_get_index(nclong)
 NcVar_get_index(long)
 NcVar_get_index(float)
 NcVar_get_index(double)
+NcVar_get_index(ncint64)
+NcVar_get_index(ncuint64)
     
 // Macros below work for short, nclong, long, float, and double, but for ncbyte
 // and char, we must use corresponding schar, uchar, or text C functions, so in 
 // these cases macros are expanded manually.
-#define NcVar_put_array(TYPE)						      \
+#define NcVar_put_array2(TYPE,NCTYPE)						      \
 NcBool NcVar::put( const TYPE* vals,					      \
 		     long edge0,					      \
 		     long edge1,					      \
@@ -995,9 +1037,11 @@ NcBool NcVar::put( const TYPE* vals,					      \
      start[j] = the_cur[j];						      \
     }									      \
     return NcError::set_err(                                                  \
-			    makename2(nc_put_vara_,TYPE) (the_file->id(), the_id, start, count, vals) \
+			    makename2(nc_put_vara_,NCTYPE) (the_file->id(), the_id, start, count, vals) \
 			    ) == NC_NOERR;     \
 }
+
+#define NcVar_put_array(TYPE) NcVar_put_array2(TYPE,TYPE)
 
 NcBool NcVar::put( const ncbyte* vals,
 		     long edge0,
@@ -1068,8 +1112,10 @@ NcVar_put_array(int)
 NcVar_put_array(long)
 NcVar_put_array(float)
 NcVar_put_array(double)
+NcVar_put_array2(ncint64, longlong)
+NcVar_put_array2(ncuint64, ulonglong)
 
-#define NcVar_put_nd_array(TYPE)					      \
+#define NcVar_put_nd_array2(TYPE,NCTYPE)					      \
 NcBool NcVar::put( const TYPE* vals, const long* count )		      \
 {									      \
     /* no need to check type() vs. TYPE, invoked C function will do that */   \
@@ -1079,9 +1125,11 @@ NcBool NcVar::put( const TYPE* vals, const long* count )		      \
     for (int i = 0; i < num_dims(); i++)				      \
       start[i] = the_cur[i];						      \
     return NcError::set_err(                                                  \
-			    makename2(nc_put_vara_,TYPE) (the_file->id(), the_id, start, (const size_t *) count, vals) \
+			    makename2(nc_put_vara_,NCTYPE) (the_file->id(), the_id, start, (const size_t *) count, vals) \
 			    ) == NC_NOERR;                                    \
 }
+
+#define NcVar_put_nd_array(TYPE) NcVar_put_nd_array2(TYPE,TYPE)
 
 NcBool NcVar::put( const ncbyte* vals, const long* count )
 {
@@ -1114,8 +1162,10 @@ NcVar_put_nd_array(int)
 NcVar_put_nd_array(long)
 NcVar_put_nd_array(float)
 NcVar_put_nd_array(double)
+NcVar_put_nd_array2(ncint64, longlong)
+NcVar_put_nd_array2(ncuint64, ulonglong)
 
-#define NcVar_get_array(TYPE)						      \
+#define NcVar_get_array2(TYPE,NCTYPE)						      \
 NcBool NcVar::get( TYPE* vals,						      \
 		     long edge0,					      \
 		     long edge1,					      \
@@ -1143,9 +1193,11 @@ NcBool NcVar::get( TYPE* vals,						      \
      start[j] = the_cur[j];						      \
     }									      \
     return NcError::set_err(                                                  \
-			    makename2(nc_get_vara_,TYPE) (the_file->id(), the_id, start, count, vals) \
+			    makename2(nc_get_vara_,NCTYPE) (the_file->id(), the_id, start, count, vals) \
 			    ) == NC_NOERR;                                    \
 }
+
+#define NcVar_get_array(TYPE) NcVar_get_array2(TYPE,TYPE)
 
 NcBool NcVar::get( ncbyte* vals,
 		     long edge0,
@@ -1214,8 +1266,10 @@ NcVar_get_array(int)
 NcVar_get_array(long)
 NcVar_get_array(float)
 NcVar_get_array(double)
+NcVar_get_array2(ncint64, longlong)
+NcVar_get_array2(ncuint64, ulonglong)
 
-#define NcVar_get_nd_array(TYPE)					      \
+#define NcVar_get_nd_array2(TYPE,NCTYPE)					      \
 NcBool NcVar::get( TYPE* vals, const long* count ) const		      \
 {									      \
     if (! the_file->data_mode())					      \
@@ -1224,9 +1278,11 @@ NcBool NcVar::get( TYPE* vals, const long* count ) const		      \
     for (int i = 0; i < num_dims(); i++)				      \
 	start[i] = the_cur[i];						      \
     return NcError::set_err(                                                  \
-			    makename2(nc_get_vara_,TYPE) (the_file->id(), the_id, start,  (const size_t *) count, vals) \
+			    makename2(nc_get_vara_,NCTYPE) (the_file->id(), the_id, start,  (const size_t *) count, vals) \
 			    ) == NC_NOERR;     \
 }
+
+#define NcVar_get_nd_array(TYPE) NcVar_get_nd_array2(TYPE,TYPE)
 
 NcBool NcVar::get( ncbyte* vals, const long* count ) const
 {
@@ -1253,6 +1309,8 @@ NcVar_get_nd_array(int)
 NcVar_get_nd_array(long)
 NcVar_get_nd_array(float)
 NcVar_get_nd_array(double)
+NcVar_get_nd_array2(ncint64, longlong)
+NcVar_get_nd_array2(ncuint64, ulonglong)
 
 // If no args, set cursor to all zeros.	 Else set initial elements of cursor
 // to args provided, rest to zeros.
@@ -1293,18 +1351,20 @@ NcBool NcVar::set_cur(long* cur)
     return TRUE;
 }
 
-#define NcVar_add_scalar_att(TYPE)					      \
+#define NcVar_add_scalar_att2(TYPE,NCTYPE)					      \
 NcBool NcVar::add_att(NcToken aname, TYPE val)				      \
 {									      \
     if (! the_file->define_mode())					      \
       return FALSE;							      \
     if (NcError::set_err(                                                     \
-			    makename2(nc_put_att_,TYPE) (the_file->id(), the_id, aname, (nc_type) NcTypeEnum(TYPE), \
+			    makename2(nc_put_att_,NCTYPE) (the_file->id(), the_id, aname, (nc_type) NcTypeEnum(TYPE), \
 		 1, &val)                                                     \
 			    ) != NC_NOERR)				      \
       return FALSE;							      \
     return TRUE;							      \
 }
+
+#define NcVar_add_scalar_att(TYPE) NcVar_add_scalar_att2(TYPE,TYPE)
 
 NcBool NcVar::add_att(NcToken aname, ncbyte val)
 {
@@ -1330,6 +1390,8 @@ NcVar_add_scalar_att(short)
 NcVar_add_scalar_att(int)
 NcVar_add_scalar_att(long)
 NcVar_add_scalar_att(double)
+NcVar_add_scalar_att2(ncint64, longlong)
+NcVar_add_scalar_att2(ncuint64, ulonglong)
 
 NcBool NcVar::add_att(NcToken aname, float val)
 {
@@ -1352,18 +1414,20 @@ NcBool NcVar::add_att(NcToken aname, const char* val)
     return TRUE;
 }
 
-#define NcVar_add_vector_att(TYPE)					      \
+#define NcVar_add_vector_att2(TYPE,NCTYPE)					      \
 NcBool NcVar::add_att(NcToken aname, int len, const TYPE* vals)		      \
 {									      \
     if (! the_file->define_mode())					      \
       return FALSE;							      \
     if (NcError::set_err(                                                     \
-			    makename2(nc_put_att_,TYPE) (the_file->id(), the_id, aname, (nc_type) NcTypeEnum(TYPE),   \
+			    makename2(nc_put_att_,NCTYPE) (the_file->id(), the_id, aname, (nc_type) NcTypeEnum(TYPE),   \
 		 len, vals)                                                   \
 			    ) != NC_NOERR)				      \
       return FALSE;							      \
     return TRUE;							      \
 }
+
+#define NcVar_add_vector_att(TYPE) NcVar_add_vector_att2(TYPE,TYPE)
 
 NcBool NcVar::add_att(NcToken aname, int len, const ncbyte* vals)
 {
@@ -1394,6 +1458,8 @@ NcVar_add_vector_att(int)
 NcVar_add_vector_att(long)
 NcVar_add_vector_att(float)
 NcVar_add_vector_att(double)
+NcVar_add_vector_att2(ncint64, longlong)
+NcVar_add_vector_att2(ncuint64, ulonglong)
 
 NcBool NcVar::rename(NcToken newname)
 {
@@ -1563,6 +1629,18 @@ NcValues* NcAtt::values( void ) const
 	status = NcError::set_err(
 				  nc_get_att_double(the_file->id(), the_variable->id(), the_name,
 				   (double *)valp->base())
+				  );
+	break;
+    case ncInt64:
+	status = NcError::set_err(
+				  nc_get_att_longlong(the_file->id(), the_variable->id(), the_name,
+				(long long *)valp->base())
+				  );
+	break;
+    case ncUInt64:
+	status = NcError::set_err(
+				  nc_get_att_ulonglong(the_file->id(), the_variable->id(), the_name,
+				(unsigned long long *)valp->base())
 				  );
 	break;
     case ncInt:
