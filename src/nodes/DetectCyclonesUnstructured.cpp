@@ -801,9 +801,18 @@ void DetectCyclonesUnstructured(
 			dTime[t] = static_cast<double>(dTimeInt[t]);
 		}
 
+	} else if (varTime->type() == ncInt64) {
+		DataVector<ncint64> dTimeInt;
+		dTimeInt.Initialize(nTime);
+
+		varTime->get(dTimeInt, nTime);
+		for (int t = 0; t < nTime; t++) {
+			dTime[t] = static_cast<double>(dTimeInt[t]);
+		}
+
 	} else {
 		_EXCEPTIONT("Variable \"time\" has an invalid type:\n"
-			"Expected \"float\", \"double\" or \"int\"");
+			"Expected \"float\", \"double\", \"int\", or \"int64\"");
 	}
 
 	// Open output file
@@ -1562,6 +1571,7 @@ try {
 
 	dcuparam.dMaxLatitude *= M_PI / 180.0;
 	dcuparam.dMinLatitude *= M_PI / 180.0;
+	dcuparam.dMinAbsLatitude *= M_PI / 180.0;
 
 	if (dcuparam.dMinLongitude < 0.0) {
 		int iMinLongitude =
