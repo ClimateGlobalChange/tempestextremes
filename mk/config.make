@@ -8,7 +8,7 @@
 
 # DEBUG:    If TRUE, compile with debugging information
 # OPT:      If TRUE, compile with optimizations enabled
-# PARALLEL: Parallel programming framework (options: MPIOMP, HPX)
+# PARALLEL: Parallel programming framework (options: MPIOMP, NONE)
 # NETCDF:   If TRUE, use NETCDF
 
 DEBUG=    FALSE
