@@ -652,6 +652,116 @@ protected:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class RestrictRegion {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	RestrictRegion() :
+		m_fActive(false),
+		m_dBox(),
+		m_nCount(0)
+	{ }
+
+	///	<summary>
+	///		Check if this RestrictRegion is active.
+	///	</summary>
+	bool IsActive() {
+		return m_fActive;
+	}
+
+	///	<summary>
+	///		Get the minimum count associated with this threshold.
+	///	</summary>
+	int GetMinimumCount() const {
+		return m_nCount;
+	}
+
+	///	<summary>
+	///		Parse a restrict region argument string, consisting of a list of
+	///		5 elements.
+	///	</summary>
+	void Parse(
+		const std::string & strArg
+	) {
+		int iMode = 0;
+
+		int iLast = 0;
+		for (int i = 0; i <= strArg.length(); i++) {
+
+			if ((i == strArg.length()) || (strArg[i] == ',')) {
+
+				std::string strSubStr =
+					strArg.substr(iLast, i - iLast);
+
+				if (iMode == 0) {
+					m_dBox.lat[0] = atof(strSubStr.c_str());
+
+				} else if (iMode == 1) {
+					m_dBox.lat[1] = atof(strSubStr.c_str());
+
+				} else if (iMode == 2) {
+					m_dBox.lon[0] = atof(strSubStr.c_str());
+
+				} else if (iMode == 3) {
+					m_dBox.lon[1] = atof(strSubStr.c_str());
+
+				} else if (iMode == 4) {
+					m_nCount = atoi(strSubStr.c_str());
+				}
+
+				iMode++;
+				iLast = i + 1;
+			}
+		}
+
+		if (iMode != 5) {
+			_EXCEPTION1("Incorrect number of arguments in --restrict_region: "
+				"5 arguments expected, %i found", iMode);
+		}
+
+		if (m_nCount < 1) {
+			_EXCEPTION1("Invalid value of count in --restrict_region (%i)", m_nCount);
+		}
+
+		m_fActive = true;
+		m_dBox.is_null = false;
+
+		Announce("Blob must enter region [%1.5f %1.5f] x [%1.5f %1.5f] for at least %i times",
+			m_dBox.lat[0], m_dBox.lat[1], m_dBox.lon[0], m_dBox.lon[1], m_nCount);
+	}
+
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	bool ContainsPoint(
+		double dLat,
+		double dLon
+	) {
+		return m_dBox.ContainsPoint(dLat, dLon);
+	}
+
+protected:
+	///	<summary>
+	///		A flag indicating this operator is active
+	///	</summary>
+	bool m_fActive;
+
+	///	<summary>
+	///		A latitude-longitude box indicating the region of interest.
+	///	</summary>
+	LatLonRegion m_dBox;
+
+	///	<summary>
+	///		The count of the number of time points the blob must be in
+	///		this region.
+	///	</summary>
+	int m_nCount;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 	NcError error(NcError::silent_nonfatal);
@@ -682,6 +792,9 @@ try {
 	// Minimum percentage overlap between blobs
 	double dPercentOverlap;
 
+	// Restrict ARs to those passing through a given region
+	std::string strRestrictRegion;
+
 	// Minimum latitude for detections
 	double dMinLat;
 
@@ -700,11 +813,11 @@ try {
 	// Threshold commands
 	std::string strThresholdCmd;
 
-	//Name of dimension variables
-	std::string latname;
-	std::string lonname;
-	std::string timename;
-	std::string OutTimeUnits;
+	// Name of dimension variables
+	std::string strLatName;
+	std::string strLonName;
+	std::string strTimeName;
+	std::string strOutTimeUnits;
 
 	// Parse the command line
 	BeginCommandLine()
@@ -716,15 +829,16 @@ try {
 		CommandLineInt(nMinBlobSize, "minsize", 1);
 		CommandLineInt(nMinTime, "mintime", 1);
 		CommandLineDouble(dPercentOverlap, "pct_overlap", 0.0)
+		CommandLineStringD(strRestrictRegion, "restrict_region", "", "(lat0,lat1,lon0,lon1,count)");
 		CommandLineBool(fRegional, "regional");
 		CommandLineDouble(dMinLat, "minlat", -90.0);
 		CommandLineDouble(dMaxLat, "maxlat", 90.0);
 		CommandLineDouble(dMinLon, "minlon", 0.0);
 		CommandLineDouble(dMaxLon, "maxlon", 360.0);
-		CommandLineString(latname, "latname","lat");
-		CommandLineString(lonname, "lonname","lon");
-		CommandLineString(timename, "timename", "time");
-		CommandLineString(OutTimeUnits,"outtimeunits","hours since 1800-01-01 00:00");
+		CommandLineString(strLatName, "latname","lat");
+		CommandLineString(strLonName, "lonname","lon");
+		CommandLineString(strTimeName, "timename", "time");
+		CommandLineString(strOutTimeUnits,"outtimeunits","hours since 1800-01-01 00:00");
 		CommandLineString(strThresholdCmd, "thresholdcmd", "");
 
 		ParseCommandLine(argc, argv);
@@ -772,6 +886,12 @@ try {
 		_EXCEPTIONT("--pct_overlap must take on values between 0 and 100");
 	}
 	dPercentOverlap /= 100.0;
+
+	// Parse the restrict region string
+	RestrictRegion opRestrictRegion;
+	if (strRestrictRegion != "") {
+		opRestrictRegion.Parse(strRestrictRegion);
+	}
 
 	// Parse the threshold string
 	std::vector<BlobThresholdOp> vecThresholdOp;
@@ -822,22 +942,22 @@ try {
 		}
 
 		// Get latitude/longitude dimensions
-		NcDim * dimLat = ncInput.get_dim(latname.c_str());
+		NcDim * dimLat = ncInput.get_dim(strLatName.c_str());
 		if (dimLat == NULL) {
 			_EXCEPTIONT("No latitude dimension found in input file");
 		}
 
-		NcDim * dimLon = ncInput.get_dim(lonname.c_str());
+		NcDim * dimLon = ncInput.get_dim(strLonName.c_str());
 		if (dimLon == NULL) {
 			_EXCEPTIONT("No longitude dimension found in input file");
 		}
 
-		NcVar * varLat = ncInput.get_var(latname.c_str());
+		NcVar * varLat = ncInput.get_var(strLatName.c_str());
 		if (varLat == NULL) {
 			_EXCEPTIONT("No variable found in input file");
 		}
 
-		NcVar * varLon = ncInput.get_var(lonname.c_str());
+		NcVar * varLon = ncInput.get_var(strLonName.c_str());
 		if (varLon == NULL) {
 			_EXCEPTIONT("No longitude variable found in input file");
 		}
@@ -880,7 +1000,7 @@ try {
 	}
 
 	// Get time dimension over all files
-	// OutTimeUnits is either predetermined or set at the command line
+	// strOutTimeUnits is either predetermined or set at the command line
 	std::vector<double> dTimeDim;
 	std::vector<Time> timeTemp;
 	double newTimeDouble;
@@ -899,16 +1019,11 @@ try {
 
 		// Convert the Time objects to doubles
 		for (int t = 0; t < timeTemp.size(); t++){
-			newTimeDouble = timeTemp[t].GetCFCompliantUnitsOffsetDouble(OutTimeUnits);
+			newTimeDouble = timeTemp[t].GetCFCompliantUnitsOffsetDouble(strOutTimeUnits);
 			dTimeDim.push_back(newTimeDouble);
 		}
 	}
 	int nTime = dTimeDim.size();
-
-//	DataVector<double> dTime;
-
-//	GetAllTimes(vecInputFiles, dTime,timename);
-//	int nTime = dTime.GetRows();
 
 	// Allocate indicator data
 	DataMatrix<int> dataIndicator(nLat, nLon);
@@ -946,7 +1061,7 @@ try {
 		}
 
 		// Get current time dimension
-		NcDim * dimTime = ncInput.get_dim(timename.c_str());
+		NcDim * dimTime = ncInput.get_dim(strTimeName.c_str());
 
 		int nLocalTimes = dimTime->size();
 
@@ -1256,6 +1371,9 @@ try {
 
 	MapGraph multimapTagGraph;
 
+	// Set of Tags that are within the restrict region
+	std::set<Tag> setRestrictRegion;
+
 	// Loop through all remaining time steps
 	for (int t = 1; t < nTime; t++) {
 
@@ -1289,25 +1407,29 @@ try {
 				}
 
 				// Verify that at least one node overlaps between blobs
-				bool fHasOverlapNode = false;
-				IndicatorSetConstIterator iter = vecBlobs[p].begin();
-				for (; iter != vecBlobs[p].end(); iter++) {
-					if (vecPrevBlobs[q].find(*iter) !=
-						vecPrevBlobs[q].end()
-					) {
-						fHasOverlapNode = true;
-						break;
+				{
+					bool fHasOverlapNode = false;
+					IndicatorSetConstIterator iter = vecBlobs[p].begin();
+					for (; iter != vecBlobs[p].end(); iter++) {
+						if (vecPrevBlobs[q].find(*iter) !=
+							vecPrevBlobs[q].end()
+						) {
+							fHasOverlapNode = true;
+							break;
+						}
 					}
-				}
 
-				if (!fHasOverlapNode) {
-					continue;
+					if (!fHasOverlapNode) {
+						continue;
+					}
 				}
 
 				// Verify that blobs meet percentage overlap criteria
 				if (dPercentOverlap != 0.0) {
 					double dCurrentArea = 0.0;
 					double dOverlapArea = 0.0;
+
+					IndicatorSetConstIterator iter = vecBlobs[p].begin();
 					for (; iter != vecBlobs[p].end(); iter++) {
 						dCurrentArea += dCellArea[iter->lat];
 						if (vecPrevBlobs[q].find(*iter) !=
@@ -1321,6 +1443,22 @@ try {
 					}
 					if (dOverlapArea < dCurrentArea * dPercentOverlap) {
 						continue;
+					}
+				}
+
+				// Check restrict_region criteria
+				if (opRestrictRegion.IsActive()) {
+					IndicatorSetConstIterator iter = vecBlobs[p].begin();
+					for (; iter != vecBlobs[p].end(); iter++) {
+						bool fInRestrictRegion =
+							opRestrictRegion.ContainsPoint(
+								dataLatDeg[iter->lat],
+								dataLonDeg[iter->lon]);
+
+						if (fInRestrictRegion) {
+							setRestrictRegion.insert(vecBlobTags[p]);
+							break;
+						}
 					}
 				}
 
@@ -1339,7 +1477,7 @@ try {
 	// Total number of blobs
 	int nTotalBlobCount = 0;
 
-	// Find all cliques
+	// Find all cliques using a bidirectional graph search
 	std::map<Tag, Tag> mapEquivalentTags;
 
 	std::set<Tag>::const_iterator iterTag = setAllTags.begin();
@@ -1364,6 +1502,9 @@ try {
 		// All time values associated with this blob
 		std::set<int> setBlobTimes;
 
+		// All time values where this blob is in the restrict region
+		std::set<int> setBlobTimesInRestrictRegion;
+
 		// Find clique containing this node
 		for (;;) {
 
@@ -1387,8 +1528,11 @@ try {
 				tagMinimum = tagNext;
 			}
 
-			// Times
 			setBlobTimes.insert(tagNext.time);
+
+			if (setRestrictRegion.find(tagNext) != setRestrictRegion.end()) {
+				setBlobTimesInRestrictRegion.insert(tagNext.time);
+			}
 
 			// Get edges from this node
 			std::pair<MapGraphIterator, MapGraphIterator> iterGraphEdges
@@ -1400,8 +1544,23 @@ try {
 			}
 		}
 
+		// Apply filters to the blob
+		bool fAcceptBlob = true;
+
+		// Filter on RestrictRegion count for this global_id
+		if (opRestrictRegion.IsActive()) {
+			if (setBlobTimesInRestrictRegion.size() < opRestrictRegion.GetMinimumCount()) {
+				fAcceptBlob = false;
+			}
+		}
+
+		// Filter on min_time
+		if (setBlobTimes.size() < nMinTime) {
+			fAcceptBlob = false;
+		}
+
 		// Set global id
-		if (setBlobTimes.size() >= nMinTime) {
+		if (fAcceptBlob) {
 			tagMinimum.global_id = nTotalBlobCount;
 		} else {
 			tagMinimum.global_id = 0;
@@ -1583,13 +1742,13 @@ try {
 	{
 		NcFile ncInput(vecInputFiles[0].c_str());
 
-		NcVar * varLat = ncInput.get_var(latname.c_str());
-		NcVar * varLon = ncInput.get_var(lonname.c_str());
+		NcVar * varLat = ncInput.get_var(strLatName.c_str());
+		NcVar * varLon = ncInput.get_var(strLonName.c_str());
 
 		CopyNcVarAttributes(varLat, varOutputLat);
 		CopyNcVarAttributes(varLon, varOutputLon);
 
-		NcVar * varTime = ncInput.get_var(timename.c_str());
+		NcVar * varTime = ncInput.get_var(strTimeName.c_str());
 		if (varTime != NULL) {
 			CopyNcVarAttributes(varTime, varOutputTime);
 		}
@@ -1597,7 +1756,7 @@ try {
 	//Change the time units to the preset
 	NcAtt * oldUnits = varOutputTime->get_att("units");
 	oldUnits->remove();
-	varOutputTime->add_att("units",OutTimeUnits.c_str());
+	varOutputTime->add_att("units",strOutTimeUnits.c_str());
 	NcVar * varData =
 		ncOutput.add_var(
 			strOutputVariable.c_str(),
