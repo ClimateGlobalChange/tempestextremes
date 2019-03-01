@@ -182,54 +182,127 @@ public:
 		} else {
 			(*this) = boxB;
 		}
-/*
-		if (iLon == nLonCount-1) {
-			if (lon[0] <= lon[1]) {
-				if (nLonCount - 1 - lon[1] < lon[0] + 1) {
-					lon[1] = nLonCount - 1;
-				} else {
-					lon[0] = nLonCount - 1;
-				}
-			}
-
-		} else if (iLon == 0) {
-			if (lon[0] <= lon[1]) {
-				if (nLonCount - lon[1] < lon[0]) {
-					lon[1] = 0;
-				} else {
-					lon[0] = 0;
-				}
-			}
-
-		} else {
-			if (lon[0] <= lon[1]) {
-				if (iLon < lon[0]) {
-					lon[0] = iLon;
-				}
-				if (iLon > lon[1]) {
-					lon[1] = iLon;
-				}
-
-			} else {
-				if ((iLon >= lon[0]) ||
-					(iLon <= lon[1])
-				) {
-				} else if (
-					iLon - lon[1] < lon[0] - iLon
-				) {
-					lon[1] = iLon;
-				} else {
-					lon[0] = iLon;
-				}
-			}
-		}
-*/
 	}
 
 	///	<summary>
 	///		Determine this LatLonBox overlaps with box.
 	///	</summary>
 	bool Overlaps(const LatLonBox & box) const {
+
+		// Check latitudes
+		if (lat[0] > box.lat[1]) {
+			return false;
+		}
+		if (lat[1] < box.lat[0]) {
+			return false;
+		}
+
+		// Both boxes cross lon 360
+		if ((lon[0] > lon[1]) && (box.lon[0] > box.lon[1])) {
+			return true;
+		}
+
+		// This box crosses lon 360
+		if (lon[0] > lon[1]) {
+			if (box.lon[1] >= lon[0]) {
+				return true;
+			}
+			if (box.lon[0] <= lon[1]) {
+				return true;
+			}
+			return false;
+		}
+
+		// That box crosses lon 360
+		if (box.lon[0] > box.lon[1]) {
+			if (lon[1] >= box.lon[0]) {
+				return true;
+			}
+			if (lon[0] <= box.lon[1]) {
+				return true;
+			}
+			return false;
+		}
+
+		// No boxes cross lon 360
+		if (box.lon[1] < lon[0]) {
+			return false;
+		}
+		if (box.lon[0] > lon[1]) {
+			return false;
+		}
+		return true;
+	}
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A structure for storing a bounding box in latitude / longitude space.
+///	</summary>
+class LatLonRegion {
+
+public:
+	///	<summary>
+	///		Flag indicating this is a null box.
+	///	</summary>
+	bool is_null;
+
+	///	<summary>
+	///		Bounding latitudes (endpoints are included).
+	///	</summar>
+	double lat[2];
+
+	///	<summary>
+	///		Bounding longitudes (endpoints are included).
+	///	</summary>
+	double lon[2];
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	LatLonRegion() :
+		is_null(true)
+	{ }
+
+	///	<summary>
+	///		Determine if this point is within the box.
+	///	</summary>
+	bool ContainsPoint(
+		double dLat,
+		double dLon
+	) {
+		if (lat[0] > lat[1]) {
+			_EXCEPTIONT("lat[0] > lat[1] not allowed");
+		}
+
+		if (dLat < lat[0]) {
+			return false;
+		}
+		if (dLat > lat[1]) {
+			return false;
+		}
+		if (lon[1] >= lon[0]) {
+			if (dLon < lon[0]) {
+				return false;
+			}
+			if (dLon > lon[1]) {
+				return false;
+			}
+
+		} else {
+			if ((dLon > lon[1]) && (dLon < lon[0])) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	///	<summary>
+	///		Determine this LatLonBox overlaps with box.
+	///	</summary>
+	bool Overlaps(const LatLonRegion & box) const {
 
 		// Check latitudes
 		if (lat[0] > box.lat[1]) {
