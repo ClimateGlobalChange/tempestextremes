@@ -240,8 +240,8 @@ int main(int argc, char ** argv ){
     _EXCEPTIONT("Check file-- no beginning month date found.");
   }  
   //use ncks to split the files
-  std::string cmd1 = "ncks -d " + timename + ",0," + std::to_string(cutIndex-1) + " " + fName + " " + fOut1;
-  std::string cmd2 = "ncks -d " + timename + ","+ std::to_string(cutIndex) + ", " + fName + " " + fOut2;
+  std::string cmd1 = "ncks -d " + timename + ",0," + std::to_string((long long)(cutIndex-1)) + " " + fName + " " + fOut1;
+  std::string cmd2 = "ncks -d " + timename + ","+ std::to_string((long long)(cutIndex)) + ", " + fName + " " + fOut2;
   system(cmd1.c_str());
   system(cmd2.c_str());
 
