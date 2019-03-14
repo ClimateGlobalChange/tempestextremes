@@ -26,6 +26,7 @@ VariableRegistry::VariableRegistry() {
 	m_domDataOp.Add("_VECMAG");
 	m_domDataOp.Add("_ABS");
 	m_domDataOp.Add("_SIGN");
+	m_domDataOp.Add("_ALLPOS");
 	m_domDataOp.Add("_AVG");
 	m_domDataOp.Add("_DIFF");
 	m_domDataOp.Add("_MULT");

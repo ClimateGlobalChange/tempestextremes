@@ -204,6 +204,36 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class DataOp_ALLPOS : public DataOp {
+
+public:
+	///	<summary>
+	///		Operartor name.
+	///	</summary>
+	static const char * name;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_ALLPOS() :
+		DataOp(name)
+	{ }
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataVector<float> const *> & vecArgData,
+		DataVector<float> & dataout
+	);
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 class DataOp_AVG : public DataOp {
 
 public:

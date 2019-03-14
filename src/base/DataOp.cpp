@@ -264,6 +264,48 @@ bool DataOp_SIGN::Apply(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// DataOp_ALLPOS
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_ALLPOS::name = "_ALLPOS";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_ALLPOS::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataVector<float> const *> & vecArgData,
+	DataVector<float> & dataout
+) {
+	if (strArg.size() <= 1) {
+		_EXCEPTION2("%s expects at least two arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	for (int v = 0; v < vecArgData.size(); v++) {
+		if (vecArgData[v] == NULL) {
+			_EXCEPTION1("Arguments to %s must be data variables",
+				m_strName.c_str());
+		}
+	}
+
+	for (int i = 0; i < dataout.GetRows(); i++) {
+		dataout[i] = 1.0;
+	}
+
+	for (int v = 0; v < vecArgData.size(); v++) {
+		const DataVector<float> & data  = *(vecArgData[v]);
+
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			if (data[i] <= 0.0) {
+				dataout[i] = 0.0;
+			}
+		}
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // DataOp_AVG
 ///////////////////////////////////////////////////////////////////////////////
 
