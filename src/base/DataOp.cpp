@@ -64,18 +64,24 @@ DataOp * DataOpManager::Add(
 	} else if (strName == "_ABS") {
 		return Add(new DataOp_ABS);
 
+	} else if (strName == "_SIGN") {
+		return Add(new DataOp_SIGN);
+
 	} else if (strName == "_AVG") {
 		return Add(new DataOp_AVG);
 
 	} else if (strName == "_DIFF") {
 		return Add(new DataOp_DIFF);
-	
+		
+	} else if (strName == "_MULT") {
+		return Add(new DataOp_MULT);
+
 	} else if (strName == "_DIV") {
 		return Add(new DataOp_DIV);
 	
 	} else if (strName == "_LAT") {
 		return Add(new DataOp_LAT);
-	
+
 	} else if (strName == "_F") {
 		return Add(new DataOp_F);
 
@@ -202,7 +208,7 @@ bool DataOp_ABS::Apply(
 	DataVector<float> & dataout
 ) {
 	if (strArg.size() != 1) {
-		_EXCEPTION2("%s expects two arguments: %i given",
+		_EXCEPTION2("%s expects one argument: %i given",
 			m_strName.c_str(), strArg.size());
 	}
 	if (vecArgData[0] == NULL) {
@@ -214,6 +220,44 @@ bool DataOp_ABS::Apply(
 
 	for (int i = 0; i < dataout.GetRows(); i++) {
 		dataout[i] = fabs(data[i]);
+	}
+	
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_SIGN
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_SIGN::name = "_SIGN";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_SIGN::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataVector<float> const *> & vecArgData,
+	DataVector<float> & dataout
+) {
+	if (strArg.size() != 1) {
+		_EXCEPTION2("%s expects one argument: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	if (vecArgData[0] == NULL) {
+		_EXCEPTION1("Arguments to %s must be data variables",
+			m_strName.c_str());
+	}
+
+	const DataVector<float> & data = *(vecArgData[0]);
+
+	for (int i = 0; i < dataout.GetRows(); i++) {
+		if (data[i] > 0.0) {
+			dataout[i] = 1.0;
+		} else if (data[i] < 0.0) {
+			dataout[i] = -1.0;
+		} else {
+			dataout[i] = 0.0;
+		}
 	}
 	
 	return true;
@@ -289,6 +333,39 @@ bool DataOp_DIFF::Apply(
 
 	for (int i = 0; i < dataout.GetRows(); i++) {
 		dataout[i] = dataLeft[i] - dataRight[i];
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_MULT
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_MULT::name = "_MULT";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_MULT::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataVector<float> const *> & vecArgData,
+	DataVector<float> & dataout
+) {
+	if (strArg.size() != 2) {
+		_EXCEPTION2("%s expects two arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
+		_EXCEPTION1("Arguments to %s must be data variables",
+			m_strName.c_str());
+	}
+
+	const DataVector<float> & dataLeft  = *(vecArgData[0]);
+	const DataVector<float> & dataRight = *(vecArgData[1]);
+
+	for (int i = 0; i < dataout.GetRows(); i++) {
+		dataout[i] = dataLeft[i] * dataRight[i];
 	}
 
 	return true;

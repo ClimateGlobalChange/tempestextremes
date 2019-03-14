@@ -174,6 +174,36 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class DataOp_SIGN : public DataOp {
+
+public:
+	///	<summary>
+	///		Operartor name.
+	///	</summary>
+	static const char * name;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_SIGN() :
+		DataOp(name)
+	{ }
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataVector<float> const *> & vecArgData,
+		DataVector<float> & dataout
+	);
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 class DataOp_AVG : public DataOp {
 
 public:
@@ -217,6 +247,36 @@ public:
 	///		Constructor.
 	///	</summary>
 	DataOp_DIFF() :
+		DataOp(name)
+	{ }
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataVector<float> const *> & vecArgData,
+		DataVector<float> & dataout
+	);
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class DataOp_MULT : public DataOp {
+
+public:
+	///	<summary>
+	///		Operartor name.
+	///	</summary>
+	static const char * name;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_MULT() :
 		DataOp(name)
 	{ }
 
