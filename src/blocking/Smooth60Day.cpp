@@ -35,7 +35,6 @@ int main(int argc, char **argv){
 
   try{
     std::string fileList;
-    std::string strfile_out;
     std::string varName;
     std::string avgName;
     std::string tname,latname,lonname,levname;
@@ -46,9 +45,7 @@ int main(int argc, char **argv){
     bool GHtoZ;
     BeginCommandLine()
       CommandLineString(fileList, "inlist", "");
-      CommandLineString(strfile_out, "out", "");
       CommandLineString(varName, "varname","");
-      CommandLineString(avgName, "avgname","");
       CommandLineBool(missingFiles, "missing");
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
@@ -66,17 +63,8 @@ int main(int argc, char **argv){
     if (fileList == ""){
       _EXCEPTIONT("No file list (--inlist) provided");
     }
-    if (strfile_out == ""){
-      _EXCEPTIONT("No output file name (--out) provided");
-    }
     if (varName == ""){
       _EXCEPTIONT("No variable name (--varname) specified");
-    }
-    if (avgName == ""){
-      _EXCEPTIONT("No average name (--avgname) specified");
-    }
-    if (fileList == ""){
-      _EXCEPTIONT("No file list (--inlist) specified");
     }
 
     //Multiplier for GH info
