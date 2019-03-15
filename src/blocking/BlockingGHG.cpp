@@ -11,8 +11,6 @@ instantaneously blocked.
 Spatial criterion for block: 12 degrees contiguous latitude blocked 
 Temporal criterion for block: 5 days persistent blocking for single latitude
 
-If data is not in the correct file format, first run Var4Dto3D to generate 
-the appropriate geopotential height file
 */
 
 #include "CommandLine.h"
@@ -219,10 +217,10 @@ int main(int argc, char** argv){
         if (std::fabs(75.-latVec[x])<0.0001){
           NHLatStart = x;
         }
-        if (std::fabs(35.-latVec[x])<0.0001){
+        if (std::fabs(25.-latVec[x])<0.0001){
           NHLatEnd = x;
         }
-        if (std::fabs(-35-latVec[x])<0.0001){
+        if (std::fabs(-25-latVec[x])<0.0001){
           SHLatStart = x;
         }
         if (std::fabs(-75.-latVec[x])<0.0001){
