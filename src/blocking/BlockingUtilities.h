@@ -82,7 +82,8 @@ bool sequentialFiles(
   int nextYear,
   int nextMonth,
   int nextDay,
-  int nextHour
+  int nextHour,
+  std::string strCalendar
 );
 
 //Takes the last time value of the previous file

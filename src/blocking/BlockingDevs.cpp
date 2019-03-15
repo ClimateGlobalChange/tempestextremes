@@ -441,7 +441,7 @@ int main(int argc, char **argv){
                                 ParseTimeDouble(strTimeUnits,strCalendar,nextVarVals[0],nextYear,nextMonth,nextDay,nextHour);
                                 
 				isSequential = sequentialFiles(prevYear,prevMonth,prevDay,prevHour,\
-                                  nextYear,nextMonth,nextDay,nextHour);
+                                  nextYear,nextMonth,nextDay,nextHour,strCalendar);
                                 if (isSequential == true){
 					NcVar *fillData = nextFile.get_var(devName.c_str());
 					fillData->get(&(nextFileBuffer[0][0][0]),tSteps,nLat,nLon);
