@@ -57,7 +57,8 @@ bool checkFileLeap(
 //Function to get number of day in year
 //Returns an integer value in the range 1-365
 int DayInYear(int nMonth,
-              int nDay);
+              int nDay,
+              std::string strCalendar);
 
 //Copied from DetectCyclones: This function
 //takes a time value (in units of hours or 
