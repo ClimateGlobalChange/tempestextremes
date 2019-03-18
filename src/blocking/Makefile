@@ -30,7 +30,8 @@ EXEC_FILES= BlockingDevs.cpp \
             AvgVar.cpp\
             BlockingDFT.cpp\
             BlockingThresh.cpp\
-	    Smooth60Day.cpp 
+	    Smooth61Day.cpp\
+            BlockingAvg.cpp 
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 
