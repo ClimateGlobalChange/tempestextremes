@@ -192,6 +192,8 @@ int main(int argc, char **argv){
     double midValue;
     //Keep track of how many days have passed so far
     int ntcount = 0;
+    //Is this year a leap year?
+    //bool isLeapYear = false;
     for (int x=0; x<nFiles; x++){
         NcFile infile(InputFiles[x].c_str());
         if (!infile.is_valid()){
@@ -224,26 +226,41 @@ int main(int argc, char **argv){
             //Read in the time info
             ParseTimeDouble(strTimeUnits,strCalendar,timeVec[t],\
             currYear,currMonth,currDay,currHour);
+            //The day that is being added to the averaging window
             fillDay = DayInYear(currMonth,currDay,strCalendar);
+            //The day that is the center of the averaging window
             yearDay = fillDay - 31;
+            //After first 30 days, dealing with periodic boundary
             if (ntcount>30*nt){
                 if (yearDay<0){
                     yearDay+=365;
                 }
             }
-            midValue = timeVec[t]-(tStep*30*nt);
+            //Fill the time axis with the number of days since the beginning of the year
             if (fileTimeAxis[yearDay]< -999999. && yearDay>=0){
+                /*if (isLeapYear==true){
+                  //From March 1st to 30th, need to subtract an extra day
+                  if (currMonth==3 && currDay<31){
+                    midValue-=tStep*nt;
+                  }
+                }*/
                 //Fill with the time double minus 30 days
-                fileTimeAxis[yearDay] = timeVec[t]-(tStep*30*nt);
+                //fileTimeAxis[yearDay] = midValue;
+                fileTimeAxis[yearDay] = double(yearDay);
                 std::cout<<"value "<<fileTimeAxis[yearDay]<<" added to "<<yearDay<<std::endl;
             }
+            //The time double 
+            midValue = timeVec[t]-(tStep*30*nt);
+            //Special case when still filling in the first 30 days worth of data
             if (yearDay<0){
                 midValue = -999999.9;
             }
             //std::cout<<"Adding fill for day "<<fillDay<<", which will go into day "<<yearDay<<std::endl;
             if (currMonth==2 && currMonth==29){
                 //skip
+                //isLeapYear = true;
             }else{
+                //Get the data from the current time step in the netCDF
                 if (is4d){
                     inData->set_cur(t,pIndex,0,0);
                     inData->get(&(currFillData[currArrIndex][0][0]),1,1,nLat,nLon);
@@ -259,32 +276,34 @@ int main(int argc, char **argv){
                 if (currArrIndex>=arrLen){
                     currArrIndex-=arrLen;
                 }
-            }
-            //Does the array time axis contain missing values?
-            for (int z=0; z<arrLen; z++){
-                if (arrTimeAxis[z]< -999999.){
-                    hasMissing=true;
-                    break;
+                //Does the array time axis contain missing values?
+                for (int z=0; z<arrLen; z++){
+                    if (arrTimeAxis[z]< -999999.){
+                        hasMissing=true;
+                        break;
+                    }
                 }
-            }
-            //If there are no missing values, sum up the data (makes a mean)
-            sumValues.Initialize(nLat,nLon);
-            if (hasMissing==false){
-                for (int z=0;z<arrLen;z++){
-                    for (int a=0; a<nLat; a++){
-                        for (int b=0; b<nLon; b++){
-                            sumValues[a][b]+=currFillData[z][a][b]*arrfrac*ghMult;
+                //If there are no missing values, sum up the data (makes a mean)
+                sumValues.Initialize(nLat,nLon);
+                if (hasMissing==false){
+                    for (int z=0;z<arrLen;z++){
+                        for (int a=0; a<nLat; a++){
+                            for (int b=0; b<nLon; b++){
+                                sumValues[a][b]+=currFillData[z][a][b]*arrfrac*ghMult;
+                            }
                         }
                     }
-                }
-                //Now add that data to the year array (will be divided by the count at the end)
-                for (int a=0; a<nLat; a++){
-                    for (int b=0; b<nLon; b++){
-                        smoothedValues[yearDay][a][b]+=sumValues[a][b];
-                        smoothedCount[yearDay][a][b]+=1.;
+                    //Now add that data to the year array (will be divided by the count at the end)
+                    for (int a=0; a<nLat; a++){
+                        for (int b=0; b<nLon; b++){
+                            smoothedValues[yearDay][a][b]+=sumValues[a][b];
+                            smoothedCount[yearDay][a][b]+=1.;
+                        }
                     }
+
                 }
             }
+            //Check the current time step and the next time step to see if it's reached the end of the year
             ParseTimeDouble(strTimeUnits,strCalendar,midValue,\
             prevYear,prevMonth,prevDay,prevHour);
             ParseTimeDouble(strTimeUnits,strCalendar,midValue + tStep,\
@@ -293,6 +312,7 @@ int main(int argc, char **argv){
             //If it's reached the end of a year, write the file
             if (nextYear>prevYear){
                 std::string outFileName = prefix + "_" + std::to_string(prevYear) + ".nc";
+                std::string outTimeUnits = "days since " + std::to_string(prevYear);
                 std::cout<<"inside while loop: writing file "<<outFileName<<std::endl;
                 NcFile outfile(outFileName.c_str(),NcFile::Replace,NULL,0,NcFile::Offset64Bits);
                 //Write the variables to the file
@@ -312,8 +332,14 @@ int main(int argc, char **argv){
                 NcVar * outTimeVar = outfile.add_var(tname.c_str(),ncDouble,outTime);
                 outTimeVar->set_cur(long(0));
                 outTimeVar->put(&(fileTimeAxis[0]),nDayYear);
-                outTimeVar->add_att("units",strTimeUnits.c_str());
-                outTimeVar->add_att("calendar",strCalendar.c_str());
+                std::string outCalendar;
+                if (nDayYear<365){
+                  outCalendar = "360_day";
+                }else{
+                  outCalendar = "noleap";
+                }
+                outTimeVar->add_att("units",outTimeUnits.c_str());
+                outTimeVar->add_att("calendar",outCalendar.c_str());
                 //lat/lon
                 NcVar * outLatVar = outfile.add_var(latname.c_str(),ncDouble,outlat);
                 NcVar * outLonVar = outfile.add_var(lonname.c_str(),ncDouble,outlon);
@@ -349,7 +375,8 @@ int main(int argc, char **argv){
 
       std::cout<<"Writing last file (did not fill the year out completely)"<<std::endl;
       std::cout<<"the year is "<<nextYear<<std::endl;
-      std::string outFileName = prefix + "_" + std::to_string(nextYear) + ".nc";
+      std::string outFileName = prefix + "_" + std::to_string(prevYear) + ".nc";
+      std::string outTimeUnits = "days since " + std::to_string(prevYear);
 
       NcFile outfile(outFileName.c_str(),NcFile::Replace,NULL,0,NcFile::Offset64Bits);
       //Write the variables to the file
@@ -359,7 +386,8 @@ int main(int argc, char **argv){
 
       for (int z=0; z<nDayYear; z++){
         if (fileTimeAxis[z]<-999999.){
-          fileTimeAxis[z]=fileTimeAxis[z-1]+(tStep*nt);
+          //fileTimeAxis[z]=fileTimeAxis[z-1]+(tStep*nt);
+          fileTimeAxis[z] = fileTimeAxis[z-1] + 1.;
         }
       }
       //Average the smoothed variable
@@ -374,8 +402,15 @@ int main(int argc, char **argv){
       NcVar * outTimeVar = outfile.add_var(tname.c_str(),ncDouble,outTime);
       outTimeVar->set_cur(long(0));
       outTimeVar->put(&(fileTimeAxis[0]),nDayYear);
-      outTimeVar->add_att("units",strTimeUnits.c_str());
-      outTimeVar->add_att("calendar",strCalendar.c_str());
+
+      std::string outCalendar;
+      if (nDayYear<365){
+        outCalendar = "360_day";
+      }else{
+        outCalendar = "noleap";
+      }
+      outTimeVar->add_att("units",outTimeUnits.c_str());
+      outTimeVar->add_att("calendar",outCalendar.c_str());
       //lat/lon
       NcVar * outLatVar = outfile.add_var(latname.c_str(),ncDouble,outlat);
       NcVar * outLonVar = outfile.add_var(lonname.c_str(),ncDouble,outlon);
