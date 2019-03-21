@@ -15,8 +15,10 @@
 ///	</remarks>
 
 #include "Variable.h"
+#include "STLStringHelper.h"
 
 #include <set>
+#include <cctype>
 
 ///////////////////////////////////////////////////////////////////////////////
 // VariableRegistry
@@ -27,6 +29,7 @@ VariableRegistry::VariableRegistry() {
 	m_domDataOp.Add("_ABS");
 	m_domDataOp.Add("_SIGN");
 	m_domDataOp.Add("_ALLPOS");
+	m_domDataOp.Add("_SUM");
 	m_domDataOp.Add("_AVG");
 	m_domDataOp.Add("_DIFF");
 	m_domDataOp.Add("_MULT");
@@ -228,15 +231,64 @@ int Variable::ParseFromString(
 				return (n+1);
 			}
 
-			// Parse arguments
-			m_varArg.resize(m_nSpecifiedDim+1);
+			// Check for floating point argument
+			if (isdigit(strIn[n]) || (strIn[n] == '.') || (strIn[n] == '-')) {
+				int nStart = n;
+				for (; n <= strIn.length(); n++) {
+					if (n == strIn.length()) {
+						_EXCEPTION1("Op argument list must be terminated"
+							" with ): %s", strIn.c_str());
+					}
+					if ((strIn[n] == ',') || (strIn[n] == ')')) {
+						break;
+					}
+				}
 
-			Variable var;
-			n += var.ParseFromString(varreg, strIn.substr(n));
+				std::string strFloat = strIn.substr(nStart, n-nStart);
+				if (!STLStringHelper::IsFloat(strFloat)) {
+					_EXCEPTION2("Invalid floating point number at position %i in: %s",
+						nStart, strIn.c_str());
+				}
+				m_strArg.push_back(strFloat);
+				m_varArg.push_back(InvalidVariableIndex);
+				m_nSpecifiedDim++;
 
-			m_varArg[m_nSpecifiedDim] = varreg.FindOrRegister(var);
+			// Check for string argument
+			} else if (strIn[n] == '\"') {
+				int nStart = n;
+				for (; n <= strIn.length(); n++) {
+					if (n == strIn.length()) {
+						_EXCEPTION1("String must be terminated with \": %s",
+							strIn.c_str());
+					}
+					if (strIn[n] == '\"') {
+						break;
+					}
+				}
+				if (n >= strIn.length()-1) {
+					_EXCEPTION1("Op argument list must be terminated"
+						" with ): %s", strIn.c_str());
+				}
+				if ((strIn[n+1] != ',') && (strIn[n+1] != ')')) {
+					_EXCEPTION2("Invalid character in argument list after "
+						"string at position %i in: %s",
+						n+1, strIn.c_str());
+				}
 
-			m_nSpecifiedDim++;
+				m_strArg.push_back(strIn.substr(nStart+1,n-nStart-1));
+				m_varArg.push_back(InvalidVariableIndex);
+				m_nSpecifiedDim++;
+
+			// Check for variable
+			} else {
+				Variable var;
+
+				n += var.ParseFromString(varreg, strIn.substr(n));
+
+				m_strArg.push_back("");
+				m_varArg.push_back(varreg.FindOrRegister(var));
+				m_nSpecifiedDim++;
+			}
 
 			if (strIn[n] == ')') {
 				return (n+1);
@@ -260,8 +312,12 @@ std::string Variable::ToString(
 	strOut += "(";
 	for (int d = 0; d < m_nSpecifiedDim; d++) {
 		if (m_fOp) {
-			Variable & var = varreg.Get(m_varArg[d]);
-			strOut += var.ToString(varreg);
+			if (m_varArg[d] != InvalidVariableIndex) {
+				Variable & var = varreg.Get(m_varArg[d]);
+				strOut += var.ToString(varreg);
+			} else {
+				strOut += m_strArg[d];
+			}
 		} else {
 			sprintf(szBuffer, "%i", m_iDim[d]);
 			strOut += szBuffer;
@@ -469,18 +525,20 @@ void Variable::LoadGridData(
 		}
 
 		// Build argument list
-		std::vector<std::string> strArg;
 		std::vector<DataVector<float> const *> vecArgData;
 		for (int i = 0; i < m_varArg.size(); i++) {
-			Variable & var = varreg.Get(m_varArg[i]);
-			var.LoadGridData(varreg, vecFiles, grid, iTime);
+			if (m_varArg[i] != InvalidVariableIndex) {
+				Variable & var = varreg.Get(m_varArg[i]);
+				var.LoadGridData(varreg, vecFiles, grid, iTime);
 
-			strArg.push_back("");
-			vecArgData.push_back(&var.GetData());
+				vecArgData.push_back(&var.GetData());
+			} else {
+				vecArgData.push_back(NULL);
+			}
 		}
 
 		// Apply the DataOp
-		pop->Apply(grid, strArg, vecArgData, m_data);
+		pop->Apply(grid, m_strArg, vecArgData, m_data);
 	}
 /*
 	// Evaluate the mean operator

@@ -19,6 +19,7 @@
 #include "DataOp.h"
 #include "Variable.h"
 #include "SimpleGrid.h"
+#include "STLStringHelper.h"
 #include "kdtree.h"
 
 #include <cstdlib>
@@ -66,6 +67,12 @@ DataOp * DataOpManager::Add(
 
 	} else if (strName == "_SIGN") {
 		return Add(new DataOp_SIGN);
+
+	} else if (strName == "_ALLPOS") {
+		return Add(new DataOp_ALLPOS);
+
+	} else if (strName == "_SUM") {
+		return Add(new DataOp_SUM);
 
 	} else if (strName == "_AVG") {
 		return Add(new DataOp_AVG);
@@ -306,6 +313,53 @@ bool DataOp_ALLPOS::Apply(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// DataOp_SUM
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_SUM::name = "_SUM";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_SUM::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataVector<float> const *> & vecArgData,
+	DataVector<float> & dataout
+) {
+	if (strArg.size() <= 1) {
+		_EXCEPTION2("%s expects at least two arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	for (int v = 0; v < vecArgData.size(); v++) {
+		if (vecArgData[v] == NULL) {
+			if (!STLStringHelper::IsFloat(strArg[v])) {
+				_EXCEPTION1("Arguments to %s must be data variables or floats",
+					m_strName.c_str());
+			}
+		}
+	}
+
+	dataout.Zero();
+	for (int v = 0; v < vecArgData.size(); v++) {
+
+		if (vecArgData[v] == NULL) {
+			float dValue = atof(strArg[v].c_str());
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				dataout[i] += dValue;
+			}
+
+		} else {
+			const DataVector<float> & data  = *(vecArgData[v]);
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				dataout[i] += data[i];
+			}
+		}
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // DataOp_AVG
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -365,16 +419,44 @@ bool DataOp_DIFF::Apply(
 		_EXCEPTION2("%s expects two arguments: %i given",
 			m_strName.c_str(), strArg.size());
 	}
-	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
-		_EXCEPTION1("Arguments to %s must be data variables",
+	if ((vecArgData[0] == NULL) && (vecArgData[1] == NULL)) {
+		_EXCEPTION1("At least one arguments to %s must be a data variable",
 			m_strName.c_str());
 	}
+	if (vecArgData[0] == NULL) {
+		if (!STLStringHelper::IsFloat(strArg[0])) {
+			_EXCEPTION1("Arguments to %s must be data variables or floats",
+				m_strName.c_str());
+		}
+	}
+	if (vecArgData[1] == NULL) {
+		if (!STLStringHelper::IsFloat(strArg[1])) {
+			_EXCEPTION1("Arguments to %s must be data variables or floats",
+				m_strName.c_str());
+		}
+	}
 
-	const DataVector<float> & dataLeft  = *(vecArgData[0]);
-	const DataVector<float> & dataRight = *(vecArgData[1]);
+	if (vecArgData[0] == NULL) {
+		float dValue = atof(strArg[0].c_str());
+		const DataVector<float> & data = *(vecArgData[1]);
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = dValue - data[i];
+		}
 
-	for (int i = 0; i < dataout.GetRows(); i++) {
-		dataout[i] = dataLeft[i] - dataRight[i];
+	} else if (vecArgData[1] == NULL) {
+		const DataVector<float> & data = *(vecArgData[0]);
+		float dValue = atof(strArg[1].c_str());
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = data[i] - dValue;
+		}
+
+	} else {
+		const DataVector<float> & dataLeft  = *(vecArgData[0]);
+		const DataVector<float> & dataRight = *(vecArgData[1]);
+
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = dataLeft[i] - dataRight[i];
+		}
 	}
 
 	return true;
@@ -394,20 +476,36 @@ bool DataOp_MULT::Apply(
 	const std::vector<DataVector<float> const *> & vecArgData,
 	DataVector<float> & dataout
 ) {
-	if (strArg.size() != 2) {
-		_EXCEPTION2("%s expects two arguments: %i given",
+	if (strArg.size() <= 1) {
+		_EXCEPTION2("%s expects at least two arguments: %i given",
 			m_strName.c_str(), strArg.size());
 	}
-	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
-		_EXCEPTION1("Arguments to %s must be data variables",
-			m_strName.c_str());
+	for (int v = 0; v < vecArgData.size(); v++) {
+		if (vecArgData[v] == NULL) {
+			if (!STLStringHelper::IsFloat(strArg[v])) {
+				_EXCEPTION1("Arguments to %s must be data variables or floats",
+					m_strName.c_str());
+			}
+		}
 	}
 
-	const DataVector<float> & dataLeft  = *(vecArgData[0]);
-	const DataVector<float> & dataRight = *(vecArgData[1]);
-
 	for (int i = 0; i < dataout.GetRows(); i++) {
-		dataout[i] = dataLeft[i] * dataRight[i];
+		dataout[i] = 1.0;
+	}
+	for (int v = 0; v < vecArgData.size(); v++) {
+
+		if (vecArgData[v] == NULL) {
+			float dValue = atof(strArg[v].c_str());
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				dataout[i] *= dValue;
+			}
+
+		} else {
+			const DataVector<float> & data  = *(vecArgData[v]);
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				dataout[i] *= data[i];
+			}
+		}
 	}
 
 	return true;
@@ -431,16 +529,47 @@ bool DataOp_DIV::Apply(
 		_EXCEPTION2("%s expects two arguments: %i given",
 			m_strName.c_str(), strArg.size());
 	}
-	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
-		_EXCEPTION1("Arguments to %s must be data variables",
+	if ((vecArgData[0] == NULL) && (vecArgData[1] == NULL)) {
+		_EXCEPTION1("At least one arguments to %s must be a data variable",
 			m_strName.c_str());
 	}
+	if (vecArgData[0] == NULL) {
+		if (!STLStringHelper::IsFloat(strArg[0])) {
+			_EXCEPTION1("Arguments to %s must be data variables or floats",
+				m_strName.c_str());
+		}
+	}
+	if (vecArgData[1] == NULL) {
+		if (!STLStringHelper::IsFloat(strArg[1])) {
+			_EXCEPTION1("Arguments to %s must be data variables or floats",
+				m_strName.c_str());
+		}
+	}
 
-	const DataVector<float> & dataLeft  = *(vecArgData[0]);
-	const DataVector<float> & dataRight = *(vecArgData[1]);
+	if (vecArgData[0] == NULL) {
+		float dValue = atof(strArg[0].c_str());
+		const DataVector<float> & data = *(vecArgData[1]);
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = dValue / data[i];
+		}
 
-	for (int i = 0; i < dataout.GetRows(); i++) {
-		dataout[i] = dataLeft[i] / dataRight[i];
+	} else if (vecArgData[1] == NULL) {
+		const DataVector<float> & data = *(vecArgData[0]);
+		float dValue = atof(strArg[1].c_str());
+		if (dValue == 0.0) {
+			_EXCEPTION1("Division by zero in %s", m_strName.c_str());
+		}
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = data[i] / dValue;
+		}
+
+	} else {
+		const DataVector<float> & dataLeft  = *(vecArgData[0]);
+		const DataVector<float> & dataRight = *(vecArgData[1]);
+
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = dataLeft[i] / dataRight[i];
+		}
 	}
 
 	return true;
