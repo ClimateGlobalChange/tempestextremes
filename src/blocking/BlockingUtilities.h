@@ -57,7 +57,8 @@ bool checkFileLeap(
 //Function to get number of day in year
 //Returns an integer value in the range 1-365
 int DayInYear(int nMonth,
-              int nDay);
+              int nDay,
+              std::string strCalendar);
 
 //Copied from DetectCyclones: This function
 //takes a time value (in units of hours or 
@@ -81,7 +82,8 @@ bool sequentialFiles(
   int nextYear,
   int nextMonth,
   int nextDay,
-  int nextHour
+  int nextHour,
+  std::string strCalendar
 );
 
 //Takes the last time value of the previous file

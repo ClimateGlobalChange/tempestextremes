@@ -170,7 +170,7 @@ int main(int argc, char ** argv){
         leap = checkFileLeap(strTimeUnits, strCalendar, dateYear,\
           dateMonth, dateDay, dateHour, timeVec[t]);
         if (leap == false){
-          dayIndex = DayInYear(dateMonth, dateDay)-1;
+          dayIndex = DayInYear(dateMonth, dateDay,strCalendar)-1;
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
               avgValue = avgMat[dayIndex][a][b];

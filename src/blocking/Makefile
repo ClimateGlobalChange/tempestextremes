@@ -19,8 +19,7 @@ UTIL_FILES= BlockingUtilities.cpp \
             Interpolate.cpp \
             DFT.cpp
 
-EXEC_FILES= BlockingAvg.cpp\
-            BlockingDevs.cpp \
+EXEC_FILES= BlockingDevs.cpp \
             BlockingGHG.cpp \
 	    BlockingNormDevs.cpp\
             BlockingPV.cpp \
@@ -30,7 +29,8 @@ EXEC_FILES= BlockingAvg.cpp\
             split_file.cpp\
             AvgVar.cpp\
             BlockingDFT.cpp\
-            BlockingThresh.cpp 
+            BlockingThresh.cpp\
+	    Smooth61Day.cpp
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 

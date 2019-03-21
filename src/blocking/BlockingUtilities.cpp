@@ -105,8 +105,28 @@ bool checkFileLeap(
 }
 
 //Function to get number of day in year
-//Returns an integer value in the range 1-365
-int DayInYear(int nMonth, int nDay){
+//For the 365 day calendar, the index is started with March as the 0 point, so
+//the final calculation needs to be adjusted; February 28th is day 365
+//nd for March 1st is 1, nd for February 28th is 365
+int DayInYear(int nMonth,int nDay,std::string strCalendar){
+  int nm,nd;
+  //std::cout<<"Month is "<<nMonth<<" and day is "<<nDay<<std::endl;
+  //Calculate the proper month coefficient
+  nm=(nMonth+9)%12;
+  if (strCalendar=="360_day"){
+    nd=30*nMonth + nDay;
+  }else{
+    nd=int((nm*306 +5)/10 + nDay);
+    if (nd>306){
+      nd-=306;
+    }else{
+      nd+=59;
+    }
+  }
+  return(nd);
+}
+
+/*int DayInYear(int nMonth, int nDay){
   int day=0;
   if (nMonth>1){
     for (int x=1; x<nMonth; x++){
@@ -124,7 +144,7 @@ int DayInYear(int nMonth, int nDay){
   day+=nDay;
   return(day);
 }
-
+*/
 //Copied from DetectCyclones: This function
 //takes a time value (in units of hours or 
 //days since reference date) and returns 4
@@ -353,12 +373,13 @@ bool sequentialFiles(
   int nextYear,
   int nextMonth,
   int nextDay,
-  int nextHour
+  int nextHour,
+  std::string strCalendar
 ){
   bool isSequential = false;
   //Day in year of each date?
-  int dayPrev = DayInYear(prevMonth,prevDay);
-  int dayNext = DayInYear(nextMonth,nextDay);
+  int dayPrev = DayInYear(prevMonth,prevDay,strCalendar);
+  int dayNext = DayInYear(nextMonth,nextDay,strCalendar);
   //Difference between years?
   int yearDiff = nextYear-prevYear;
   //If yearDiff is 1, is it going from December to January?
@@ -1272,7 +1293,7 @@ void calcDevs( bool latNorm,
       std::cout<<"Leap day! Skipping time step."<<std::endl;
     }
     else{
-      currAvgIndex = DayInYear(leapMonth,leapDay)-1;
+      currAvgIndex = DayInYear(leapMonth,leapDay,strCalendar)-1;
       avgIPV->set_cur(currAvgIndex,0,0);
       avgIPV->get(&(avgMat[0][0]),1,nLat,nLon);
       for (int a=0; a<nLat; a++){
@@ -1352,7 +1373,7 @@ void calcNormalizedDevs(bool isPV,
       ParseTimeDouble(strTimeUnits,strCalendar,timeVals[t],dateYear,\
          dateMonth,dateDay,dateHour);
 
-      threshIndex = DayInYear(dateMonth,dateDay)-1;
+      threshIndex = DayInYear(dateMonth,dateDay,strCalendar)-1;
       inDev->set_cur(t,0,0);
       inDev->get(&(aDevMat[0][0]),1,nLat,nLon);
       for (int a=0; a<nLat; a++){
@@ -1391,7 +1412,7 @@ void calcNormalizedDevs(bool isPV,
       ParseTimeDouble(strTimeUnits,strCalendar,timeVals[t],dateYear,\
          dateMonth,dateDay,dateHour);
 
-      threshIndex = DayInYear(dateMonth,dateDay)-1; 
+      threshIndex = DayInYear(dateMonth,dateDay,strCalendar)-1; 
       inDev->set_cur(t,0,0);
       inDev->get(&(aDevMat[0][0]),1,nLat,nLon);
        for (int a=0; a<nLat; a++){
