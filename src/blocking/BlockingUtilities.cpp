@@ -114,7 +114,7 @@ int DayInYear(int nMonth,int nDay,std::string strCalendar){
   //Calculate the proper month coefficient
   nm=(nMonth+9)%12;
   if (strCalendar=="360_day"){
-    nd=30*nMonth + nDay;
+    nd=30*(nMonth-1) + nDay;
   }else{
     nd=int((nm*306 +5)/10 + nDay);
     if (nd>306){

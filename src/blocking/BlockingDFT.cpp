@@ -35,8 +35,6 @@ int main(int argc, char ** argv){
       CommandLineString(avgName,"avgname","");
       CommandLineString(varName,"varname","");
       CommandLineInt(nWaves, "ncoef",12);
-      CommandLineInt(startday,"startday",1);
-      CommandLineInt(endday,"endday",365);
       CommandLineString(tname,"tname","time");
       CommandLineString(levname, "levname", "lev");
       CommandLineString(latname,"latname","lat");
@@ -70,6 +68,21 @@ int main(int argc, char ** argv){
     if (!readin.is_valid()){
       _EXCEPTION1("Unable to open file %s for reading",vecFiles[0].c_str());
     }
+    NcVar *timeVar = readin.get_var(tname.c_str());
+
+    std::string strCalendar;
+    NcAtt *attCal = timeVar->get_att("calendar");
+    if (attCal==NULL){
+      strCalendar = "standard";
+    }else{
+      strCalendar = attCal->as_string(0);
+    }
+    if (strncmp(strCalendar.c_str(),"360_day",7)==0){
+      endday=360;
+    }else{
+      endday=365;
+    }
+    startday=1;
     //axis lengths
     int tLen,latLen,lonLen;
     tLen = readin.get_dim(tname.c_str())->size();
@@ -103,6 +116,7 @@ int main(int argc, char ** argv){
 
     //Initialize storage array: day, lat, lon
     int yearLen = (endday-startday)+1;
+    std::cout<<"Year is "<<yearLen<<" long"<<std::endl;
     DataMatrix3D<double> storeMat(yearLen,latLen,lonLen);
     //Initialize counts array: day, lat, lon
     DataMatrix3D<double> countsMat(yearLen, latLen, lonLen);
@@ -123,7 +137,9 @@ int main(int argc, char ** argv){
       tLen = readin.get_dim(tname.c_str()) ->size();
       //std::cout<<"Reading in file #"<<x<<", "<<vecFiles[x].c_str()<<std::endl;
       NcVar *inputVar = readin.get_var(varName.c_str());
-
+      if (inputVar==NULL){
+        _EXCEPTIONT("Couldn't read input variable.");
+      }
       std::cout<<"Reading in variable "<<varName.c_str()<<std::endl;
       int nDims = inputVar->num_dims();
       if (nDims > 3 && !is4D){
@@ -153,10 +169,12 @@ int main(int argc, char ** argv){
       int dateYear, dateMonth, dateDay, dateHour, dayIndex;
       bool leap;
       double inputVal;
+
       //std::cout<<"Storing values."<<std::endl;
       //Store the values and counts in the matrices at the appropriate day index
 
       //Input data
+	std::cout<<"Entering time loop for file."<<std::endl;
       for (int t=0; t<tLen; t++){
         inputData.Initialize(latLen, lonLen);
       
@@ -169,11 +187,12 @@ int main(int argc, char ** argv){
         }
         ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t],\
           dateYear, dateMonth, dateDay, dateHour);
+//        std::cout<<"Date is "<<dateYear<<"/"<<dateMonth<<"/"<<dateDay<<std::endl;
         leap = checkFileLeap(strTimeUnits, strCalendar, dateYear,\
           dateMonth, dateDay, dateHour, timeVec[t]);
         if (leap == false){
           dayIndex = DayInYear(dateMonth, dateDay,strCalendar)-1;
-          //std::cout<<"Day index is "<<dayIndex<<std::endl;
+//          std::cout<<"Day index is "<<dayIndex<<std::endl;
           for (int a=0; a<latLen; a++){
             for (int b=0; b<lonLen; b++){
               inputVal = inputData[a][b];
