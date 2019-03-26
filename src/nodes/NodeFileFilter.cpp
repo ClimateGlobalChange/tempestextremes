@@ -195,6 +195,9 @@ try {
 	// Data is regional
 	bool fRegional;
 
+	// List of variables to preserve
+	std::string strPreserve;
+
 	// Output data file
 	std::string strOutputData;
 
@@ -214,7 +217,7 @@ try {
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineBool(fRegional, "regional");
 
-
+		CommandLineString(strPreserve, "preserve", "");
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineString(strOutputDataList, "out_data_list", "");
 
@@ -262,7 +265,7 @@ try {
 		_EXCEPTIONT("Invalid --in_nodefile_type, expected \"SN\" or \"DCU\"");
 	}
 
-	// Parse in_fmt string
+	// Parse --in_fmt string
 	ColumnDataHeader cdhInput;
 	cdhInput.Parse(strInputFormat);
 
@@ -297,6 +300,10 @@ try {
 			}
 		}
 	}
+
+	// Parse variable preservation list
+	std::vector< std::string > vecPreserveVariables;
+	STLStringHelper::ParseVariableList(strPreserve, vecPreserveVariables);
 
 	// Define the SimpleGrid
 	SimpleGrid grid;
@@ -500,6 +507,22 @@ try {
 
 		// Copy time
 		CopyNcVar(ncinfile, ncoutfile, "time");
+
+		// Copy latitude and/or longitude
+		CopyNcVarIfExists(ncinfile, ncoutfile, "lat");
+		CopyNcVarIfExists(ncinfile, ncoutfile, "latitude");
+		CopyNcVarIfExists(ncinfile, ncoutfile, "LAT");
+		CopyNcVarIfExists(ncinfile, ncoutfile, "lat_0");
+
+		CopyNcVarIfExists(ncinfile, ncoutfile, "lon");
+		CopyNcVarIfExists(ncinfile, ncoutfile, "longitude");
+		CopyNcVarIfExists(ncinfile, ncoutfile, "LON");
+		CopyNcVarIfExists(ncinfile, ncoutfile, "lon_0");
+
+		// Copy preserve variables
+		for (int p = 0; p < vecPreserveVariables.size(); p++) {
+			CopyNcVar(ncinfile, ncoutfile, vecPreserveVariables[p]);
+		}
 
 		// Loop through all variables
 		for (int v = 0; v < atFilterByDist.size(); v++) {

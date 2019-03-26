@@ -310,6 +310,24 @@ void CopyNcVar(
 
 ////////////////////////////////////////////////////////////////////////////////
 
+void CopyNcVarIfExists(
+	NcFile & ncIn,
+	NcFile & ncOut,
+	const std::string & strVarName,
+	bool fCopyAttributes,
+	bool fCopyData
+) {
+	// Turn off fatal errors in NetCDF
+	NcError error(NcError::silent_nonfatal);
+
+	NcVar * var = ncIn.get_var(strVarName.c_str());
+	if (var != NULL) {
+		CopyNcVar(ncIn, ncOut, strVarName, fCopyAttributes, fCopyData);
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void ReadCFTimeDataFromNcFile(
 	NcFile * ncfile,
 	const std::string & strFilename,

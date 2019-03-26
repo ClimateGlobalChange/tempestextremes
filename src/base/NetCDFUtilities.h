@@ -61,6 +61,19 @@ void CopyNcVar(
 ////////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		Copy a NetCDF varaible from one file to another if it exists.
+///	</summary>
+void CopyNcVarIfExists(
+	NcFile & ncIn,
+	NcFile & ncOut,
+	const std::string & strVarName,
+	bool fCopyAttributes = true,
+	bool fCopyData = true
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Read the time data from a NetCDF file.
 ///	</summary>
 void ReadCFTimeDataFromNcFile(
