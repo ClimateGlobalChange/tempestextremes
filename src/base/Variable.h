@@ -76,6 +76,8 @@ typedef std::vector<Variable> VariableVector;
 
 typedef int VariableIndex;
 
+static const VariableIndex InvalidVariableIndex = (-1);
+
 class VariableIndexVector : public std::vector<VariableIndex> {};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -228,6 +230,11 @@ public:
 	///		Specified dimension values.
 	///	</summary>
 	int m_iDim[MaxArguments];
+
+	///	<summary>
+	///		Specified operator arguments.
+	///	</summary>
+	std::vector<std::string> m_strArg;
 
 	///	<summary>
 	///		Specified operator arguments.
