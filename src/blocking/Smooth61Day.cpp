@@ -100,6 +100,7 @@ int main(int argc, char **argv){
 
     //Time and Calendar attributes
     NcAtt *attCal = timeVal->get_att("calendar");
+    NcAtt *attUnits = timeVal->get_att("units");
     std::string strCalendar;
     std::string strTimeUnits;
     if(attCal==NULL){
@@ -115,6 +116,10 @@ int main(int argc, char **argv){
     if (strncmp(strCalendar.c_str(),"360_day",7)==0){
       nDayYear=360;
     }
+    if (attUnits==NULL){
+      _EXCEPTIONT("No time units provided.");
+    }
+    strTimeUnits = attUnits->as_string(0);
 
     //Resolution of the time axis
     double tRes;
@@ -138,6 +143,7 @@ int main(int argc, char **argv){
       int nLev = reffile.get_dim(levname.c_str())->size();
       NcVar *levvar = reffile.get_var(levname.c_str());
       DataVector<double> pVec(nLev);
+      levvar->set_cur(long(0));
       levvar->get(&pVec[0],nLev);
 
       double pval = 50000.0;
