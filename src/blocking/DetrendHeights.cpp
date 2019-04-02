@@ -213,7 +213,7 @@ int main(int argc, char **argv){
                 for (int a=0; a<nLat; a++){
                     for (int b=0; b<nLon; b++){
                         detrendVal = slopeStore[a][b]* double(yearDiff) + interceptStore[a][b];
-                        detrendStore[t][a][b]= detrendVal + varSlice[a][b];
+                        detrendStore[t][a][b]= detrendVal + varSlice[a][b]*ghMult;
                     }
                 }
             }
