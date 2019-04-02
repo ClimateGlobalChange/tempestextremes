@@ -18,6 +18,7 @@
 #define _STLSTRINGHELPER_H_
 
 #include <string>
+#include <vector>
 
 #include <cstring>
 
@@ -107,6 +108,39 @@ inline static bool IsFloat(const std::string &str) {
 		}
 	}
 	return fIsFloat;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+static void ParseVariableList(
+	const std::string & strVariables,
+	std::vector< std::string > & vecVariableStrings
+) {
+	int iVarBegin = 0;
+	int iVarCurrent = 0;
+
+	// Parse variable name
+	for (;;) {
+		if ((iVarCurrent >= strVariables.length()) ||
+			(strVariables[iVarCurrent] == ',') ||
+			(strVariables[iVarCurrent] == ' ')
+		) {
+			if (iVarCurrent == iVarBegin) {
+				if (iVarCurrent >= strVariables.length()) {
+					break;
+				}
+
+				continue;
+			}
+
+			vecVariableStrings.push_back(
+				strVariables.substr(iVarBegin, iVarCurrent - iVarBegin));
+
+			iVarBegin = iVarCurrent + 1;
+		}
+
+		iVarCurrent++;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
