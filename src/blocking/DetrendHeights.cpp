@@ -39,14 +39,15 @@ int main(int argc, char **argv){
         std::string varName;
         std::string tname, latname, lonname, levname;
         bool is4d, isHpa, GHtoZ;
-        int startYear,endYear,centerYear;
+        int startYear,endYear;
+        //,endYear,centerYear;
         BeginCommandLine()
             CommandLineString(fileList,"inlist","");
             CommandLineString(linfile,"linfile","");
             CommandLineString(varName,"varname","");
             CommandLineInt(startYear,"startyear",-9999);
             CommandLineInt(endYear,"endyear",-9999);
-            CommandLineInt(centerYear,"centeryear",-9999);
+            //CommandLineInt(centerYear,"centeryear",-9999);
             CommandLineString(tname,"tname","time");
             CommandLineString(latname,"latname","lat");
             CommandLineString(lonname,"lonname","lon");
@@ -64,12 +65,16 @@ int main(int argc, char **argv){
             _EXCEPTIONT("No variable name (--varname) specified");
         }
 
+        if (std::fabs(startYear-9999)<0.001){
+            _EXCEPTIONT("Need to provide first year of trend line (--startyear)");
+        }
+
         //Generate the file list
         std::vector<std::string> InputFiles;
         GetInputFileList(fileList, InputFiles);
         int nFiles = InputFiles.size();   
-
-        if (std::fabs(centerYear+9999)<0.001){
+        int nYearsInFiles = endYear-startYear+1;
+        /*if (std::fabs(centerYear+9999)<0.001){
             if (std::fabs(startYear-9999)<0.001){
                 _EXCEPTIONT("Need to provide first year of input files (--startyear)");
             }
@@ -82,7 +87,7 @@ int main(int argc, char **argv){
             //What is the value of half the years +1?
             centerYear = std::floor(nYearsInFiles/2)+startYear;
             std::cout<<"For "<<nYearsInFiles<<" years, the center year is "<<centerYear<<std::endl;
-        }
+        }*/
         //Multiplier for GH info
         double ghMult=1.;
         if (GHtoZ){
@@ -144,7 +149,7 @@ int main(int argc, char **argv){
 
         //Open the linear trend variables
         NcVar * slopeVar = linreg.get_var("slope");
-        NcVar * interceptVar = linreg.get_var("intercept");
+        //NcVar * interceptVar = linreg.get_var("intercept");
 
    
 
@@ -153,7 +158,7 @@ int main(int argc, char **argv){
         int dateYear,dateMonth,dateDay,dateHour;
         int dayIndex;
         int yearDiff;
-        double detrendVal;
+        double detrendVal,detrendMean;
         DataMatrix<double> slopeStore(nLat,nLon);
         DataMatrix<double>interceptStore(nLat,nLon);
         DataMatrix<double>varSlice(nLat,nLon);
@@ -199,14 +204,8 @@ int main(int argc, char **argv){
                 dayIndex = DayInYear(dateMonth,dateDay,strCalendar)-1;
                 slopeVar->set_cur(dayIndex,0,0);
                 slopeVar->get(&(slopeStore[0][0]),1,nLat,nLon);
-                interceptVar->set_cur(dayIndex);
-                interceptVar->get(&(interceptStore[0][0]),1,nLat,nLon);
-                //Use the year value to detrend the height value
-                //If hasCenterYear is true, the center year will be the default 0 line
-                //This assumes an odd number of years
-                //If hasCenterYear is false, the center year will be the first year where value is subtracted
-                yearDiff=centerYear-dateYear;
-                std::cout<<"Year difference between "<<centerYear<<" and "<<dateYear<<" is "<<yearDiff<<std::endl;
+                //Difference between current year and starting year of trendline
+                yearDiff=dateYear-startYear;
                 //Get the time slice for the original variable
                 if (is4d){
                     heightData->set_cur(t,pIndex,0,0);
@@ -217,8 +216,13 @@ int main(int argc, char **argv){
                 }
                 for (int a=0; a<nLat; a++){
                     for (int b=0; b<nLon; b++){
-                        detrendVal = slopeStore[a][b]* double(yearDiff) + interceptStore[a][b];
-                        detrendStore[t][a][b]= detrendVal + varSlice[a][b]*ghMult;
+                        //Detrended value is:
+                        //D=Z - L + mean(L)
+                        //Which works out to
+                        //D = Z - m*yearDiff + 0.5*m*nYearsInFiles
+                        detrendVal = slopeStore[a][b]* double(yearDiff);
+                        detrendMean = slopeStore[a][b]*0.5*double(nYearsInFiles);
+                        detrendStore[t][a][b]= varSlice[a][b]*ghMult - detrendVal + detrendMean;
                     }
                 }
             }
