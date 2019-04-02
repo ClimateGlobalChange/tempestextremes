@@ -69,13 +69,14 @@ int main(int argc, char **argv){
         GetInputFileList(fileList, InputFiles);
         int nFiles = InputFiles.size();   
 
-        if (std::fabs(centerYear-9999)<0.001){
+        if (std::fabs(centerYear+9999)<0.001){
             if (std::fabs(startYear-9999)<0.001){
                 _EXCEPTIONT("Need to provide first year of input files (--startyear)");
             }
             if (std::fabs(endYear-9999)<0.001){
                 _EXCEPTIONT("Need to provide last year of input files (--endyear)");
             }
+	    std::cout<<"Start year is "<<startYear<<" and end year is "<<endYear<<std::endl;
             //How many years are in the file list?
             int nYearsInFiles = endYear-startYear +1;
             //What is the value of half the years +1?
@@ -129,13 +130,13 @@ int main(int argc, char **argv){
 
         std::string linUnits;
         std::string linCalendar;
-        NcAtt * timeUnits = linreg.get_att("units");
+        NcAtt * timeUnits = lintimevar->get_att("units");
         if (timeUnits==NULL){
             _EXCEPTIONT("Could not find time units.");
         }
         linUnits = timeUnits->as_string(0);
 
-        NcAtt * timeCal = linreg.get_att("calendar");
+        NcAtt * timeCal = lintimevar->get_att("calendar");
         linCalendar = timeCal->as_string(0);
         if (timeCal==NULL || strncmp(linCalendar.c_str(),"gregorian",9)==0){
             linCalendar="standard";

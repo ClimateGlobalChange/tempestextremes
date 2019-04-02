@@ -13,7 +13,7 @@ parser.add_argument("--latname",default="lat")
 parser.add_argument("--lonname",default="lon")
 parser.add_argument("--varname",default="SMOOTHED_Z500")
 results=parser.parse_args()
-
+print("Opening file list.")
 flist= open(results.lsname,"r")
 datafiles=flist.read().splitlines()
 nyears=len(datafiles)
@@ -56,7 +56,7 @@ for t in range(0,ndays):
 
 #Write the output file
 print("Writing {} to file".format(results.out))
-daysSince=np.arange(0,ndays)
+daysSince=np.arange(0.,ndays,dtype='d')
 dataset_out=xa.Dataset({'slope':([results.timename,results.latname,results.lonname],marray),
     'intercept':([results.timename,results.latname,results.lonname],barray)},
     coords={results.timename:daysSince,
