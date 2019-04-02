@@ -1,7 +1,8 @@
+import argparse
 import numpy as np
 import xarray as xa
 import pandas as pd
-import argparse
+
 
 
 parser=argparse.ArgumentParser(description="Provide a text file list for the linear regression calculation.")
