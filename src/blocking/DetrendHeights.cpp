@@ -180,8 +180,12 @@ int main(int argc, char **argv){
             }
             strTimeUnits = attTime->as_string(0);
             NcAtt *attCal = timevar->get_att("calendar");
+	    if (attCal==NULL){
+		    strCalendar = "standard";
+		 }else{
             strCalendar = attCal->as_string(0);
-            //Read in the height data
+		}
+	    //Read in the height data
             NcVar * heightData = infile.get_var(varName.c_str());
             if (heightData==NULL){
                 _EXCEPTIONT("Couldn't read in variable.");
