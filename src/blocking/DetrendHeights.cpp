@@ -39,15 +39,15 @@ int main(int argc, char **argv){
         std::string varName;
         std::string tname, latname, lonname, levname;
         bool is4d, isHpa, GHtoZ;
-        int startYear,endYear;
+        int centerYear;
         //,endYear,centerYear;
         BeginCommandLine()
             CommandLineString(fileList,"inlist","");
             CommandLineString(linfile,"linfile","");
             CommandLineString(varName,"varname","");
-            CommandLineInt(startYear,"startyear",-9999);
-            CommandLineInt(endYear,"endyear",-9999);
-            //CommandLineInt(centerYear,"centeryear",-9999);
+            //CommandLineInt(startYear,"startyear",-9999);
+            //CommandLineInt(endYear,"endyear",-9999);
+            CommandLineInt(centerYear,"centeryear",-9999);
             CommandLineString(tname,"tname","time");
             CommandLineString(latname,"latname","lat");
             CommandLineString(lonname,"lonname","lon");
@@ -65,15 +65,15 @@ int main(int argc, char **argv){
             _EXCEPTIONT("No variable name (--varname) specified");
         }
 
-        if (std::fabs(startYear-9999)<0.001){
-            _EXCEPTIONT("Need to provide first year of trend line (--startyear)");
+        if (std::fabs(centerYear-9999)<0.001){
+            _EXCEPTIONT("Need to provide center year of trend line (--centeryear)");
         }
 
         //Generate the file list
         std::vector<std::string> InputFiles;
         GetInputFileList(fileList, InputFiles);
         int nFiles = InputFiles.size();   
-        int nYearsInFiles = endYear-startYear+1;
+        //int nYearsInFiles = endYear-startYear+1;
         /*if (std::fabs(centerYear+9999)<0.001){
             if (std::fabs(startYear-9999)<0.001){
                 _EXCEPTIONT("Need to provide first year of input files (--startyear)");
@@ -205,7 +205,7 @@ int main(int argc, char **argv){
                 slopeVar->set_cur(dayIndex,0,0);
                 slopeVar->get(&(slopeStore[0][0]),1,nLat,nLon);
                 //Difference between current year and starting year of trendline
-                yearDiff=dateYear-startYear;
+                yearDiff=dateYear-centerYear;
                 //Get the time slice for the original variable
                 if (is4d){
                     heightData->set_cur(t,pIndex,0,0);
@@ -217,12 +217,11 @@ int main(int argc, char **argv){
                 for (int a=0; a<nLat; a++){
                     for (int b=0; b<nLon; b++){
                         //Detrended value is:
-                        //D=Z - L + mean(L)
-                        //Which works out to
-                        //D = Z - m*yearDiff + 0.5*m*nYearsInFiles
+                        //D=Z - L 
+                        //Where t=0 at the center year and the year difference
+                        //is calculated with respect to the center year
                         detrendVal = slopeStore[a][b]* double(yearDiff);
-                        detrendMean = slopeStore[a][b]*0.5*double(nYearsInFiles);
-                        detrendStore[t][a][b]= varSlice[a][b]*ghMult - detrendVal + detrendMean;
+                        detrendStore[t][a][b]= varSlice[a][b]*ghMult - detrendVal;
                     }
                 }
             }
