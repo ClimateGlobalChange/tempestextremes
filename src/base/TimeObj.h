@@ -18,6 +18,7 @@
 #define _TIMEOBJ_H_
 
 #include "Exception.h"
+#include "STLStringHelper.h"
 
 #include <string>
 #include <cstdlib>
@@ -127,17 +128,20 @@ public:
 	static CalendarType CalendarTypeFromString(
 		const std::string & strCalendar
 	) {
-		if (strCalendar == "none") {
+		std::string strCalendarTemp = strCalendar;
+		STLStringHelper::ToLower(strCalendarTemp);
+
+		if (strCalendarTemp == "none") {
 			return CalendarNone;
-		} else if (strCalendar == "noleap") {
+		} else if (strCalendarTemp == "noleap") {
 			return CalendarNoLeap;
-		} else if (strCalendar == "standard") {
+		} else if (strCalendarTemp == "standard") {
 			return CalendarStandard;
-		} else if (strCalendar == "gregorian") {
+		} else if (strCalendarTemp == "gregorian") {
 			return CalendarGregorian;
-		} else if (strCalendar == "proleptic_gregorian") {
+		} else if (strCalendarTemp == "proleptic_gregorian") {
 			return CalendarGregorian;
-		} else if (strCalendar == "360_day") {
+		} else if (strCalendarTemp == "360_day") {
 			return Calendar360Day;
 		} else {
 			return CalendarUnknown;
