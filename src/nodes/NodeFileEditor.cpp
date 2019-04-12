@@ -203,6 +203,11 @@ void CalculateRadialProfile(
 
 		// Calculate azimuthal velocity
 		double dUa = dUx * dAx + dUy * dAy + dUz * dAz;
+		
+                // Azimuthal convention positive if cyclonic, flip in SH
+                if (dLat0 < 0.0) {
+			dUa = -dUa;
+		}
 
 		//printf("%1.5e %1.5e :: %1.5e %1.5e\n", dUlon, dUlat, dUr, dUa);
 
