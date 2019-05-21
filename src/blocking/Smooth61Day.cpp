@@ -74,7 +74,7 @@ int main(int argc, char **argv){
     if (GHtoZ){
       ghMult = 1./9.8;
     }
-    std::cout<<"ghmult is "<<ghMult<<std::endl;
+    //std::cout<<"ghmult is "<<ghMult<<std::endl;
 
     //STEP 1: GENERATE THE LIST OF FILES, GET UNITS AND SUCH
     //Create list of input files
@@ -116,6 +116,7 @@ int main(int argc, char **argv){
     if (strncmp(strCalendar.c_str(),"360_day",7)==0){
       nDayYear=360;
     }
+	std::cout<<"Calendar is "<<nDayYear<<" days."<<std::endl;
     if (attUnits==NULL){
       _EXCEPTIONT("No time units provided.");
     }
@@ -136,7 +137,9 @@ int main(int argc, char **argv){
     else {
       tRes = tStep/24.0;
     }
+
     double nt = 1./tRes;
+	//std::cout<<"tstep is "<<tStep<<", tres is "<<tRes<<" and nt is "<<nt<<std::endl;
     //Pressure axis (if 4D)
     int pIndex = 10000000;
     if (is4d){
@@ -234,14 +237,18 @@ int main(int argc, char **argv){
             currYear,currMonth,currDay,currHour);
             //The day that is being added to the averaging window
             fillDay = DayInYear(currMonth,currDay,strCalendar);
+		//std::cout<<"Fill day calculated as "<<fillDay<<std::endl;
             //The day that is the center of the averaging window
             yearDay = fillDay - 31;
+		//std::cout<<"year day is "<<yearDay<<std::endl;
             //After first 30 days, dealing with periodic boundary
             if (ntcount>30*nt){
                 if (yearDay<0){
-                    yearDay+=365;
+                    yearDay+=nDayYear;
                 }
-            }
+            }else{
+			std::cout<<"30 days not yet filled"<<std::endl;
+		}
             //Fill the time axis with the number of days since the beginning of the year
             if (fileTimeAxis[yearDay]< -999999. && yearDay>=0){
                 /*if (isLeapYear==true){
@@ -253,7 +260,7 @@ int main(int argc, char **argv){
                 //Fill with the time double minus 30 days
                 //fileTimeAxis[yearDay] = midValue;
                 fileTimeAxis[yearDay] = double(yearDay);
-                std::cout<<"value "<<fileTimeAxis[yearDay]<<" added to "<<yearDay<<std::endl;
+                //std::cout<<"value "<<fileTimeAxis[yearDay]<<" added to "<<yearDay<<std::endl;
             }
             //The time double 
             midValue = timeVec[t]-(tStep*30*nt);
@@ -314,7 +321,7 @@ int main(int argc, char **argv){
             prevYear,prevMonth,prevDay,prevHour);
             ParseTimeDouble(strTimeUnits,strCalendar,midValue + tStep,\
             nextYear,nextMonth,nextDay,nextHour);
-            std::cout<<"prevYear is "<<prevYear<<" and nextYear is "<<nextYear<<std::endl;
+            //std::cout<<"prevYear is "<<prevYear<<" and nextYear is "<<nextYear<<std::endl;
             //If it's reached the end of a year, write the file
             if (nextYear>prevYear){
                 std::string outFileName = prefix + "_" + std::to_string(prevYear) + ".nc";
@@ -363,6 +370,7 @@ int main(int argc, char **argv){
                 std::cout<<"Reset file time axis"<<std::endl;
                 smoothedValues.Initialize(nDayYear,nLat,nLon);
                 smoothedCount.Initialize(nDayYear,nLat,nLon);
+		//std::cout<<"end of file write loop."<<std::endl;
             }
         }
         infile.close();

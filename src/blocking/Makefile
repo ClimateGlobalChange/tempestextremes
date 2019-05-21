@@ -31,7 +31,9 @@ EXEC_FILES= BlockingDevs.cpp \
             BlockingDFT.cpp\
             BlockingThresh.cpp\
 	    Smooth61Day.cpp\
-            DetrendHeights.cpp
+            DetrendHeights.cpp\
+            ExtractTimeStep.cpp\
+            DailyAverage.cpp
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 

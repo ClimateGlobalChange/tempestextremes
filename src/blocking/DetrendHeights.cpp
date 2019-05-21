@@ -65,7 +65,7 @@ int main(int argc, char **argv){
             _EXCEPTIONT("No variable name (--varname) specified");
         }
 
-        if (std::fabs(centerYear-9999)<0.001){
+        if (std::fabs(centerYear+9999)<0.001){
             _EXCEPTIONT("Need to provide center year of trend line (--centeryear)");
         }
 
@@ -206,6 +206,7 @@ int main(int argc, char **argv){
                 slopeVar->get(&(slopeStore[0][0]),1,nLat,nLon);
                 //Difference between current year and starting year of trendline
                 yearDiff=dateYear-centerYear;
+		std::cout<<"year diff is "<<yearDiff<<std::endl;
                 //Get the time slice for the original variable
                 if (is4d){
                     heightData->set_cur(t,pIndex,0,0);
@@ -221,6 +222,9 @@ int main(int argc, char **argv){
                         //Where t=0 at the center year and the year difference
                         //is calculated with respect to the center year
                         detrendVal = slopeStore[a][b]* double(yearDiff);
+			if (a==10 && b==50){
+				std::cout<<"slope is "<<slopeStore[a][b]<<" and detrend val is "<<detrendVal<<std::endl;
+			}
                         detrendStore[t][a][b]= varSlice[a][b]*ghMult - detrendVal;
                     }
                 }
