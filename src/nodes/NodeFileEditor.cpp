@@ -483,7 +483,8 @@ void MaxClosedContourDelta(
 	int iTime,
 	PathNode & pathnode,
 	VariableIndex varix,
-	std::string strRadius
+	std::string strRadius,
+	std::string strIndex
 ) {
 	// Get radius
 	double dRadius = pathnode.GetColumnDataAsDouble(cdh, strRadius);
@@ -496,8 +497,19 @@ void MaxClosedContourDelta(
 		_EXCEPTIONT("\n<radius> must be no larger than 180 (degrees)");
 	}
 
-	// Get the center grid index
-	const int ix0 = pathnode.m_gridix;
+	// Get index of the centerpoint
+	int ix0;
+	if (strIndex == "") {
+		ix0 = pathnode.m_gridix;
+	} else {
+		ix0 = pathnode.GetColumnDataAsInteger(cdh, strIndex);
+
+		//std::cout << pathnode.m_gridix << " " << ix0 << std::endl;
+	}
+
+	if ((ix0 < 0) || (ix0 >= grid.GetSize())) {
+		_EXCEPTIONT("Initial index point out of range");
+	}
 
 	// Load the variable data
 	Variable & var = varreg.Get(varix);
@@ -1046,16 +1058,26 @@ try {
 
 			// max_closed_contour_delta
 			if ((*pargtree)[2] == "max_closed_contour_delta") {
-				if (pargfunc->size() != 2) {
+				if ((pargfunc->size() < 2) && (pargfunc->size() > 3)) {
 					_EXCEPTIONT("Syntax error: Function \"max_closed_contour_delta\" "
-						"requires four arguments:\n"
-						"max_closed_contour_delta(<variable>, <radius>)");
+						"requires two or three arguments:\n"
+						"max_closed_contour_delta(<variable>, <radius>)\n"
+						"max_closed_contour_delta(<variable>, <radius>, <index>)");
 				}
 
 				// Parse variable
 				Variable var;
 				var.ParseFromString(varreg, (*pargfunc)[0]);
 				VariableIndex varix = varreg.FindOrRegister(var);
+
+				// Radius
+				std::string strRadius((*pargfunc)[1]);
+				
+				// Index
+				std::string strIndex("");
+				if (pargfunc->size() == 3) {
+					strIndex = (*pargfunc)[2];
+				}
 
 				// Loop through all Times
 				TimeToPathNodeMap::iterator iterPathNode =
@@ -1091,7 +1113,8 @@ try {
 							iTime,
 							pathnode,
 							varix,
-							(*pargfunc)[1]);
+							strRadius,
+							strIndex);
 					}
 				}
 

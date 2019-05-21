@@ -35,7 +35,11 @@ public:
 		Min,
 		Avg,
 		MaxDist,
-		MinDist
+		MinDist,
+		MaxCoordinate,
+		MinCoordinate,
+		MaxIndex,
+		MinIndex
 	};
 
 public:
@@ -79,6 +83,15 @@ public:
 						m_eOp = MaxDist;
 					} else if (strSubStr == "mindist") {
 						m_eOp = MinDist;
+					} else if (strSubStr == "maxcoord") {
+						m_eOp = MaxCoordinate;
+					} else if (strSubStr == "mincoord") {
+						m_eOp = MinCoordinate;
+					} else if (strSubStr == "maxix") {
+						m_eOp = MaxIndex;
+					} else if (strSubStr == "minix") {
+						m_eOp = MinIndex;
+
 					} else {
 						_EXCEPTION1("Output invalid operation \"%s\"",
 							strSubStr.c_str());
@@ -126,6 +139,10 @@ public:
 			strDescription += "Distance to maximum of ";
 		} else if (m_eOp == MinDist) {
 			strDescription += "Distance to minimum of ";
+		} else if (m_eOp == MaxCoordinate) {
+			strDescription += "Coordinates of maximum of ";
+		} else if (m_eOp == MinCoordinate) {
+			strDescription += "Coordinates of minimum of ";
 		}
 
 		char szBuffer[128];
@@ -181,10 +198,13 @@ void ApplyOutputOp(
 	float dValue;
 	float dRMax;
 
-	if (op.m_eOp == OutputOp::Max) {
+	// Value of the minimum or maximum value within given range
+	if ((op.m_eOp == OutputOp::Max) ||
+	    (op.m_eOp == OutputOp::Min)
+	) {
 		FindLocalMinMax<real>(
 			grid,
-			false,
+			(op.m_eOp == OutputOp::Min),
 			dataState,
 			ixCandidate,
 			op.m_dDistance,
@@ -195,10 +215,14 @@ void ApplyOutputOp(
 		sprintf(buf, szFormat, dValue);
 		strResult = buf;
 
-	} else if (op.m_eOp == OutputOp::MaxDist) {
+	// Distance to the minimum or maximum value within given range
+	} else if (
+		(op.m_eOp == OutputOp::MaxDist) ||
+		(op.m_eOp == OutputOp::MinDist)
+	) {
 		FindLocalMinMax<float>(
 			grid,
-			false,
+			(op.m_eOp == OutputOp::MinDist),
 			dataState,
 			ixCandidate,
 			op.m_dDistance,
@@ -209,10 +233,14 @@ void ApplyOutputOp(
 		sprintf(buf, szFormat, dRMax);
 		strResult = buf;
 
-	} else if (op.m_eOp == OutputOp::Min) {
+	// Coordinates (lon,lat) of the minimum or maximum value within given range
+	} else if (
+		(op.m_eOp == OutputOp::MaxCoordinate) ||
+		(op.m_eOp == OutputOp::MinCoordinate)
+	) {
 		FindLocalMinMax<float>(
 			grid,
-			true,
+			(op.m_eOp == OutputOp::MinCoordinate),
 			dataState,
 			ixCandidate,
 			op.m_dDistance,
@@ -220,13 +248,28 @@ void ApplyOutputOp(
 			dValue,
 			dRMax);
 
-		sprintf(buf, szFormat, dValue);
+		if ((ixExtremum <= 0) || (ixExtremum >= grid.m_dLon.GetRows())) {
+			_EXCEPTIONT("Extremum position out of range");
+		}
+		if (ixExtremum >= grid.m_dLat.GetRows()) {
+			_EXCEPTIONT("Longitude/latitude array size inconsistency in SimpleGrid");
+		}
+		sprintf(buf, "%3.6f", grid.m_dLon[ixExtremum] * 180.0 / M_PI);
 		strResult = buf;
 
-	} else if (op.m_eOp == OutputOp::MinDist) {
+		strResult += "\t";
+
+		sprintf(buf, "%3.6f", grid.m_dLat[ixExtremum] * 180.0 / M_PI);
+		strResult += buf;
+
+	// Coordinates (lon,lat) of the minimum or maximum value within given range
+	} else if (
+		(op.m_eOp == OutputOp::MaxIndex) ||
+		(op.m_eOp == OutputOp::MinIndex)
+	) {
 		FindLocalMinMax<float>(
 			grid,
-			true,
+			(op.m_eOp == OutputOp::MinIndex),
 			dataState,
 			ixCandidate,
 			op.m_dDistance,
@@ -234,9 +277,10 @@ void ApplyOutputOp(
 			dValue,
 			dRMax);
 
-		sprintf(buf, szFormat, dRMax);
+		sprintf(buf, "%i", ixExtremum);
 		strResult = buf;
 
+	// Average of the field over a given distance
 	} else if (op.m_eOp == OutputOp::Avg) {
 		FindLocalAverage<float>(
 			grid,
