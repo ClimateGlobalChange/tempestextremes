@@ -100,26 +100,32 @@ public:
 	///	</summary>
 	void GenerateLatitudeLongitude(
 		NcFile * ncFile,
-		bool fRegional
+		bool fRegional,
+		const std::string & strLatitudeName,
+		const std::string & strLongitudeName
 	) {
-		NcDim * dimLat = ncFile->get_dim("lat");
+		NcDim * dimLat = ncFile->get_dim(strLatitudeName.c_str());
 		if (dimLat == NULL) {
-			_EXCEPTIONT("No dimension \"lat\" found in input file");
+			_EXCEPTION1("No dimension \"%s\" found in input file",
+				strLatitudeName.c_str());
 		}
 
-		NcDim * dimLon = ncFile->get_dim("lon");
+		NcDim * dimLon = ncFile->get_dim(strLongitudeName.c_str());
 		if (dimLon == NULL) {
-			_EXCEPTIONT("No dimension \"lon\" found in input file");
+			_EXCEPTION1("No dimension \"%s\" found in input file",
+				strLongitudeName.c_str());
 		}
 
-		NcVar * varLat = ncFile->get_var("lat");
+		NcVar * varLat = ncFile->get_var(strLatitudeName.c_str());
 		if (varLat == NULL) {
-			_EXCEPTIONT("No variable \"lat\" found in input file");
+			_EXCEPTION1("No variable \"%s\" found in input file",
+				strLatitudeName.c_str());
 		}
 
-		NcVar * varLon = ncFile->get_var("lon");
+		NcVar * varLon = ncFile->get_var(strLongitudeName.c_str());
 		if (varLon == NULL) {
-			_EXCEPTIONT("No variable \"lon\" found in input file");
+			_EXCEPTION1("No variable \"%s\" found in input file",
+				strLongitudeName.c_str());
 		}
 
 		int nLat = dimLat->size();
@@ -141,6 +147,17 @@ public:
 
 		// Generate the SimpleGrid
 		GenerateLatitudeLongitude(vecLat, vecLon, fRegional);
+	}
+
+	///	<summary>
+	///		Try to automatically generate the SimpleGrid from a NetCDF
+	///		file with latitude/longitude coordinates.
+	///	</summary>
+	void GenerateLatitudeLongitude(
+		NcFile * ncFile,
+		bool fRegional
+	) {
+		return GenerateLatitudeLongitude(ncFile, fRegional, "lat", "lon");
 	}
 
 	///	<summary>

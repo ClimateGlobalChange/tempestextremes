@@ -627,6 +627,8 @@ public:
 		pvecThresholdOp(NULL),
 		pvecOutputOp(NULL),
 		nTimeStride(1),
+		strLatitudeName("lat"),
+		strLongitudeName("lon"),
 		fRegional(false),
 		fOutputHeader(false),
 		iVerbosityLevel(0)
@@ -674,6 +676,12 @@ public:
 
 	// Time stride
 	int nTimeStride;
+
+	// Name of the latitude dimension
+	std::string strLatitudeName;
+
+	// Name of the longitude dimension
+	std::string strLongitudeName;
 
 	// Regional (do not wrap longitudinal boundaries)
 	bool fRegional;
@@ -758,7 +766,11 @@ void DetectCyclonesUnstructured(
 
 	// No connectivity file; check for latitude/longitude dimension
 	} else {
-		grid.GenerateLatitudeLongitude(vecFiles[0], param.fRegional);
+		grid.GenerateLatitudeLongitude(
+			vecFiles[0],
+			param.fRegional,
+			param.strLatitudeName,
+			param.strLongitudeName);
 
 		nLon = grid.m_dLon.GetRows();
 		nLat = grid.m_dLat.GetRows();
@@ -1341,6 +1353,8 @@ try {
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,op,dist;...]");
 		CommandLineInt(dcuparam.nTimeStride, "timestride", 1);
+		CommandLineString(dcuparam.strLatitudeName, "latname", "lat");
+		CommandLineString(dcuparam.strLongitudeName, "lonname", "lon");
 		CommandLineBool(dcuparam.fRegional, "regional");
 		CommandLineBool(dcuparam.fOutputHeader, "out_header");
 		CommandLineInt(dcuparam.iVerbosityLevel, "verbosity", 0);
