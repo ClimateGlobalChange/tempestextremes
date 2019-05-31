@@ -200,6 +200,7 @@ for it,r in blob_extents.iterrows():
         omask=bslice*oslice
         rnew = calcAI(bmask,r)
         rnew['BI']=calcBI(omask)
+	rnew['calendar']=input_calendar
         df_indices=df_indices.append(rnew,ignore_index=True)
 
 
