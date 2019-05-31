@@ -76,7 +76,7 @@ int main(int argc,char**argv){
                         tVar->set_cur(long(0));
                         tVar->get(&(timeVec[0]),nTime);
 
-                        std::cout<<"Getting time info"<<std::endl;
+                       // std::cout<<"Getting time info"<<std::endl;
                         //Time units and calendar
                         std::string strCalendar;
                         std::string strTimeUnits;
@@ -87,14 +87,14 @@ int main(int argc,char**argv){
                     	 strTimeUnits = attTime->as_string(0);
                         std::cout<<"Time units are "<<strTimeUnits.c_str()<<std::endl;
                         NcAtt * attCal = tVar->get_att("calendar");
-                        std::cout<<"DEBUG: before if statement!"<<std::endl;
+                        //std::cout<<"DEBUG: before if statement!"<<std::endl;
                         if (attCal==NULL){
                                 std::cout<<"Calendar attribute does not exist; setting to standard."<<std::endl;
                                 strCalendar = "standard";
                         }else{
                                 strCalendar = attCal->as_string(0);
                         }
-                        std::cout<<"DEBUG: after if statement!"<<std::endl;
+                        //std::cout<<"DEBUG: after if statement!"<<std::endl;
                         std::cout<<"Calendar is "<<strCalendar.c_str();
                         std::vector<int> tIndices;
                         int prevYear=-9999;
@@ -109,7 +109,7 @@ int main(int argc,char**argv){
 		//		std::cout<<"prevdate is "<<prevYear<<prevMonth<<prevDay<<" and currdate is "<<currYear<<currMonth<<currDay<<std::endl;
 				if (std::fabs(currDay-prevDay)>0.01){
 					tIndices.push_back(t);
-				//	std::cout<<"Added time step "<<t<<"("<<currYear<<currMonth<<currDay<<" to vector"<<std::endl;
+					std::cout<<"Added time step "<<t<<" ("<<currYear<<currMonth<<currDay<<") to vector"<<std::endl;
 					prevYear = currYear;
 					prevMonth=currMonth;
 					prevDay = currDay;
@@ -160,8 +160,9 @@ int main(int argc,char**argv){
 				if (d<(nOutTime-1)){
 					de=tIndices[d+1]-1;
 				}else{
-					de=nTime;
+					de=nTime-1;
 				}
+				std::cout<<"ds is "<<ds<<" and de is "<<de<<std::endl;
 				for (int s=ds; s<=de; s++){
 				//	std::cout<<"s is currently "<<s<<std::endl;
 					//Set the time slice value
@@ -169,7 +170,6 @@ int main(int argc,char**argv){
 						inVar->set_cur(s,pIndex,0,0);
 						inVar->get(&(currSlice[0][0]),1,1,nLat,nLon);
 					}else{
-						std::cout<<"Getting data from time "<<s<<" for index "<<d<<std::endl;
 						inVar->set_cur(s,0,0);
 						inVar->get(&(currSlice[0][0]),1,nLat,nLon);
 					}
@@ -186,9 +186,6 @@ int main(int argc,char**argv){
 			for (int d=0; d<nOutTime; d++){
 				for (int a=0; a<nLat; a++){
 					for (int b=0; b<nLon; b++){
-						if (a==50 && b==100){
-							std::cout<<"dividing "<<datStore[d][a][b]<<" by "<<countStore[d][a][b]<<std::endl;
-						}
 						avgStore[d][a][b] = datStore[d][a][b]/countStore[d][a][b];
 					}
 				}

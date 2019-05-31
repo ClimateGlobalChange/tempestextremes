@@ -34,6 +34,7 @@ int main(int argc, char **argv){
 
     //list of input files for which to calculate deviations
     std::string fileList;
+    std::string fileOutList;
     //name of single input file
     std::string fileName;
     //name of single output file
@@ -65,6 +66,7 @@ int main(int argc, char **argv){
       CommandLineString(fileName, "in","");
       CommandLineString(outName, "out","");
       CommandLineString(fileList, "inlist", "");
+      CommandLineString(fileOutList,"outlist","");
       CommandLineString(varName,"varname","");
       CommandLineString(avgName, "avg", "");
       CommandLineString(avgVarName, "avgname","");
@@ -136,6 +138,12 @@ int main(int argc, char **argv){
       InputFiles.push_back(fileName);
     }
     nFiles = InputFiles.size();
+    std::vector<std::string> OutputFiles;
+  //Necessary because I need to write to a separate output directory!!
+    if (fileOutList!=""){
+      GetInputFileList(fileOutList,OutputFiles);
+    }
+
 
     //Open averages file
     NcFile avgFile(avgName.c_str());
@@ -237,7 +245,7 @@ int main(int argc, char **argv){
       }
     }
     tempFile.close();
-   
+    std::cout<<"tsteps is "<<tSteps<<std::endl; 
 		//First, the dev variable
     for (int x=0; x<nFiles; x++){
 
@@ -291,7 +299,7 @@ int main(int argc, char **argv){
       int z=0;
 
       //How many leap day times step are there?
-      if (strCalendar!="noleap"){
+      if (strCalendar!="noleap" && strCalendar!="360_day"){
         for (int t=0; t<nTime; t++){
           ParseTimeDouble(strTimeUnits, strCalendar, timeVals[t], leapYear,\
             leapMonth, leapDay, leapHour);
@@ -306,11 +314,15 @@ int main(int argc, char **argv){
       }else{
         outputTime = timeVals;
       }
+	std::cout<<"DEBUG: THERE ARE "<<nLeapSteps<<" leap days in file"<<std::endl;
       
       //Create output file that corresponds to IPV data
 
       std::string strOutFile;
-      if (outName != ""){
+      if (fileOutList!=""){
+        strOutFile = OutputFiles[x].c_str();
+      }
+      else if (outName != ""){
         strOutFile = outName;
       }else{
         pos = InputFiles[x].find(insuff);
@@ -321,6 +333,9 @@ int main(int argc, char **argv){
       std::cout<<"Writing unsmoothed anomaly variables to file "<<strOutFile.c_str()<<std::endl;
 			InputDevFiles.push_back(strOutFile);
       NcFile outfile(strOutFile.c_str(), NcFile::Replace, NULL,0,NcFile::Offset64Bits);
+      if (!outfile.is_valid()){
+	_EXCEPTION1("Couldn't open file %s",strOutFile.c_str());
+      }
       int nOutTime;
       nOutTime = nTime-nLeapSteps;
       NcDim *tDimOut = outfile.add_dim(tname.c_str(),nOutTime);
@@ -331,7 +346,6 @@ int main(int argc, char **argv){
       CopyNcVarAttributes(inTime,tVarOut);      
       tVarOut->set_cur((long) 0);
       tVarOut->put(&(outputTime[0]),nOutTime);
-
 
       NcVar *latVarOut = outfile.add_var(latname.c_str(),ncDouble,latDimOut);
       copy_dim_var(inLat,latVarOut);
@@ -353,6 +367,7 @@ int main(int argc, char **argv){
         calcDevs(false,ZGHval,fourDval,pIndex, tSteps, nOutTime, strTimeUnits, strCalendar, \
         varData, devOut, AvarData, inTime, avgTimeVals, inLat,missingNo);
       }
+
 			outfile.close();
     }
 		//Now, the smoothed devs
@@ -433,13 +448,22 @@ int main(int argc, char **argv){
                         //But first, check: are the files sequential?
 			if (x<(nFiles-1)){
 				NcFile nextFile(InputDevFiles[x+1].c_str());
+				std::cout<<"DEBUG: next file is "<<InputDevFiles[x+1].c_str()<<std::endl;
                                 NcVar * nextTvar = nextFile.get_var(tname.c_str());
                                 int nextTsz = nextFile.get_dim(tname.c_str())->size();
 				DataVector<double> nextVarVals(nextTsz);
 				nextTvar->set_cur((long) 0);
 				nextTvar->get(&(nextVarVals[0]),nextTsz);
-                                ParseTimeDouble(strTimeUnits,strCalendar,nextVarVals[0],nextYear,nextMonth,nextDay,nextHour);
-                                
+				std::string strNextTime;
+				std::string strNextCal;
+				NcAtt * nextAttTime = nextTvar->get_att("units");
+				if (nextAttTime==NULL){
+					_EXCEPTIONT("Time variable has no units attribute.");
+				}
+				strNextTime = nextAttTime->as_string(0);
+
+                                ParseTimeDouble(strNextTime,strCalendar,nextVarVals[0],nextYear,nextMonth,nextDay,nextHour);
+                               std::cout<<"prev date is "<<prevYear<<"/"<<prevMonth<<"/"<<prevDay<<" and next date is "<<nextYear<<"/"<<nextMonth<<"/"<<nextDay<<std::endl; 
 				isSequential = sequentialFiles(prevYear,prevMonth,prevDay,prevHour,\
                                   nextYear,nextMonth,nextDay,nextHour,strCalendar);
                                 if (isSequential == true){
@@ -447,6 +471,7 @@ int main(int argc, char **argv){
 					fillData->get(&(nextFileBuffer[0][0][0]),tSteps,nLat,nLon);
 				}
                                 else{
+				std::cout<<"Missing some steps, filling in with buffer"<<std::endl;
 				//Fill the buffer with fill values
 					for (int t=0; t<tSteps; t++){
 						for (int a=0; a<nLat; a++){
