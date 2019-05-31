@@ -89,6 +89,8 @@ parser.add_argument('--is4D',action="store_true")
 parser.add_argument("--hpa",action="store_true")
 parser.add_argument("--timename",default="time")
 parser.add_argument("--levname",default="plev")
+parser.add_argument("--latname",default="lat")
+parser.add_argument("--lonname",default="lon")
 parser.add_argument("-ld","--listdevs",required=True,action="store")
 parser.add_argument("-vd","--vardevs",default="ADZ")
 parser.add_argument("-o","--out",required=True,action="store")
@@ -97,9 +99,9 @@ results=parser.parse_args()
 
 fname_out=results.out
 fname=results.filemerged
-data_blob=results.listblob
-data_orig=results.listz500
-data_dev=results.listdevs
+data_blob=open(results.listblob).read().splitlines()
+data_orig=open(results.listz500).read().splitlines()
+data_dev=open(results.listdevs).read().splitlines()
 
 #xarray of blobfiles
 dblob=xa.open_mfdataset(data_blob,use_cftime=True)
@@ -110,7 +112,7 @@ var_blob=dblob[results.varblob]
 temp_open=xa.open_dataset(data_blob[0],decode_times=False)
 file_calendar=temp_open[results.timename].attrs['calendar']
 #xarray of anom files
-ddev=da.open_mfdataset(data_dev,use_cftime=True)
+ddev=xa.open_mfdataset(data_dev,use_cftime=True)
 ddev=ddev.rename({results.timename:'time',results.latname:'lat',results.lonname:'lon'})
 ddev=ddev.sortby(ddev['time'])
 var_devs=ddev[results.vardevs]
@@ -124,7 +126,7 @@ if (isinstance(tvar_check[0],cftime.Datetime360Day)==True):
 dorig=xa.open_mfdataset(data_orig,use_cftime=True)
 dorig=dorig.rename({results.timename:'time',results.latname:'lat',results.lonname:'lon'})
 if (input_calendar!='360_day'):
-    dorig=dorig.sel(time=~((dorig['time']dt.month==2) & (dorig['time'].dt.day == 29)))
+    dorig=dorig.sel(time=~((dorig['time'].dt.month==2) & (dorig['time'].dt.day == 29)))
 if (results.is4D==True):
     if (results.levname !='plev'):
         dorig=dorig.rename({results.levname:'plev'})
@@ -200,7 +202,7 @@ for it,r in blob_extents.iterrows():
         omask=bslice*oslice
         rnew = calcAI(bmask,r)
         rnew['BI']=calcBI(omask)
-	rnew['calendar']=input_calendar
+        rnew['calendar']=input_calendar
         df_indices=df_indices.append(rnew,ignore_index=True)
 
 

@@ -7,10 +7,10 @@ parser=argparse.ArgumentParser(description="Provide a text file list of BlobStat
 parser.add_argument("-f","--filelist",required=True,action="store")
 parser.add_argument("-o","--out",required=True,action="store")
 parser.add_argument("-s","--season",required=True,action="store")
-parser.add_argument("-r","region",required=True,action="store")
+parser.add_argument("-r","--region",required=True,action="store")
 parser.add_argument("-d","--dataset",required=True,action="store")
 results=parser.parse_args()
-flist=results.filelist
+flist=open(results.filelist).read().splitlines()
 s=results.season
 r=results.region
 d=results.dataset
