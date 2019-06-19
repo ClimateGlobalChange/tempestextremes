@@ -27,7 +27,7 @@ parser.add_argument("-o","--out",required=True,action="store")
 results=parser.parse_args()
 
 fname_out=results.out
-dat_in=read.csv(results.filein,na_filter=False)
+dat_in=pd.read_csv(results.filein,na_filter=False)
 dat_summ=pd.DataFrame()
 
 for f in sorted(list(set(dat_in['fname']))):
@@ -38,7 +38,7 @@ for f in sorted(list(set(dat_in['fname']))):
         dat_bsub = dat_bsub.sort_values('time')
         sline=dat_bsub.iloc[0]
         eline=dat_bsub.iloc[len(dat_bsub)-1]
-	calendar=sline['calendar']
+        calendar=sline['calendar']
         stime=sline['time']
         etime=eline['time']
         ysnum=int(stime[:4])
@@ -82,8 +82,9 @@ for f in sorted(list(set(dat_in['fname']))):
         dat_summ=dat_summ.append(dict_bsub,ignore_index=True)
 #Write to file
 colnames_summ=dict_bsub.keys()
-dat_summ=dat_summ[colnames_summ]
+print(colnames_summ)
+dat_summ=dat_summ[list(colnames_summ)]
 
 dat_summ.to_csv(fname_out,index=False,na_rep="_")
-
+print("Wrote {:}".format(fname_out))
 

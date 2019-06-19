@@ -78,7 +78,6 @@ def calcBI(field_mask):
     return(bi)
 
 
-
 parser=argparse.ArgumentParser(description="Provide the list of blobs, list of z500, list of anomaly, and the stats text file")
 parser.add_argument("-fm","--filemerged",required=True,action="store")
 parser.add_argument("-lb","--listblob",required=True,action="store")
@@ -108,6 +107,8 @@ dblob=xa.open_mfdataset(data_blob,use_cftime=True)
 dblob=dblob.rename({results.timename:'time',results.latname:'lat',results.lonname:'lon'})
 dblob=dblob.sortby(dblob['time'])
 var_blob=dblob[results.varblob]
+print("Opened blob variable")
+
 #Get the calendar by not decoding 
 temp_open=xa.open_dataset(data_blob[0],decode_times=False)
 file_calendar=temp_open[results.timename].attrs['calendar']
@@ -116,6 +117,8 @@ ddev=xa.open_mfdataset(data_dev,use_cftime=True)
 ddev=ddev.rename({results.timename:'time',results.latname:'lat',results.lonname:'lon'})
 ddev=ddev.sortby(ddev['time'])
 var_devs=ddev[results.vardevs]
+print("Opened anom variable.")
+
 #Determine what the input calendar should be
 tvar_check=var_devs['time'].values
 input_calendar='noleap'
@@ -157,7 +160,7 @@ if (isinstance(tvar_check[0],cftime.DatetimeNoLeap) == False) & (input_calendar=
         tstep=t3[t]
         t3[t] = cftime.DatetimeNoLeap(tstep.year,tstep.month,tstep.day,tstep.hour)
     var_blob['time'] = t3
-
+print("Opened Z500 variable.")
 
 #Merged file
 blob_extents=pd.read_csv(fname)
@@ -183,6 +186,7 @@ for it,r in blob_extents.iterrows():
     ymin=r['minlat']-0.001
     ymax=r['maxlat']+0.001
     if (sdate in tvar_check):
+        #print(sdate)
         #Need to deal with the case where there's the periodic boundary
         if (xmin>xmax):
             b1=var_blob.sel(time=sdate,lat=slice(ymin,ymax),lon=slice(xmin,360))
@@ -198,13 +202,17 @@ for it,r in blob_extents.iterrows():
             oslice = var_z500.sel(time=sdate,lat=slice(ymin,ymax),lon=slice(xmin,xmax))
             bslice=var_blob.sel(time=sdate,lat=slice(ymin,ymax),lon=slice(xmin,xmax))
             dslice=var_devs.sel(time=sdate,lat=slice(ymin,ymax),lon=slice(xmin,xmax))
-        bmask=bslice*dslice
-        omask=bslice*oslice
-        rnew = calcAI(bmask,r)
-        rnew['BI']=calcBI(omask)
-        rnew['calendar']=input_calendar
-        df_indices=df_indices.append(rnew,ignore_index=True)
-
+        num_pts=np.sum(bslice.values)
+        if num_pts>0:
+            bmask=bslice*dslice
+            omask=bslice*oslice
+            rnew = calcAI(bmask,r)
+            rnew['BI']=float(calcBI(omask))
+            rnew['calendar']=input_calendar
+            if rnew['AI']>0:
+                df_indices=df_indices.append(rnew,ignore_index=True)
+        else:
+            print("No points found in bslice ({:},{:},{:},{:})".format(xmin,xmax,ymin,ymax))
 
 df_indices.to_csv(fname_out,index=False,na_rep="_")  
-
+print("Wrote {:}".format(fname_out))

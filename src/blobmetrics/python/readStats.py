@@ -47,3 +47,4 @@ colnames_dat[len(colnames_dat)-1]='fname'
 #reorder the columns (it was bugging me)
 dat_total=dat_total[colnames_dat]
 dat_total.to_csv(fname_out,index=False,na_rep='_')
+print("wrote {:}".format(fname_out))

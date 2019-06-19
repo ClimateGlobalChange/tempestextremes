@@ -106,3 +106,4 @@ df_total=df_total.sort_values(['var','region','time'])
 #print("Length of stitchblobs for {:} {:} was {:} and length of detectblobs was {:}; length of merged dataframe is {:}".format(d,r,len(df_stitch),len(df_detect),len(df_total)))
 
 df_total.to_csv(fname_out,index=False,na_rep="_")
+print("Wrote {:}".format(fname_out))
