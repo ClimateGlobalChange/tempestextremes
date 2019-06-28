@@ -90,7 +90,7 @@ bool checkFileLeap(
   int leapDay=0;
   int leapHour=0;
 
-  if (strCalendar!="noleap" && dateMonth<=2){
+  if (strCalendar!="noleap" && strCalendar!="360_day" && dateMonth<=2){
     //Check whether file contains a Feb 29
 
     ParseTimeDouble(strTimeUnits, strCalendar, timeVal, leapYear,\
@@ -376,6 +376,10 @@ bool sequentialFiles(
   int nextHour,
   std::string strCalendar
 ){
+int yearLen = 365;
+if (strCalendar=="360_day"){
+yearLen=360;
+}
   bool isSequential = false;
   //Day in year of each date?
   int dayPrev = DayInYear(prevMonth,prevDay,strCalendar);
@@ -386,7 +390,7 @@ bool sequentialFiles(
   int dayDiff = dayNext-dayPrev;
   if (yearDiff <=1.){
     //Is the difference 365-1?
-    if (std::fabs(dayDiff)>=364){
+    if (std::fabs(dayDiff)>=(yearLen-1)){
       isSequential = true;
     }
     if (std::fabs(dayDiff)<=1){
@@ -1289,12 +1293,13 @@ void calcDevs( bool latNorm,
     //check if this time step is a leap day
     ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t], leapYear,\
       leapMonth, leapDay, leapHour);
-    if (leapMonth==2 && leapDay == 29){
+    if (leapMonth==2 && leapDay == 29 && strCalendar!="noleap" && strCalendar!="360_day"){
       std::cout<<"Leap day! Skipping time step."<<std::endl;
     }
     else{
       currAvgIndex = DayInYear(leapMonth,leapDay,strCalendar)-1;
-      avgIPV->set_cur(currAvgIndex,0,0);
+    //  std::cout<<"DEBUG: for date "<<leapMonth<<"/"<<leapDay<<" the avg index minus 1 is "<<currAvgIndex<<std::endl;
+	avgIPV->set_cur(currAvgIndex,0,0);
       avgIPV->get(&(avgMat[0][0]),1,nLat,nLon);
       for (int a=0; a<nLat; a++){
         //Denominator for Z500 anomaly lat normalization
@@ -1319,6 +1324,7 @@ void calcDevs( bool latNorm,
             inputVal /= 9.8;
           }
           devMat[a][b] = inputVal-avgMat[a][b];
+
           if (latNorm){
             devMat[a][b]*=sineRatio;
           }

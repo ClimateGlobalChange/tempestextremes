@@ -292,7 +292,7 @@ int main(int argc, char ** argv){
 
     //Add time units
     outTimeVar->add_att("units","days since 0001-01-01");
-
+    outTimeVar->add_att("calendar",strCalendar.c_str());
     NcDim *outLat = outfile.add_dim(latname.c_str(),latLen);
     NcDim *outLon = outfile.add_dim(lonname.c_str(),lonLen);
     NcVar *outLatVar = outfile.add_var(latname.c_str(),ncDouble,outLat);

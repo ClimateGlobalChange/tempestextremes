@@ -128,6 +128,7 @@ void add_vars_to_file(NcFile & infile,
 
 
 int main(int argc, char ** argv ){
+  NcError error(NcError::verbose_nonfatal);
   try{
   std::string fName;
   std::string fOut1;

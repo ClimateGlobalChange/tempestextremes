@@ -36,12 +36,14 @@ int main(int argc, char ** argv){
   try{
     std::string outFile,fileList,avgName,avgFile,varName,tname,latname,lonname;
     int nWavesLat,nWavesLon,nWavesTime;
+    double threshMin;
     BeginCommandLine()
       CommandLineString(outFile,"outfile","");
       CommandLineString(fileList,"inlist","");
       CommandLineString(avgFile,"davgfile","");
       CommandLineString(avgName,"davgname","");
       CommandLineString(varName,"dvarname","");
+      CommandLineDouble(threshMin,"threshmin",-99999);
       CommandLineString(tname,"tname","time");
       CommandLineString(latname,"latname","lat");
       CommandLineString(lonname,"lonname","lon");
@@ -66,6 +68,9 @@ int main(int argc, char ** argv){
     }
     if (outFile==""){
       _EXCEPTIONT("Need to provide output file name.");
+    }
+    if (threshMin<-99990){
+      _EXCEPTIONT("Need to provide minimum threshold value");
     }
     std::vector<std::string> vecFiles;
     GetInputFileList(fileList,vecFiles);
@@ -336,6 +341,9 @@ int main(int argc, char ** argv){
         FourierCoefs = DFT(inputDaily,nWavesTime);
         outputDaily = IDFT(FourierCoefs);
         for (int d=0; d<dLen; d++){
+          if (outputDaily[d]<threshMin){
+            outputDaily[d] = threshMin;
+          }
           outputMat[d][a][b] = outputDaily[d];
         }
       }

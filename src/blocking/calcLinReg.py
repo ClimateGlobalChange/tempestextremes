@@ -21,11 +21,15 @@ yrange=np.arange(0.,nyears)
 
 #This is just a pointer to the dataset
 dataset=xa.open_mfdataset(datafiles,decode_times=False,concat_dim=results.timename)
+#rename dims if necessary
+dataset=dataset.rename({results.timename:'time',results.latname:'lat',results.lonname:'lon'})
+
 #Read in the data
+
 svar=dataset[results.varname][:]
-tvar=dataset[results.timename][:]
-latvar=dataset[results.latname][:]
-lonvar=dataset[results.lonname][:]
+tvar=dataset['time'][:]
+latvar=dataset['lat'][:]
+lonvar=dataset['lon'][:]
 nlat=len(latvar)
 nlon=len(lonvar)
 ndays=dataset.chunks[results.timename][0]
@@ -42,12 +46,13 @@ for t in range(0,ndays):
     #print(dstring)
     #tsel=pd.date_range(start=dstring,periods=nyears,freq=pd.DateOffset(years=1))
     #Subset the data by the time steps
-    zpts=svar.sel(time=t).values
+    zpts=svar.sel(time=t)
     print("Subsetting for time {:d}".format(t))
     #Fit the linear regression to each lat/lon
     for x in range(0,nlat):
         for y in range(0,nlon):
-            zsub=zpts[:,x,y]
+            zsub=zpts.isel(lat=x,lon=y).values
+            print("subset for indices {:},{:}".format(x,y))
             #Check for nan
             idx=np.isfinite(yrange) & np.isfinite(zsub)
             m,b= np.polyfit(yrange[idx],zsub[idx],1)
@@ -57,11 +62,11 @@ for t in range(0,ndays):
 #Write the output file
 print("Writing {} to file".format(results.out))
 daysSince=np.arange(0.,ndays,dtype='d')
-dataset_out=xa.Dataset({'slope':([results.timename,results.latname,results.lonname],marray),
-    'intercept':([results.timename,results.latname,results.lonname],barray)},
-    coords={results.timename:daysSince,
-        results.latname:latvar,
-        results.lonname:lonvar})
+dataset_out=xa.Dataset({'slope':(['time','lat','lon'],marray),
+    'intercept':(['time','lat','lon'],barray)},
+    coords={'time':daysSince,
+        'lat':latvar,
+        'lon':lonvar})
 
 netcdf_calendar = "standard"
 if (ndays<365):
