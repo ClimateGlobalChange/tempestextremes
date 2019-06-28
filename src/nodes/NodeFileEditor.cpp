@@ -991,11 +991,9 @@ try {
 				// Loop through all PathNodes
 				for (int p = 0; p < pathvec.size(); p++) {
 					Path & path = pathvec[p];
+
 					for (int i = 0; i < pathvec[p].m_vecPathNodes.size(); i++) {
 						PathNode & pathnode = path.m_vecPathNodes[i];
-
-						double dThreshold =
-							pathnode.GetColumnDataAsDouble(cdhInput, strThreshold);
 
 						ColumnDataRadialVelocityProfile * pdat =
 							dynamic_cast<ColumnDataRadialVelocityProfile *>(
@@ -1007,6 +1005,36 @@ try {
 						}
 
 						const std::vector<double> & dArray = pdat->m_dUa;
+
+						if (dArray.size() == 0) {
+							_EXCEPTIONT("PathNode RadialVelocityProfile has zero size");
+						}
+						if (pdat->m_dR.size() != dArray.size()) {
+							_EXCEPTIONT("PathNode R array size different from Ua size");
+						}
+
+						// Get the threshold
+						double dThreshold;
+						if (strThreshold == "max") {
+							dThreshold = dArray[0];
+							for (int k = 0; k < dArray.size(); k++) {
+								if (dArray[k] > dThreshold) {
+									dThreshold = dArray[k];
+								}
+							}
+
+						} else if (strThreshold == "min") {
+							dThreshold = dArray[0];
+							for (int k = 0; k < dArray.size(); k++) {
+								if (dArray[k] < dThreshold) {
+									dThreshold = dArray[k];
+								}
+							}
+
+						} else {
+							dThreshold =
+								pathnode.GetColumnDataAsDouble(cdhInput, strThreshold);
+						}
 
 						// Find array index
 						int j = dArray.size()-1;
@@ -1034,6 +1062,13 @@ try {
 						} else if (strOp == "<") {
 							for (; j > 0; j--) {
 								if (dArray[j] < dThreshold) {
+									break;
+								}
+							}
+
+						} else if (strOp == "=") {
+							for (; j > 0; j--) {
+								if (dArray[j] == dThreshold) {
 									break;
 								}
 							}

@@ -199,7 +199,7 @@ void ParseNodeFile(
 			int nOutputSize = vecDelimitedOutput.size();
 
 			if (cdh.size() != nOutputSize-4) {
-				_EXCEPTION3("Mismatch between column label length (%i)"
+				_EXCEPTION3("Mismatch between column header size specified in format (%i)"
 					" and node file columns on line %i of \"%s\"",
 					static_cast<int>(cdh.size()), iLine, strNodeFile.c_str());
 			}
