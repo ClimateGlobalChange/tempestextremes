@@ -35,6 +35,10 @@ void ArgumentTree::SubParse(
 	char szListType
 ) {
 	if (str.length() == 0) {
+		if (szListType == '(') {
+			m_strArgumentList.push_back(str);
+			m_vecSubArguments.push_back(NULL);
+		}
 		return;
 	}
 
@@ -64,7 +68,6 @@ void ArgumentTree::SubParse(
 bool ArgumentTree::Parse(
 	const std::string & str
 ) {
-	//std::cout << str << std::endl;
 	if (m_strArgumentList.size() != 0) {
 		_EXCEPTIONT("Attempting to initialize already initialized ArgumentTree");
 	}
@@ -81,13 +84,33 @@ bool ArgumentTree::Parse(
 
 	// Search for semi-colon separated strings at top level
 	if (m_fSemiColonDelimited) {
+		bool fInQuote = false;
+
 		for (size_t i = 0; i <= str.length(); i++) {
+
+			// Quotation mark
+			if (fInQuote) {
+				if (str[i] == '\"') {
+					fInQuote = false;
+				}
+				continue;
+			}
+			if (str[i] == '\"') {
+				fInQuote = true;
+				continue;
+			}
 
 			// Semi-colon separator
 			if ((i == str.length()) || (str[i] == ';')) {
 				SubParse(str.substr(iLast,i-iLast), ';');
 				iLast = i+1;
 			}
+		}
+
+		// Unterminated quotation mark
+		if (fInQuote) {
+			_EXCEPTION1("Unterminated quotation mark found in input string \"%s\"",
+				str.c_str());
 		}
 
 		return true;
@@ -122,6 +145,20 @@ bool ArgumentTree::Parse(
 				iLast = i+1;
 				continue;
 			}
+		}
+
+		// Quotation mark
+		if (str[i] == '\"') {
+			for (i++; i < str.length(); i++) {
+				if (str[i] == '\"') {
+					break;
+				}
+			}
+			if (i == str.length()) {
+				_EXCEPTION1("Unterminated quotation mark found in input string \"%s\"",
+					str.c_str());
+			}
+			continue;
 		}
 
 		// Open parentheses

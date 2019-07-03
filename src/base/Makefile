@@ -19,7 +19,8 @@ FILES= Announce.cpp \
 	   SimpleGridUtilities.cpp \
 	   AutoCurator.cpp \
 	   ArgumentTree.cpp \
-	   NodeFileUtilities.cpp
+	   NodeFileUtilities.cpp \
+	   RLLPolygonArray.cpp
 
 LIB_TARGET= libextremesbase.a
 

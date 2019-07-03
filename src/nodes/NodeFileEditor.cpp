@@ -23,6 +23,7 @@
 #include "ArgumentTree.h"
 #include "STLStringHelper.h"
 #include "NodeFileUtilities.h"
+#include "RLLPolygonArray.h"
 
 #include "netcdfcpp.h"
 
@@ -204,8 +205,8 @@ void CalculateRadialProfile(
 		// Calculate azimuthal velocity
 		double dUa = dUx * dAx + dUy * dAy + dUz * dAz;
 		
-                // Azimuthal convention positive if cyclonic, flip in SH
-                if (dLat0 < 0.0) {
+		// Azimuthal convention positive if cyclonic, flip in SH
+		if (dLat0 < 0.0) {
 			dUa = -dUa;
 		}
 
@@ -503,8 +504,6 @@ void MaxClosedContourDelta(
 		ix0 = pathnode.m_gridix;
 	} else {
 		ix0 = pathnode.GetColumnDataAsInteger(cdh, strIndex);
-
-		//std::cout << pathnode.m_gridix << " " << ix0 << std::endl;
 	}
 
 	if ((ix0 < 0) || (ix0 >= grid.GetSize())) {
@@ -900,14 +899,24 @@ try {
 			}
 
 			// Get the function arguments
+			int nArguments = (-1);
 			const ArgumentTree * pargfunc = pargtree->GetSubTree(3);
-			if (pargfunc == NULL) {
-				_EXCEPTIONT("Logic error");
+			if (pargfunc != NULL) {
+				nArguments = pargfunc->size();
+			} else {
+				if ((*pargtree)[3] == "") {
+					nArguments = 0;
+				} else {
+					nArguments = 1;
+				}
 			}
+			//if (pargfunc == NULL) {
+			//	_EXCEPTIONT("Logic error");
+			//}
 
 			// radial_wind_profile
 			if ((*pargtree)[2] == "radial_wind_profile") {
-				if (pargfunc->size() != 4) {
+				if (nArguments != 4) {
 					_EXCEPTIONT("Syntax error: Function \"radial_wind_profile\" "
 						"requires four arguments:\n"
 						"radial_wind_profile(<u variable>, <v variable>, <# bins>, <bin width>)");
@@ -972,7 +981,7 @@ try {
 
 			// lastwhere
 			if ((*pargtree)[2] == "lastwhere") {
-				if (pargfunc->size() != 3) {
+				if (nArguments != 3) {
 					_EXCEPTIONT("Syntax error: Function \"lastwhere\" "
 						"requires three arguments:\n"
 						"lastwhere(<column name>, <op>, <threshold>)");
@@ -1093,7 +1102,7 @@ try {
 
 			// max_closed_contour_delta
 			if ((*pargtree)[2] == "max_closed_contour_delta") {
-				if ((pargfunc->size() < 2) && (pargfunc->size() > 3)) {
+				if ((nArguments < 2) && (nArguments > 3)) {
 					_EXCEPTIONT("Syntax error: Function \"max_closed_contour_delta\" "
 						"requires two or three arguments:\n"
 						"max_closed_contour_delta(<variable>, <radius>)\n"
@@ -1159,6 +1168,56 @@ try {
 				AnnounceEndBlock("Done");
 				continue;
 			}
+
+			// region_name
+			if ((*pargtree)[2] == "region_name") {
+				if (nArguments != 1) {
+					_EXCEPTIONT("Syntax error: Function \"region_name\" "
+						"requires one argument:\n"
+						"region_name(<filename>)");
+				}
+
+				std::string strFilename = (*pargtree)[3];
+				if (strFilename[0] == '\"') {
+					if ((strFilename.length() == 1) ||
+						(strFilename[strFilename.length()-1] != '\"')
+					) {
+						_EXCEPTION1("Unterminated quotation mark in filename \"%s\"",
+							strFilename.c_str());
+					}
+					strFilename = strFilename.substr(1,strFilename.length()-2);
+				}
+
+				RLLPolygonArray rllpolyarray;
+
+				rllpolyarray.FromFile(strFilename);
+
+				// Loop through all PathNodes
+				for (int p = 0; p < pathvec.size(); p++) {
+					Path & path = pathvec[p];
+
+					for (int i = 0; i < pathvec[p].m_vecPathNodes.size(); i++) {
+						PathNode & pathnode = path.m_vecPathNodes[i];
+
+						int ix0 = pathnode.m_gridix;
+
+						RLLPoint pt;
+						pt.lon = grid.m_dLon[ix0];
+						pt.lat = grid.m_dLat[ix0];
+
+						pathnode.PushColumnData(
+							new ColumnDataString(
+								rllpolyarray.NameOfRegionContainingPoint(pt)));
+
+					}
+				}
+
+				// Add new variable to ColumnDataHeader
+				cdhInput.push_back((*pargtree)[0]);
+
+				continue;
+			}
+
 /*
 			// sum_radius
 			if ((*pargtree)[2] == "sum_radius") {
