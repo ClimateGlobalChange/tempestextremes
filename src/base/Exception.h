@@ -56,6 +56,9 @@ throw Exception(__FILE__, __LINE__, text, var1, var2, var3, var4, var5, var6, va
 #define _EXCEPTION8(text, var1, var2, var3, var4, var5, var6, var7, var8) \
 throw Exception(__FILE__, __LINE__, text, var1, var2, var3, var4, var5, var6, var7, var8)
 
+#define _ASSERT(x) \
+if (!(x)) {_EXCEPTIONT("Assertion failure");}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #include <string>

@@ -39,7 +39,8 @@ public:
 
 public:
 	///	<summary>
-	///		Load in the node array from a file.
+	///		Load in the node array from a file, with vertices
+	///		specified in degrees.
 	///	</summary>
 	void FromFile(
 		const std::string & strFilename
@@ -49,11 +50,20 @@ public:
 	///	<summary>
 	///		Determine if the given point is within the polygon.
 	///	</summary>
+	///	<param name="pt_in_degrees">
+	///		Regular longitude-latitude coordinates of the testing
+	///		point in degrees.
+	///	</param>
 	const std::string & NameOfRegionContainingPoint(
-		const RLLPoint & pt
+		const RLLPoint & pt_in_degrees
 	);
 
 protected:
+	///	<summary>
+	///		Default polygon name.
+	///	</summary>
+	std::string m_strDefault;
+
 	///	<summary>
 	///		Array of polygon names.
 	///	</summary>
@@ -62,7 +72,7 @@ protected:
 	///	<summary>
 	///		Array of polygon nodes.
 	///	</summary>
-	RLLPointVector m_vecNodes;
+	std::vector<RLLPointVector> m_vecNodes;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

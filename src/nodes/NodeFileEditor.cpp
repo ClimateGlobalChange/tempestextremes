@@ -1202,8 +1202,8 @@ try {
 						int ix0 = pathnode.m_gridix;
 
 						RLLPoint pt;
-						pt.lon = grid.m_dLon[ix0];
-						pt.lat = grid.m_dLat[ix0];
+						pt.lon = grid.m_dLon[ix0] * 180.0 / M_PI;
+						pt.lat = grid.m_dLat[ix0] * 180.0 / M_PI;
 
 						pathnode.PushColumnData(
 							new ColumnDataString(

@@ -20,6 +20,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <cmath>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -160,7 +161,14 @@ void RLLPolygonArray::FromFile(
 								"Invalid float \"%s\"",
 								iLine, strFilename.c_str(), strText.c_str());
 						}
+						double dLat = atof(strText.c_str());
 						vecPolygonLat.push_back(atof(strText.c_str()));
+
+						if (fabs(dLat) > 90.0) {
+							_EXCEPTION3("Error on line %i of \"%s\": "
+								"Latitude of vertex out of range [-90,90] (%1.15e)",
+								iLine, strFilename.c_str(), dLat);
+						}
 
 						if (vecPolygonLat.size() == nVertexCount) {
 							eReadModePoly = RLLPolygonArray_ReadModePolyDone;
@@ -197,13 +205,48 @@ void RLLPolygonArray::FromFile(
 					iLine, strFilename.c_str());
 			}
 
+			// Check for line segments of zero length
+			for (int v = 0; v < nVertexCount; v++) {
+				int v1 = (v+1)%nVertexCount;
+
+				double dLon0 = vecPolygonLon[v];
+				double dLon1 = vecPolygonLon[v1];
+
+				double dLat0 = vecPolygonLat[v];
+				double dLat1 = vecPolygonLat[v1];
+
+				if ((fabs(dLon0 - dLon1) < 1.0e-13) && (fabs(dLat0 - dLat1) < 1.0e-13)) {
+					_EXCEPTION2("Line segment of zero length found on line %i of \"%s\"",
+						iLine, strFilename.c_str());
+				}
+			}
+
+			// Verify polygons don't exceed 360 degrees of longitude
+			double dMinLon = vecPolygonLon[0];
+			double dMaxLon = vecPolygonLon[0];
+			for (int v = 1; v < nVertexCount; v++) {
+				if (vecPolygonLon[v] < dMinLon) {
+					dMinLon = vecPolygonLon[v];
+				}
+				if (vecPolygonLon[v] > dMaxLon) {
+					dMaxLon = vecPolygonLon[v];
+				}
+			}
+			if (dMaxLon - dMinLon > 360.0) {
+				_EXCEPTION2("Polygons must not span more than 360 degrees of "
+					"longitude on line %i of \"%s\"", iLine, strFilename.c_str());
+			}
+
 			// Insert polygon vertices into array
+			int ixPoly = m_vecNames.size();
+
 			m_vecNames.push_back(strPolygonName);
+			m_vecNodes.push_back(RLLPointVector());
 			for (int v = 0; v < nVertexCount; v++) {
 				RLLPoint pt;
 				pt.lon = vecPolygonLon[v];
 				pt.lat = vecPolygonLat[v];
-				m_vecNodes.push_back(pt);
+				m_vecNodes[ixPoly].push_back(pt);
 			}
 
 			if (m_vecNames.size() == nPolygonCount) {
@@ -221,9 +264,115 @@ void RLLPolygonArray::FromFile(
 ///////////////////////////////////////////////////////////////////////////////
 
 const std::string & RLLPolygonArray::NameOfRegionContainingPoint(
-	const RLLPoint & pt
+	const RLLPoint & pt_in_degrees
 ) {
-	return m_vecNames[0];
+	static const double Threshold = 1.0e-13;
+
+	const RLLPoint & pt = pt_in_degrees;
+
+	_ASSERT(m_vecNames.size() != m_vecNodes.size());
+
+	// Loop through all regions starting at the top until we find one
+	// that matches.
+	for (int r = 0; r < m_vecNames.size(); r++) {
+
+		_ASSERT(m_vecNodes[r].size() > 0);
+
+		// Minimum longitude of polygon
+		double dMinLon = m_vecNodes[r][0].lon;
+		double dMaxLon = m_vecNodes[r][0].lon;
+		for (int i = 0; i < m_vecNodes[r].size(); i++) {
+			if (m_vecNodes[r][i].lon < dMinLon) {
+				dMinLon = m_vecNodes[r][i].lon;
+			}
+			if (m_vecNodes[r][i].lon > dMaxLon) {
+				dMaxLon = m_vecNodes[r][i].lon;
+			}
+		}
+		_ASSERT(dMaxLon - dMinLon <= 360.0);
+
+		// If a point is inside a closed region, then a ray cast from the point
+		// along a line of constant longitude will pass through an odd number
+		// of edges.
+		int nIntersections = 0;
+
+		for (int i = 0; i < m_vecNodes[r].size(); i++) {
+
+			int i1 = (i+1)%(m_vecNodes[r].size());
+
+			// Move search to [dMinLon, dMinLon + 360.0]
+			double dLon0 = pt.lon;
+			double dLat0 = pt.lat;
+
+			double dLon0Ix = floor((dLon0 - dMinLon) / 360.0);
+			dLon0 = dLon0 - dLon0Ix * 360.0;
+			_ASSERT((dLon0 >= dMinLon) && (dLon0 <= dMinLon + 360.0));
+			dLon0 -= dMinLon;
+
+			double dLon1 = m_vecNodes[r][i].lon - dMinLon;
+			double dLat1 = m_vecNodes[r][i].lat;
+
+			double dLon2 = m_vecNodes[r][i1].lon - dMinLon;
+			double dLat2 = m_vecNodes[r][i1].lat;
+
+			// Check for line segment of zero length
+			if ((fabs(dLon1 - dLon2) < Threshold) &&
+			    (fabs(dLat1 - dLat2) < Threshold)
+			) {
+				_EXCEPTIONT("Line segment of zero length detected");
+			}
+
+			// Check latitudes
+			if (fabs(dLat0) > 90.0 + Threshold) {
+				_EXCEPTION1("Latitude of point %1.5e out of range [-90,90]", dLat0);
+			}
+			if (fabs(dLat1) > 90.0 + Threshold) {
+				_EXCEPTION1("Latitude of edge %1.5e out of range [-90,90]", dLat1);
+			}
+			if (fabs(dLat2) > 90.0 + Threshold) {
+				_EXCEPTION1("Latitude of edge %1.5e out of range [-90,90]", dLat2);
+			}
+
+			// Edge of constant longitude
+			if (fabs(dLon1 - dLon2) < Threshold) {
+
+				// Check if the point lies along the edge
+				if (fabs(dLon1 - dLon0) < Threshold) {
+					double dT = (dLat0 - dLat1) / (dLat2 - dLat1);
+					if ((dT > -Threshold) && (dT < 1.0 + Threshold)) {
+						return m_vecNames[r];
+					}
+				}
+				continue;
+
+			// Not an edge of constant longitude
+			} else {
+
+				// Calculate longitude of intersection
+				double dT = (dLon0 - dLon1) / (dLon2 - dLon1);
+
+				// Latitude of intersection
+				double dLatI = dLat1 + dT * (dLat2 - dLat1);
+
+				// Check if point lies along edge
+				if (fabs(dLatI - dLat0) < Threshold) {
+					return m_vecNames[r];
+				}
+
+				// Check if ray intersects edge north of the point
+				if ((dLatI > dLat0) && (dT > Threshold) && (dT < 1.0 - Threshold)) {
+					nIntersections++;
+				}
+			}
+		}
+
+		// If the number of intersections is odd then the point is inside the polygon
+		if ((nIntersections % 2) == 1) {
+			return m_vecNames[r];
+		}
+	}
+
+	return m_strDefault;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
