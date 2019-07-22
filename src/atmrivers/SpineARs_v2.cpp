@@ -467,9 +467,6 @@ public:
 	///	</summary>
 	SpineARsParam() :
 		fpLog(NULL),
-		nLaplacianPoints(0),
-		dLaplacianDist(0.0),
-		dMinLaplacian(0.0),
 		dMinAbsLat(0.0),
 		fRegional(false),
 		iVerbosityLevel(0),
@@ -480,15 +477,6 @@ public:
 public:
 	// Log
 	FILE * fpLog;
-
-	// Number of points in Laplacian calculation
-	int nLaplacianPoints;
-
-	// Radius of the Laplacian (in degrees)
-	double dLaplacianDist;
-
-	// Minimum Laplacian
-	double dMinLaplacian;
 
 	// Minimum absolute latitude (in degrees)
 	double dMinAbsLat;
@@ -1029,16 +1017,7 @@ try {
 		CommandLineString(strOutputFileList, "out_file_list", "");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,name;...]");
-		//CommandLineString(sarparam.strIWVVariable, "var", "");
-		CommandLineInt(sarparam.nLaplacianPoints, "laplacianpoints", 8);
-		CommandLineDoubleD(sarparam.dLaplacianDist, "laplaciandist", 10.0, "(degrees)");
-		CommandLineDouble(sarparam.dMinLaplacian, "minlaplacian", 0.5e4);
 		CommandLineDouble(sarparam.dMinAbsLat, "minabslat", 15.0);
-		//CommandLineDouble(sarparam.dMinIWV, "minval", 20.0);
-		//CommandLineInt(nMinArea, "minarea", 0);
-		//CommandLineInt(nAddTimeDim, "addtimedim", -1);
-		//CommandLineString(strAddTimeDimUnits, "addtimedimunits", "");
-		//CommandLineBool(sarparam.fOutputLaplacian, "laplacianout");
 		CommandLineBool(sarparam.fRegional, "regional");
 		CommandLineInt(sarparam.iVerbosityLevel, "verbosity", 0);
 
