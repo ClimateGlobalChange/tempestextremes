@@ -20,6 +20,10 @@ else ifeq ($(UNAME),Linux)
     SYSTEM= CORI
     SYSTEM_MAKEFILE= cori.make
   endif
+  ifeq ($(findstring casper,$(HOST)),casper)
+    SYSTEM= CHEYENNE
+    SYSTEM_MAKEFILE= cheyenne.make
+  endif
   ifeq ($(findstring cheyenne,$(HOST)),cheyenne)
     SYSTEM= CHEYENNE
     SYSTEM_MAKEFILE= cheyenne.make
