@@ -13,11 +13,10 @@ MPIF90=            ftn
 
 # NetCDF
 NETCDF_ROOT=       $(NETCDF_DIR)
-NETCDF_CXX_ROOT=   /global/homes/p/paullric/netcdf-cxx-cori
-#NETCDF_CXX_ROOT=   /global/homes/m/marielp/netcdf-cxx-4.2
+NETCDF_CXX_ROOT=   $(TEMPESTEXTREMESDIR)/src/netcdf-cxx-4.2/
 NETCDF_CXXFLAGS=   -I$(NETCDF_ROOT)/include -I$(NETCDF_CXX_ROOT)/include
 NETCDF_LIBRARIES=  -lnetcdf -lnetcdf_c++
-NETCDF_LDFLAGS=    -L$(NETCDF_ROOT)/lib -L$(NETCDF_CXX_ROOT)/lib -Wl,-rpath=$(NETCDF_CXX_ROOT)/lib
+NETCDF_LDFLAGS=    -L$(NETCDF_ROOT)/lib -L$(NETCDF_CXX_ROOT) -Wl,-rpath=$(NETCDF_CXX_ROOT)
 
 # LAPACK (Intel MKL)
 LAPACK_INTERFACE=  FORTRAN
