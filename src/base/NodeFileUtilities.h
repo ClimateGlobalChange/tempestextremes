@@ -32,13 +32,6 @@ class AutoCurator;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-enum InputFileType {
-	InputFileTypeDCU,
-	InputFileTypeSN
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
 ///	<summary>
 ///		A vector of PathNode indices (path #, pathnode #).
 ///	</summary>
@@ -57,6 +50,14 @@ typedef std::map<Time, PathNodeIndexVector> TimeToPathNodeMap;
 class ColumnDataHeader {
 
 public:
+	///	<summary>
+	///		Assignment operator overload.
+	///	</summary>
+	ColumnDataHeader & operator=(const ColumnDataHeader & cdh) {
+		m_vecColumnHeader = cdh.m_vecColumnHeader;
+		return *this;
+	}
+
 	///	<summary>
 	///		Parse the format string for the column data header.
 	///	</summary>
@@ -111,6 +112,24 @@ public:
 			}
 		}
 		return (-1);
+	}
+
+	///	<summary>
+	///		Populate a vector of indices from a ColumnDataHeader.
+	///	</summary>
+	void GetIndicesFromColumnDataHeader(
+		const ColumnDataHeader & cdh,
+		std::vector<int> & vecColumnDataOutIx
+	) const {
+		for (int i = 0; i < cdh.size(); i++) {
+			int ix = GetIndexFromString(cdh[i]);
+			if (ix == (-1)) {
+				_EXCEPTION1("Unknown column data header \"%s\"",
+					cdh[i].c_str());
+			} else {
+				vecColumnDataOutIx.push_back(ix);
+			}
+		}
 	}
 
 	///	<summary>
@@ -474,7 +493,7 @@ public:
 	Time m_timeStart;
 
 	///	<summary>
-	///		Array of PathNodes in the path.
+	///		Array of PathNodes in the path, in temporal order.
 	///	</summary>
 	std::vector<PathNode> m_vecPathNodes;
 };
@@ -499,18 +518,98 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-///	<summary>
-///		Read in a node file and parse it into a PathVector.
-///	</summary>
-void ParseNodeFile(
-	const std::string & strNodeFile,
-	InputFileType iftype,
-	const ColumnDataHeader & cdh,
-	const SimpleGrid & grid,
-	Time::CalendarType caltype,
-	PathVector & pathvec,
-	TimeToPathNodeMap & mapTimeToPathNode
-);
+class NodeFile {
+
+public:
+	///	<summary>
+	///		Different types of NodeFiles.
+	///	</summary>
+	enum PathType {
+		PathTypeDCU,
+		PathTypeSN
+	};
+
+	///	<summary>
+	///		Format of the NodeFile.
+	///	</summary>
+	enum FileFormat {
+		FileFormatGFDL,
+		FileFormatCSV
+	};
+
+public:
+	///	<summary>
+	///		Read in a node file and parse it into a PathVector.
+	///	</summary>
+	void Read(
+		const std::string & strNodeFile,
+		PathType ePathType,
+		const ColumnDataHeader & cdh,
+		const SimpleGrid & grid,
+		Time::CalendarType caltype
+	);
+
+	///	<summary>
+	///		Write a node file.
+	///	</summary>
+	void Write(
+		const std::string & strNodeFile,
+		const SimpleGrid * pgrid = NULL,
+		const std::vector<int> * pvecColumnDataOutIx = NULL,
+		FileFormat eFileFormat = FileFormatGFDL,
+		bool fIncludeHeader = false
+	);
+
+public:
+	///	<summary>
+	///		Get the PathType associated with this NodeFile.
+	///	</summary>
+	const PathType & GetPathType() const {
+		return m_ePathType;
+	}
+
+	///	<summary>
+	///		Get the ColumnDataHeader.
+	///	</summary>
+	ColumnDataHeader & GetColumnDataHeader() {
+		return m_cdh;
+	}
+
+	///	<summary>
+	///		Get the PathVector.
+	///	</summary>
+	PathVector & GetPathVector() {
+		return m_pathvec;
+	}
+
+	///	<summary>
+	///		Get the TimeToPathNodeMap.
+	///	</summary>
+	TimeToPathNodeMap & GetTimeToPathNodeMap() {
+		return m_mapTimeToPathNode;
+	}
+
+public:
+	///	<summary>
+	///		The type of path described by this NodeFile.
+	///	</summary>
+	PathType m_ePathType;
+
+	///	<summary>
+	///		The ColumnDataHeaders of this file.
+	///	</summary>
+	ColumnDataHeader m_cdh;
+
+	///	<summary>
+	///		Vector of paths containing the ColumnData from the NodeFile.
+	///	</summary>
+	PathVector m_pathvec;
+
+	///	<summary>
+	///		A map from Times to PathNodes.
+	///	</summary>
+	TimeToPathNodeMap m_mapTimeToPathNode;
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 

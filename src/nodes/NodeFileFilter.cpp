@@ -207,6 +207,12 @@ try {
 	// Filter variables by distance
 	std::string strFilterByDist;
 
+	// Only output the mask
+	bool fMaskOnly;
+
+	// Apply the inverted filter
+	bool fInvert;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputNodeFile, "in_nodefile", "");
@@ -222,6 +228,8 @@ try {
 		CommandLineString(strOutputDataList, "out_data_list", "");
 
 		CommandLineString(strFilterByDist, "bydist", "");
+		CommandLineBool(fMaskOnly, "mask_only");
+		CommandLineBool(fInvert, "invert");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -244,7 +252,7 @@ try {
 			" may be specified");
 	}
 	if ((strOutputData.length() == 0) && (strOutputDataList.length() == 0)) {
-		_EXCEPTIONT("No output data file (--out_data) or (--out_data_list)"
+		_EXCEPTIONT("No output file (--out_data) or (--out_data_list)"
 			" specified");
 	}
 	if ((strOutputData.length() != 0) && (strOutputDataList.length() != 0)) {
@@ -256,14 +264,17 @@ try {
 	}
 
 	// Input file type
-	InputFileType iftype;
+	NodeFile::PathType iftype;
 	if (strInputNodeFileType == "DCU") {
-		iftype = InputFileTypeDCU;
+		iftype = NodeFile::PathTypeDCU;
 	} else if (strInputNodeFileType == "SN") {
-		iftype = InputFileTypeSN;
+		iftype = NodeFile::PathTypeSN;
 	} else {
 		_EXCEPTIONT("Invalid --in_nodefile_type, expected \"SN\" or \"DCU\"");
 	}
+
+	// NodeFile
+	NodeFile nodefile;
 
 	// Parse --in_fmt string
 	ColumnDataHeader cdhInput;
@@ -436,18 +447,16 @@ try {
 	}
 
 	// Parse NodeFile
-	PathVector pathvec;
-	TimeToPathNodeMap mapTimeToPathNode;
+	PathVector & pathvec = nodefile.GetPathVector();
+	TimeToPathNodeMap & mapTimeToPathNode = nodefile.GetTimeToPathNodeMap();
 
 	AnnounceStartBlock("Parsing nodefile");
-	ParseNodeFile(
+	nodefile.Read(
 		strInputNodeFile,
 		iftype,
 		cdhInput,
 		grid,
-		caltype,
-		pathvec,
-		mapTimeToPathNode);
+		caltype);
 	AnnounceEndBlock("Done");
 
 	// Create data array
@@ -637,8 +646,28 @@ try {
 				}
 
 				// Apply filter
-				for (int i = 0; i < data.GetRows(); i++) {
-					data[i] *= dataFilter[i];
+				if (!fMaskOnly) {
+					if (!fInvert) {
+						for (int i = 0; i < data.GetRows(); i++) {
+							data[i] *= dataFilter[i];
+						}
+					} else {
+						for (int i = 0; i < data.GetRows(); i++) {
+							data[i] *= (1.0 - dataFilter[i]);
+						}
+					}
+
+				// Only output the filter mask
+				} else {
+					if (!fInvert) {
+						for (int i = 0; i < data.GetRows(); i++) {
+							data[i] = dataFilter[i];
+						}
+					} else {
+						for (int i = 0; i < data.GetRows(); i++) {
+							data[i] = 1.0 - dataFilter[i];
+						}
+					}
 				}
 
 				// Write data

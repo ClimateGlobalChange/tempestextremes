@@ -357,7 +357,7 @@ public:
 	///		Get the month.
 	///	</summary>
 	inline int GetMonth() const {
-		if (m_eTimeType == TypeFixed) {
+		if ((m_eTimeType == TypeFixed) && (m_eCalendarType != CalendarNone)) {
 			return m_iMonth + 1;
 		} else {
 			return m_iMonth;
@@ -368,7 +368,7 @@ public:
 	///		Get the day.
 	///	</summary>
 	inline int GetDay() const {
-		if (m_eTimeType == TypeFixed) {
+		if ((m_eTimeType == TypeFixed) && (m_eCalendarType != CalendarNone)) {
 			return m_iDay + 1;
 		} else {
 			return m_iDay;
@@ -414,14 +414,22 @@ public:
 	///		Set the month.
 	///	</summary>
 	inline void SetMonth(int iMonth) {
-		m_iMonth = iMonth;
+		if ((m_eTimeType == TypeFixed) && (m_eCalendarType != CalendarNone)) {
+			m_iMonth = iMonth - 1;
+		} else {
+			m_iMonth = iMonth;
+		}
 	}
 
 	///	<summary>
 	///		Set the day.
 	///	</summary>
 	inline void SetDay(int iDay) {
-		m_iDay = iDay;
+		if ((m_eTimeType == TypeFixed) && (m_eCalendarType != CalendarNone)) {
+			m_iDay = iDay - 1;
+		} else {
+			m_iDay = iDay;
+		}
 	}
 
 	///	<summary>

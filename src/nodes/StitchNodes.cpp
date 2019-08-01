@@ -17,6 +17,7 @@
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
+#include "NodeFileUtilities.h"
 
 #include "kdtree.h"
 
@@ -146,7 +147,7 @@ void ParseInput(
 
 			ParseVariableList(strLine, vecTimes[iTime]);
 
-			if (vecTimes[iTime].size() < 5) {
+			if (vecTimes[iTime].size() != 5) {
 				_EXCEPTION1("Malformed time string:\n%s", strLine.c_str());
 			}
 
@@ -234,13 +235,13 @@ typedef std::vector< std::vector< std::vector<std::string> > > CandidateVector;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class PathSegment {
+class SimplePathSegment {
 
 public:
 	///	<summary>
 	///		Constructor.
 	///	</summary>
-	PathSegment(
+	SimplePathSegment(
 		int iTime0,
 		int iCandidate0,
 		int iTime1,
@@ -257,7 +258,7 @@ public:
 	///	<summary>
 	///		Comparator.
 	///	</summary>
-	bool operator< (const PathSegment & seg) const {
+	bool operator< (const SimplePathSegment & seg) const {
 		std::pair<int,int> pr0(m_iTime[0], m_iCandidate[0]);
 		std::pair<int,int> pr1(seg.m_iTime[0], seg.m_iCandidate[0]);
 		return (pr0 < pr1);
@@ -275,11 +276,11 @@ public:
 	int m_iCandidate[2];
 };
 
-typedef std::set<PathSegment> PathSegmentSet;
+typedef std::set<SimplePathSegment> SimplePathSegmentSet;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class Path {
+class SimplePath {
 
 public:
 	///	<summary>
@@ -293,7 +294,7 @@ public:
 	std::vector<int> m_iCandidates;
 };
 
-typedef std::vector<Path> PathVector;
+typedef std::vector<SimplePath> SimplePathVector;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -461,7 +462,7 @@ public:
 	///		Verify that the specified path satisfies the threshold op.
 	///	</summary>
 	bool Apply(
-		const Path & path,
+		const SimplePath & path,
 		const CandidateVector & vecCandidates
 	) {
 		int nCount = 0;
@@ -594,7 +595,7 @@ try {
 	int nTimeStride;
 
 	// Output format
-	std::string strOutputFormat;
+	std::string strOutputFileFormat;
 
 	// Thresholds
 	std::string strThreshold;
@@ -603,7 +604,7 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
 		CommandLineString(strOutputFile, "out", "");
-		CommandLineString(strFormat, "format", "no,i,j,lon,lat");
+		CommandLineString(strFormat, "format", "i,j,lon,lat");
 		CommandLineDoubleD(dRange, "range", 5.0, "(degrees)");
 		CommandLineInt(nMinPathLength, "minlength", 3);
 		CommandLineDoubleD(dMinEndpointDistance, "min_endpoint_dist", 0.0, "(degrees)");
@@ -612,7 +613,7 @@ try {
 		CommandLineStringD(strThreshold, "threshold", "",
 			"[col,op,value,count;...]");
 		CommandLineInt(nTimeStride, "timestride", 1);
-		CommandLineStringD(strOutputFormat, "out_format", "std", "(std|visit)");
+		CommandLineStringD(strOutputFileFormat, "out_file_format", "gfdl", "(gfdl|csv|csvnohead)");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -625,10 +626,11 @@ try {
 	}
 
 	// Output format
-	if ((strOutputFormat != "std") &&
-		(strOutputFormat != "visit")
+	if ((strOutputFileFormat != "gfdl") &&
+		(strOutputFileFormat != "csv") &&
+		(strOutputFileFormat != "csvnohead")
 	) {
-		_EXCEPTIONT("Output format must be either \"std\" or \"visit\"");
+		_EXCEPTIONT("Output format must be either \"gfdl\", \"csv\", or \"csvnohead\"");
 	}
 
 	// Parse format string
@@ -755,7 +757,7 @@ try {
 	// Create set of path segments
 	AnnounceStartBlock("Populating set of path segments");
 
-	std::vector<PathSegmentSet> vecPathSegmentsSet;
+	std::vector<SimplePathSegmentSet> vecPathSegmentsSet;
 	vecPathSegmentsSet.resize(vecTimes.size()-1);
 
 	// Insert nodes from this time level
@@ -817,7 +819,7 @@ try {
 
 					// Insert new path segment into set of path segments
 					vecPathSegmentsSet[t].insert(
-						PathSegment(t, i, t+g, iRes));
+						SimplePathSegment(t, i, t+g, iRes));
 
 					break;
 				}
@@ -830,7 +832,7 @@ try {
 	// Work forwards to find all paths
 	AnnounceStartBlock("Constructing paths");
 
-	std::vector< Path > vecPaths;
+	std::vector<SimplePath> vecPaths;
 
 	int nRejectedMinLengthPaths = 0;
 	int nRejectedMinEndpointDistPaths = 0;
@@ -844,9 +846,9 @@ try {
 		while (vecPathSegmentsSet[t].size() > 0) {
 
 			// Create a new path
-			Path path;
+			SimplePath path;
 
-			PathSegmentSet::iterator iterSeg
+			SimplePathSegmentSet::iterator iterSeg
 				= vecPathSegmentsSet[t].begin();
 
 			path.m_iTimes.push_back(iterSeg->m_iTime[0]);
@@ -865,7 +867,7 @@ try {
 					break;
 				}
 
-				PathSegment segFind(
+				SimplePathSegment segFind(
 					iterSeg->m_iTime[1], iterSeg->m_iCandidate[1], 0, 0);
 
 				vecPathSegmentsSet[tx].erase(iterSeg);
@@ -993,7 +995,60 @@ try {
 
 	// Write results out
 	AnnounceStartBlock("Writing results");
-	if (strOutputFormat == "std") {
+
+	// Convert the result into a NodeFile
+	{
+		NodeFile nodefile;
+		nodefile.m_ePathType = NodeFile::PathTypeSN;
+		nodefile.m_pathvec.resize(vecPaths.size());
+
+		for (int i = 0; i < vecFormatStrings.size(); i++) {
+			nodefile.m_cdh.push_back(vecFormatStrings[i]);
+		}
+
+		for (int i = 0; i < vecPaths.size(); i++) {
+			Path & path = nodefile.m_pathvec[i];
+			path.m_vecPathNodes.resize(vecPaths[i].m_iTimes.size());
+
+			if (vecPaths[i].m_iTimes.size() == 0) {
+				_EXCEPTIONT("Zero length Path found");
+			}
+
+			for (int t = 0; t < vecPaths[i].m_iTimes.size(); t++) {
+				PathNode & pathnode = path.m_vecPathNodes[t];
+
+				int iTime = vecPaths[i].m_iTimes[t];
+				_ASSERT(vecTimes[iTime].size() == 5);
+
+				int iCandidate = vecPaths[i].m_iCandidates[t];
+
+				int iYear = atoi(vecTimes[iTime][0].c_str());
+				int iMonth = atoi(vecTimes[iTime][1].c_str());
+				int iDay = atoi(vecTimes[iTime][2].c_str());
+				int iSecond = atoi(vecTimes[iTime][4].c_str()) * 3600;
+
+				path.m_vecPathNodes[t].m_time =
+					Time(iYear, iMonth, iDay, iSecond, 0, Time::CalendarNone);
+
+				for (int j = 0; j < vecCandidates[iTime][iCandidate].size(); j++) {
+					pathnode.m_vecColumnData.push_back(
+						new ColumnDataString(
+							vecCandidates[iTime][iCandidate][j]));
+				}
+			}
+
+			path.m_timeStart = path.m_vecPathNodes[0].m_time;
+		}
+		if (strOutputFileFormat == "gfdl") {
+			nodefile.Write(strOutputFile);
+		} else if (strOutputFileFormat == "csv") {
+			nodefile.Write(strOutputFile, NULL, NULL, NodeFile::FileFormatCSV, true);
+		} else if (strOutputFileFormat == "csvnohead") {
+			nodefile.Write(strOutputFile, NULL, NULL, NodeFile::FileFormatCSV, false);
+		}
+	}
+/*
+	if (strOutputFileFormat == "std") {
 		FILE * fp = fopen(strOutputFile.c_str(), "w");
 		if (fp == NULL) {
 			_EXCEPTION1("Failed to open output file \"%s\"",
@@ -1037,7 +1092,7 @@ try {
 		}
 		fclose(fp);
 
-	} else if (strOutputFormat == "visit") {
+	} else if (strOutputFileFormat == "visit") {
 		FILE * fp = fopen(strOutputFile.c_str(), "w");
 		if (fp == NULL) {
 			_EXCEPTION1("Failed to open output file \"%s\"",
@@ -1073,7 +1128,7 @@ try {
 			}
 		}
 	}
-
+*/
 	AnnounceEndBlock("Done");
 
 	// Cleanup

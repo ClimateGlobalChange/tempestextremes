@@ -637,7 +637,7 @@ try {
 	std::string strInputFileList;
 
 	// Input file type
-	std::string strInputFileType;
+	std::string strPathType;
 
 	// Input data file
 	std::string strInputData;
@@ -660,6 +660,9 @@ try {
 	// Output file
 	std::string strOutputFile;
 
+	// Output file format
+	std::string strOutputFileFormat;
+
 	// Calculation commands
 	std::string strCalculate;
 
@@ -673,7 +676,7 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in_file", "");
 		//CommandLineString(strInputFileList, "in_file_list", "");
-		CommandLineStringD(strInputFileType, "in_file_type", "SN", "[DCU|SN]");
+		CommandLineStringD(strPathType, "in_file_type", "SN", "[DCU|SN]");
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
@@ -683,6 +686,7 @@ try {
 		CommandLineString(strOutputFormat, "out_fmt", "");
 
 		CommandLineString(strOutputFile, "out_file", "");
+		CommandLineStringD(strOutputFileFormat, "out_file_format", "gfdl", "(gfdl|csv|csvnohead)");
 		//CommandLineBool(fOutputAppend, "out_append");
 
 		CommandLineString(strCalculate, "calculate", "");
@@ -716,16 +720,25 @@ try {
 		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list)"
 			" may be specified");
 	}
+	if ((strOutputFileFormat != "gfdl") &&
+		(strOutputFileFormat != "csv") &&
+		(strOutputFileFormat != "csvnohead")
+	) {
+		_EXCEPTIONT("Output format must be either \"gfdl\", \"csv\", or \"csvnohead\"");
+	}
 
 	// Input file type
-	InputFileType iftype;
-	if (strInputFileType == "DCU") {
-		iftype = InputFileTypeDCU;
-	} else if (strInputFileType == "SN") {
-		iftype = InputFileTypeSN;
+	NodeFile::PathType iftype;
+	if (strPathType == "DCU") {
+		iftype = NodeFile::PathTypeDCU;
+	} else if (strPathType == "SN") {
+		iftype = NodeFile::PathTypeSN;
 	} else {
 		_EXCEPTIONT("Invalid --in_file_type, expected \"SN\" or \"DCU\"");
 	}
+
+	// NodeFile
+	NodeFile nodefile;
 
 	// Parse in_fmt string
 	ColumnDataHeader cdhInput;
@@ -822,31 +835,34 @@ try {
 	}
 
 	// A map from Times to file lines, used for StitchNodes formatted output
-	TimeToPathNodeMap mapTimeToPathNode;
+	TimeToPathNodeMap & mapTimeToPathNode = nodefile.GetTimeToPathNodeMap();
+
+	// Vector of Path information
+	PathVector & pathvec = nodefile.GetPathVector();
 
 	// Loop over all files
 	for (int f = 0; f < vecInputFiles.size(); f++) {
 
 		AnnounceStartBlock("Processing input (%s)", vecInputFiles[f].c_str());
 
-		// Vector of Path information loaded from StitchNodes file
-		PathVector pathvec;
-
 		// Read contents of NodeFile into PathVector
 		AnnounceStartBlock("Reading file");
-		ParseNodeFile(
+		nodefile.Read(
 			vecInputFiles[f],
 			iftype,
 			cdhInput,
 			grid,
-			autocurator.GetCalendarType(),
-			pathvec,
-			mapTimeToPathNode);
+			autocurator.GetCalendarType());
+			//pathvec,
+			//mapTimeToPathNode);
 		AnnounceEndBlock("Done");
+
+		// Working ColumnDataHeader
+		ColumnDataHeader & cdhWorking = nodefile.m_cdh;
 
 /*
 		// Calculate velocity at each point
-		if (iftype == InputFileTypeSN) {
+		if (iftype == NodeFile::PathTypeSN) {
 
 			// Calculate trajectory velocity
 			Path & path = vecPaths[vecPaths.size()-1];
@@ -888,11 +904,11 @@ try {
 
 			// Assignment operation
 			if (pargtree->size() == 3) {
-				int ix = cdhInput.GetIndexFromString((*pargtree)[2]);
+				int ix = cdhWorking.GetIndexFromString((*pargtree)[2]);
 				if (ix == (-1)) {
 					_EXCEPTION1("Unknown column header \"%s\"", (*pargtree)[2].c_str());
 				}
-				cdhInput.push_back((*pargtree)[0]);
+				nodefile.m_cdh.push_back((*pargtree)[0]);
 				pathvec.Duplicate(ix);
 				AnnounceEndBlock("Done");
 				continue;
@@ -962,7 +978,7 @@ try {
 							varreg,
 							vecncDataFiles,
 							grid,
-							cdhInput,
+							cdhWorking,
 							iTime,
 							pathnode,
 							varixU,
@@ -973,7 +989,7 @@ try {
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhInput.push_back((*pargtree)[0]);
+				cdhWorking.push_back((*pargtree)[0]);
 
 				AnnounceEndBlock("Done");
 				continue;
@@ -988,7 +1004,7 @@ try {
 				}
 
 				// Get arguments
-				int ix = cdhInput.GetIndexFromString((*pargfunc)[0]);
+				int ix = cdhWorking.GetIndexFromString((*pargfunc)[0]);
 				if (ix == (-1)) {
 					_EXCEPTION1("Invalid column header \"%s\"", (*pargfunc)[0].c_str());
 				}
@@ -1042,7 +1058,7 @@ try {
 
 						} else {
 							dThreshold =
-								pathnode.GetColumnDataAsDouble(cdhInput, strThreshold);
+								pathnode.GetColumnDataAsDouble(cdhWorking, strThreshold);
 						}
 
 						// Find array index
@@ -1094,7 +1110,7 @@ try {
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhInput.push_back((*pargtree)[0]);
+				cdhWorking.push_back((*pargtree)[0]);
 
 				AnnounceEndBlock("Done");
 				continue;
@@ -1153,7 +1169,7 @@ try {
 							varreg,
 							vecncDataFiles,
 							grid,
-							cdhInput,
+							cdhWorking,
 							iTime,
 							pathnode,
 							varix,
@@ -1163,7 +1179,7 @@ try {
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhInput.push_back((*pargtree)[0]);
+				cdhWorking.push_back((*pargtree)[0]);
 
 				AnnounceEndBlock("Done");
 				continue;
@@ -1213,7 +1229,7 @@ try {
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhInput.push_back((*pargtree)[0]);
+				cdhWorking.push_back((*pargtree)[0]);
 
 				continue;
 			}
@@ -1262,7 +1278,7 @@ try {
 							varreg,
 							vecncDataFiles,
 							grid,
-							cdhInput,
+							cdhWorking,
 							iTime,
 							pathnode,
 							varix,
@@ -1271,7 +1287,7 @@ try {
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhInput.push_back((*pargtree)[0]);
+				cdhWorking.push_back((*pargtree)[0]);
 
 				AnnounceEndBlock("Done");
 				continue;
@@ -1287,57 +1303,38 @@ try {
 		// Output
 		if (strOutputFile != "") {
 			std::vector<int> vecColumnDataOutIx;
-			for (int i = 0; i < cdhOutput.size(); i++) {
-				int ix = cdhInput.GetIndexFromString(cdhOutput[i]);
-				if (ix == (-1)) {
-					_EXCEPTION1("Unknown column data header \"%s\"",
-						cdhOutput[i].c_str());
-				} else {
-					vecColumnDataOutIx.push_back(ix);
-				}
-			}
+			cdhWorking.GetIndicesFromColumnDataHeader(cdhOutput, vecColumnDataOutIx);
 
 			AnnounceStartBlock("Writing output");
-			FILE * fpOutput = fopen(strOutputFile.c_str(),"w");
 
-			if (iftype == InputFileTypeSN) {
-				for (int p = 0; p < pathvec.size(); p++) {
-					Path & path = pathvec[p];
-					fprintf(fpOutput, "start\t%i\t%i\t%i\t%i\t%i\n",
-						static_cast<int>(path.m_vecPathNodes.size()),
-						path.m_timeStart.GetYear(),
-						path.m_timeStart.GetMonth(),
-						path.m_timeStart.GetDay(),
-						path.m_timeStart.GetSecond() / 3600);
+			NodeFile::FileFormat nodefileformat;
+			if (strOutputFileFormat == "gfdl") {
+				nodefile.Write(
+					strOutputFile,
+					&grid,
+					&vecColumnDataOutIx,
+					NodeFile::FileFormatGFDL);
 
-					for (int i = 0; i < pathvec[p].m_vecPathNodes.size(); i++) {
-						PathNode & pathnode = path.m_vecPathNodes[i];
+			} else if (strOutputFileFormat == "csv") {
+				nodefile.Write(
+					strOutputFile,
+					&grid,
+					&vecColumnDataOutIx,
+					NodeFile::FileFormatCSV,
+					true);
 
-						if (grid.m_nGridDim.size() == 1) {
-							fprintf(fpOutput, "\t%lu", pathnode.m_gridix);
-						} else if (grid.m_nGridDim.size() == 2) {
-							fprintf(fpOutput, "\t%lu\t%lu",
-								pathnode.m_gridix % grid.m_nGridDim[1],
-								pathnode.m_gridix / grid.m_nGridDim[1]);
-						}
-
-						for (int j = 0; j < vecColumnDataOutIx.size(); j++) {
-							const ColumnData * pcd =
-								pathnode.m_vecColumnData[vecColumnDataOutIx[j]];
-							fprintf(fpOutput, "\t%s", pcd->ToString().c_str());
-						}
-
-						fprintf(fpOutput, "\t%i\t%i\t%i\t%i\n",
-							pathnode.m_time.GetYear(),
-							pathnode.m_time.GetMonth(),
-							pathnode.m_time.GetDay(),
-							pathnode.m_time.GetSecond() / 3600);
-					}
-				}
+			} else if (strOutputFileFormat == "csvnohead") {
+				nodefile.Write(
+					strOutputFile,
+					&grid,
+					&vecColumnDataOutIx,
+					NodeFile::FileFormatCSV,
+					false);
 
 			} else {
-				_EXCEPTIONT("Sorry, not yet implemented!");
+				_EXCEPTION();
 			}
+
 			AnnounceEndBlock("Done");
 		}
 		AnnounceEndBlock("Done");
