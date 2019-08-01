@@ -595,7 +595,7 @@ try {
 	int nTimeStride;
 
 	// Output format
-	std::string strOutputFormat;
+	std::string strOutputFileFormat;
 
 	// Thresholds
 	std::string strThreshold;
@@ -613,7 +613,7 @@ try {
 		CommandLineStringD(strThreshold, "threshold", "",
 			"[col,op,value,count;...]");
 		CommandLineInt(nTimeStride, "timestride", 1);
-		CommandLineStringD(strOutputFormat, "out_file_format", "gfdl", "(gfdl|csv)");
+		CommandLineStringD(strOutputFileFormat, "out_file_format", "gfdl", "(gfdl|csv|csvnohead)");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -626,10 +626,11 @@ try {
 	}
 
 	// Output format
-	if ((strOutputFormat != "gfdl") &&
-		(strOutputFormat != "csv")
+	if ((strOutputFileFormat != "gfdl") &&
+		(strOutputFileFormat != "csv") &&
+		(strOutputFileFormat != "csvnohead")
 	) {
-		_EXCEPTIONT("Output format must be either \"gfdl\" or \"csv\"");
+		_EXCEPTIONT("Output format must be either \"gfdl\", \"csv\", or \"csvnohead\"");
 	}
 
 	// Parse format string
@@ -1001,6 +1002,10 @@ try {
 		nodefile.m_ePathType = NodeFile::PathTypeSN;
 		nodefile.m_pathvec.resize(vecPaths.size());
 
+		for (int i = 0; i < vecFormatStrings.size(); i++) {
+			nodefile.m_cdh.push_back(vecFormatStrings[i]);
+		}
+
 		for (int i = 0; i < vecPaths.size(); i++) {
 			Path & path = nodefile.m_pathvec[i];
 			path.m_vecPathNodes.resize(vecPaths[i].m_iTimes.size());
@@ -1034,14 +1039,16 @@ try {
 
 			path.m_timeStart = path.m_vecPathNodes[0].m_time;
 		}
-		if (strOutputFormat == "gfdl") {
+		if (strOutputFileFormat == "gfdl") {
 			nodefile.Write(strOutputFile);
-		} else if (strOutputFormat == "csv") {
-			nodefile.Write(strOutputFile, NULL, NULL, NodeFile::FileFormatCSV);
+		} else if (strOutputFileFormat == "csv") {
+			nodefile.Write(strOutputFile, NULL, NULL, NodeFile::FileFormatCSV, true);
+		} else if (strOutputFileFormat == "csvnohead") {
+			nodefile.Write(strOutputFile, NULL, NULL, NodeFile::FileFormatCSV, false);
 		}
 	}
 /*
-	if (strOutputFormat == "std") {
+	if (strOutputFileFormat == "std") {
 		FILE * fp = fopen(strOutputFile.c_str(), "w");
 		if (fp == NULL) {
 			_EXCEPTION1("Failed to open output file \"%s\"",
@@ -1085,7 +1092,7 @@ try {
 		}
 		fclose(fp);
 
-	} else if (strOutputFormat == "visit") {
+	} else if (strOutputFileFormat == "visit") {
 		FILE * fp = fopen(strOutputFile.c_str(), "w");
 		if (fp == NULL) {
 			_EXCEPTION1("Failed to open output file \"%s\"",

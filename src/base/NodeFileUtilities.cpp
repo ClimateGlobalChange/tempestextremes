@@ -353,18 +353,33 @@ void NodeFile::Write(
 
 		// CSV file format
 		} else if (eFileFormat == FileFormatCSV) {
+
+			if (fIncludeHeader) {
+				fprintf(fpOutput, "track_id, year, month, day, hour");
+				if (pgrid != NULL) {
+					if (pgrid->m_nGridDim.size() == 1) {
+						fprintf(fpOutput, ", i");
+					} else {
+						fprintf(fpOutput, ", i, j");
+					}
+				}
+				if (pvecColumnDataOutIx == NULL) {
+					for (int i = 0; i < m_cdh.size(); i++) {
+						fprintf(fpOutput, ", %s", m_cdh[i].c_str());
+					}
+
+				} else {
+					for (int j = 0; j < pvecColumnDataOutIx->size(); j++) {
+						fprintf(fpOutput, ", %s", m_cdh[(*pvecColumnDataOutIx)[j]].c_str());
+					}
+				}
+				fprintf(fpOutput,"\n");
+			}
+
 			for (int p = 0; p < m_pathvec.size(); p++) {
 				Path & path = m_pathvec[p];
 				if (m_pathvec[p].m_vecPathNodes.size() == 0) {
 					_EXCEPTIONT("Zero length Path found");
-				}
-
-				if (fIncludeHeader) {
-					fprintf(fpOutput, "track_id, year, month, day, hour");
-					for (int i = 0; i < m_cdh.size(); i++) {
-						fprintf(fpOutput, ", %s", m_cdh[i].c_str());
-					}
-					fprintf(fpOutput,"\n");
 				}
 
 				for (int i = 0; i < m_pathvec[p].m_vecPathNodes.size(); i++) {
