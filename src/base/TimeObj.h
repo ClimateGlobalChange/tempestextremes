@@ -135,6 +135,8 @@ public:
 			return CalendarNone;
 		} else if (strCalendarTemp == "noleap") {
 			return CalendarNoLeap;
+		} else if (strCalendarTemp == "365_day"){
+			return CalendarNoLeap;
 		} else if (strCalendarTemp == "standard") {
 			return CalendarStandard;
 		} else if (strCalendarTemp == "gregorian") {
