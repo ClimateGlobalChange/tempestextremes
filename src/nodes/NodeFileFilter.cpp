@@ -256,14 +256,17 @@ try {
 	}
 
 	// Input file type
-	InputFileType iftype;
+	NodeFile::PathType iftype;
 	if (strInputNodeFileType == "DCU") {
-		iftype = InputFileTypeDCU;
+		iftype = NodeFile::PathTypeDCU;
 	} else if (strInputNodeFileType == "SN") {
-		iftype = InputFileTypeSN;
+		iftype = NodeFile::PathTypeSN;
 	} else {
 		_EXCEPTIONT("Invalid --in_nodefile_type, expected \"SN\" or \"DCU\"");
 	}
+
+	// NodeFile
+	NodeFile nodefile;
 
 	// Parse --in_fmt string
 	ColumnDataHeader cdhInput;
@@ -436,18 +439,16 @@ try {
 	}
 
 	// Parse NodeFile
-	PathVector pathvec;
-	TimeToPathNodeMap mapTimeToPathNode;
+	PathVector & pathvec = nodefile.GetPathVector();
+	TimeToPathNodeMap & mapTimeToPathNode = nodefile.GetTimeToPathNodeMap();
 
 	AnnounceStartBlock("Parsing nodefile");
-	ParseNodeFile(
+	nodefile.Read(
 		strInputNodeFile,
 		iftype,
 		cdhInput,
 		grid,
-		caltype,
-		pathvec,
-		mapTimeToPathNode);
+		caltype);
 	AnnounceEndBlock("Done");
 
 	// Create data array
