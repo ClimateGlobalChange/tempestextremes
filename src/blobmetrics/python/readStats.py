@@ -19,7 +19,7 @@ fname_out=results.out
 
 #Get the headers from the first file
 colnames=open(flist[0]).readlines()[0].strip().split(",")
-colnames_full=["var","bnum","season","region"]
+colnames_full=["var","bnum","calendar","season","region"]
 colnames_full.extend(colnames)
 colnames_full.append("fname")
 
