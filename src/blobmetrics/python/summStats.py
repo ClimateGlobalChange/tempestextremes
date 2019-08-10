@@ -24,7 +24,7 @@ def getDistanceFromLatLonInKm(lat1,lon1,lat2,lon2):
 parser=argparse.ArgumentParser(description="Parse the merged/index file and summarize")
 parser.add_argument("-f","--filein",required=True,action="store")
 parser.add_argument("-o","--out",required=True,action="store")
-parser.add_argument("-c","--calendar",required=True,action="store")
+#parser.add_argument("-c","--calendar",required=True,action="store")
 results=parser.parse_args()
 
 fname_out=results.out
@@ -39,7 +39,7 @@ for f in sorted(list(set(dat_in['fname']))):
         dat_bsub = dat_bsub.sort_values('time')
         sline=dat_bsub.iloc[0]
         eline=dat_bsub.iloc[len(dat_bsub)-1]
-        calendar=results.calendar
+        calendar=sline['calendar']
         stime=sline['time']
         etime=eline['time']
         ysnum=int(stime[:4])
