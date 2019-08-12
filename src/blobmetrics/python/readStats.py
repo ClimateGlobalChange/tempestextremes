@@ -9,7 +9,7 @@ parser.add_argument("-o","--out",required=True,action="store")
 parser.add_argument("-s","--season",required=True,action="store")
 parser.add_argument("-r","--region",required=True,action="store")
 parser.add_argument("-d","--dataset",required=True,action="store")
-parser.add_argument("-c","--calendar",required=True,action="store")
+#parser.add_argument("-c","--calendar",required=True,action="store")
 results=parser.parse_args()
 flist=open(results.filelist).read().splitlines()
 s=results.season
@@ -19,7 +19,7 @@ fname_out=results.out
 
 #Get the headers from the first file
 colnames=open(flist[0]).readlines()[0].strip().split(",")
-colnames_full=["var","bnum","calendar","season","region"]
+colnames_full=["var","bnum","season","region"]
 colnames_full.extend(colnames)
 colnames_full.append("fname")
 
@@ -34,7 +34,8 @@ for str_file in flist:
             if "Blob" in lin[0]:
                 bnum=lin[0].split()[1]
             else:
-                dict_line={"var":d,"bnum":bnum,"time":lin[0],"season":s,"region":r,"calendar":results.calendar,"fname":str_file}
+                dict_line={"var":d,"bnum":bnum,"time":lin[0],"season":s,"region":r,"fname":str_file}
+#                dict_line={"var":d,"bnum":bnum,"time":lin[0],"season":s,"region":r,"calendar":results.calendar,"fname":str_file}
                 nc=1
                 for v in colnames[1:len(colnames)]:
                     dict_line[v]=float(lin[nc])
