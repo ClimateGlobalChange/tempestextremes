@@ -24,6 +24,7 @@ def getDistanceFromLatLonInKm(lat1,lon1,lat2,lon2):
 parser=argparse.ArgumentParser(description="Parse the merged/index file and summarize")
 parser.add_argument("-f","--filein",required=True,action="store")
 parser.add_argument("-o","--out",required=True,action="store")
+#parser.add_argument("-c","--calendar",required=True,action="store")
 results=parser.parse_args()
 
 fname_out=results.out
