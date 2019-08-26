@@ -45,6 +45,157 @@ void CalculateRadialProfile(
 	const ColumnDataHeader & cdh,
 	int iTime,
 	PathNode & pathnode,
+	VariableIndex varix,
+	std::string strBins,
+	std::string strBinWidth
+) {
+	// Get number of bins
+	int nBins = pathnode.GetColumnDataAsInteger(cdh, strBins);
+
+	// Get bin width
+	double dBinWidth = pathnode.GetColumnDataAsDouble(cdh, strBinWidth);
+
+	// Check arguments
+	if (nBins <= 0) {
+		_EXCEPTIONT("\nNonpositive value of <bins> argument given");
+	}
+	if (dBinWidth <= 0.0) {
+		_EXCEPTIONT("\nNonpositive value of <bin_width> argument given");
+	}
+	if (static_cast<double>(nBins) * dBinWidth > 180.0) {
+		_EXCEPTIONT("\n<bins> x <bin_width> must be no larger than 180 (degrees)");
+	}
+
+	// Get the center grid index
+	const int ix0 = pathnode.m_gridix;
+
+	// Load the data
+	Variable & var = varreg.Get(varix);
+	var.LoadGridData(varreg, vecFiles, grid, iTime);
+	const DataVector<float> & dataState = var.GetData();
+
+	// Verify that dRadius is less than 180.0
+	double dRadius = dBinWidth * static_cast<double>(nBins);
+
+	if ((dRadius < 0.0) || (dRadius > 180.0)) {
+		_EXCEPTIONT("Radius must be in the range [0.0, 180.0]");
+	}
+
+	// Check grid index
+	if (ix0 >= grid.m_vecConnectivity.size()) {
+		_EXCEPTION2("Grid index (%i) out of range (< %i)",
+			ix0, static_cast<int>(grid.m_vecConnectivity.size()));
+	}
+
+	// Central lat/lon and Cartesian coord
+	double dLon0 = grid.m_dLon[ix0];
+	double dLat0 = grid.m_dLat[ix0];
+
+	// Allocate bins
+	std::vector< std::vector<double> > dValues;
+	dValues.resize(nBins);
+
+	// Queue of nodes that remain to be visited
+	std::queue<int> queueNodes;
+	for (int n = 0; n < grid.m_vecConnectivity[ix0].size(); n++) {
+		queueNodes.push(grid.m_vecConnectivity[ix0][n]);
+	}
+
+	// Set of nodes that have already been visited
+	std::set<int> setNodesVisited;
+
+	// Loop through all latlon elements
+	while (queueNodes.size() != 0) {
+		int ix = queueNodes.front();
+		queueNodes.pop();
+
+		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
+			continue;
+		}
+
+		setNodesVisited.insert(ix);
+
+		// Don't perform calculation on central node
+		if (ix == ix0) {
+			continue;
+		}
+
+		// lat/lon and Cartesian coords of this point
+		double dLat = grid.m_dLat[ix];
+		double dLon = grid.m_dLon[ix];
+
+		// Great circle distance to this element (in degrees)
+		double dR =
+			sin(dLat0) * sin(dLat)
+			+ cos(dLat0) * cos(dLat) * cos(dLon - dLon0);
+
+		if (dR >= 1.0) {
+			dR = 0.0;
+		} else if (dR <= -1.0) {
+			dR = 180.0;
+		} else {
+			dR = 180.0 / M_PI * acos(dR);
+		}
+		if (dR != dR) {
+			_EXCEPTIONT("NaN value detected");
+		}
+
+		if (dR >= dRadius) {
+			continue;
+		}
+
+		// Determine bin
+		int iBin = static_cast<int>(dR / dBinWidth);
+		if (iBin >= nBins) {
+			_EXCEPTIONT("Logic error");
+		}
+
+		dValues[iBin].push_back(dataState[ix]);
+
+		if (iBin < nBins-1) {
+			dValues[iBin+1].push_back(dataState[ix]);
+		}
+
+		// Add all neighbors of this point
+		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+			queueNodes.push(grid.m_vecConnectivity[ix][n]);
+		}
+	}
+
+	// Construct radial profile
+	ColumnDataRadialProfile * pdat =
+		new ColumnDataRadialProfile;
+
+	pathnode.PushColumnData(pdat);
+
+	pdat->m_dR.resize(nBins);
+	pdat->m_dValues.resize(nBins);
+
+	pdat->m_dR[0] = 0.0;
+	pdat->m_dValues[0] = 0.0;
+	for (int i = 1; i < nBins; i++) {
+		double dAvg = 0.0;
+		if (dValues[i].size() != 0) {
+			for (int j = 0; j < dValues[i].size(); j++) {
+				dAvg += dValues[i][j];
+			}
+			dAvg /= static_cast<double>(dValues[i].size());
+		}
+		pdat->m_dR[i] = static_cast<double>(i) * dBinWidth;
+		pdat->m_dValues[i] = dAvg;
+	}
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void CalculateRadialWindProfile(
+	VariableRegistry & varreg,
+	NcFileVector & vecFiles,
+	const SimpleGrid & grid,
+	const ColumnDataHeader & cdh,
+	int iTime,
+	PathNode & pathnode,
 	VariableIndex varixU,
 	VariableIndex varixV,
 	std::string strBins,
@@ -930,6 +1081,65 @@ try {
 			//	_EXCEPTIONT("Logic error");
 			//}
 
+			// radial_profile
+			if ((*pargtree)[2] == "radial_profile") {
+				if (nArguments != 3) {
+					_EXCEPTIONT("Syntax error: Function \"radial_profile\" "
+						"requires three arguments:\n"
+						"radial_wind_profile(<variable>, <# bins>, <bin width>)");
+				}
+
+				// Parse zonal wind variable
+				Variable var;
+				var.ParseFromString(varreg, (*pargfunc)[0]);
+				VariableIndex varix = varreg.FindOrRegister(var);
+
+				// Loop through all Times
+				TimeToPathNodeMap::iterator iterPathNode =
+					mapTimeToPathNode.begin();
+				for (; iterPathNode != mapTimeToPathNode.end(); iterPathNode++) {
+					const Time & time = iterPathNode->first;
+
+					// Unload data from the VariableRegistry
+					varreg.UnloadAllGridData();
+
+					// Open NetCDF files with data at this time
+					NcFileVector vecncDataFiles;
+					int iTime;
+					autocurator.Find(time, vecncDataFiles, iTime);
+					if (vecncDataFiles.size() == 0) {
+						_EXCEPTION1("Time (%s) does not exist in input data fileset",
+							time.ToString().c_str());
+					}
+
+					// Loop through all PathNodes which need calculating at this Time
+					for (int i = 0; i < iterPathNode->second.size(); i++) {
+						int iPath = iterPathNode->second[i].first;
+						int iPathNode = iterPathNode->second[i].second;
+
+						PathNode & pathnode =
+							pathvec[iPath].m_vecPathNodes[iPathNode];
+
+						CalculateRadialProfile(
+							varreg,
+							vecncDataFiles,
+							grid,
+							cdhWorking,
+							iTime,
+							pathnode,
+							varix,
+							(*pargfunc)[1],
+							(*pargfunc)[2]);
+					}
+				}
+
+				// Add new variable to ColumnDataHeader
+				cdhWorking.push_back((*pargtree)[0]);
+
+				AnnounceEndBlock("Done");
+				continue;
+			}
+
 			// radial_wind_profile
 			if ((*pargtree)[2] == "radial_wind_profile") {
 				if (nArguments != 4) {
@@ -974,7 +1184,7 @@ try {
 						PathNode & pathnode =
 							pathvec[iPath].m_vecPathNodes[iPathNode];
 
-						CalculateRadialProfile(
+						CalculateRadialWindProfile(
 							varreg,
 							vecncDataFiles,
 							grid,
@@ -1020,21 +1230,22 @@ try {
 					for (int i = 0; i < pathvec[p].m_vecPathNodes.size(); i++) {
 						PathNode & pathnode = path.m_vecPathNodes[i];
 
-						ColumnDataRadialVelocityProfile * pdat =
-							dynamic_cast<ColumnDataRadialVelocityProfile *>(
+						ColumnDataDoubleArrayTemplate * pdat =
+							dynamic_cast<ColumnDataDoubleArrayTemplate *>(
 								pathnode.m_vecColumnData[ix]);
 
 						if (pdat == NULL) {
-							_EXCEPTION1("Cannot cast \"%s\" to RadialVelocityProfile type",
+							_EXCEPTION1("Cannot cast \"%s\" to DoubleArray type",
 								(*pargfunc)[0].c_str());
 						}
 
-						const std::vector<double> & dArray = pdat->m_dUa;
+						const std::vector<double> & dArray = pdat->GetValues();
+						const std::vector<double> & dIndices = pdat->GetIndices();
 
 						if (dArray.size() == 0) {
-							_EXCEPTIONT("PathNode RadialVelocityProfile has zero size");
+							_EXCEPTIONT("PathNode RadialProfile has zero size");
 						}
-						if (pdat->m_dR.size() != dArray.size()) {
+						if (dIndices.size() != dArray.size()) {
 							_EXCEPTIONT("PathNode R array size different from Ua size");
 						}
 
@@ -1105,7 +1316,91 @@ try {
 
 						// Add this data to the pathnode
 						pathnode.PushColumnData(
-							new ColumnDataDouble(pdat->m_dR[j]));
+							new ColumnDataDouble(dIndices[j]));
+					}
+				}
+
+				// Add new variable to ColumnDataHeader
+				cdhWorking.push_back((*pargtree)[0]);
+
+				AnnounceEndBlock("Done");
+				continue;
+			}
+
+			// Extract the value of an array at a given radius
+			if ((*pargtree)[2] == "value") {
+				if (nArguments != 2) {
+					_EXCEPTIONT("Syntax error: Function \"value\" "
+						"requires two arguments:\n"
+						"lastwhere(<column name>, <index>)");
+				}
+
+				// Get arguments
+				int ix = cdhWorking.GetIndexFromString((*pargfunc)[0]);
+				if (ix == (-1)) {
+					_EXCEPTION1("Invalid column header \"%s\"", (*pargfunc)[0].c_str());
+				}
+
+				const std::string & strIndex = (*pargfunc)[1];
+
+				// Loop through all PathNodes
+				for (int p = 0; p < pathvec.size(); p++) {
+					Path & path = pathvec[p];
+
+					for (int i = 0; i < pathvec[p].m_vecPathNodes.size(); i++) {
+						PathNode & pathnode = path.m_vecPathNodes[i];
+
+						ColumnDataDoubleArrayTemplate * pdat =
+							dynamic_cast<ColumnDataDoubleArrayTemplate *>(
+								pathnode.m_vecColumnData[ix]);
+
+						if (pdat == NULL) {
+							_EXCEPTION1("Cannot cast \"%s\" to DoubleArray type",
+								(*pargfunc)[0].c_str());
+						}
+
+						const std::vector<double> & dR = pdat->GetIndices();
+						const std::vector<double> & dUa = pdat->GetValues();
+
+						if (dR.size() == 0) {
+							_EXCEPTIONT("PathNode RadialVelocityProfile has zero size");
+						}
+						if (dR.size() != dUa.size()) {
+							_EXCEPTIONT("PathNode R array size different from Ua size");
+						}
+
+						double dIndex =
+							pathnode.GetColumnDataAsDouble(cdhWorking, strIndex);
+
+						if (dIndex < 0.0) {
+							_EXCEPTION1("Negative index value (%3.6f) found in call to value()",
+								dIndex);
+						}
+
+						// Extract the value using linear interpolation
+						double dValue;
+						bool fIndexOutOfRange = true;
+						for (int j = 1; j < dR.size(); j++) {
+							if (dR[j] > dIndex) {
+								if (dR[j] == dR[j-1]) {
+									dValue = 0.5 * (dUa[j] + dUa[j-1]);
+								} else {
+									dValue = (
+										dUa[j-1] * (dR[j] - dIndex)
+										+ dUa[j] * (dIndex - dR[j-1])
+										) / (dR[j] - dR[j-1]);
+								}
+								fIndexOutOfRange = false;
+								break;
+							}
+						}
+						if (fIndexOutOfRange) {
+							dValue = dUa[dUa.size()-1];
+						}
+
+						// Add this data to the pathnode
+						pathnode.PushColumnData(
+							new ColumnDataDouble(dValue));
 					}
 				}
 
