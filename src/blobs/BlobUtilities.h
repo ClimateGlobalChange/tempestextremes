@@ -19,7 +19,7 @@
 
 #include "Exception.h"
 #include "Announce.h"
-#include "DataVector.h"
+#include "DataArray1D.h"
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
@@ -396,12 +396,12 @@ void GetInputFileList(
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		Get a DataVector containing the time variable across a list of
+///		Get a DataArray1D containing the time variable across a list of
 ///		input files.
 ///	</summary>
 void GetAllTimes(
 	const std::vector<std::string> & vecInputFiles,
-	DataVector<double> & dataTimes,
+	DataArray1D<double> & dataTimes,
 	std::string timename
 ) {
 	std::vector<double> vecTimes;
@@ -427,8 +427,7 @@ void GetAllTimes(
 			}
 
 		} else {
-			DataVector<double> dTime;
-			dTime.Initialize(nTime);
+			DataArray1D<double> dTime(nTime);
 
 			varTime->get(dTime, nTime);
 			for (int t = 0; t < nTime; t++) {
@@ -438,7 +437,7 @@ void GetAllTimes(
 		}
 	}
 
-	dataTimes.Initialize(vecTimes.size());
+	dataTimes.Allocate(vecTimes.size());
 	memcpy(&(dataTimes[0]), &(vecTimes[0]), vecTimes.size() * sizeof(double));
 }
 

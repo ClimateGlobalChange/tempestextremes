@@ -18,9 +18,9 @@ and outputs integer values (INT_ADIPV) which can then be used by StitchBlobs
 #include "Exception.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix4D.h"
+#include "DataArray1D.h"
+#include "DataArray3D.h"
+#include "DataArray4D.h"
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
@@ -135,7 +135,7 @@ int main(int argc, char **argv){
     int dim3 = refFile.get_dim(lonname.c_str())->size();
     refFile.close();
 
-    DataMatrix3D <double> threshMat(dim1,dim2,dim3);
+    DataArray3D <double> threshMat(dim1,dim2,dim3);
 
     if (!const_thresh){
       //Open threshold values file
@@ -207,7 +207,7 @@ int main(int argc, char **argv){
       }
 
 
-      DataVector<double> timeVals(nTime);
+      DataArray1D<double> timeVals(nTime);
       inTime->set_cur((long) 0);
       inTime->get(&(timeVals[0]),nTime);
 

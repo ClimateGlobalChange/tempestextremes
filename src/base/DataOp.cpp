@@ -159,8 +159,8 @@ DataOp * DataOpManager::Find(
 bool DataOp::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & out
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & out
 ) {
 	return true;
 }
@@ -176,8 +176,8 @@ const char * DataOp_VECMAG::name = "_VECMAG";
 bool DataOp_VECMAG::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & dataout
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
 ) {
 	if (strArg.size() != 2) {
 		_EXCEPTION2("%s expects two arguments: %i given",
@@ -188,8 +188,8 @@ bool DataOp_VECMAG::Apply(
 			m_strName.c_str());
 	}
 
-	const DataVector<float> & dataLeft  = *(vecArgData[0]);
-	const DataVector<float> & dataRight = *(vecArgData[1]);
+	const DataArray1D<float> & dataLeft  = *(vecArgData[0]);
+	const DataArray1D<float> & dataRight = *(vecArgData[1]);
 
 	for (int i = 0; i < dataout.GetRows(); i++) {
 		dataout[i] =
@@ -211,8 +211,8 @@ const char * DataOp_ABS::name = "_ABS";
 bool DataOp_ABS::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & dataout
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
 ) {
 	if (strArg.size() != 1) {
 		_EXCEPTION2("%s expects one argument: %i given",
@@ -223,7 +223,7 @@ bool DataOp_ABS::Apply(
 			m_strName.c_str());
 	}
 
-	const DataVector<float> & data = *(vecArgData[0]);
+	const DataArray1D<float> & data = *(vecArgData[0]);
 
 	for (int i = 0; i < dataout.GetRows(); i++) {
 		dataout[i] = fabs(data[i]);
@@ -243,8 +243,8 @@ const char * DataOp_SIGN::name = "_SIGN";
 bool DataOp_SIGN::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & dataout
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
 ) {
 	if (strArg.size() != 1) {
 		_EXCEPTION2("%s expects one argument: %i given",
@@ -255,7 +255,7 @@ bool DataOp_SIGN::Apply(
 			m_strName.c_str());
 	}
 
-	const DataVector<float> & data = *(vecArgData[0]);
+	const DataArray1D<float> & data = *(vecArgData[0]);
 
 	for (int i = 0; i < dataout.GetRows(); i++) {
 		if (data[i] > 0.0) {
@@ -281,8 +281,8 @@ const char * DataOp_ALLPOS::name = "_ALLPOS";
 bool DataOp_ALLPOS::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & dataout
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
 ) {
 	if (strArg.size() <= 1) {
 		_EXCEPTION2("%s expects at least two arguments: %i given",
@@ -300,7 +300,7 @@ bool DataOp_ALLPOS::Apply(
 	}
 
 	for (int v = 0; v < vecArgData.size(); v++) {
-		const DataVector<float> & data  = *(vecArgData[v]);
+		const DataArray1D<float> & data  = *(vecArgData[v]);
 
 		for (int i = 0; i < dataout.GetRows(); i++) {
 			if (data[i] <= 0.0) {
@@ -323,8 +323,8 @@ const char * DataOp_SUM::name = "_SUM";
 bool DataOp_SUM::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & dataout
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
 ) {
 	if (strArg.size() <= 1) {
 		_EXCEPTION2("%s expects at least two arguments: %i given",
@@ -349,7 +349,7 @@ bool DataOp_SUM::Apply(
 			}
 
 		} else {
-			const DataVector<float> & data  = *(vecArgData[v]);
+			const DataArray1D<float> & data  = *(vecArgData[v]);
 			for (int i = 0; i < dataout.GetRows(); i++) {
 				dataout[i] += data[i];
 			}
@@ -370,8 +370,8 @@ const char * DataOp_AVG::name = "_AVG";
 bool DataOp_AVG::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & dataout
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
 ) {
 	if (strArg.size() <= 1) {
 		_EXCEPTION2("%s expects at least two arguments: %i given",
@@ -386,7 +386,7 @@ bool DataOp_AVG::Apply(
 
 	dataout.Zero();
 	for (int v = 0; v < vecArgData.size(); v++) {
-		const DataVector<float> & data  = *(vecArgData[v]);
+		const DataArray1D<float> & data  = *(vecArgData[v]);
 
 		for (int i = 0; i < dataout.GetRows(); i++) {
 			dataout[i] += data[i];
@@ -412,8 +412,8 @@ const char * DataOp_DIFF::name = "_DIFF";
 bool DataOp_DIFF::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & dataout
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
 ) {
 	if (strArg.size() != 2) {
 		_EXCEPTION2("%s expects two arguments: %i given",
@@ -438,21 +438,21 @@ bool DataOp_DIFF::Apply(
 
 	if (vecArgData[0] == NULL) {
 		float dValue = atof(strArg[0].c_str());
-		const DataVector<float> & data = *(vecArgData[1]);
+		const DataArray1D<float> & data = *(vecArgData[1]);
 		for (int i = 0; i < dataout.GetRows(); i++) {
 			dataout[i] = dValue - data[i];
 		}
 
 	} else if (vecArgData[1] == NULL) {
-		const DataVector<float> & data = *(vecArgData[0]);
+		const DataArray1D<float> & data = *(vecArgData[0]);
 		float dValue = atof(strArg[1].c_str());
 		for (int i = 0; i < dataout.GetRows(); i++) {
 			dataout[i] = data[i] - dValue;
 		}
 
 	} else {
-		const DataVector<float> & dataLeft  = *(vecArgData[0]);
-		const DataVector<float> & dataRight = *(vecArgData[1]);
+		const DataArray1D<float> & dataLeft  = *(vecArgData[0]);
+		const DataArray1D<float> & dataRight = *(vecArgData[1]);
 
 		for (int i = 0; i < dataout.GetRows(); i++) {
 			dataout[i] = dataLeft[i] - dataRight[i];
@@ -473,8 +473,8 @@ const char * DataOp_MULT::name = "_MULT";
 bool DataOp_MULT::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & dataout
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
 ) {
 	if (strArg.size() <= 1) {
 		_EXCEPTION2("%s expects at least two arguments: %i given",
@@ -501,7 +501,7 @@ bool DataOp_MULT::Apply(
 			}
 
 		} else {
-			const DataVector<float> & data  = *(vecArgData[v]);
+			const DataArray1D<float> & data  = *(vecArgData[v]);
 			for (int i = 0; i < dataout.GetRows(); i++) {
 				dataout[i] *= data[i];
 			}
@@ -522,8 +522,8 @@ const char * DataOp_DIV::name = "_DIV";
 bool DataOp_DIV::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & dataout
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
 ) {
 	if (strArg.size() != 2) {
 		_EXCEPTION2("%s expects two arguments: %i given",
@@ -548,13 +548,13 @@ bool DataOp_DIV::Apply(
 
 	if (vecArgData[0] == NULL) {
 		float dValue = atof(strArg[0].c_str());
-		const DataVector<float> & data = *(vecArgData[1]);
+		const DataArray1D<float> & data = *(vecArgData[1]);
 		for (int i = 0; i < dataout.GetRows(); i++) {
 			dataout[i] = dValue / data[i];
 		}
 
 	} else if (vecArgData[1] == NULL) {
-		const DataVector<float> & data = *(vecArgData[0]);
+		const DataArray1D<float> & data = *(vecArgData[0]);
 		float dValue = atof(strArg[1].c_str());
 		if (dValue == 0.0) {
 			_EXCEPTION1("Division by zero in %s", m_strName.c_str());
@@ -564,8 +564,8 @@ bool DataOp_DIV::Apply(
 		}
 
 	} else {
-		const DataVector<float> & dataLeft  = *(vecArgData[0]);
-		const DataVector<float> & dataRight = *(vecArgData[1]);
+		const DataArray1D<float> & dataLeft  = *(vecArgData[0]);
+		const DataArray1D<float> & dataRight = *(vecArgData[1]);
 
 		for (int i = 0; i < dataout.GetRows(); i++) {
 			dataout[i] = dataLeft[i] / dataRight[i];
@@ -586,8 +586,8 @@ const char * DataOp_LAT::name = "_LAT";
 bool DataOp_LAT::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & dataout
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
 ) {
 	if (strArg.size() != 0) {
 		_EXCEPTION2("%s expects zero arguments: %i given",
@@ -612,8 +612,8 @@ const char * DataOp_F::name = "_F";
 bool DataOp_F::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & dataout
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
 ) {
 	static const double Omega = 7.2921e-5;
 
@@ -755,9 +755,9 @@ void BuildLaplacianOperator(
 		_EXCEPTIONT("Error creating kdtree");
 	}
 
-	DataVector<double> dXi(grid.GetSize());
-	DataVector<double> dYi(grid.GetSize());
-	DataVector<double> dZi(grid.GetSize());
+	DataArray1D<double> dXi(grid.GetSize());
+	DataArray1D<double> dYi(grid.GetSize());
+	DataArray1D<double> dZi(grid.GetSize());
 	for (int i = 0; i < grid.GetSize(); i++) {
 		double dLat = grid.m_dLat[i];
 		double dLon = grid.m_dLon[i];
@@ -921,8 +921,8 @@ DataOp_LAPLACIAN::DataOp_LAPLACIAN(
 bool DataOp_LAPLACIAN::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
-	const std::vector<DataVector<float> const *> & vecArgData,
-	DataVector<float> & dataout
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
 ) {
 	if (strArg.size() != 1) {
 		_EXCEPTION2("%s expects one argument: %i given",

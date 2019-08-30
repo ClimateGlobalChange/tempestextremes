@@ -18,8 +18,8 @@
 #include "Exception.h"
 #include "Announce.h"
 
-#include "DataVector.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
@@ -187,8 +187,7 @@ try {
 	int nFiles = vecInputFiles.size();
 
 	// Density
-	DataMatrix<int> nCounts;
-	nCounts.Initialize(nLat, nLon);
+	DataArray2D<int> nCounts(nLat, nLon);
 
 	// Loop through all files in list
 	AnnounceStartBlock("Processing files");
@@ -320,8 +319,8 @@ try {
 	varLat->add_att("units", "degrees_north");
 	varLon->add_att("units", "degrees_east");
 
-	DataVector<double> dLat(nLat);
-	DataVector<double> dLon(nLon);
+	DataArray1D<double> dLat(nLat);
+	DataArray1D<double> dLon(nLon);
 
 	for (int j = 0; j < nLat; j++) {
 		dLat[j] = dLatBegin

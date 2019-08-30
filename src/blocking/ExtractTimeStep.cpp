@@ -12,8 +12,8 @@ within the file (for example, 12Z).*/
 #include "Announce.h"
 #include "TimeObj.h"
 
-#include "DataVector.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
@@ -70,7 +70,7 @@ int main(int argc,char **argv){
 			if (tVar == NULL){
 				_EXCEPTION1("Couldn't find variable %s",tname.c_str());
 			}
-			DataVector<double> timeVec(nTime);
+			DataArray1D<double> timeVec(nTime);
 			tVar->set_cur(long(0));
 			tVar->get(&(timeVec[0]),nTime);
 			
@@ -112,8 +112,8 @@ int main(int argc,char **argv){
 
 			//Create new time variable for output
 			int nOutTime = tIndices.size();
-			DataVector<double> newTimeVec(nOutTime);
-			DataMatrix3D<double> outMat(nOutTime,nLat,nLon);
+			DataArray1D<double> newTimeVec(nOutTime);
+			DataArray3D<double> outMat(nOutTime,nLat,nLon);
 			//Read in the original variable
 			NcVar * inVar = infile.get_var(varName.c_str());
 			int currT;

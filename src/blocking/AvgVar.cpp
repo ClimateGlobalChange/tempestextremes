@@ -16,9 +16,9 @@ but only has the axes [lat,lon]
 */
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
+#include "DataArray3D.h"
 #include "Announce.h"
 #include "CommandLine.h"
 #include "Exception.h"
@@ -29,7 +29,7 @@ but only has the axes [lat,lon]
 #include <cstring>
 
 //Outputs a matrix that is the SUM of the elements along the time axis
-void Varto2Dsum(NcVar *inVar, int v, DataMatrix3D<double> & outMat){
+void Varto2Dsum(NcVar *inVar, int v, DataArray3D<double> & outMat){
     //Check that the number of dimensions is 3
     int nDims = inVar->num_dims();
     if (nDims != 3){
@@ -41,8 +41,8 @@ void Varto2Dsum(NcVar *inVar, int v, DataMatrix3D<double> & outMat){
     latLen = inVar->get_dim(1)->size();
     lonLen = inVar->get_dim(2)->size();
 
-    DataMatrix3D<double> inMat(tLen,latLen,lonLen);
-	//DataMatrix<double> outMat(latLen,lonLen);
+    DataArray3D<double> inMat(tLen,latLen,lonLen);
+	//DataArray2D<double> outMat(latLen,lonLen);
     inVar->set_cur(0,0,0);
     inVar->get((&inMat[0][0][0]), tLen,latLen,lonLen);
 	
@@ -125,7 +125,7 @@ int main(int argc, char ** argv){
 		// The third axis is the length of your variable vector
 		// Use a temporary 2D matrix for function output
 		int varLen = varVec.size();
-		DataMatrix3D<double> storeMat(latLen,lonLen,varLen);
+		DataArray3D<double> storeMat(latLen,lonLen,varLen);
 
 		//Open the first file and add each variable to working matrix
 		for (int v=0; v<varLen; v++){
@@ -169,7 +169,7 @@ int main(int argc, char ** argv){
 		testoutvar->set_cur(0,0,0);
 		testoutvar->put(&(storeMat[0][0][0]),latLen,lonLen,varLen);*/
 		//output each of the variables
-		DataMatrix<double>putMat(latLen,lonLen);
+		DataArray2D<double>putMat(latLen,lonLen);
 		for (int v=0; v<varLen; v++){
 			NcVar * outvar = readout.add_var(varVec[v].c_str(),ncDouble,outLat,outLon);
 			outvar->set_cur(0,0);

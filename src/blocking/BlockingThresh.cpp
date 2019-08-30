@@ -16,9 +16,9 @@ as the average of the deviations file, and calculates the standard deviation
 of the instantaneous deviation values.
 */
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
+#include "DataArray3D.h"
 #include "Announce.h"
 #include "CommandLine.h"
 #include "Exception.h"
@@ -93,13 +93,13 @@ int main(int argc, char ** argv){
 
     //Open lats vector
     NcVar *latRef = avgin.get_var(latname.c_str());
-    DataVector <double> latVec(latLen);
+    DataArray1D <double> latVec(latLen);
     latRef->set_cur((long) 0);
     latRef->get(&(latVec[0]),latLen);
 		
     //Read in the matrix of average values
     NcVar *avgVar = avgin.get_var(avgName.c_str());
-    DataMatrix3D<double> avgMat(dLen,latLen,lonLen);
+    DataArray3D<double> avgMat(dLen,latLen,lonLen);
     avgVar->set_cur(0,0,0);
     avgVar->get(&(avgMat[0][0][0]),dLen,latLen,lonLen);
     std::cout<<"Opening input files"<<std::endl;	
@@ -112,12 +112,12 @@ int main(int argc, char ** argv){
     int tLen;
     tLen = readin.get_dim(tname.c_str())->size();
     //Initialize storage array: day, lat, lon
-    DataMatrix3D<double> storeMat(dLen,latLen,lonLen);
+    DataArray3D<double> storeMat(dLen,latLen,lonLen);
     //Initialize counts array: day, lat, lon
-    DataMatrix3D<double> countsMat(dLen, latLen, lonLen);
+    DataArray3D<double> countsMat(dLen, latLen, lonLen);
     //Initialize input data: time, lat, lon
-    DataMatrix<double> inputData(latLen,lonLen);
-    DataVector<double> timeVec(tLen);
+    DataArray2D<double> inputData(latLen,lonLen);
+    DataArray1D<double> timeVec(tLen);
 
     //Close file (then re-open in loop)
     readin.close();
@@ -140,7 +140,7 @@ int main(int argc, char ** argv){
     //  inputVar->get(&(inputData[0][0][0]),tLen,latLen,lonLen);
 
       //Time and calendar
-      timeVec.Initialize(tLen);
+      timeVec.Allocate(tLen);
       NcVar *timeVar = readin.get_var(tname.c_str());
       timeVar->set_cur((long)0);
       timeVar->get(&(timeVec[0]),tLen);
@@ -167,7 +167,7 @@ int main(int argc, char ** argv){
       //std::cout<<"Storing values."<<std::endl;
       //Store the values and counts in the matrices at the appropriate day index
       for (int t=0; t<tLen; t++){
-        inputData.Initialize(latLen,lonLen);
+        inputData.Allocate(latLen,lonLen);
         inputVar->set_cur(t,0,0);
         inputVar->get(&(inputData[0][0]),1,latLen,lonLen);
         ParseTimeDouble(strTimeUnits, strCalendar, timeVec[t],\
@@ -245,7 +245,7 @@ int main(int argc, char ** argv){
     std::vector<double>zonalDaily(lonLen);
     std::vector<std::complex<double> >FC(lonLen);
     std::vector<double> zonalOut(lonLen);
-    DataMatrix3D<double> zonalMat(dLen,latLen,lonLen);
+    DataArray3D<double> zonalMat(dLen,latLen,lonLen);
 
     for (int d=0; d<dLen; d++){
       for (int a=0; a<latLen; a++){
@@ -293,7 +293,7 @@ int main(int argc, char ** argv){
     std::vector<double> NHout(NHLen);
     std::vector<double> SHout(SHLen);
     int a1;
-    DataMatrix3D<double>zmMat(dLen,latLen,lonLen);
+    DataArray3D<double>zmMat(dLen,latLen,lonLen);
     for (int d=0; d<dLen; d++){
       for (int b=0; b<lonLen; b++){
         for (int a=0; a<eqIndex; a++){
@@ -330,7 +330,7 @@ int main(int argc, char ** argv){
     std::vector<double> inputDaily(dLen);
     std::vector<std::complex<double> >FourierCoefs(dLen);
     std::vector<double>outputDaily(dLen);
-    DataMatrix3D<double> outputMat(dLen,latLen,lonLen);
+    DataArray3D<double> outputMat(dLen,latLen,lonLen);
 
 
     for (int a=0; a<latLen; a++){

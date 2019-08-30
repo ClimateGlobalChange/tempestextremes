@@ -10,10 +10,10 @@
 #include "BlockingUtilities.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix4D.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
+#include "DataArray3D.h"
+#include "DataArray4D.h"
 #include "TimeObj.h"
 #include "Announce.h"
 
@@ -433,7 +433,7 @@ void copy_dim_var(
 	){
   //Get necessary information from infile
   int varLen = inVar->get_dim(0)->size();
-  DataVector<double> inVec(varLen);
+  DataArray1D<double> inVec(varLen);
   inVar->set_cur((long) 0);
   inVar->get(&(inVec[0]), varLen);
   //Copy data to new outgoing variable
@@ -466,28 +466,28 @@ void interpolate_lev(NcVar *var,
 
 
   //hybrid coefficient A
-  DataVector<double> vecHyam(nLev);
+  DataArray1D<double> vecHyam(nLev);
   hyam->set_cur((long) 0);
   hyam->get(&(vecHyam[0]), nLev);
 
   //hybrid coefficient B
-  DataVector<double> vecHybm(nLev);
+  DataArray1D<double> vecHybm(nLev);
   hybm->set_cur((long) 0);
   hybm->get(&(vecHybm[0]), nLev);
 
   //Pressure levels
-  DataVector<double> vecpLev(npLev);
+  DataArray1D<double> vecpLev(npLev);
   pLev->set_cur((long) 0);
   pLev->get(&(vecpLev[0]), npLev);
  
   //Matrix to store PS
-  DataMatrix <double> matPS(nLat, nLon);
+  DataArray2D <double> matPS(nLat, nLon);
 
   //Matrix to store input variable data
-  DataMatrix3D<double> matVar(nLev, nLat, nLon);
+  DataArray3D<double> matVar(nLev, nLat, nLon);
   
   //Matrix to store output variable data
-  DataMatrix3D<double> matVarOut(npLev, nLat, nLon);
+  DataArray3D<double> matVarOut(npLev, nLat, nLon);
   //std::cout<<"within interpolate_lev: about to interpolate"<<std::endl; 
   //Loop over input data and interpolate to output var
   for (int t=0; t<nTime; t++){
@@ -538,12 +538,12 @@ void VarPressureAvg(
 	nLon = invar->get_dim(3)->size();
 
 	//Input into Matrix
-	DataMatrix4D<double> inMat(nTime,nPlev,nLat,nLon);
+	DataArray4D<double> inMat(nTime,nPlev,nLat,nLon);
 	invar->set_cur(0,0,0,0);
 	invar->get(&(inMat[0][0][0][0]),nTime,nPlev,nLat,nLon);
 	
     //Pressure axis values
-    DataVector<double> pVec(nPlev);
+    DataArray1D<double> pVec(nPlev);
     pVals->set_cur((long) 0);
     pVals->get(&(pVec[0]), nPlev);
 
@@ -567,7 +567,7 @@ void VarPressureAvg(
       pos_top = temp;
     }
 
-    DataMatrix3D<double> outMat(nTime, nLat, nLon);  
+    DataArray3D<double> outMat(nTime, nLat, nLon);  
     double bot,mid,top;
     double modLevLen = pos_bot-pos_top;
     double invLevLen = 1.0/(2.0*modLevLen);
@@ -603,16 +603,16 @@ void PT_calc(
         int nPlev,
         int nLat,
         int nLon,
-	DataMatrix3D<double>TMat, 
+	DataArray3D<double>TMat, 
 	NcVar *pLev, 
-	DataMatrix3D<double> &PTMat
+	DataArray3D<double> &PTMat
 ){
 
   double pFrac;
   double exp = 287.0/1004.5;
 
   //INPUTS
-  DataVector<double> pVec(nPlev);
+  DataArray1D<double> pVec(nPlev);
 
   pLev->set_cur((long) 0);
   pLev->get(&(pVec[0]), nPlev);
@@ -626,7 +626,7 @@ void PT_calc(
     int nextB = 0;
     double currT;
   //OUTPUT: PT
-//  DataMatrix4D<double> PTMat(nTime, nPlev, nLat, nLon);
+//  DataArray4D<double> PTMat(nTime, nPlev, nLat, nLon);
     for (int p=0; p<nPlev; p++){
       pFrac = 100000.0/pVec[p];
       for (int a=0; a<nLat; a++){
@@ -646,7 +646,7 @@ double replaceMissingFloat(int currA,
                            int currB,
                            int currP,
                            double valThresh,
-                           DataMatrix3D<double> VarMat,
+                           DataArray3D<double> VarMat,
                            int aLen,
                            int bLen
 ){
@@ -681,7 +681,7 @@ double replaceMissingFloat(int currA,
 double replaceMissingFloat2D(int currA,
                            int currB,
                            double valThresh,
-                           DataMatrix<double> VarMat,
+                           DataArray2D<double> VarMat,
                            int aLen,
                            int bLen
 ){
@@ -725,8 +725,8 @@ void pv_vars_calc(
   double & dphi,
   double & dlambda,
   double & p_res,
-  DataVector<double> & coriolis,
-  DataVector<double> & cosphi
+  DataArray1D<double> & coriolis,
+  DataArray1D<double> & cosphi
 ){ 
   double radius = 6371000.0;
   double pi = 4.0*std::atan(1.0);
@@ -736,17 +736,17 @@ void pv_vars_calc(
   double sinphi;
 
   nLat = lat->get_dim(0)->size();
-  DataVector<double> latVec(nLat);
+  DataArray1D<double> latVec(nLat);
   lat->set_cur((long) 0);
   lat->get(&(latVec[0]), nLat);
 
   nLon = lon->get_dim(0)->size();
-  DataVector<double> lonVec(nLon);
+  DataArray1D<double> lonVec(nLon);
   lon->set_cur((long) 0);
   lon->get(&(lonVec[0]), nLon);
 
   np = plev->get_dim(0)->size();
-  DataVector<double> pVec(np);
+  DataArray1D<double> pVec(np);
   plev->set_cur((long) 0);
   plev->get(&(pVec[0]), np);
   
@@ -770,12 +770,12 @@ void rVort_calc(
         int nPlev,
         int nLat,
         int nLon,
-	DataMatrix3D<double>UMat,
-	DataMatrix3D<double>VMat,
+	DataArray3D<double>UMat,
+	DataArray3D<double>VMat,
 	double dphi,
 	double dlambda,
-	DataVector<double> cosphi,
-	DataMatrix3D<double> & RVMat
+	DataArray1D<double> cosphi,
+	DataArray3D<double> & RVMat
 ){
 
   double radius = 6371000.0;
@@ -787,7 +787,7 @@ void rVort_calc(
 //U WRT PHI
   double U1,U2,U3,V1,V2,V3;
 
-  DataMatrix3D<double> dUdphi(nPlev, nLat, nLon);
+  DataArray3D<double> dUdphi(nPlev, nLat, nLon);
     for (int p=0; p<nPlev; p++){
       for (int b=0; b<nLon; b++){
         U1=UMat[p][2][b];
@@ -837,7 +837,7 @@ void rVort_calc(
     }
 
   //V WRT LAMBDA
-  DataMatrix3D<double> dVdl(nPlev, nLat, nLon);
+  DataArray3D<double> dVdl(nPlev, nLat, nLon);
     for (int p=0; p<nPlev; p++){
       for (int a=0; a<nLat; a++){
         V1=VMat[p][a][1];
@@ -935,7 +935,7 @@ double GHcheck(double z_0,
 
 
 bool missingValCheck(
-  DataMatrix3D<double> fillData,
+  DataArray3D<double> fillData,
   int nTime,
   double missingNum
 ){
@@ -959,7 +959,7 @@ void MissingFill(
   int arrLen,
   int & currArrIndex,
   int & dateIndex,
-  DataMatrix3D<double> & currFillData
+  DataArray3D<double> & currFillData
 ){
 
   int nFill = contCheck/tRes-1;
@@ -996,18 +996,18 @@ void PV_calc(
         int nPlev,
         int nLat,
         int nLon,
-	DataMatrix3D<double>UMat,
-	DataMatrix3D<double>VMat,
-	DataMatrix3D<double> PTMat,
-	DataMatrix3D<double> RVMat,
-        DataVector<double>pVec,	
-	DataVector<double> coriolis,
-        DataVector<double>cosphi,
+	DataArray3D<double>UMat,
+	DataArray3D<double>VMat,
+	DataArray3D<double> PTMat,
+	DataArray3D<double> RVMat,
+        DataArray1D<double>pVec,	
+	DataArray1D<double> coriolis,
+        DataArray1D<double>cosphi,
 	double dphi,
 	double dlambda,
         double lat_res,
         double lon_res,
-	DataMatrix3D<double> &PVMat
+	DataArray3D<double> &PVMat
 ){
   double invdp,invdp1,invdp2;
   double invdphi= 1.0/(2.0*dphi);
@@ -1019,9 +1019,9 @@ void PV_calc(
 
   //Matrices for the partials
   //PT, U, V WRT P
-  DataMatrix3D<double> dpt_dp(nPlev, nLat, nLon);
-  DataMatrix3D<double> du_dp(nPlev, nLat, nLon);
-  DataMatrix3D<double> dv_dp(nPlev, nLat, nLon);
+  DataArray3D<double> dpt_dp(nPlev, nLat, nLon);
+  DataArray3D<double> du_dp(nPlev, nLat, nLon);
+  DataArray3D<double> dv_dp(nPlev, nLat, nLon);
 
   invdp1 = 1.0/(2.0*(pVec[1]-pVec[0]));
   invdp2 = 1.0/(2.0*(pVec[nPlev-1]-pVec[nPlev-2]));
@@ -1114,7 +1114,7 @@ void PV_calc(
     }
   
   //PT WRT PHI
-  DataMatrix3D<double> dpt_dphi(nPlev, nLat, nLon);
+  DataArray3D<double> dpt_dphi(nPlev, nLat, nLon);
   //end cases
     for (int p=0; p<nPlev; p++){
       for (int b=0; b<nLon; b++){
@@ -1129,7 +1129,7 @@ void PV_calc(
     }
 
   //PT WRT LAMBDA
-  DataMatrix3D<double> dpt_dl(nPlev, nLat, nLon);
+  DataArray3D<double> dpt_dl(nPlev, nLat, nLon);
   //end cases
     for (int p=0; p<nPlev; p++){
       for (int a=0; a<nLat; a++){
@@ -1163,9 +1163,9 @@ void IPV_calc(
        int nLat,
        int nLon,
        double lat_res,
-       DataVector<double> pVec,
-       DataMatrix3D<double> PVMat,
-       DataMatrix<double> & IPVMat       
+       DataArray1D<double> pVec,
+       DataArray3D<double> PVMat,
+       DataArray2D<double> & IPVMat       
 ){
   //Integrate PV over upper troposphere
   int pos_top;
@@ -1258,18 +1258,18 @@ void calcDevs( bool latNorm,
     nLon = inIPV->get_dim(2)->size();
   }
 
-  DataVector<double> latVec(nLat);
+  DataArray1D<double> latVec(nLat);
   lat->set_cur((long) 0);
   lat->get(&(latVec[0]),nLat);
 
   //Vector of instantaneous time axis
-  DataVector<double> timeVec(nTime);
+  DataArray1D<double> timeVec(nTime);
   inTime->set_cur((long) 0);
   inTime->get(&(timeVec[0]),nTime);
 
 //Deal with skipped days          
   int d=0;
-//  DataVector<double> newTime(nOutTime);
+//  DataArray1D<double> newTime(nOutTime);
 
   int leapYear=0;
   int leapMonth=0;
@@ -1277,9 +1277,9 @@ void calcDevs( bool latNorm,
   int leapHour=0;
   int currAvgIndex=0;
 //input instantaneous and average data 
-  DataMatrix<double> IPVMat(nLat,nLon);
-  DataMatrix<double> avgMat(nLat,nLon);
-  DataMatrix<double> devMat(nLat,nLon);
+  DataArray2D<double> IPVMat(nLat,nLon);
+  DataArray2D<double> avgMat(nLat,nLon);
+  DataArray2D<double> devMat(nLat,nLon);
   double num = std::sin(45*pi/180);
   double denom, sineRatio, inputVal;
   for (int t=0; t<nTime; t++){
@@ -1347,7 +1347,7 @@ void calcNormalizedDevs(bool isPV,
                        NcVar * inTime,
                        std::string strTimeUnits,
                        std::string strCalendar,
-                       DataMatrix3D<double>threshMat,
+                       DataArray3D<double>threshMat,
                        double minThresh){
 
   int nLat,nLon,nOutTime;
@@ -1356,16 +1356,16 @@ void calcNormalizedDevs(bool isPV,
   nLat = inDev->get_dim(1)->size();
   nLon = inDev->get_dim(2)->size();
   //lat values
-  DataVector<double> latVec(nLat);
+  DataArray1D<double> latVec(nLat);
   lat->set_cur((long) 0);
   lat->get(&(latVec[0]),nLat);
   //time values
-  DataVector<double> timeVals(nOutTime);
+  DataArray1D<double> timeVals(nOutTime);
   inTime->set_cur((long) 0);
   inTime->get(&(timeVals[0]),nOutTime);
 
-  DataMatrix<double> aDevMat(nLat,nLon);
-  DataMatrix<int> posIntDevs(nLat,nLon);
+  DataArray2D<double> aDevMat(nLat,nLon);
+  DataArray2D<int> posIntDevs(nLat,nLon);
   double invAnom;
   double divDev,pos,neg;
   int threshIndex = 0;
@@ -1448,11 +1448,11 @@ void calcNormalizedDevs(bool isPV,
 }
 
 /*
-void stdDev(DataMatrix3D<double>inDevs,
+void stdDev(DataArray3D<double>inDevs,
               int nTime,
               int nLat,
               int nLon,
-              DataMatrix<double> & outStdDev){
+              DataArray2D<double> & outStdDev){
   //average the deviations along the time axis
   double sigSum;
   double dev;
@@ -1486,7 +1486,7 @@ void calcDevsGH(bool leap,
               NcVar *avgTime,
               NcVar *lat,
               NcVar *outTime,
-              DataMatrix3D threshmat){
+              DataArray3D threshmat){
 
   int nTime,nLat,nLon,nSteps,avgDay,nOutTime;
   double tRes;
@@ -1497,11 +1497,11 @@ void calcDevsGH(bool leap,
   nLon = inGH->get_dim(2)->size();
 
 //input GH
-  DataMatrix3D<double> GHMat(nTime,nLat,nLon);
+  DataArray3D<double> GHMat(nTime,nLat,nLon);
   inGH->set_cur(0,0,0);
   inGH->get(&(GHMat[0][0][0]),nTime,nLat,nLon);
 
-  DataVector<double> timeVec(nTime);
+  DataArray1D<double> timeVec(nTime);
   inTime->set_cur((long) 0);
   inTime->get(&(timeVec[0]),nTime);
 
@@ -1519,17 +1519,17 @@ void calcDevsGH(bool leap,
 
 //avg GH
   avgDay = avgGH->get_dim(0)->size();
-  DataMatrix3D<double> avgMat(avgDay,nLat,nLon);
+  DataArray3D<double> avgMat(avgDay,nLat,nLon);
   avgGH->set_cur(0,0,0);
   avgGH->get(&(avgMat[0][0][0]),avgDay,nLat,nLon);
 
-  DataVector<int> avgDayVec(avgDay);
+  DataArray1D<int> avgDayVec(avgDay);
   avgTime->set_cur((long) 0);
   avgTime->get(&(avgDayVec[0]),avgDay);
 
 //Latitude values 
 
-  DataVector<double> latVec(nLat);
+  DataArray1D<double> latVec(nLat);
   lat->set_cur((long) 0);
   lat->get(&(latVec[0]),nLat);
 //Matrix for output data
@@ -1541,8 +1541,8 @@ void calcDevsGH(bool leap,
     nOutTime = nTime;
   }
 
-  DataMatrix3D<double> devMat(nOutTime,nLat,nLon);
-  DataMatrix3D<double> aDevMat(nOutTime,nLat,nLon);
+  DataArray3D<double> devMat(nOutTime,nLat,nLon);
+  DataArray3D<double> aDevMat(nOutTime,nLat,nLon);
 
 //Number of days in IPV
   int nDays = nTime*tRes;
@@ -1551,7 +1551,7 @@ void calcDevsGH(bool leap,
 
 //Deal with skipped days          
   int d=0;
-  DataVector<double> newTime(nOutTime);
+  DataArray1D<double> newTime(nOutTime);
 
   int leapYear=0;
   int leapMonth=0;
@@ -1645,8 +1645,8 @@ void calcDevsGH(bool leap,
   std::cout<<"Wrote smoothed devs to file."<<std::endl;
 //Divide matrix by GH anomaly value 
 
-  DataMatrix3D<int> posIntDevs(nOutTime,nLat,nLon);
-  DataMatrix<double> stdDevs(nLat,nLon);
+  DataArray3D<int> posIntDevs(nOutTime,nLat,nLon);
+  DataArray2D<double> stdDevs(nLat,nLon);
   stdDev(aDevMat,nOutTime,nLat,nLon,stdDevs);
 
   double invAnom;
@@ -1685,23 +1685,23 @@ void PV_calc2(
         int nPlev,
         int nLat,
         int nLon,
-	DataMatrix3D<double>UMat,
-	DataMatrix3D<double>VMat,
-	DataMatrix3D<double> PTMat,
-	DataMatrix3D<double> RVMat,
-        DataVector<double>pVec,	
-	DataVector<double> coriolis,
-        DataVector<double>cosphi,
+	DataArray3D<double>UMat,
+	DataArray3D<double>VMat,
+	DataArray3D<double> PTMat,
+	DataArray3D<double> RVMat,
+        DataArray1D<double>pVec,	
+	DataArray1D<double> coriolis,
+        DataArray1D<double>cosphi,
 	double dphi,
 	double dlambda,
         double lat_res,
         double lon_res,
-	DataMatrix3D<double> &PVMat,
-  DataMatrix3D<double> &dpt_dp,
-  DataMatrix3D<double> &du_dp,
-  DataMatrix3D<double> &dv_dp,
-  DataMatrix3D<double> &dpt_dphi,
-  DataMatrix3D<double> &dpt_dl 
+	DataArray3D<double> &PVMat,
+  DataArray3D<double> &dpt_dp,
+  DataArray3D<double> &du_dp,
+  DataArray3D<double> &dv_dp,
+  DataArray3D<double> &dpt_dphi,
+  DataArray3D<double> &dpt_dl 
 ){
   double invdp,invdp1,invdp2;
   double invdphi= 1.0/(2.0*dphi);

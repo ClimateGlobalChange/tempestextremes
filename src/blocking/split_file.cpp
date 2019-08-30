@@ -10,8 +10,8 @@
 #include "Exception.h"
 #include "CommandLine.h"
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix3D.h"
+#include "DataArray1D.h"
+#include "DataArray3D.h"
 #include <cstdlib>
 #include <cmath>
 #include "TimeObj.h"
@@ -74,7 +74,7 @@ void add_vars_to_file(NcFile & infile,
     std::cout<<"nLev is "<<nLev<<std::endl;
   }
 
-  DataVector<double> t1(newTLen1);
+  DataArray1D<double> t1(newTLen1);
   timeVar->set_cur((long) pos0);
   timeVar->get(&(t1[0]),newTLen1);
 
@@ -102,7 +102,7 @@ void add_vars_to_file(NcFile & infile,
   copy_dim_var(lonVar,lon1var);
 
   if (nLev>0){
-    DataMatrix4D<double> vMat(newTLen1,nLev,nLat,nLon);
+    DataArray4D<double> vMat(newTLen1,nLev,nLat,nLon);
     for (int v=0; v<vars.size(); v++){
       NcVar * invar = infile.get_var(vars[v].c_str());
       invar->set_cur(pos0,0,0,0);
@@ -113,7 +113,7 @@ void add_vars_to_file(NcFile & infile,
       outvar->put(&(vMat[0][0][0][0]),newTLen1,nLev,nLat,nLon);
     }
   }else{
-    DataMatrix3D<double> vMat(newTLen1,nLat,nLon);
+    DataArray3D<double> vMat(newTLen1,nLat,nLon);
     for (int v=0; v<vars.size(); v++){
       NcVar * invar = infile.get_var(vars[v].c_str());
       invar->set_cur(pos0,0,0);
@@ -204,7 +204,7 @@ int main(int argc, char ** argv ){
     nLev = infile.get_dim(levname.c_str())->size();
   }
 
-  DataVector<double> timeVec(nTime);
+  DataArray1D<double> timeVec(nTime);
   timeVar ->set_cur((long) 0);
   timeVar ->get(&(timeVec[0]),nTime);
 
@@ -298,11 +298,11 @@ int main(int argc, char ** argv ){
   std::cout<<"New time dimensions are "<<newTLen1<<" and "<<newTLen2<<std::endl;
 
   //new time vectors
-  DataVector<double> t1(newTLen1);
+  DataArray1D<double> t1(newTLen1);
   timeVar->set_cur((long) 0);
   timeVar->get(&(t1[0]),newTLen1);
 
-  DataVector<double> t2(newTLen2);
+  DataArray1D<double> t2(newTLen2);
   timeVar->set_cur((long) cutIndex);
   timeVar->get(&(t2[0]),newTLen2);
 

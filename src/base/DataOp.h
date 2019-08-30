@@ -17,7 +17,7 @@
 #ifndef _DATAOP_H_
 #define _DATAOP_H_
 
-#include "DataVector.h"
+#include "DataArray1D.h"
 #include "SparseMatrix.h"
 
 #include <string>
@@ -101,8 +101,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 
 protected:
@@ -137,8 +137,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 };
 
@@ -167,8 +167,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 };
 
@@ -197,8 +197,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 };
 
@@ -227,8 +227,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 };
 
@@ -257,8 +257,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 };
 
@@ -287,8 +287,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 };
 
@@ -317,8 +317,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 };
 
@@ -347,8 +347,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 };
 
@@ -377,8 +377,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 };
 
@@ -407,8 +407,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 };
 
@@ -437,8 +437,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 };
 
@@ -463,8 +463,8 @@ public:
 	virtual bool Apply(
 		const SimpleGrid & grid,
 		const std::vector<std::string> & strArg,
-		const std::vector<DataVector<float> const *> & vecArgData,
-		DataVector<float> & dataout
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
 	);
 
 protected:

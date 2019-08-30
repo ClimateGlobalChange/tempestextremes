@@ -17,8 +17,8 @@ next step.
 #include "Announce.h"
 #include "TimeObj.h"
 
-#include "DataVector.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
@@ -94,7 +94,7 @@ int main(int argc, char **argv){
     if (timeVal==NULL){
       _EXCEPTIONT("Could not read time variable.");
     }
-    DataVector<double> timeVec(nTime);
+    DataArray1D<double> timeVec(nTime);
     timeVal->set_cur((long) 0);
     timeVal->get(&(timeVec[0]),nTime);
 
@@ -145,7 +145,7 @@ int main(int argc, char **argv){
     if (is4d){
       int nLev = reffile.get_dim(levname.c_str())->size();
       NcVar *levvar = reffile.get_var(levname.c_str());
-      DataVector<double> pVec(nLev);
+      DataArray1D<double> pVec(nLev);
       levvar->set_cur(long(0));
       levvar->get(&pVec[0],nLev);
 
@@ -169,20 +169,20 @@ int main(int argc, char **argv){
     //Length of 61 days axis
     int arrLen = int(61.0/tRes);
     //Array time axis
-    DataVector<double> arrTimeAxis(arrLen);
-    DataVector<double> allTimes(arrLen);
+    DataArray1D<double> arrTimeAxis(arrLen);
+    DataArray1D<double> allTimes(arrLen);
     //Initialize with missing values
     for (int a=0; a<arrLen; a++){
         arrTimeAxis[a]=-999999.9;
     }
     //Fill Array
-    DataMatrix3D<double> currFillData(arrLen,nLat,nLon);
+    DataArray3D<double> currFillData(arrLen,nLat,nLon);
     //Store matrix for summed values
-    DataMatrix<double> sumValues(nLat,nLon);
+    DataArray2D<double> sumValues(nLat,nLon);
     //Final year long array
-    DataMatrix3D<double> smoothedValues(nDayYear,nLat,nLon);
-    DataMatrix3D<double> smoothedCount(nDayYear,nLat,nLon);
-    DataVector<double> fileTimeAxis(nDayYear);
+    DataArray3D<double> smoothedValues(nDayYear,nLat,nLon);
+    DataArray3D<double> smoothedCount(nDayYear,nLat,nLon);
+    DataArray1D<double> fileTimeAxis(nDayYear);
     for (int t=0; t<nDayYear; t++){
         fileTimeAxis[t]=-999999.9;
     }
@@ -216,7 +216,7 @@ int main(int argc, char **argv){
             _EXCEPTIONT("Couldn't read time variable.");
         }   
         nTime = infile.get_dim(tname.c_str())->size();
-        DataVector<double> timeVec(nTime);
+        DataArray1D<double> timeVec(nTime);
         timeVal->set_cur(long(0));
         timeVal->get(&(timeVec[0]),nTime);
         //time units
@@ -297,7 +297,7 @@ int main(int argc, char **argv){
                     }
                 }
                 //If there are no missing values, sum up the data (makes a mean)
-                sumValues.Initialize(nLat,nLon);
+                sumValues.Allocate(nLat,nLon);
                 if (hasMissing==false){
                     for (int z=0;z<arrLen;z++){
                         for (int a=0; a<nLat; a++){
@@ -368,8 +368,8 @@ int main(int argc, char **argv){
                     fileTimeAxis[z]=-999999.9;
                 }
                 std::cout<<"Reset file time axis"<<std::endl;
-                smoothedValues.Initialize(nDayYear,nLat,nLon);
-                smoothedCount.Initialize(nDayYear,nLat,nLon);
+                smoothedValues.Allocate(nDayYear,nLat,nLon);
+                smoothedCount.Allocate(nDayYear,nLat,nLon);
 		//std::cout<<"end of file write loop."<<std::endl;
             }
         }

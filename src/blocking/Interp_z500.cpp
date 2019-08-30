@@ -8,9 +8,9 @@
 #include "BlockingUtilities.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix4D.h"
+#include "DataArray1D.h"
+#include "DataArray3D.h"
+#include "DataArray4D.h"
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
@@ -35,25 +35,25 @@ void interp_1lev(NcVar *var,
   nLon = var->get_dim(3)->size();
 
  //Matrix to store PS
-  DataMatrix3D <double> matPS(nTime, nLat, nLon);
+  DataArray3D <double> matPS(nTime, nLat, nLon);
   ps->set_cur(0, 0, 0);
   ps->get(&(matPS[0][0][0]), nTime, nLat, nLon);
 
   //Matrix to store input variable data
-  DataMatrix4D<double> matVar(nTime, nLev, nLat, nLon);
+  DataArray4D<double> matVar(nTime, nLev, nLat, nLon);
   var->set_cur(0, 0, 0, 0);
   var->get(&(matVar[0][0][0][0]), nTime, nLev, nLat, nLon);
 
   //Matrix to store output variable data
-  DataMatrix3D<double> matVarOut(nTime, nLat, nLon);
+  DataArray3D<double> matVarOut(nTime, nLat, nLon);
 
   //hybrid coefficient A
-  DataVector<double> vecHyam(nLev);
+  DataArray1D<double> vecHyam(nLev);
   hyam->set_cur((long) 0);
   hyam->get(&(vecHyam[0]), nLev);
 
   //hybrid coefficient B
-  DataVector<double> vecHybm(nLev);
+  DataArray1D<double> vecHybm(nLev);
   hybm->set_cur((long) 0);
   hybm->get(&(vecHybm[0]), nLev);
 

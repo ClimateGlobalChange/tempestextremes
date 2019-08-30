@@ -18,8 +18,8 @@
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
-#include "DataVector.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
 #include "TimeObj.h"
 #include "NodeOutputOp.h"
 #include "SimpleGridUtilities.h"
@@ -367,7 +367,7 @@ void ParseInputFiles(
 template <typename real>
 bool HasClosedContour(
 	const SimpleGrid & grid,
-	const DataVector<real> & dataState,
+	const DataArray1D<real> & dataState,
 	const int ix0,
 	double dDeltaAmt,
 	double dDeltaDist,
@@ -496,7 +496,7 @@ bool HasClosedContour(
 template <typename real>
 bool SatisfiesThreshold(
 	const SimpleGrid & grid,
-	const DataVector<real> & dataState,
+	const DataArray1D<real> & dataState,
 	const int ix0,
 	const ThresholdOp::Operation op,
 	const double dTargetValue,
@@ -789,15 +789,13 @@ void DetectCyclonesUnstructured(
 
 	int nTime = dimTime->size();
 
-	DataVector<double> dTime;
-	dTime.Initialize(nTime);
+	DataArray1D<double> dTime(nTime);
 
 	if (varTime->type() == ncDouble) {
 		varTime->get(dTime, nTime);
 
 	} else if (varTime->type() == ncFloat) {
-		DataVector<float> dTimeFloat;
-		dTimeFloat.Initialize(nTime);
+		DataArray1D<float> dTimeFloat(nTime);
 
 		varTime->get(dTimeFloat, nTime);
 		for (int t = 0; t < nTime; t++) {
@@ -805,8 +803,7 @@ void DetectCyclonesUnstructured(
 		}
 
 	} else if (varTime->type() == ncInt) {
-		DataVector<int> dTimeInt;
-		dTimeInt.Initialize(nTime);
+		DataArray1D<int> dTimeInt(nTime);
 
 		varTime->get(dTimeInt, nTime);
 		for (int t = 0; t < nTime; t++) {
@@ -814,8 +811,7 @@ void DetectCyclonesUnstructured(
 		}
 
 	} else if (varTime->type() == ncInt64) {
-		DataVector<ncint64> dTimeInt;
-		dTimeInt.Initialize(nTime);
+		DataArray1D<ncint64> dTimeInt(nTime);
 
 		varTime->get(dTimeInt, nTime);
 		for (int t = 0; t < nTime; t++) {
@@ -861,7 +857,7 @@ void DetectCyclonesUnstructured(
 		Variable & varSearchBy = varreg.Get(param.ixSearchBy);
 		varSearchBy.LoadGridData(varreg, vecFiles, grid, t);
 
-		const DataVector<float> & dataSearch = varSearchBy.GetData();
+		const DataArray1D<float> & dataSearch = varSearchBy.GetData();
 
 		// Parse time information
 		NcAtt * attTimeUnits = varTime->get_att("units");
@@ -899,9 +895,9 @@ void DetectCyclonesUnstructured(
 		int nRejectedTopography = 0;
 		int nRejectedMerge = 0;
 
-		DataVector<int> vecRejectedClosedContour(vecClosedContourOp.size());
-		DataVector<int> vecRejectedNoClosedContour(vecNoClosedContourOp.size());
-		DataVector<int> vecRejectedThreshold(vecThresholdOp.size());
+		DataArray1D<int> vecRejectedClosedContour(vecClosedContourOp.size());
+		DataArray1D<int> vecRejectedNoClosedContour(vecNoClosedContourOp.size());
+		DataArray1D<int> vecRejectedThreshold(vecThresholdOp.size());
 
 		// Eliminate based on interval
 		if ((param.dMinLatitude != param.dMaxLatitude) ||
@@ -1061,7 +1057,7 @@ void DetectCyclonesUnstructured(
 			// Load the search variable data
 			Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
 			var.LoadGridData(varreg, vecFiles, grid, t);
-			const DataVector<float> & dataState = var.GetData();
+			const DataArray1D<float> & dataState = var.GetData();
 
 			// Loop through all pressure minima
 			std::set<int>::const_iterator iterCandidate
@@ -1098,7 +1094,7 @@ void DetectCyclonesUnstructured(
 			// Load the search variable data
 			Variable & var = varreg.Get(vecClosedContourOp[ccc].m_varix);
 			var.LoadGridData(varreg, vecFiles, grid, t);
-			const DataVector<float> & dataState = var.GetData();
+			const DataArray1D<float> & dataState = var.GetData();
 
 			// Loop through all pressure minima
 			std::set<int>::const_iterator iterCandidate
@@ -1135,7 +1131,7 @@ void DetectCyclonesUnstructured(
 			// Load the search variable data
 			Variable & var = varreg.Get(vecNoClosedContourOp[ccc].m_varix);
 			var.LoadGridData(varreg, vecFiles, grid, t);
-			const DataVector<float> & dataState = var.GetData();
+			const DataArray1D<float> & dataState = var.GetData();
 
 			// Loop through all pressure minima
 			std::set<int>::const_iterator iterCandidate
@@ -1220,7 +1216,7 @@ void DetectCyclonesUnstructured(
 				vecOutputValue[i].resize(vecOutputOp.size());
 			}
 
-			//DataMatrix<float> dOutput(setCandidates.size(), vecOutputOp.size());
+			//DataArray2D<float> dOutput(setCandidates.size(), vecOutputOp.size());
 			for (int outc = 0; outc < vecOutputOp.size(); outc++) {
 
 				// Loop through all pressure minima

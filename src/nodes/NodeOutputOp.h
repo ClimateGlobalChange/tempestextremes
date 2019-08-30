@@ -191,7 +191,7 @@ void ApplyOutputOp(
 	// Load the search variable data
 	Variable & var = varreg.Get(op.m_varix);
 	var.LoadGridData(varreg, vecFiles, grid, ixTime);
-	const DataVector<float> & dataState = var.GetData();
+	const DataArray1D<float> & dataState = var.GetData();
 
 	// Return values from the output operators
 	int ixExtremum;

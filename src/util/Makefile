@@ -14,11 +14,7 @@ TEMPESTEXTREMESBASEDIR= $(TEMPESTEXTREMESDIR)/src/base
 
 TEMPESTEXTREMESBASELIB= $(TEMPESTEXTREMESBASEDIR)/libextremesbase.a
 
-EXEC_FILES= DetectNodes.cpp \
-			HistogramNodes.cpp \
-            StitchNodes.cpp \
-			NodeFileEditor.cpp \
-			NodeFileFilter.cpp
+EXEC_FILES= GenerateConnectivityFile.cpp
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 

@@ -19,7 +19,7 @@
 #include "Announce.h"
 #include "Variable.h"
 #include "AutoCurator.h"
-#include "DataMatrix.h"
+#include "DataArray2D.h"
 #include "ArgumentTree.h"
 #include "STLStringHelper.h"
 #include "NodeFileUtilities.h"
@@ -72,7 +72,7 @@ void CalculateRadialProfile(
 	// Load the data
 	Variable & var = varreg.Get(varix);
 	var.LoadGridData(varreg, vecFiles, grid, iTime);
-	const DataVector<float> & dataState = var.GetData();
+	const DataArray1D<float> & dataState = var.GetData();
 
 	// Verify that dRadius is less than 180.0
 	double dRadius = dBinWidth * static_cast<double>(nBins);
@@ -224,12 +224,12 @@ void CalculateRadialWindProfile(
 	// Load the zonal wind data
 	Variable & varU = varreg.Get(varixU);
 	varU.LoadGridData(varreg, vecFiles, grid, iTime);
-	const DataVector<float> & dataStateU = varU.GetData();
+	const DataArray1D<float> & dataStateU = varU.GetData();
 
 	// Load the meridional wind data
 	Variable & varV = varreg.Get(varixV);
 	varV.LoadGridData(varreg, vecFiles, grid, iTime);
-	const DataVector<float> & dataStateV = varV.GetData();
+	const DataArray1D<float> & dataStateV = varV.GetData();
 
 	// Verify that dRadius is less than 180.0
 	double dRadius = dBinWidth * static_cast<double>(nBins);
@@ -534,10 +534,10 @@ void CalculateStormVelocity(
 		_EXCEPTIONT("Path must contain at least two nodes");
 	}
 
-	DataVector<double> dX(nPathNodes);
-	DataVector<double> dY(nPathNodes);
-	DataMatrix<double> dC(nPathNodes-1, 4);
-	DataVector<double> dWork(nPathNodes*3);
+	DataArray1D<double> dX(nPathNodes);
+	DataArray1D<double> dY(nPathNodes);
+	DataArray2D<double> dC(nPathNodes-1, 4);
+	DataArray1D<double> dWork(nPathNodes*3);
 
 	// Velocity column data
 	std::vector<ColumnDataRLLVelocity *> vecPathNodeVelocity;
@@ -664,7 +664,7 @@ void MaxClosedContourDelta(
 	// Load the variable data
 	Variable & var = varreg.Get(varix);
 	var.LoadGridData(varreg, vecFiles, grid, iTime);
-	const DataVector<float> & dataState = var.GetData();
+	const DataArray1D<float> & dataState = var.GetData();
 
 	// Maximum closed contour delta
 	double dMaxDelta = 0.0;
@@ -1077,9 +1077,6 @@ try {
 					nArguments = 1;
 				}
 			}
-			//if (pargfunc == NULL) {
-			//	_EXCEPTIONT("Logic error");
-			//}
 
 			// radial_profile
 			if ((*pargtree)[2] == "radial_profile") {

@@ -13,9 +13,9 @@
 #include "Exception.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix4D.h"
+#include "DataArray1D.h"
+#include "DataArray3D.h"
+#include "DataArray4D.h"
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
@@ -228,11 +228,11 @@ int main(int argc, char **argv){
 
   //if Pressure axis is in hPa, need to change to Pa
     if (is_hPa){
-      DataVector<double> levhPa(lev_len);
+      DataArray1D<double> levhPa(lev_len);
       levvar->set_cur((long) 0);
       levvar->get(&(levhPa[0]),lev_len);
 
-      DataVector<double> levPa(lev_len);
+      DataArray1D<double> levPa(lev_len);
       for (int p=0; p<lev_len; p++){
         levPa[p] = levhPa[p]*100.0;
       }
@@ -250,19 +250,19 @@ int main(int argc, char **argv){
     copy_dim_var(latvar, lat_vals);
     copy_dim_var(lonvar, lon_vals);
     double lat_res,lon_res,dphi,dlambda,dp;;
-    DataVector<double> coriolis(lat_len);
-    DataVector<double> cosphi(lat_len);
+    DataArray1D<double> coriolis(lat_len);
+    DataArray1D<double> cosphi(lat_len);
 
 
     pv_vars_calc(lat_vals, lon_vals, lev_vals, lat_res, lon_res,\
       dphi, dlambda, dp, coriolis, cosphi);
 
-    DataVector<double>pVec(lev_len);
+    DataArray1D<double>pVec(lev_len);
     lev_vals->set_cur((long)0);
     lev_vals->get(&(pVec[0]),lev_len);
 
-    DataMatrix3D<double> PVMat(lev_len,lat_len,lon_len);
-    DataMatrix<double>IPVMat(lat_len,lon_len);
+    DataArray3D<double> PVMat(lev_len,lat_len,lon_len);
+    DataArray2D<double>IPVMat(lat_len,lon_len);
     NcVar * pv_var = NULL;
   //if PV hasn't already been calculated, calculate it!
    if (!has_PV){
@@ -285,11 +285,11 @@ int main(int argc, char **argv){
     
 
 
-      DataMatrix3D<double> PTVar(lev_len,lat_len,lon_len);
-      DataMatrix3D<double> TVar(lev_len,lat_len,lon_len);
-      DataMatrix3D<double>RVVar(lev_len,lat_len,lon_len);
-      DataMatrix3D<double>UMat(lev_len,lat_len,lon_len);
-      DataMatrix3D<double>VMat(lev_len,lat_len,lon_len);
+      DataArray3D<double> PTVar(lev_len,lat_len,lon_len);
+      DataArray3D<double> TVar(lev_len,lat_len,lon_len);
+      DataArray3D<double>RVVar(lev_len,lat_len,lon_len);
+      DataArray3D<double>UMat(lev_len,lat_len,lon_len);
+      DataArray3D<double>VMat(lev_len,lat_len,lon_len);
    //CALCULATE PV AND IPV PER TIME STEP
       for (int t=0; t<time_len; t++){
       //Calculate PT

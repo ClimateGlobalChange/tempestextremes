@@ -18,7 +18,7 @@
 #define _SIMPLEGRIDUTILITIES_H_
 
 #include "SimpleGrid.h"
-#include "DataVector.h"
+#include "DataArray1D.h"
 
 #include <set>
 
@@ -44,7 +44,7 @@ template <typename real>
 void FindLocalMinMax(
 	const SimpleGrid & grid,
 	bool fMinimum,
-	const DataVector<real> & data,
+	const DataArray1D<real> & data,
 	int ix0,
 	double dMaxDist,
 	int & ixExtremum,
@@ -53,22 +53,22 @@ void FindLocalMinMax(
 );
 
 ///	<summary>
-///		Find the locations of all minima in the given DataVector.
+///		Find the locations of all minima in the given DataArray1D.
 ///	</summary>
 template <typename real>
 void FindAllLocalMinima(
 	const SimpleGrid & grid,
-	const DataVector<real> & data,
+	const DataArray1D<real> & data,
 	std::set<int> & setMinima
 );
 
 ///	<summary>
-///		Find the locations of all maxima in the given DataVector.
+///		Find the locations of all maxima in the given DataArray1D.
 ///	</summary>
 template <typename real>
 void FindAllLocalMaxima(
 	const SimpleGrid & grid,
-	const DataVector<real> & data,
+	const DataArray1D<real> & data,
 	std::set<int> & setMaxima
 );
 
@@ -81,7 +81,7 @@ void FindAllLocalMaxima(
 template <typename real>
 void FindLocalAverage(
 	const SimpleGrid & grid,
-	const DataVector<real> & data,
+	const DataArray1D<real> & data,
 	int ix0,
 	double dMaxDist,
 	real & dAverage

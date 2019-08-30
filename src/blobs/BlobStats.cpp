@@ -20,8 +20,8 @@
 #include "Exception.h"
 #include "Announce.h"
 
-#include "DataVector.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
 #include "TimeObj.h"
 
 #include "netcdfcpp.h"
@@ -170,11 +170,11 @@ try {
 	int nLat;
 	int nLon;
 
-	DataVector<double> dataLatDeg;
-	DataVector<double> dataLat;
+	DataArray1D<double> dataLatDeg;
+	DataArray1D<double> dataLat;
 
-	DataVector<double> dataLonDeg;
-	DataVector<double> dataLon;
+	DataArray1D<double> dataLonDeg;
+	DataArray1D<double> dataLon;
 
 	bool fFlippedLat = false;
 
@@ -213,11 +213,11 @@ try {
 		nLat = dimLat->size();
 		nLon = dimLon->size();
 
-		dataLatDeg.Initialize(nLat);
-		dataLat.Initialize(nLat);
+		dataLatDeg.Allocate(nLat);
+		dataLat.Allocate(nLat);
 
-		dataLonDeg.Initialize(nLon);
-		dataLon.Initialize(nLon);
+		dataLonDeg.Allocate(nLon);
+		dataLon.Allocate(nLon);
 
 		varLat->get(dataLatDeg, nLat);
 		for (int j = 0; j < nLat; j++) {
@@ -326,10 +326,13 @@ try {
 		}
 
 		// Blob index data
-		DataMatrix<int> dataIndex(nLat, nLon);
+		DataArray2D<int> dataIndex(nLat, nLon);
 
 		// Get current time dimension
 		NcDim * dimTime = ncInput.get_dim("time");
+		if (dimTime == NULL) {
+			_EXCEPTIONT("Dimension \"time\" missing from input file");
+		}
 
 		int nLocalTimes = dimTime->size();
 
@@ -438,6 +441,11 @@ try {
 				// Add blob area
 				iterBlobQuantities->second.dArea +=
 					cos(dataLat[j]) * dAreaElement;
+
+				if ((t == 3) && (dataIndex[j][i] == 2)) {
+					printf ("%1.5e %1.5e %1.5e %1.5e %1.5e\n",
+						dataLat[j] * 180.0 / M_PI, dataLon[i] * 180.0 / M_PI, cos(dataLat[j]), dAreaElement, iterBlobQuantities->second.dArea);
+				}
 
 			}
 			}

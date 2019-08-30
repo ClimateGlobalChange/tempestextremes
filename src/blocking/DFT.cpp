@@ -14,10 +14,7 @@ This is a discrete Fourier transform function that will perform
 #include <cmath>
 #include <complex>
 #include <vector>
-//#include "/Users/mariellep/tempestextremes/src/base/DataVector.h"
-//#include "/Users/mariellep/tempestextremes/src/base/Exception.h"
 #include "DFT.h"
-//#include "DataVector.h"
 #include "Exception.h"
 
 std::vector<std::complex<double> > DFT(std::vector<double> inputVals,

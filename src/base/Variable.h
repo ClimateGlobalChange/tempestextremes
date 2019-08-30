@@ -19,7 +19,7 @@
 
 #include "netcdfcpp.h"
 
-#include "DataVector.h"
+#include "DataArray1D.h"
 #include "SimpleGrid.h"
 #include "DataOp.h"
 
@@ -206,7 +206,7 @@ public:
 	///	<summary>
 	///		Get the data associated with this variable.
 	///	</summary>
-	const DataVector<float> & GetData() const {
+	const DataArray1D<float> & GetData() const {
 		return m_data;
 	}
 
@@ -255,7 +255,7 @@ public:
 	///	<summary>
 	///		Data associated with this Variable.
 	///	</summary>
-	DataVector<float> m_data;
+	DataArray1D<float> m_data;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
