@@ -16,7 +16,7 @@
 
 #include "AutoCurator.h"
 #include "Exception.h"
-#include "DataVector.h"
+#include "DataArray1D.h"
 #include "Variable.h"
 
 #include "netcdfcpp.h"
@@ -143,21 +143,21 @@ void AutoCurator::IndexFiles(
 				strFile.c_str(), attCalendar->as_string(0));
 		}
 
-		DataVector<int> vecTimeInt;
-		DataVector<float> vecTimeFloat;
-		DataVector<double> vecTimeDouble;
+		DataArray1D<int> vecTimeInt;
+		DataArray1D<float> vecTimeFloat;
+		DataArray1D<double> vecTimeDouble;
 		if (varTime->type() == ncInt) {
-			vecTimeInt.Initialize(dimTime->size());
+			vecTimeInt.Allocate(dimTime->size());
 			varTime->set_cur((long)0);
 			varTime->get(&(vecTimeInt[0]), dimTime->size());
 
 		} else if (varTime->type() == ncFloat) {
-			vecTimeFloat.Initialize(dimTime->size());
+			vecTimeFloat.Allocate(dimTime->size());
 			varTime->set_cur((long)0);
 			varTime->get(&(vecTimeFloat[0]), dimTime->size());
 
 		} else if (varTime->type() == ncDouble) {
-			vecTimeDouble.Initialize(dimTime->size());
+			vecTimeDouble.Allocate(dimTime->size());
 			varTime->set_cur((long)0);
 			varTime->get(&(vecTimeDouble[0]), dimTime->size());
 

@@ -18,9 +18,9 @@ Temporal criterion for block: 5 days persistent blocking for single latitude
 #include "Exception.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix4D.h"
+#include "DataArray1D.h"
+#include "DataArray3D.h"
+#include "DataArray4D.h"
 #include "BlockingUtilities.h"
 
 #include <cstdlib>
@@ -143,7 +143,7 @@ int main(int argc, char** argv){
         NcDim * lev = readin.get_dim(levname.c_str());
         int nLev = lev->size();
         NcVar *levvar = readin.get_var(levname.c_str());
-        DataVector<double> pVec(nLev);
+        DataArray1D<double> pVec(nLev);
         levvar->get(&(pVec[0]),nLev);
 
         //Find the 500 mb level
@@ -166,9 +166,9 @@ int main(int argc, char** argv){
       if (nDims > 3 && !is4D){
         _EXCEPTIONT("Error: variable has more than 3 dimensions, must use --is4D.");
       }
-      //Create a DataMatrix to hold the timestep's data
-      DataMatrix<double>ZData(nLat,nLon);
-      DataMatrix<double>outIndex(nLat,nLon);
+      //Create a DataArray2D to hold the timestep's data
+      DataArray2D<double>ZData(nLat,nLon);
+      DataArray2D<double>outIndex(nLat,nLon);
      // std::string delim = ".";
       size_t pos,len;
       pos = InputFiles[x].find(insuff);
@@ -196,7 +196,7 @@ int main(int argc, char** argv){
     //Create variable to hold blocking Y/N
       NcVar *blocking_vals = file_out.add_var("ZG", ncDouble, out_time, out_lat, out_lon);
 
-      DataVector<double> latVec(nLat);
+      DataArray1D<double> latVec(nLat);
       latvar->set_cur((long) 0);
       latvar->get(&(latVec[0]),nLat);
 
@@ -248,7 +248,7 @@ int main(int argc, char** argv){
     int i_N, i_S;
 
   //NEW VARIABLE: TM BLOCKING INDEX
-//    DataMatrix3D<double> outIndex(nTime,nLat,nLon);
+//    DataArray3D<double> outIndex(nTime,nLat,nLon);
     for (int t=0; t<nTime; t++){
       if (is4D){
         zvar->set_cur(t,pIndex,0,0);

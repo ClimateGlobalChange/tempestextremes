@@ -18,8 +18,8 @@
 #include "Exception.h"
 #include "Announce.h"
 
-#include "DataVector.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
@@ -173,7 +173,7 @@ try {
 		_EXCEPTIONT("Error accessing variable \"lon\"");
 	}
 
-	DataVector<double> dLonDeg(dimLon->size());
+	DataArray1D<double> dLonDeg(dimLon->size());
 	varLon->get(&(dLonDeg[0]), dimLon->size());
 
 	// Get the latitude dimension
@@ -188,7 +188,7 @@ try {
 		_EXCEPTIONT("Error accessing variable \"lat\"");
 	}
 
-	DataVector<double> dLatDeg(dimLat->size());
+	DataArray1D<double> dLatDeg(dimLat->size());
 	varLat->get(&(dLatDeg[0]), dimLat->size());
 
 	// Get the integrated water vapor variable
@@ -198,10 +198,10 @@ try {
 			strIWVVariable.c_str());
 	}
 
-	DataMatrix<float> dIWV(dimLat->size(), dimLon->size());
+	DataArray2D<float> dIWV(dimLat->size(), dimLon->size());
 
 	// Open the NetCDF output file
-	NcFile ncOutput(strOutputFile.c_str(), NcFile::Replace);
+	NcFile ncOutput(strOutputFile.c_str(), NcFile::Replace, NULL, 0, NcFile::Netcdf4);
 	if (!ncOutput.is_valid()) {
 		_EXCEPTION1("Unable to open NetCDF file \"%s\" for writing",
 			strOutputFile.c_str());
@@ -252,7 +252,7 @@ try {
 	}
 
 	// Tagged cell array
-	DataMatrix<int> dIWVtag(dimLat->size(), dimLon->size());
+	DataArray2D<int> dIWVtag(dimLat->size(), dimLon->size());
 
 	NcVar * varIWVtag = NULL;
 	if (dimTimeOut != NULL) {
@@ -272,7 +272,7 @@ try {
 	}
 
 	// Laplacian
-	DataMatrix<double> dLaplacian(dimLat->size(), dimLon->size());
+	DataArray2D<double> dLaplacian(dimLat->size(), dimLon->size());
 
 	NcVar * varLaplacian = NULL;
 	if (fOutputLaplacian) {
@@ -389,7 +389,7 @@ try {
 		}
 
 		// Compute zonal threshold
-		DataVector<float> dZonalThreshold(dimLat->size());
+		DataArray1D<float> dZonalThreshold(dimLat->size());
 		for (int j = 0; j < dimLat->size(); j++) {
 			float dMaxZonalIWV = dIWV[j][0];
 			for (int i = 0; i < dimLon->size(); i++) {
@@ -406,7 +406,7 @@ try {
 		}
 
 		// Compute meridional threshold
-		DataVector<float> dMeridThreshold(dimLon->size());
+		DataArray1D<float> dMeridThreshold(dimLon->size());
 		for (int i = 0; i < dimLon->size(); i++) {
 			float dMaxMeridIWV = dIWV[0][i];
 			for (int j = 0; j < dimLat->size(); j++) {

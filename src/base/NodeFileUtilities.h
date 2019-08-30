@@ -288,7 +288,22 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class ColumnDataRadialVelocityProfile : public ColumnData {
+class ColumnDataDoubleArrayTemplate : public ColumnData {
+public:
+	///	<summary>
+	///		Get the indices of this array.
+	///	</summary>
+	virtual const std::vector<double> & GetIndices() const = 0;
+
+	///	<summary>
+	///		Get the values of this array.
+	///	</summary>
+	virtual const std::vector<double> & GetValues() const = 0;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class ColumnDataRadialProfile : public ColumnDataDoubleArrayTemplate {
 
 public:
 	///	<summary>
@@ -296,12 +311,68 @@ public:
 	///	</summary>
 	virtual std::string ToString() const {
 		char buf[100];
-		std::string strOut = "\"";
+		std::string strOut = "\"[";
+		for (int i = 0; i < m_dValues.size(); i++) {
+			sprintf(buf, "%3.6e", m_dValues[i]);
+			strOut += buf;
+			if (i == m_dValues.size()-1) {
+				strOut += "]\"";
+			} else {
+				strOut += ",";
+			}
+		}
+		return strOut;
+	}
+
+	///	<summary>
+	///		Return a duplicate of this ColumnData.
+	///	</summary>
+	virtual ColumnData * Duplicate() const {
+		return new ColumnDataRadialProfile(*this);
+	}
+
+	///	<summary>
+	///		Get the indices of this array.
+	///	</summary>
+	virtual const std::vector<double> & GetIndices() const {
+		return m_dR;
+	}
+
+	///	<summary>
+	///		Get the values of this array.
+	///	</summary>
+	virtual const std::vector<double> & GetValues() const {
+		return m_dValues;
+	}
+
+public:
+	///	<summary>
+	///		Vector of radial coordinates.
+	///	</summary>
+	std::vector<double> m_dR;
+
+	///	<summary>
+	///		Vector of values.
+	///	</summary>
+	std::vector<double> m_dValues;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class ColumnDataRadialVelocityProfile : public ColumnDataDoubleArrayTemplate {
+
+public:
+	///	<summary>
+	///		Express this column data as a string.
+	///	</summary>
+	virtual std::string ToString() const {
+		char buf[100];
+		std::string strOut = "\"[";
 		for (int i = 0; i < m_dUa.size(); i++) {
 			sprintf(buf, "%3.6e", m_dUa[i]);
 			strOut += buf;
 			if (i == m_dUa.size()-1) {
-				strOut += "\"";
+				strOut += "]\"";
 			} else {
 				strOut += ",";
 			}
@@ -314,6 +385,20 @@ public:
 	///	</summary>
 	virtual ColumnData * Duplicate() const {
 		return new ColumnDataRadialVelocityProfile(*this);
+	}
+
+	///	<summary>
+	///		Get the indices of this array.
+	///	</summary>
+	virtual const std::vector<double> & GetIndices() const {
+		return m_dR;
+	}
+
+	///	<summary>
+	///		Get the values of this array.
+	///	</summary>
+	virtual const std::vector<double> & GetValues() const {
+		return m_dUa;
 	}
 
 public:

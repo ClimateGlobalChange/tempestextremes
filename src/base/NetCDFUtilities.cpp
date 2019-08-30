@@ -17,7 +17,7 @@
 #include "NetCDFUtilities.h"
 #include "Exception.h"
 #include "Announce.h"
-#include "DataVector.h"
+#include "DataArray1D.h"
 #include "netcdfcpp.h"
 
 #include <vector>
@@ -180,8 +180,7 @@ void CopyNcVar(
 
 	// ncByte / ncChar type
 	if ((var->type() == ncByte) || (var->type() == ncChar)) {
-		DataVector<char> data;
-		data.Initialize(nDataSize);
+		DataArray1D<char> data(nDataSize);
 
 		varOut =
 			ncOut.add_var(
@@ -198,8 +197,7 @@ void CopyNcVar(
 
 	// ncShort type
 	if (var->type() == ncShort) {
-		DataVector<short> data;
-		data.Initialize(nDataSize);
+		DataArray1D<short> data(nDataSize);
 
 		varOut =
 			ncOut.add_var(
@@ -218,8 +216,7 @@ void CopyNcVar(
 
 	// ncInt type
 	if (var->type() == ncInt) {
-		DataVector<int> data;
-		data.Initialize(nDataSize);
+		DataArray1D<int> data(nDataSize);
 
 		varOut =
 			ncOut.add_var(
@@ -238,8 +235,7 @@ void CopyNcVar(
 
 	// ncFloat type
 	if (var->type() == ncFloat) {
-		DataVector<float> data;
-		data.Initialize(nDataSize);
+		DataArray1D<float> data(nDataSize);
 
 		varOut =
 			ncOut.add_var(
@@ -258,8 +254,7 @@ void CopyNcVar(
 
 	// ncDouble type
 	if (var->type() == ncDouble) {
-		DataVector<double> data;
-		data.Initialize(nDataSize);
+		DataArray1D<double> data(nDataSize);
 
 		varOut =
 			ncOut.add_var(
@@ -278,8 +273,7 @@ void CopyNcVar(
 
 	// ncInt64 type
 	if (var->type() == ncInt64) {
-		DataVector<ncint64> data;
-		data.Initialize(nDataSize);
+		DataArray1D<ncint64> data(nDataSize);
 
 		varOut =
 			ncOut.add_var(
@@ -382,28 +376,28 @@ void ReadCFTimeDataFromNcFile(
 	std::string strTimeUnits = attTimeUnits->as_string(0);
 
 	// Load in time data
-	DataVector<int> vecTimeInt;
-	DataVector<float> vecTimeFloat;
-	DataVector<double> vecTimeDouble;
-	DataVector<ncint64> vecTimeInt64;
+	DataArray1D<int> vecTimeInt;
+	DataArray1D<float> vecTimeFloat;
+	DataArray1D<double> vecTimeDouble;
+	DataArray1D<ncint64> vecTimeInt64;
 
 	if (varTime->type() == ncInt) {
-		vecTimeInt.Initialize(dimTime->size());
+		vecTimeInt.Allocate(dimTime->size());
 		varTime->set_cur((long)0);
 		varTime->get(&(vecTimeInt[0]), dimTime->size());
 
 	} else if (varTime->type() == ncFloat) {
-		vecTimeFloat.Initialize(dimTime->size());
+		vecTimeFloat.Allocate(dimTime->size());
 		varTime->set_cur((long)0);
 		varTime->get(&(vecTimeFloat[0]), dimTime->size());
 
 	} else if (varTime->type() == ncDouble) {
-		vecTimeDouble.Initialize(dimTime->size());
+		vecTimeDouble.Allocate(dimTime->size());
 		varTime->set_cur((long)0);
 		varTime->get(&(vecTimeDouble[0]), dimTime->size());
 
 	} else if (varTime->type() == ncInt64) {
-		vecTimeInt64.Initialize(dimTime->size());
+		vecTimeInt64.Allocate(dimTime->size());
 		varTime->set_cur((long)0);
 		varTime->get(&(vecTimeInt64[0]), dimTime->size());
 

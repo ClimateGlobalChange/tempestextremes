@@ -11,9 +11,9 @@
 #include "BlockingUtilities.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix4D.h"
+#include "DataArray1D.h"
+#include "DataArray3D.h"
+#include "DataArray4D.h"
 
 #include <cstdlib>
 #include <cmath>

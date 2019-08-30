@@ -20,8 +20,8 @@
 #include "Announce.h"
 #include "SimpleGrid.h"
 
-#include "DataVector.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
@@ -197,7 +197,7 @@ public:
 template <typename real>
 bool SatisfiesThreshold(
 	const SimpleGrid & grid,
-	const DataVector<real> & dataState,
+	const DataArray1D<real> & dataState,
 	const int ix0,
 	const ThresholdOp::Operation op,
 	const double dTargetValue,
@@ -565,14 +565,14 @@ void SpineARs(
 		nLat = dimLat->size();
 		nLon = dimLon->size();
 
-		DataVector<double> vecLat(nLat);
+		DataArray1D<double> vecLat(nLat);
 		varLat->get(vecLat, nLat);
 
 		for (int j = 0; j < nLat; j++) {
 			vecLat[j] *= M_PI / 180.0;
 		}
 
-		DataVector<double> vecLon(nLon);
+		DataArray1D<double> vecLon(nLon);
 		varLon->get(vecLon, nLon);
 
 		for (int i = 0; i < nLon; i++) {
@@ -595,16 +595,14 @@ void SpineARs(
 		nTime = dimTime->size();
 	}
 
-	DataVector<double> dTime;
-	dTime.Initialize(nTime);
+	DataArray1D<double> dTime(nTime);
 
 	if (varTime != NULL) {
 		if (varTime->type() == ncDouble) {
 			varTime->get(dTime, nTime);
 
 		} else if (varTime->type() == ncFloat) {
-			DataVector<float> dTimeFloat;
-			dTimeFloat.Initialize(nTime);
+			DataArray1D<float> dTimeFloat(nTime);
 
 			varTime->get(dTimeFloat, nTime);
 			for (int t = 0; t < nTime; t++) {
@@ -612,8 +610,7 @@ void SpineARs(
 			}
 
 		} else if (varTime->type() == ncInt) {
-			DataVector<int> dTimeInt;
-			dTimeInt.Initialize(nTime);
+			DataArray1D<int> dTimeInt(nTime);
 
 			varTime->get(dTimeInt, nTime);
 			for (int t = 0; t < nTime; t++) {
@@ -728,7 +725,7 @@ void SpineARs(
 	AnnounceEndBlock("Done");
 
 	// Tagged cell array
-	DataVector<int> bIWVtag(grid.GetSize());
+	DataArray1D<int> bIWVtag(grid.GetSize());
 
 	// Loop through all times
 	for (int t = 0; t < nTime; t ++) {
@@ -812,7 +809,7 @@ void SpineARs(
 			// Load the search variable data
 			Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
 			var.LoadGridData(varreg, vecFiles, grid, t);
-			const DataVector<float> & dataState = var.GetData();
+			const DataArray1D<float> & dataState = var.GetData();
 
 			// Loop through data
 			for (int i = 0; i < grid.GetSize(); i++) {
@@ -876,7 +873,7 @@ void SpineARs(
 
 					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
 					var.LoadGridData(varreg, vecFiles, grid, t);
-					const DataVector<float> & dataState = var.GetData();
+					const DataArray1D<float> & dataState = var.GetData();
 
 					ncvar->set_cur(t, 0);
 					ncvar->put(&(dataState[0]), 1, grid.m_nGridDim[0]);
@@ -892,7 +889,7 @@ void SpineARs(
 
 					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
 					var.LoadGridData(varreg, vecFiles, grid, t);
-					const DataVector<float> & dataState = var.GetData();
+					const DataArray1D<float> & dataState = var.GetData();
 
 					ncvar->set_cur(t, 0, 0);
 					ncvar->put(&(dataState[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
@@ -937,7 +934,7 @@ void SpineARs(
 
 					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
 					var.LoadGridData(varreg, vecFiles, grid, t);
-					const DataVector<float> & dataState = var.GetData();
+					const DataArray1D<float> & dataState = var.GetData();
 
 					ncvar->set_cur((long)0);
 					ncvar->put(&(dataState[0]), grid.m_nGridDim[0]);
@@ -952,7 +949,7 @@ void SpineARs(
 
 					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
 					var.LoadGridData(varreg, vecFiles, grid, t);
-					const DataVector<float> & dataState = var.GetData();
+					const DataArray1D<float> & dataState = var.GetData();
 
 					ncvar->set_cur(0, 0);
 					ncvar->put(&(dataState[0]), grid.m_nGridDim[0], grid.m_nGridDim[1]);

@@ -17,7 +17,7 @@
 #ifndef _SPARSEMATRIX_H_
 #define _SPARSEMATRIX_H_
 
-#include "DataVector.h"
+#include "DataArray1D.h"
 
 #include <map>
 
@@ -89,13 +89,13 @@ public:
 	///		Get the entries of the SparseMatrix.
 	///	</summary>
 	void GetEntries(
-		DataVector<int> & dataRows,
-		DataVector<int> & dataCols,
-		DataVector<DataType> & dataEntries
+		DataArray1D<int> & dataRows,
+		DataArray1D<int> & dataCols,
+		DataArray1D<DataType> & dataEntries
 	) const {
-		dataRows.Initialize(m_mapEntries.size());
-		dataCols.Initialize(m_mapEntries.size());
-		dataEntries.Initialize(m_mapEntries.size());
+		dataRows.Allocate(m_mapEntries.size());
+		dataCols.Allocate(m_mapEntries.size());
+		dataEntries.Allocate(m_mapEntries.size());
 
 		int ix = 0;
 
@@ -113,9 +113,9 @@ public:
 	///		Set the entries of the SparseMatrix in bulk.
 	///	</summary>
 	void SetEntries(
-		const DataVector<int> & dataRows,
-		const DataVector<int> & dataCols,
-		const DataVector<DataType> & dataEntries
+		const DataArray1D<int> & dataRows,
+		const DataArray1D<int> & dataCols,
+		const DataArray1D<DataType> & dataEntries
 	) {
 		if (dataRows.GetRows() != dataCols.GetRows()) {
 			_EXCEPTIONT("Mismatch between size of dataRows and dataCols");
@@ -169,11 +169,11 @@ public:
 
 public:
 	///	<summary>
-	///		Apply the sparse matrix to a DataVector.
+	///		Apply the sparse matrix to a DataArray1D.
 	///	</summary>
 	void Apply(
-		const DataVector<DataType> & dataVectorIn,
-		DataVector<DataType> & dataVectorOut
+		const DataArray1D<DataType> & dataVectorIn,
+		DataArray1D<DataType> & dataVectorOut
 	) const {
 /*
 		if (dataVectorIn.GetRows() != m_nCols) {

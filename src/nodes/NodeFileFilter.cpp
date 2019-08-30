@@ -19,7 +19,7 @@
 #include "Announce.h"
 #include "Variable.h"
 #include "AutoCurator.h"
-#include "DataMatrix.h"
+#include "DataArray2D.h"
 #include "ArgumentTree.h"
 #include "STLStringHelper.h"
 #include "NodeFileUtilities.h"
@@ -43,7 +43,7 @@ void BuildFilter(
 	const PathVector & pathvec,
 	const PathNodeIndexVector & vecPathNodes,
 	const std::string & strDist,
-	DataVector<double> & dataFilter
+	DataArray1D<double> & dataFilter
 ) {
 	dataFilter.Zero();
 
@@ -460,10 +460,10 @@ try {
 	AnnounceEndBlock("Done");
 
 	// Create data array
-	DataVector<double> data(grid.GetSize());
+	DataArray1D<double> data(grid.GetSize());
 
 	// Create filter
-	DataVector<double> dataFilter(grid.GetSize());
+	DataArray1D<double> dataFilter(grid.GetSize());
 
 	// Loop over all files
 	if (vecInputFileList.size() != vecOutputFileList.size()) {
@@ -587,7 +587,7 @@ try {
 				nAuxDims *= vecDim[d]->size();
 			}
 
-			DataVector<long> vecDataSize(vecDim.size());
+			DataArray1D<long> vecDataSize(vecDim.size());
 			for (int d = 0; d < vecDim.size(); d++) {
 				if (d >= vecDim.size() - nGridDims) {
 					vecDataSize[d] = vecDim[d]->size();
@@ -600,7 +600,7 @@ try {
 			int iCurrentTime = (-1);
 
 			// Loop through all auxiliary dimensions
-			DataVector<long> vecDataPos(vecDim.size());
+			DataArray1D<long> vecDataPos(vecDim.size());
 			for (int i = 0; i < nAuxDims; i++) {
 
 				// Load data

@@ -11,8 +11,8 @@
 #include "Announce.h"
 #include "TimeObj.h"
 
-#include "DataVector.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
@@ -72,7 +72,7 @@ int main(int argc,char**argv){
                         if (tVar == NULL){
                                 _EXCEPTION1("Couldn't find variable %s",tname.c_str());
                         }
-                        DataVector<double> timeVec(nTime);
+                        DataArray1D<double> timeVec(nTime);
                         tVar->set_cur(long(0));
                         tVar->get(&(timeVec[0]),nTime);
 
@@ -123,12 +123,12 @@ int main(int argc,char**argv){
                         //Create new time variable for output
                         int nOutTime = tIndices.size();
 			std::cout<<"Output will be "<<nOutTime<<" in time dimension"<<std::endl;
-                        DataVector<double> newTimeVec(nOutTime);
+                        DataArray1D<double> newTimeVec(nOutTime);
 			int pIndex = 10000000;
     			if (is4d){
       				int nLev = infile.get_dim(levname.c_str())->size();
     				NcVar *levvar = infile.get_var(levname.c_str());
-      				DataVector<double> pVec(nLev);
+      				DataArray1D<double> pVec(nLev);
       				levvar->set_cur(long(0));
       				levvar->get(&pVec[0],nLev);
 
@@ -149,9 +149,9 @@ int main(int argc,char**argv){
 
                         //Read in the original variable
                         NcVar * inVar = infile.get_var(varName.c_str());
-			DataMatrix3D<double> datStore(nOutTime,nLat,nLon);
-			DataMatrix3D<double> countStore(nOutTime,nLat,nLon);
-			DataMatrix<double> currSlice(nLat,nLon);
+			DataArray3D<double> datStore(nOutTime,nLat,nLon);
+			DataArray3D<double> countStore(nOutTime,nLat,nLon);
+			DataArray2D<double> currSlice(nLat,nLon);
 			//Add each time slice to the appropriate day
 			int ds,de;
 			for (int d=0; d<nOutTime; d++){
@@ -181,7 +181,7 @@ int main(int argc,char**argv){
 					}
 				}
 			}
-			DataMatrix3D<double> avgStore(nOutTime,nLat,nLon);
+			DataArray3D<double> avgStore(nOutTime,nLat,nLon);
 			//Now average all the values
 			for (int d=0; d<nOutTime; d++){
 				for (int a=0; a<nLat; a++){

@@ -8,9 +8,9 @@
 
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
+#include "DataArray3D.h"
 #include "Announce.h"
 #include "CommandLine.h"
 #include "Exception.h"
@@ -21,7 +21,7 @@
 #include <cstring>
 
 void densCalc(NcVar * inVar,
-              DataMatrix<double> & outMat){
+              DataArray2D<double> & outMat){
 
   int tLen,latLen,lonLen;
   double invtLen;
@@ -32,11 +32,11 @@ void densCalc(NcVar * inVar,
   latLen = inVar->get_dim(1)->size();
   lonLen = inVar->get_dim(2)->size();
 
-  DataMatrix3D<double> inMat(tLen,latLen,lonLen);
+  DataArray3D<double> inMat(tLen,latLen,lonLen);
   inVar->set_cur(0,0,0);
   inVar->get((&inMat[0][0][0]), tLen,latLen,lonLen);
 
-  //DataMatrix<double> outMat(latLen,lonLen);
+  //DataArray2D<double> outMat(latLen,lonLen);
   for (int i=0; i<latLen; i++){
     for (int j=0; j<lonLen; j++){
       outMat[i][j] = 0.0;
@@ -63,12 +63,12 @@ void densCalc(NcVar * inVar,
   //outVar->put((&outMat[0][0]),latLen,lonLen);
 }
 
-void yearlyStdDev(DataMatrix3D<double> inMat,
+void yearlyStdDev(DataArray3D<double> inMat,
                  int nTime,
                  int nLat,
                  int nLon,
-                 DataMatrix<double> & outMat){
-  DataMatrix<double> meanval(nLat,nLon);
+                 DataArray2D<double> & outMat){
+  DataArray2D<double> meanval(nLat,nLon);
   double invt = 1./((double)nTime);
 
   for (int t=0; t<nTime; t++){
@@ -150,7 +150,7 @@ int main(int argc, char ** argv){
     //read input variable
     NcVar * inVar = readin.get_var(varName.c_str());
     //Create output matrix
-    DataMatrix<double> outMat(latLen,lonLen);
+    DataArray2D<double> outMat(latLen,lonLen);
     densCalc(inVar,outMat);
     //Option for calculating the yearly standard deviation 
  /*   if (calcStdDev){
@@ -163,7 +163,7 @@ int main(int argc, char ** argv){
 */
     //If multiple files, add these values to the output
     if (vecFiles.size()>1){
-      DataMatrix<double> addMat(latLen,lonLen);
+      DataArray2D<double> addMat(latLen,lonLen);
       std::cout<<"There are "<<vecFiles.size()<<" files."<<std::endl;
       for (int v=1; v<vecFiles.size(); v++){
         NcFile addread(vecFiles[v].c_str());
@@ -209,7 +209,7 @@ int main(int argc, char ** argv){
 
 /*    if (calcStdDev){
       NcVar * stdDevVar = readout.add_var("stddev", ncDouble,outLat,outLon);
-      DataMatrix<double> stdDevMat(latLen,lonLen);
+      DataArray2D<double> stdDevMat(latLen,lonLen);
       yearlyStdDev(storeMat,vecFiles.size(),latLen,lonLen,stdDevMat);
       stdDevVar->set_cur(0,0);
       stdDevVar->put(&(stdDevMat[0][0]),latLen,lonLen);

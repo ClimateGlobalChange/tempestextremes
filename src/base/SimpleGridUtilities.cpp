@@ -24,7 +24,7 @@ template <typename real>
 void FindLocalMinMax(
 	const SimpleGrid & grid,
 	bool fMinimum,
-	const DataVector<real> & data,
+	const DataArray1D<real> & data,
 	int ix0,
 	double dMaxDist,
 	int & ixExtremum,
@@ -114,7 +114,7 @@ void FindLocalMinMax(
 template <typename real>
 void FindAllLocalMinima(
 	const SimpleGrid & grid,
-	const DataVector<real> & data,
+	const DataArray1D<real> & data,
 	std::set<int> & setMinima
 ) {
 	int sFaces = grid.m_vecConnectivity.size();
@@ -142,7 +142,7 @@ void FindAllLocalMinima(
 template <typename real>
 void FindAllLocalMaxima(
 	const SimpleGrid & grid,
-	const DataVector<real> & data,
+	const DataArray1D<real> & data,
 	std::set<int> & setMaxima
 ) {
 	int sFaces = grid.m_vecConnectivity.size();
@@ -170,7 +170,7 @@ void FindAllLocalMaxima(
 template <typename real>
 void FindLocalAverage(
 	const SimpleGrid & grid,
-	const DataVector<real> & data,
+	const DataArray1D<real> & data,
 	int ix0,
 	double dMaxDist,
 	real & dAverage
@@ -248,7 +248,7 @@ void FindLocalAverage(
 template void FindLocalMinMax<float>(
 	const SimpleGrid & grid,
 	bool fMinimum,
-	const DataVector<float> & data,
+	const DataArray1D<float> & data,
 	int ix0,
 	double dMaxDist,
 	int & ixExtremum,
@@ -259,7 +259,7 @@ template void FindLocalMinMax<float>(
 template void FindLocalMinMax<double>(
 	const SimpleGrid & grid,
 	bool fMinimum,
-	const DataVector<double> & data,
+	const DataArray1D<double> & data,
 	int ix0,
 	double dMaxDist,
 	int & ixExtremum,
@@ -269,31 +269,31 @@ template void FindLocalMinMax<double>(
 
 template void FindAllLocalMinima<float>(
 	const SimpleGrid & grid,
-	const DataVector<float> & data,
+	const DataArray1D<float> & data,
 	std::set<int> & setMinima
 );
 
 template void FindAllLocalMinima<double>(
 	const SimpleGrid & grid,
-	const DataVector<double> & data,
+	const DataArray1D<double> & data,
 	std::set<int> & setMinima
 );
 
 template void FindAllLocalMaxima<float>(
 	const SimpleGrid & grid,
-	const DataVector<float> & data,
+	const DataArray1D<float> & data,
 	std::set<int> & setMaxima
 );
 
 template void FindAllLocalMaxima<double>(
 	const SimpleGrid & grid,
-	const DataVector<double> & data,
+	const DataArray1D<double> & data,
 	std::set<int> & setMaxima
 );
 
 template void FindLocalAverage<float>(
 	const SimpleGrid & grid,
-	const DataVector<float> & data,
+	const DataArray1D<float> & data,
 	int ix0,
 	double dMaxDist,
 	float & dAverage
@@ -301,7 +301,7 @@ template void FindLocalAverage<float>(
 
 template void FindLocalAverage<double>(
 	const SimpleGrid & grid,
-	const DataVector<double> & data,
+	const DataArray1D<double> & data,
 	int ix0,
 	double dMaxDist,
 	double & dAverage

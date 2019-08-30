@@ -18,8 +18,8 @@ the detrended data.
 #include "Announce.h"
 #include "TimeObj.h"
 
-#include "DataVector.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
@@ -99,7 +99,7 @@ int main(int argc, char **argv){
             NcFile reffile(InputFiles[0].c_str());
             int nLev = reffile.get_dim(levname.c_str())->size();
             NcVar * levvar = reffile.get_var(levname.c_str());
-            DataVector<double> pVec(nLev);
+            DataArray1D<double> pVec(nLev);
             levvar->set_cur(long(0));
             levvar->get(&(pVec[0]),nLev);
 
@@ -129,7 +129,7 @@ int main(int argc, char **argv){
         //We already know the day in year, which will be used to match the 
         //regression value to the date
         NcVar * lintimevar = linreg.get_var(tname.c_str());
-        DataVector<double> linTimeVec(lintime);
+        DataArray1D<double> linTimeVec(lintime);
         lintimevar->set_cur((long)0);
         lintimevar->get(&(linTimeVec[0]),lintime);
 
@@ -159,9 +159,9 @@ int main(int argc, char **argv){
         int dayIndex;
         int yearDiff;
         double detrendVal,detrendMean;
-        DataMatrix<double> slopeStore(nLat,nLon);
-        DataMatrix<double>interceptStore(nLat,nLon);
-        DataMatrix<double>varSlice(nLat,nLon);
+        DataArray2D<double> slopeStore(nLat,nLon);
+        DataArray2D<double>interceptStore(nLat,nLon);
+        DataArray2D<double>varSlice(nLat,nLon);
         size_t pos,len;
         //Begin reading in the files
         for (int x=0; x<nFiles; x++){
@@ -175,7 +175,7 @@ int main(int argc, char **argv){
             //Time variable
             NcVar * timevar = infile.get_var(tname.c_str());
             nTime = infile.get_dim(tname.c_str())->size();
-            DataVector<double>timeVec(nTime);
+            DataArray1D<double>timeVec(nTime);
             timevar->set_cur(long(0));
             timevar->get(&(timeVec[0]),nTime);
             //Time units
@@ -195,7 +195,7 @@ int main(int argc, char **argv){
             if (heightData==NULL){
                 _EXCEPTIONT("Couldn't read in variable.");
             }
-            DataMatrix3D<double> detrendStore(nTime,nLat,nLon);
+            DataArray3D<double> detrendStore(nTime,nLat,nLon);
             for (int t=0; t<nTime; t++){
                 //Read in the time info
                 ParseTimeDouble(strTimeUnits,strCalendar,timeVec[t],\

@@ -11,7 +11,7 @@
 #include <memory>
 #include "BlockingUtilities.h"
 #include "CommandLine.h"
-#include "DataMatrix3D.h"
+#include "DataArray3D.h"
 #include "netcdfcpp.h"
 
 int main(int argc, char** argv) {
@@ -107,8 +107,8 @@ int main(int argc, char** argv) {
   NcVar* outBlobVar = outFile.add_var(blobVarName.c_str(), ncInt, outTimeDim,
                                       outLatDim, outLonDim);
 
-  DataMatrix3D<int> outData(timeDimSize, latDimSize, lonDimSize);
-  DataMatrix3D<int> inData(timeDimSize, latDimSize, lonDimSize);
+  DataArray3D<int> outData(timeDimSize, latDimSize, lonDimSize);
+  DataArray3D<int> inData(timeDimSize, latDimSize, lonDimSize);
 
 //  for (auto& inFile : inFiles) {
   for (int x=0; x<nFiles; x++){

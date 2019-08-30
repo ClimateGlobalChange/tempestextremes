@@ -18,9 +18,9 @@ and outputs integer values (INT_ADIPV) which can then be used by StitchBlobs
 #include "Exception.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix4D.h"
+#include "DataArray1D.h"
+#include "DataArray3D.h"
+#include "DataArray4D.h"
 #include <cstdlib>
 #include <cmath>
 #include <cstring>
@@ -184,7 +184,7 @@ int main(int argc, char **argv){
       NcDim * lev = tempFile.get_dim(levname.c_str());
       int nLev = lev->size();
       NcVar *levvar = tempFile.get_var(levname.c_str());
-      DataVector<double> pVec(nLev);
+      DataArray1D<double> pVec(nLev);
       levvar->get(&(pVec[0]),nLev);
 
       //Find the 500 mb level
@@ -209,7 +209,7 @@ int main(int argc, char **argv){
       //Get info on number of time steps per day
       NcVar *tInfo = tempFile.get_var(tname.c_str());
       int tsz = tempFile.get_dim(tname.c_str())->size();
-      DataVector<double> tvec(tsz);
+      DataArray1D<double> tvec(tsz);
       tInfo->set_cur((long)0);
       tInfo->get(&(tvec[0]),tsz);
 
@@ -283,7 +283,7 @@ int main(int argc, char **argv){
       }
 
 
-      DataVector<double> timeVals(nTime);
+      DataArray1D<double> timeVals(nTime);
       inTime->set_cur((long) 0);
       inTime->get(&(timeVals[0]),nTime);
 
@@ -293,7 +293,7 @@ int main(int argc, char **argv){
       int leapDay = 0;
       int leapHour = 0;
 
-      DataVector <double> outputTime(nTime);
+      DataArray1D <double> outputTime(nTime);
 
       int nLeapSteps = 0;
       int z=0;
@@ -376,9 +376,9 @@ int main(int argc, char **argv){
 	  double div = (double) 2*tSteps;
 	  double invDiv = 1.0/div;
 		//Create the two-day matrix which will hold the averaging window
-		DataMatrix3D<double> twoDayMat(2*tSteps,nLat,nLon);
-		DataMatrix3D<double> nextFileBuffer(tSteps,nLat,nLon);
-		DataMatrix<double>aDevMat(nLat,nLon);
+		DataArray3D<double> twoDayMat(2*tSteps,nLat,nLon);
+		DataArray3D<double> nextFileBuffer(tSteps,nLat,nLon);
+		DataArray2D<double>aDevMat(nLat,nLon);
 		int xcount=0;
                 int prevYear,prevMonth,prevDay,prevHour,nextYear,nextMonth,nextDay,nextHour = 0;                
                 bool isSequential;
@@ -421,7 +421,7 @@ int main(int argc, char **argv){
       NcDim *tDim = infile.get_dim(tname.c_str());
       NcVar *tVar = infile.get_var(tname.c_str());
       nTime = tDim->size();
-	DataVector<double> tVarVals(nTime);
+	DataArray1D<double> tVarVals(nTime);
 	tVar->set_cur((long) 0);
 	tVar->get(&(tVarVals[0]),nTime);	
 	NcDim *latDim = infile.get_dim(latname.c_str());
@@ -451,7 +451,7 @@ int main(int argc, char **argv){
 				std::cout<<"DEBUG: next file is "<<InputDevFiles[x+1].c_str()<<std::endl;
                                 NcVar * nextTvar = nextFile.get_var(tname.c_str());
                                 int nextTsz = nextFile.get_dim(tname.c_str())->size();
-				DataVector<double> nextVarVals(nextTsz);
+				DataArray1D<double> nextVarVals(nextTsz);
 				nextTvar->set_cur((long) 0);
 				nextTvar->get(&(nextVarVals[0]),nextTsz);
 				std::string strNextTime;

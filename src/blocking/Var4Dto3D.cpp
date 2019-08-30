@@ -11,9 +11,9 @@ only along the lev axis)*/
 #include "Exception.h"
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix4D.h"
+#include "DataArray1D.h"
+#include "DataArray3D.h"
+#include "DataArray4D.h"
 #include "BlockingUtilities.h"
 #include "Interpolate.h"
 
@@ -108,7 +108,7 @@ int main(int argc, char** argv){
     NcVar *levvar = readin.get_var(levname.c_str());
 
     //Create a data vector with the associated pressure values 
-    DataVector<double> pVec(nLev);
+    DataArray1D<double> pVec(nLev);
     levvar->set_cur((long) 0);
     levvar->get(&(pVec[0]),nLev);
 
@@ -170,7 +170,7 @@ int main(int argc, char** argv){
 
       NcVar *vvar = readin.get_var(varVec[v].c_str());
       NcVar *outvar = file_out.add_var(varVec[v].c_str(),ncDouble,out_time,out_lat,out_lon);
-      DataMatrix<double> VData(nLat, nLon);
+      DataArray2D<double> VData(nLat, nLon);
 
       for (int t=0; t<nTime; t++){
         vvar->set_cur(t,pIndex,0,0);

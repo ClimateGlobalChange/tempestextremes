@@ -12,10 +12,10 @@
 
 #include "NetCDFUtilities.h"
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix4D.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
+#include "DataArray3D.h"
+#include "DataArray4D.h"
 #include "TimeObj.h"
 #include "Announce.h"
 
@@ -139,9 +139,9 @@ void PT_calc(
         int nPlev,
         int nLat,
         int nLon,
-        DataMatrix3D<double> TMat, 
+        DataArray3D<double> TMat, 
         NcVar *pLev, 
-        DataMatrix3D<double> &PTMat
+        DataArray3D<double> &PTMat
 );
 
 //Replaces a missing value with one interpolated in the longitudinal direction
@@ -149,14 +149,14 @@ double replaceMissingFloat(int currA,
                            int currB,
                            int currP,
                            double valThresh,
-                           DataMatrix3D<double> VarMat,
+                           DataArray3D<double> VarMat,
                            int aLen,
                            int bLen
 );
 double replaceMissingFloat2D(int currA,
                            int currB,
                            double valThresh,
-                           DataMatrix<double> VarMat,
+                           DataArray2D<double> VarMat,
                            int aLen,
                            int bLen
 );		
@@ -172,8 +172,8 @@ void pv_vars_calc(
   double & dphi,
   double & dlambda,
   double & p_res,
-  DataVector<double> & coriolis,
-  DataVector<double> & cosphi
+  DataArray1D<double> & coriolis,
+  DataArray1D<double> & cosphi
 );
 
 
@@ -184,12 +184,12 @@ void rVort_calc(
         int nPlev,
         int nLat,
         int nLon,
-        DataMatrix3D<double>UMat,
-        DataMatrix3D<double>VMat,
+        DataArray3D<double>UMat,
+        DataArray3D<double>VMat,
         double dphi,
         double dlambda,
-        DataVector<double> cosphi,
-        DataMatrix3D<double> & RVMat
+        DataArray1D<double> cosphi,
+        DataArray3D<double> & RVMat
 );
 
 //////////////////////////////////////
@@ -209,7 +209,7 @@ double GHcheck(double z_0,
 
 
 bool missingValCheck(
-  DataMatrix3D<double> fillData,
+  DataArray3D<double> fillData,
   int nTime,
   double missingNum
 );
@@ -224,7 +224,7 @@ void MissingFill(
   int ArrLen,
   int & currArrIndex,
   int & dateIndex,
-  DataMatrix3D<double> & currFillData
+  DataArray3D<double> & currFillData
 );
 
 //////////////////////////////////////////////////
@@ -240,18 +240,18 @@ void PV_calc(
         int nPlev,
         int nLat,
         int nLon,
-        DataMatrix3D<double>UMat,
-        DataMatrix3D<double>VMat,
-        DataMatrix3D<double> PTMat,
-        DataMatrix3D<double> RVMat,
-        DataVector<double>pVec,
-        DataVector<double> coriolis,
-        DataVector<double>cosphi,
+        DataArray3D<double>UMat,
+        DataArray3D<double>VMat,
+        DataArray3D<double> PTMat,
+        DataArray3D<double> RVMat,
+        DataArray1D<double>pVec,
+        DataArray1D<double> coriolis,
+        DataArray1D<double>cosphi,
         double dphi,
         double dlambda,
         double lat_res,
         double lon_res,
-        DataMatrix3D<double> & PVMat
+        DataArray3D<double> & PVMat
 );
 
 
@@ -260,9 +260,9 @@ void IPV_calc(
        int nLat,
        int nLon,
        double lat_res,
-       DataVector<double> pVec,
-       DataMatrix3D<double> PVMat,
-       DataMatrix<double> & IPVMat
+       DataArray1D<double> pVec,
+       DataArray3D<double> PVMat,
+       DataArray2D<double> & IPVMat
 );
 
 ////////////////////////////////////////////////////
@@ -313,7 +313,7 @@ void calcDevs(bool latNorm,
 											int nSteps,
 						          int & currMatIndex,
 						          int & currTindex,
-						          DataMatrix3D<double> &twoDayMat);
+						          DataArray3D<double> &twoDayMat);
 */
 void calcNormalizedDevs(bool isPV,
                        NcVar * inDev,
@@ -322,13 +322,13 @@ void calcNormalizedDevs(bool isPV,
                        NcVar * inTime,
                        std::string strTimeUnits,
                        std::string strCalendar,
-                       DataMatrix3D<double>threshMat,
+                       DataArray3D<double>threshMat,
                        double minThresh);
-/*void stdDev(DataMatrix3D<double>inDevs,
+/*void stdDev(DataArray3D<double>inDevs,
               int nTime,
               int nLat,
               int nLon,
-              DataMatrix<double> & outStdDev);
+              DataArray2D<double> & outStdDev);
 
 
 void calcDevsGH(bool leap,
@@ -353,23 +353,23 @@ void PV_calc2(
         int nPlev,
         int nLat,
         int nLon,
-        DataMatrix3D<double>UMat,
-        DataMatrix3D<double>VMat,
-        DataMatrix3D<double> PTMat,
-        DataMatrix3D<double> RVMat,
-        DataVector<double>pVec,
-        DataVector<double> coriolis,
-        DataVector<double>cosphi,
+        DataArray3D<double>UMat,
+        DataArray3D<double>VMat,
+        DataArray3D<double> PTMat,
+        DataArray3D<double> RVMat,
+        DataArray1D<double>pVec,
+        DataArray1D<double> coriolis,
+        DataArray1D<double>cosphi,
         double dphi,
         double dlambda,
         double lat_res,
         double lon_res,
-        DataMatrix3D<double> &PVMat,
-  DataMatrix3D<double> &dpt_dp,
-  DataMatrix3D<double> &du_dp,
-  DataMatrix3D<double> &dv_dp,
-  DataMatrix3D<double> &dpt_dphi,
-  DataMatrix3D<double> &dpt_dl
+        DataArray3D<double> &PVMat,
+  DataArray3D<double> &dpt_dp,
+  DataArray3D<double> &du_dp,
+  DataArray3D<double> &dv_dp,
+  DataArray3D<double> &dpt_dphi,
+  DataArray3D<double> &dpt_dl
 );
 
 #endif

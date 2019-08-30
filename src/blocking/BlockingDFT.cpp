@@ -7,9 +7,9 @@
 //////////////////////////////////////////////////
 
 #include "netcdfcpp.h"
-#include "DataVector.h"
-#include "DataMatrix3D.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
+#include "DataArray3D.h"
 #include "Announce.h"
 #include "CommandLine.h"
 #include "Exception.h"
@@ -95,7 +95,7 @@ int main(int argc, char ** argv){
         NcDim * lev = readin.get_dim(levname.c_str());
         int nLev = lev->size();
         NcVar *levvar = readin.get_var(levname.c_str());
-        DataVector<double> pVec(nLev);
+        DataArray1D<double> pVec(nLev);
         levvar->get(&(pVec[0]),nLev);
 
         //Find the 500 mb level
@@ -117,12 +117,12 @@ int main(int argc, char ** argv){
     //Initialize storage array: day, lat, lon
     int yearLen = (endday-startday)+1;
     std::cout<<"Year is "<<yearLen<<" long"<<std::endl;
-    DataMatrix3D<double> storeMat(yearLen,latLen,lonLen);
+    DataArray3D<double> storeMat(yearLen,latLen,lonLen);
     //Initialize counts array: day, lat, lon
-    DataMatrix3D<double> countsMat(yearLen, latLen, lonLen);
+    DataArray3D<double> countsMat(yearLen, latLen, lonLen);
     //Initialize input datan array: lat, lon
-    DataMatrix<double> inputData(latLen,lonLen);
-    DataVector<double> timeVec(tLen);
+    DataArray2D<double> inputData(latLen,lonLen);
+    DataArray1D<double> timeVec(tLen);
 
     //Close file (then re-open in loop)
     readin.close();
@@ -145,7 +145,7 @@ int main(int argc, char ** argv){
       if (nDims > 3 && !is4D){
         _EXCEPTIONT("Error: variable has more than 3 dimensions, must use --is4D.");
       }
-      timeVec.Initialize(tLen);
+      timeVec.Allocate(tLen);
       NcVar *timeVar = readin.get_var(tname.c_str());
       timeVar->set_cur((long)0);
       timeVar->get(&(timeVec[0]),tLen);
@@ -176,7 +176,7 @@ int main(int argc, char ** argv){
       //Input data
 	std::cout<<"Entering time loop for file."<<std::endl;
       for (int t=0; t<tLen; t++){
-        inputData.Initialize(latLen, lonLen);
+        inputData.Allocate(latLen, lonLen);
       
         if (is4D){
           inputVar->set_cur(t,pIndex,0,0);
@@ -232,7 +232,7 @@ int main(int argc, char ** argv){
     std::vector<double> inputDaily(yearLen);
     std::vector<std::complex <double> > FourierCoefs(yearLen);
     std::vector<double> outputDaily(yearLen);
-    DataMatrix3D<double> outputMat(yearLen, latLen, lonLen);
+    DataArray3D<double> outputMat(yearLen, latLen, lonLen);
     for (int a=0; a<latLen; a++){
       for (int b=0; b<lonLen; b++){
         for (int d=0; d<yearLen; d++){
@@ -248,8 +248,8 @@ int main(int argc, char ** argv){
     }
 
 
-/*    DataMatrix3D<double> outputMatZonal(yearLen,latLen,lonLen);
-    DataMatrix <double> zonalAvgMat(yearLen,latLen);
+/*    DataArray3D<double> outputMatZonal(yearLen,latLen,lonLen);
+    DataArray2D <double> zonalAvgMat(yearLen,latLen);
     for (int d=0; d<yearLen; d++){
       for (int a=0; a<latLen; a++){
         for (int b=0; b<lonLen; b++){
@@ -282,7 +282,7 @@ int main(int argc, char ** argv){
 
     NcFile outfile(outFile.c_str(),NcFile::Replace,NULL,0,NcFile::Offset64Bits);
     NcDim *outTime = outfile.add_dim(tname.c_str(),yearLen);
-    DataVector<int> tVals(yearLen);
+    DataArray1D<int> tVals(yearLen);
     for (int t=startday; t<=endday; t++){
       tVals[t] = t;
     }

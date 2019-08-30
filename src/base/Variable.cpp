@@ -441,7 +441,7 @@ void Variable::LoadGridData(
 	//std::cout << "Loading " << ToString(varreg) << " " << iTime << std::endl;
 
 	// Allocate data
-	m_data.Initialize(grid.GetSize());
+	m_data.Allocate(grid.GetSize());
 	m_iTime = iTime;
 
 	// Get the data directly from a variable
@@ -525,7 +525,7 @@ void Variable::LoadGridData(
 		}
 
 		// Build argument list
-		std::vector<DataVector<float> const *> vecArgData;
+		std::vector<DataArray1D<float> const *> vecArgData;
 		for (int i = 0; i < m_varArg.size(); i++) {
 			if (m_varArg[i] != InvalidVariableIndex) {
 				Variable & var = varreg.Get(m_varArg[i]);

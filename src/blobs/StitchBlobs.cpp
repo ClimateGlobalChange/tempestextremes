@@ -20,8 +20,8 @@
 #include "Exception.h"
 #include "Announce.h"
 
-#include "DataVector.h"
-#include "DataMatrix.h"
+#include "DataArray1D.h"
+#include "DataArray2D.h"
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
@@ -260,9 +260,9 @@ public:
 	///		Verify that the specified path satisfies the threshold op.
 	///	</summary>
 	bool Apply(
-		const DataVector<double> & dCellArea,
-		const DataVector<double> & dLatDeg,
-		const DataVector<double> & dLonDeg,
+		const DataArray1D<double> & dCellArea,
+		const DataArray1D<double> & dLatDeg,
+		const DataArray1D<double> & dLonDeg,
 		const IndicatorSet & setBlobPoints,
 		const LatLonBox & boxBlob
 	) {
@@ -420,9 +420,9 @@ public:
 	///		Verify that the specified path satisfies the threshold op.
 	///	</summary>
 	void Apply(
-		const DataVector<double> & dCellArea,
-		const DataVector<double> & dLatDeg,
-		const DataVector<double> & dLonDeg,
+		const DataArray1D<double> & dCellArea,
+		const DataArray1D<double> & dLatDeg,
+		const DataArray1D<double> & dLonDeg,
 		const std::vector<Tag> & vecBlobTags,
 		const std::vector<IndicatorSet> & vecBlobs,
 		const std::vector<LatLonBox> & vecBlobBoxes,
@@ -923,14 +923,14 @@ try {
 	int nLat;
 	int nLon;
 
-	DataVector<double> dataLatDeg;
-	DataVector<double> dataLatRad;
+	DataArray1D<double> dataLatDeg;
+	DataArray1D<double> dataLatRad;
 
-	DataVector<double> dataLonDeg;
-	DataVector<double> dataLonRad;
+	DataArray1D<double> dataLonDeg;
+	DataArray1D<double> dataLonRad;
 
 	// Cell areas as a function of latitude index
-	DataVector<double> dCellArea;
+	DataArray1D<double> dCellArea;
 
 	{
 		// Load the first netcdf input file
@@ -965,11 +965,11 @@ try {
 		nLat = dimLat->size();
 		nLon = dimLon->size();
 
-		dataLatDeg.Initialize(nLat);
-		dataLatRad.Initialize(nLat);
+		dataLatDeg.Allocate(nLat);
+		dataLatRad.Allocate(nLat);
 
-		dataLonDeg.Initialize(nLon);
-		dataLonRad.Initialize(nLon);
+		dataLonDeg.Allocate(nLon);
+		dataLonRad.Allocate(nLon);
 
 		varLat->get(dataLatDeg, nLat);
 		for (int j = 0; j < nLat; j++) {
@@ -985,7 +985,7 @@ try {
 		double dDeltaLon = 2.0 * M_PI / static_cast<double>(nLon);
 		double dDeltaLat = M_PI / static_cast<double>(nLat);
 
-		dCellArea.Initialize(nLat);
+		dCellArea.Allocate(nLat);
 		for (int j = 0; j < nLat; j++) {
 			dCellArea[j] =
 				EarthRadius
@@ -1026,7 +1026,7 @@ try {
 	int nTime = dTimeDim.size();
 
 	// Allocate indicator data
-	DataMatrix<int> dataIndicator(nLat, nLon);
+	DataArray2D<int> dataIndicator(nLat, nLon);
 
 	// Build blobs at each time level
 	AnnounceStartBlock("Building blob set at each time level");
@@ -1146,8 +1146,7 @@ try {
 			// Rejections due to insufficient node count
 			int nRejectedMinSize = 0;
 
-			DataVector<int> nRejectedThreshold;
-			nRejectedThreshold.Initialize(vecThresholdOp.size());
+			DataArray1D<int> nRejectedThreshold(vecThresholdOp.size());
 
 			// Find all patches
 			for (; setIndicators.size() != 0;) {
@@ -1766,8 +1765,7 @@ try {
 			dimOutputLon);
 
 	// Loop through all time steps
-	DataMatrix<int> dataBlobTag;
-	dataBlobTag.Initialize(nLat, nLon);
+	DataArray2D<int> dataBlobTag(nLat, nLon);
 
 	for (int t = 0; t < nTime; t++) {
 
