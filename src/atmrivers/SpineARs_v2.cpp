@@ -468,6 +468,8 @@ public:
 	SpineARsParam() :
 		fpLog(NULL),
 		dMinAbsLat(0.0),
+		dMinLat(-90.0),
+		dMaxLat(90.0),
 		fRegional(false),
 		iVerbosityLevel(0),
 		pvecThresholdOp(NULL),
@@ -480,6 +482,12 @@ public:
 
 	// Minimum absolute latitude (in degrees)
 	double dMinAbsLat;
+
+	// Minimum latitude (in degrees)
+	double dMinLat;
+
+	// Maximum latitude (in degrees)
+	double dMaxLat;
 
 	// Regional (do not wrap longitudinal boundaries)
 	bool fRegional;
@@ -787,6 +795,12 @@ void SpineARs(
 			if (fabs(grid.m_dLat[i]) < param.dMinAbsLat * M_PI / 180.0) {
 				continue;
 			}
+			if (grid.m_dLat[i] < param.dMinLat * M_PI / 180.0) {
+				continue;
+			}
+			if (grid.m_dLat[i] > param.dMaxLat * M_PI / 180.0) {
+				continue;
+			}
 
 /*
 			if (dIWV[i] < dMinIWV) {
@@ -1014,7 +1028,9 @@ try {
 		CommandLineString(strOutputFileList, "out_file_list", "");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,name;...]");
-		CommandLineDouble(sarparam.dMinAbsLat, "minabslat", 15.0);
+		CommandLineDouble(sarparam.dMinAbsLat, "minabslat", 0.0);
+		CommandLineDouble(sarparam.dMinLat, "minlat", -90.0);
+		CommandLineDouble(sarparam.dMaxLat, "maxlat", 90.0);
 		CommandLineBool(sarparam.fRegional, "regional");
 		CommandLineInt(sarparam.iVerbosityLevel, "verbosity", 0);
 
