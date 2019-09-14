@@ -29,6 +29,10 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class Mesh;
+
+///////////////////////////////////////////////////////////////////////////////
+
 ///	<summary>
 ///		A data structure describing the grid, including coordinates of
 ///		each data point and graph connectivity of elements.
@@ -70,6 +74,24 @@ public:
 	void GenerateLatitudeLongitude(
 		NcFile * ncFile,
 		bool fRegional
+	);
+
+	///	<summary>
+	///		Initialize the SimpleGrid from a Mesh assuming the mesh is a finite
+	///		volume mesh.
+	///	</summary>
+	void FromMeshFV(
+		const Mesh & mesh
+	);
+
+	///	<summary>
+	///		Initialize the SimpleGrid from a Mesh assuming the mesh is a finite
+	///		element mesh.
+	///	</summary>
+	void FromMeshFE(
+		const Mesh & mesh,
+		bool fCGLL,
+		int nP
 	);
 
 	///	<summary>

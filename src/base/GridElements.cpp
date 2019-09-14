@@ -30,7 +30,7 @@
 #include <algorithm>
 #include "netcdfcpp.h"
 
-#include "triangle.h"
+//#include "triangle.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Face
@@ -2048,8 +2048,9 @@ bool ConvexifyFace(
 	int iFace,
 	bool fRemoveConcaveFaces,
 	bool fVerbose
-)
-{
+) {
+	_EXCEPTIONT("NOT IMPLEMENTED");
+/*
 	Face & face = mesh.faces[iFace];
 	const int nNodes = face.edges.size()-1;
 	if(fVerbose) {
@@ -2177,6 +2178,7 @@ bool ConvexifyFace(
 	meshout.RemoveCoincidentNodes();
 
 	return true;
+*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////

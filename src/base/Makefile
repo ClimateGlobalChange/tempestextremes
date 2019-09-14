@@ -21,7 +21,15 @@ FILES= Announce.cpp \
 	   ArgumentTree.cpp \
 	   NodeFileUtilities.cpp \
 	   RLLPolygonArray.cpp \
-	   SimpleGrid.cpp
+	   SimpleGrid.cpp \
+	   GridElements.cpp \
+	   FiniteElementTools.cpp \
+	   GaussQuadrature.cpp \
+	   GaussLobattoQuadrature.cpp \
+	   MeshUtilities.cpp \
+	   MeshUtilitiesFuzzy.cpp \
+	   PolynomialInterp.cpp \
+	   LegendrePolynomial.cpp
 
 LIB_TARGET= libextremesbase.a
 

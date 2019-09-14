@@ -753,13 +753,16 @@ public:
 	void RemoveCoincidentNodes();
 
 	///	<summary>
-	///		Write the mesh to a NetCDF file.
+	///		Write the mesh to a NetCDF file in Exodus format.
 	///	</summary>
 	void Write(
 		const std::string & strFile,
 		NcFile::FileFormat eFileFormat = NcFile::Classic
 	) const;
 
+	///	<summary>
+	///		Write the mesh to a NetCDF file in SCRIP format.
+	///	</summary>
 	void WriteScrip(
 		const std::string & strFile,
 		NcFile::FileFormat eFileFormat = NcFile::Classic

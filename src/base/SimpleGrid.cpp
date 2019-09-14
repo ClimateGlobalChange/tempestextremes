@@ -15,6 +15,10 @@
 ///	</remarks>
 
 #include "SimpleGrid.h"
+#include "GridElements.h"
+#include "FiniteElementTools.h"
+#include "GaussLobattoQuadrature.h"
+#include "Announce.h"
 
 #include <cstdlib>
 #include <cmath>
@@ -150,6 +154,335 @@ void SimpleGrid::GenerateLatitudeLongitude(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void SimpleGrid::FromMeshFV(
+	const Mesh & mesh
+) {
+	if ((m_nGridDim.size() != 0) ||
+	    (m_dLon.GetRows() != 0) ||
+	    (m_dLat.GetRows() != 0) ||
+	    (m_dArea.GetRows() != 0) ||
+	    (m_vecConnectivity.size() != 0)
+	) {
+		_EXCEPTIONT("Attempting to read previously initialized SimpleGrid");
+	}
+
+	if (mesh.vecFaceArea.GetRows() == 0) {
+		_EXCEPTIONT("Mesh::CalculateFaceAreas() must be called prior "
+			"to SimpleGrid::FromMeshFV()");
+	}
+	if (mesh.edgemap.size() == 0) {
+		_EXCEPTIONT("Mesh::ConstructEdgeMap() must be called prior "
+			"to SimpleGrid::FromMeshFV()");
+	}
+
+	// Number of faces
+	size_t sFaces = mesh.faces.size();
+
+	// Copy over areas
+	m_dArea = mesh.vecFaceArea;
+
+	// Generate connectivity from edge map
+	std::vector< std::set<int> > m_vecConnectivitySet;
+	m_vecConnectivitySet.resize(sFaces);
+
+	EdgeMapConstIterator iterEdgeMap = mesh.edgemap.begin();
+	for (; iterEdgeMap != mesh.edgemap.end(); iterEdgeMap++) {
+		const FacePair & facepr = iterEdgeMap->second;
+		if ((facepr[0] < 0) || (facepr[0] >= sFaces)) {
+			_EXCEPTION1("EdgeMap FacePair out of range (%i)", facepr[0]);
+		}
+		if ((facepr[1] < 0) || (facepr[1] >= sFaces)) {
+			_EXCEPTION1("EdgeMap FacePair out of range (%i)", facepr[1]);
+		}
+		m_vecConnectivitySet[facepr[0]].insert(facepr[1]);
+		m_vecConnectivitySet[facepr[1]].insert(facepr[0]);
+	}
+
+	m_vecConnectivity.resize(sFaces);
+	for (int i = 0; i < sFaces; i++) {
+		std::set<int>::const_iterator iterConnect =
+			m_vecConnectivitySet[i].begin();
+		for (; iterConnect != m_vecConnectivitySet[i].end(); iterConnect++) {
+			m_vecConnectivity[i].push_back(*iterConnect);
+		}
+	}
+
+	// Generate centerpoints
+	m_dLon.Allocate(sFaces);
+	m_dLat.Allocate(sFaces);
+
+	// Mesh is a RLL mesh -- special calculation for centerpoint values
+	if (mesh.type == Mesh::MeshType_RLL) {
+		_EXCEPTIONT("How to define nGridDim?");
+
+		for (int i = 0; i < sFaces; i++) {
+
+			const Face & face = mesh.faces[i];
+
+			int nNodes = face.edges.size();
+
+			if (nNodes != 4) {
+				_EXCEPTIONT("RLL mesh must have exactly 4 nodes per face");
+			}
+
+			double dLonc = 0.0;
+			double dLatc = 0.0;
+
+			for (int j = 0; j < nNodes; j++) {
+
+				const Node & node = mesh.nodes[face[j]];
+
+				double dLon;
+				double dLat;
+
+				XYZtoRLL_Deg(
+					node.x,
+					node.y,
+					node.z,
+					dLon,
+					dLat);
+
+				// Consider periodicity of longitude
+				if ((j != 0) && (fabs(dLonc / static_cast<double>(j) - dLon) > 180.0)) {
+					if (dLonc > dLon) {
+						dLon += 360.0;
+					}
+					if (dLonc < dLon) {
+						dLon -= 360.0;
+					}
+				}
+
+				// Sanity check: Longitude still out of range
+				if ((j != 0) && (fabs(dLonc / static_cast<double>(j) - dLon) > 180.0)) {
+					printf("FATAL:  Mesh face appears to extend more than 180 degrees longitude\n");
+					for (int k = 0; k < j; k++) {
+
+						const Node & nodeK = mesh.nodes[face[k]];
+
+						XYZtoRLL_Deg(
+							nodeK.x,
+							nodeK.y,
+							nodeK.z,
+							dLon,
+							dLat);
+
+						printf("Node %i: %1.15e %1.15e\n", k, dLon, dLat);
+					}
+					_EXCEPTION();
+				}
+
+				dLonc += dLon;
+				dLatc += dLat;
+			}
+
+			m_dLon[i] = dLonc / static_cast<double>(nNodes);
+			m_dLat[i] = dLatc / static_cast<double>(nNodes);
+		}
+
+	// Any other kind of mesh, use Carteisan coords and project to surface of sphere
+	} else {
+		m_nGridDim.resize(1);
+		m_nGridDim[0] = sFaces;
+
+		for (size_t i = 0; i < sFaces; i++) {
+
+			const Face & face = mesh.faces[i];
+
+			int nNodes = face.edges.size();
+
+			double dXc = 0.0;
+			double dYc = 0.0;
+			double dZc = 0.0;
+
+			for (int j = 0; j < nNodes; j++) {
+				const Node & node = mesh.nodes[face[j]];
+
+				dXc += node.x;
+				dYc += node.y;
+				dZc += node.z;
+			}
+
+			dXc /= static_cast<double>(nNodes);
+			dYc /= static_cast<double>(nNodes);
+			dZc /= static_cast<double>(nNodes);
+
+			XYZtoRLL_Deg(dXc, dYc, dZc, m_dLon[i], m_dLat[i]);
+		}
+	}
+
+	// Output total area
+	{
+		double dTotalArea = 0.0;
+		for (size_t i = 0; i < sFaces; i++) {
+			dTotalArea += m_dArea[i];
+		}
+		Announce("Total calculated area: %1.15e", dTotalArea);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void SimpleGrid::FromMeshFE(
+	const Mesh & mesh,
+	bool fCGLL,
+	int nP
+) {
+	if (!fCGLL) {
+		_EXCEPTIONT("Sorry, not implemented yet!");
+	}
+
+	if ((m_nGridDim.size() != 0) ||
+	    (m_dLon.GetRows() != 0) ||
+	    (m_dLat.GetRows() != 0) ||
+	    (m_dArea.GetRows() != 0) ||
+	    (m_vecConnectivity.size() != 0)
+	) {
+		_EXCEPTIONT("Attempting to read previously initialized SimpleGrid");
+	}
+
+	if (mesh.vecFaceArea.GetRows() == 0) {
+		_EXCEPTIONT("Mesh::CalculateFaceAreas() must be called prior "
+			"to SimpleGrid::FromMeshFE()");
+	}
+	if (mesh.edgemap.size() == 0) {
+		_EXCEPTIONT("Mesh::ConstructEdgeMap() must be called prior "
+			"to SimpleGrid::FromMeshFE()");
+	}
+
+	// Number of elements
+	size_t nElements = mesh.faces.size();
+
+	// Gauss-Lobatto nodes and weights
+	DataArray1D<double> dG(nP);
+	DataArray1D<double> dW(nP);
+
+	GaussLobattoQuadrature::GetPoints(nP, 0.0, 1.0, dG, dW);
+
+	// Generate coincident node map and Jacobian
+	DataArray3D<int> dataGLLnodes(nP, nP, nElements);
+	DataArray3D<double> dataGLLJacobian(nP, nP, nElements);
+
+	GenerateMetaData(mesh, nP, true, dataGLLnodes, dataGLLJacobian);
+
+	// Generate areas
+	if (fCGLL) {
+		GenerateUniqueJacobian(
+			dataGLLnodes,
+			dataGLLJacobian,
+			m_dArea);
+	} else {
+		GenerateDiscontinuousJacobian(
+			dataGLLJacobian,
+			m_dArea);
+	}
+
+	// Number of faces
+	size_t sFaces = m_dArea.GetRows();
+
+	m_nGridDim.resize(1);
+	m_nGridDim[0] = sFaces;
+
+	// Generate coordinates
+	{
+		m_dLon.Allocate(sFaces);
+		m_dLat.Allocate(sFaces);
+
+		const NodeVector & nodevec = mesh.nodes;
+		for (int k = 0; k < nElements; k++) {
+			const Face & face = mesh.faces[k];
+
+			if (face.edges.size() != 4) {
+				_EXCEPTIONT("Mesh must only contain quadrilateral elements");
+			}
+
+			double dFaceNumericalArea = 0.0;
+
+			for (int j = 0; j < nP; j++) {
+			for (int i = 0; i < nP; i++) {
+				int ix = dataGLLnodes[j][i][k]-1;
+
+				_ASSERT((ix >= 0) && (ix < m_dLon.GetRows()));
+
+				Node nodeGLL;
+				Node dDx1G;
+				Node dDx2G;
+
+				ApplyLocalMap(
+					face,
+					nodevec,
+					dG[i],
+					dG[j],
+					nodeGLL,
+					dDx1G,
+					dDx2G);
+
+				XYZtoRLL_Deg(
+					nodeGLL.x,
+					nodeGLL.y,
+					nodeGLL.z,
+					m_dLon[ix],
+					m_dLat[ix]);
+			}
+			}
+		}
+	}
+
+	// Generate connectivity
+	{
+		std::vector< std::set<int> > vecConnectivitySet;
+		vecConnectivitySet.resize(sFaces);
+
+		for (size_t f = 0; f < nElements; f++) {
+
+			for (int q = 0; q < nP; q++) {
+			for (int p = 0; p < nP; p++) {
+
+				std::set<int> & setLocalConnectivity =
+					vecConnectivitySet[dataGLLnodes[q][p][f]-1];
+
+				// Connect in all directions
+				if (p != 0) {
+					setLocalConnectivity.insert(
+						dataGLLnodes[q][p-1][f]);
+				}
+				if (p != (nP-1)) {
+					setLocalConnectivity.insert(
+						dataGLLnodes[q][p+1][f]);
+				}
+				if (q != 0) {
+					setLocalConnectivity.insert(
+						dataGLLnodes[q-1][p][f]);
+				}
+				if (q != (nP-1)) {
+					setLocalConnectivity.insert(
+						dataGLLnodes[q+1][p][f]);
+				}
+			}
+			}
+		}
+
+		m_vecConnectivity.resize(sFaces);
+		for (size_t i = 0; i < sFaces; i++) {
+			std::set<int>::const_iterator iterConnect =
+				vecConnectivitySet[i].begin();
+			for (; iterConnect != vecConnectivitySet[i].end(); iterConnect++) {
+				m_vecConnectivity[i].push_back(*iterConnect);
+			}
+		}
+	}
+
+	// Output total area
+	{
+		double dTotalArea = 0.0;
+		for (size_t i = 0; i < sFaces; i++) {
+			dTotalArea += m_dArea[i];
+		}
+		Announce("Total calculated area: %1.15e", dTotalArea);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void SimpleGrid::FromFile(
 	const std::string & strConnectivityFile
 ) {
@@ -260,6 +593,7 @@ void SimpleGrid::ToFile(
 		sFaces *= m_nGridDim[i];
 		fsOutput << "," << m_nGridDim[i];
 	}
+	fsOutput << std::endl;
 
 	if (m_dLon.GetRows() != sFaces) {
 		_EXCEPTIONT("Mangled SimpleGrid structure: m_dLon.size() != size from m_nGridDim");
@@ -274,11 +608,10 @@ void SimpleGrid::ToFile(
 		_EXCEPTIONT("Mangled SimpleGrid structure: m_dLon.size() != m_vecConnectivity.size()");
 	}
 
-	fsOutput << sFaces << std::endl;
 	for (size_t i = 0; i < sFaces; i++) {
 		fsOutput << m_dLon[i] << "," << m_dLat[i] << ","
-			<< m_dArea[i] << "," << m_vecConnectivity[i].size() << std::endl;
-		for (size_t j = 0; j < m_vecConnectivity[i].size(); i++) {
+			<< m_dArea[i] << "," << m_vecConnectivity[i].size();
+		for (size_t j = 0; j < m_vecConnectivity[i].size(); j++) {
 			fsOutput << "," << m_vecConnectivity[i][j];
 		}
 		fsOutput << std::endl;
