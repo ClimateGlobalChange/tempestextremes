@@ -14,6 +14,7 @@
 ///		or implied warranty.
 ///	</remarks>
 
+#include "Constants.h"
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
@@ -23,6 +24,7 @@
 #include "ArgumentTree.h"
 #include "STLStringHelper.h"
 #include "NodeFileUtilities.h"
+#include "GridElements.h"
 #include "RLLPolygonArray.h"
 
 #include "netcdfcpp.h"
@@ -125,20 +127,7 @@ void CalculateRadialProfile(
 		double dLon = grid.m_dLon[ix];
 
 		// Great circle distance to this element (in degrees)
-		double dR =
-			sin(dLat0) * sin(dLat)
-			+ cos(dLat0) * cos(dLat) * cos(dLon - dLon0);
-
-		if (dR >= 1.0) {
-			dR = 0.0;
-		} else if (dR <= -1.0) {
-			dR = 180.0;
-		} else {
-			dR = 180.0 / M_PI * acos(dR);
-		}
-		if (dR != dR) {
-			_EXCEPTIONT("NaN value detected");
-		}
+		double dR = GreatCircleDistance_Deg(dLon0, dLat0, dLon, dLat);
 
 		if (dR >= dRadius) {
 			continue;
@@ -290,20 +279,7 @@ void CalculateRadialWindProfile(
 		double dZ = sin(dLat);
 
 		// Great circle distance to this element (in degrees)
-		double dR =
-			sin(dLat0) * sin(dLat)
-			+ cos(dLat0) * cos(dLat) * cos(dLon - dLon0);
-
-		if (dR >= 1.0) {
-			dR = 0.0;
-		} else if (dR <= -1.0) {
-			dR = 180.0;
-		} else {
-			dR = 180.0 / M_PI * acos(dR);
-		}
-		if (dR != dR) {
-			_EXCEPTIONT("NaN value detected");
-		}
+		double dR = GreatCircleDistance_Deg(dLon0, dLat0, dLon, dLat);
 
 		if (dR >= dRadius) {
 			continue;
@@ -724,20 +700,7 @@ void MaxClosedContourDelta(
 		double dLon = grid.m_dLon[ix];
 
 		// Great circle distance to this element (in degrees)
-		double dR =
-			sin(dLat0) * sin(dLat)
-			+ cos(dLat0) * cos(dLat) * cos(dLon - dLon0);
-
-		if (dR >= 1.0) {
-			dR = 0.0;
-		} else if (dR <= -1.0) {
-			dR = 180.0;
-		} else {
-			dR = 180.0 / M_PI * acos(dR);
-		}
-		if (dR != dR) {
-			_EXCEPTIONT("NaN value detected");
-		}
+		double dR = GreatCircleDistance_Deg(dLon0, dLat0, dLon, dLat);
 
 		if (dR >= dRadius) {
 			break;
@@ -752,6 +715,147 @@ void MaxClosedContourDelta(
 	// Store the maximum closed contour delta as new column data
 	ColumnDataDouble * pdat =
 		new ColumnDataDouble(dMaxDelta);
+
+	pathnode.PushColumnData(pdat);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Types of standard cyclone metrics.
+///	</summary>
+enum CycloneMetric {
+	CycloneMetric_ACE,
+	CycloneMetric_IKE,
+	CycloneMetric_PDI
+};
+
+///	<summary>
+///		Calculate popular cyclone metrics, including:
+///		Accumulated Cyclone Energy (ACE),
+///		Integrated Kinetic Energy (IKE),
+///		Potential Dissipation Index (PDI)
+///	</summary>
+void CalculateCycloneMetrics(
+	CycloneMetric eCycloneMetric,
+	VariableRegistry & varreg,
+	NcFileVector & vecFiles,
+	const SimpleGrid & grid,
+	const ColumnDataHeader & cdh,
+	int iTime,
+	PathNode & pathnode,
+	VariableIndex varixU,
+	VariableIndex varixV,
+	std::string strRadius
+) {
+	// Get the radius of the calculation (in great circle degrees)
+	double dRadius = pathnode.GetColumnDataAsDouble(cdh, strRadius);
+
+	// Check arguments
+	if ((dRadius <= 0) || (dRadius > 180.0)) {
+		_EXCEPTIONT("Radius must be in the range (0.0, 180.0]");
+	}
+
+	// Get the center grid index
+	const int ix0 = pathnode.m_gridix;
+
+	// Load the zonal wind data
+	Variable & varU = varreg.Get(varixU);
+	varU.LoadGridData(varreg, vecFiles, grid, iTime);
+	const DataArray1D<float> & dataStateU = varU.GetData();
+
+	// Load the meridional wind data
+	Variable & varV = varreg.Get(varixV);
+	varV.LoadGridData(varreg, vecFiles, grid, iTime);
+	const DataArray1D<float> & dataStateV = varV.GetData();
+
+	// Check grid index
+	if (ix0 >= grid.m_vecConnectivity.size()) {
+		_EXCEPTION2("Grid index (%i) out of range (< %i)",
+			ix0, static_cast<int>(grid.m_vecConnectivity.size()));
+	}
+
+	// Central lat/lon and Cartesian coord
+	double dLon0 = grid.m_dLon[ix0];
+	double dLat0 = grid.m_dLat[ix0];
+
+	// Queue of nodes that remain to be visited
+	std::queue<int> queueNodes;
+	for (int n = 0; n < grid.m_vecConnectivity[ix0].size(); n++) {
+		queueNodes.push(grid.m_vecConnectivity[ix0][n]);
+	}
+
+	// Set of nodes that have already been visited
+	std::set<int> setNodesVisited;
+
+	// Value
+	double dValue = 0.0;
+
+	// Loop through all latlon elements
+	while (queueNodes.size() != 0) {
+		int ix = queueNodes.front();
+		queueNodes.pop();
+
+		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
+			continue;
+		}
+
+		setNodesVisited.insert(ix);
+
+		// Don't perform calculation on central node
+		if (ix == ix0) {
+			continue;
+		}
+
+		// lat/lon and Cartesian coords of this point
+		double dLat = grid.m_dLat[ix];
+		double dLon = grid.m_dLon[ix];
+
+		// Great circle distance to this element (in degrees)
+		double dR = GreatCircleDistance_Deg(dLon0, dLat0, dLon, dLat);
+
+		if (dR >= dRadius) {
+			continue;
+		}
+
+		// Velocities at this location
+		double dUlon = dataStateU[ix];
+		double dUlat = dataStateV[ix];
+
+		// Velocity magnitude
+		double dUmag = sqrt(dUlon * dUlon + dUlat * dUlat);
+
+		// Accumulated Cyclone Energy (ACE)
+		if (eCycloneMetric == CycloneMetric_ACE) {
+			double dUmag_kt = KnotsPerMetersPerSecond * dUmag;
+			double dTempValue = dUmag_kt * dUmag_kt * 1.0e-4;
+			if (dTempValue > dValue) {
+				dValue = dTempValue;
+			}
+
+		// Integrated Kinetic Energy (IKE)
+		} else if (eCycloneMetric == CycloneMetric_IKE) {
+			dValue +=
+				0.5
+				* dUmag * dUmag
+				* grid.m_dArea[ix]
+				* EarthRadius * EarthRadius;
+
+		// Potential Dissipation Index (PDI)
+		} else if (eCycloneMetric == CycloneMetric_PDI) {
+			double dTempValue = dUmag * dUmag * dUmag;
+			if (dTempValue > dValue) {
+				dValue = dTempValue;
+			}
+
+		} else {
+			_EXCEPTIONT("Invalid eCycloneMetric value");
+		}
+	}
+
+	// Store the maximum closed contour delta as new column data
+	ColumnDataDouble * pdat =
+		new ColumnDataDouble(dValue);
 
 	pathnode.PushColumnData(pdat);
 }
@@ -1076,6 +1180,88 @@ try {
 				} else {
 					nArguments = 1;
 				}
+			}
+
+			// eval_ace, eval_ike, eval_pdi
+			if (((*pargtree)[2] == "eval_ace") ||
+			    ((*pargtree)[2] == "eval_ike") ||
+			    ((*pargtree)[2] == "eval_pdi")
+			) {
+				if (nArguments != 3) {
+					_EXCEPTION2("Syntax error: Function \"%s\" "
+						"requires three arguments:\n"
+						"%s(<u variable>, <v variable>, <radius>)",
+						(*pargtree)[2].c_str(),
+						(*pargtree)[2].c_str());
+				}
+
+				// Parse zonal wind variable
+				Variable varU;
+				varU.ParseFromString(varreg, (*pargfunc)[0]);
+				VariableIndex varixU = varreg.FindOrRegister(varU);
+
+				// Parse meridional wind variable
+				Variable varV;
+				varV.ParseFromString(varreg, (*pargfunc)[1]);
+				VariableIndex varixV = varreg.FindOrRegister(varV);
+
+				// Cyclone metric
+				CycloneMetric eCycloneMetric;
+				if ((*pargtree)[2] == "eval_ace") {
+					eCycloneMetric = CycloneMetric_ACE;
+				} else if ((*pargtree)[2] == "eval_ike") {
+					eCycloneMetric = CycloneMetric_IKE;
+				} else if ((*pargtree)[2] == "eval_pdi") {
+					eCycloneMetric = CycloneMetric_PDI;
+				} else {
+					_EXCEPTION();
+				}
+
+				// Loop through all Times
+				TimeToPathNodeMap::iterator iterPathNode =
+					mapTimeToPathNode.begin();
+				for (; iterPathNode != mapTimeToPathNode.end(); iterPathNode++) {
+					const Time & time = iterPathNode->first;
+
+					// Unload data from the VariableRegistry
+					varreg.UnloadAllGridData();
+
+					// Open NetCDF files with data at this time
+					NcFileVector vecncDataFiles;
+					int iTime;
+					autocurator.Find(time, vecncDataFiles, iTime);
+					if (vecncDataFiles.size() == 0) {
+						_EXCEPTION1("Time (%s) does not exist in input data fileset",
+							time.ToString().c_str());
+					}
+
+					// Loop through all PathNodes which need calculating at this Time
+					for (int i = 0; i < iterPathNode->second.size(); i++) {
+						int iPath = iterPathNode->second[i].first;
+						int iPathNode = iterPathNode->second[i].second;
+
+						PathNode & pathnode =
+							pathvec[iPath].m_vecPathNodes[iPathNode];
+
+						CalculateCycloneMetrics(
+							eCycloneMetric,
+							varreg,
+							vecncDataFiles,
+							grid,
+							cdhWorking,
+							iTime,
+							pathnode,
+							varixU,
+							varixV,
+							(*pargfunc)[2]);
+					}
+				}
+
+				// Add new variable to ColumnDataHeader
+				cdhWorking.push_back((*pargtree)[0]);
+
+				AnnounceEndBlock("Done");
+				continue;
 			}
 
 			// radial_profile

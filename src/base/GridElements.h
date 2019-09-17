@@ -882,6 +882,33 @@ inline double AverageLongitude_Rad(
 }
 
 ///	<summary>
+///		Calculate the great circle distance between two RLL points.
+///	</summary>
+inline double GreatCircleDistance_Deg(
+	double dLon1,
+	double dLat1,
+	double dLon2,
+	double dLat2
+) {
+	double dR =
+		sin(dLat1) * sin(dLat2)
+		+ cos(dLat1) * cos(dLat2) * cos(dLon2 - dLon1);
+
+	if (dR >= 1.0) {
+		dR = 0.0;
+	} else if (dR <= -1.0) {
+		dR = 180.0;
+	} else {
+		dR = 180.0 / M_PI * acos(dR);
+	}
+	if (dR != dR) {
+		_EXCEPTIONT("NaN value detected");
+	}
+
+	return dR;
+}
+
+///	<summary>
 ///		Calculate the dot product between two Nodes.
 ///	</summary>
 inline Real DotProduct(
