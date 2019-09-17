@@ -850,6 +850,38 @@ inline void XYZtoRLL_Deg(
 }
 
 ///	<summary>
+///		Calculate an average longitude from two given longitudes (in radians).
+///	</summary>
+inline double AverageLongitude_Rad(
+	double dLon1,
+	double dLon2
+) {
+	double dDeltaLon;
+	if (dLon2 > dLon1) {
+		dDeltaLon = fmod(dLon2 - dLon1, 2.0 * M_PI);
+		if (dDeltaLon > M_PI) {
+			dDeltaLon = dDeltaLon - 2.0 * M_PI;
+		}
+	} else {
+		dDeltaLon = - fmod(dLon1 - dLon2, 2.0 * M_PI);
+		if (dDeltaLon < -M_PI) {
+			dDeltaLon = dDeltaLon + 2.0 * M_PI;
+		}
+	}
+
+	double dLonAvg = dLon1 + 0.5 * dDeltaLon;
+
+	if ((dLonAvg < 0.0) && (dLon1 >= 0.0) && (dLon2 >= 0.0)) {
+		dLonAvg += 2.0 * M_PI;
+	}
+	if ((dLonAvg > 2.0 * M_PI) && (dLon1 <= 2.0 * M_PI) && (dLon2 <= 2.0 * M_PI)) {
+		dLonAvg -= 2.0 * M_PI;
+	}
+
+	return dLonAvg;
+}
+
+///	<summary>
 ///		Calculate the dot product between two Nodes.
 ///	</summary>
 inline Real DotProduct(

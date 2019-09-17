@@ -46,6 +46,7 @@ void SimpleGrid::GenerateLatitudeLongitude(
 
 	m_dLat.Allocate(nLon * nLat);
 	m_dLon.Allocate(nLon * nLat);
+	m_dArea.Allocate(nLon * nLat);
 	m_vecConnectivity.resize(nLon * nLat);
 
 	m_nGridDim.resize(2);
@@ -58,6 +59,11 @@ void SimpleGrid::GenerateLatitudeLongitude(
 			_EXCEPTIONT("In SimpleGrid, latitude array must be given in radians");
 		}
 	}
+	for (int i = 0; i < nLon; i++) {
+		if (fabs(vecLon[i]) > 2.0 * M_PI + 1.0e-12) {
+			_EXCEPTIONT("In SimpleGrid, longitude array must be given in radians");
+		}
+	}
 
 	int ixs = 0;
 	for (int j = 0; j < nLat; j++) {
@@ -66,6 +72,54 @@ void SimpleGrid::GenerateLatitudeLongitude(
 		// Vectorize coordinates
 		m_dLat[ixs] = vecLat[j];
 		m_dLon[ixs] = vecLon[i];
+
+		// Bounds of each volume and associated area
+		double dLatRad1;
+		double dLatRad2;
+		
+		double dLonRad1;
+		double dLonRad2;
+
+		if (j == 0) {
+			if (fRegional) {
+				dLatRad1 = m_dLat[0] - 0.5 * (m_dLat[1] - m_dLat[0]);
+			} else {
+				dLatRad1 = -0.5 * M_PI;
+			}
+		} else {
+			dLatRad1 = 0.5 * (m_dLat[j-1] + m_dLat[j]);
+		}
+		if (j == nLat-1) {
+			if (fRegional) {
+				dLatRad2 = m_dLat[j] + 0.5 * (m_dLat[j] - m_dLat[j-1]);
+			} else {
+				dLatRad2 = 0.5 * M_PI;
+			}
+		} else {
+			dLatRad2 = 0.5 * (m_dLat[j+1] + m_dLat[j]);
+		}
+
+		if (i == 0) {
+			if (fRegional) {
+				dLonRad1 = m_dLon[0] - 0.5 * (m_dLon[1] - m_dLon[0]);
+			} else {
+				dLonRad1 = AverageLongitude_Rad(m_dLon[0], m_dLon[nLon-1]);
+			}
+		} else {
+			dLonRad1 = AverageLongitude_Rad(m_dLon[i-1], m_dLon[i]);
+		}
+
+		if (i == nLon-1) {
+			if (fRegional) {
+				dLonRad2 = m_dLon[i] + 0.5 * (m_dLon[i] - m_dLon[i-1]);
+			} else {
+				dLonRad2 = AverageLongitude_Rad(m_dLon[nLon-1], m_dLon[0]);
+			}
+		} else {
+			dLonRad2 = AverageLongitude_Rad(m_dLon[i], m_dLon[i+1]);
+		}
+
+		m_dArea[ixs] = fabs(sin(dLatRad2) - sin(dLatRad1)) * fabs(dLonRad2 - dLonRad1);
 
 		// Connectivity in each compass direction
 		if (j != 0) {
@@ -86,6 +140,15 @@ void SimpleGrid::GenerateLatitudeLongitude(
 
 		ixs++;
 	}
+	}
+
+	// Output total area
+	{
+		double dTotalArea = 0.0;
+		for (size_t i = 0; i < m_dArea.GetRows(); i++) {
+			dTotalArea += m_dArea[i];
+		}
+		Announce("Total calculated area: %1.15e", dTotalArea);
 	}
 
 }

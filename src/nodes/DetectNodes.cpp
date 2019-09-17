@@ -704,6 +704,7 @@ void DetectCyclonesUnstructured(
 	VariableRegistry & varreg,
 	const DetectCyclonesParam & param
 ) {
+
 	// Set the Announce buffer
 	if (param.fpLog == NULL) {
 		_EXCEPTIONT("Invalid log buffer");
@@ -748,11 +749,6 @@ void DetectCyclonesUnstructured(
 	// Define the SimpleGrid
 	SimpleGrid grid;
 
-	// Dimensions
-	int nSize = 0;
-	int nLon = 0;
-	int nLat = 0;
-
 	// Load in the benchmark file
 	NcFileVector vecFiles;
 
@@ -760,20 +756,19 @@ void DetectCyclonesUnstructured(
 
 	// Check for connectivity file
 	if (strConnectivity != "") {
+		AnnounceStartBlock("Loading grid data from connectivity file");
 		grid.FromFile(strConnectivity);
-
-		nSize = grid.GetSize();
+		AnnounceEndBlock("Done");
 
 	// No connectivity file; check for latitude/longitude dimension
 	} else {
+		AnnounceStartBlock("Generating RLL grid data");
 		grid.GenerateLatitudeLongitude(
 			vecFiles[0],
 			param.fRegional,
 			param.strLatitudeName,
 			param.strLongitudeName);
-
-		nLon = grid.m_dLon.GetRows();
-		nLat = grid.m_dLat.GetRows();
+		AnnounceEndBlock("Done");
 	}
 
 	// Get time dimension
