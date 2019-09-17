@@ -725,6 +725,7 @@ void MaxClosedContourDelta(
 ///		Types of standard cyclone metrics.
 ///	</summary>
 enum CycloneMetric {
+	CycloneMetric_ACEPSL,
 	CycloneMetric_ACE,
 	CycloneMetric_IKE,
 	CycloneMetric_PDI
@@ -818,38 +819,56 @@ void CalculateCycloneMetrics(
 			continue;
 		}
 
-		// Velocities at this location
-		double dUlon = dataStateU[ix];
-		double dUlat = dataStateV[ix];
+		// Accumulated Cyclone Energy from PSL (ACEPSL)
+		if (eCycloneMetric == CycloneMetric_ACEPSL) {
+			double dPSL_hPa = dataStateU[ix] / 100.0;
 
-		// Velocity magnitude
-		double dUmag = sqrt(dUlon * dUlon + dUlat * dUlat);
-
-		// Accumulated Cyclone Energy (ACE)
-		if (eCycloneMetric == CycloneMetric_ACE) {
-			double dUmag_kt = KnotsPerMetersPerSecond * dUmag;
-			double dTempValue = dUmag_kt * dUmag_kt * 1.0e-4;
-			if (dTempValue > dValue) {
-				dValue = dTempValue;
+			if (dPSL_hPa > 1016.0) {
+				continue;
 			}
 
-		// Integrated Kinetic Energy (IKE)
-		} else if (eCycloneMetric == CycloneMetric_IKE) {
-			dValue +=
-				0.5
-				* dUmag * dUmag
-				* grid.m_dArea[ix]
-				* EarthRadius * EarthRadius;
+			double dTempValue = 3.92 * pow(1016.0 - dPSL_hPa, 0.644);
 
-		// Potential Dissipation Index (PDI)
-		} else if (eCycloneMetric == CycloneMetric_PDI) {
-			double dTempValue = dUmag * dUmag * dUmag;
+			dTempValue *= 1.0e-4 * dTempValue;
+
 			if (dTempValue > dValue) {
 				dValue = dTempValue;
 			}
 
 		} else {
-			_EXCEPTIONT("Invalid eCycloneMetric value");
+			// Velocities at this location
+			double dUlon = dataStateU[ix];
+			double dUlat = dataStateV[ix];
+
+			// Velocity magnitude
+			double dUmag = sqrt(dUlon * dUlon + dUlat * dUlat);
+
+			// Accumulated Cyclone Energy (ACE)
+			if (eCycloneMetric == CycloneMetric_ACE) {
+				double dUmag_kt = KnotsPerMetersPerSecond * dUmag;
+				double dTempValue = dUmag_kt * dUmag_kt * 1.0e-4;
+				if (dTempValue > dValue) {
+					dValue = dTempValue;
+				}
+
+			// Integrated Kinetic Energy (IKE)
+			} else if (eCycloneMetric == CycloneMetric_IKE) {
+				dValue +=
+					0.5
+					* dUmag * dUmag
+					* grid.m_dArea[ix]
+					* EarthRadius * EarthRadius;
+
+			// Potential Dissipation Index (PDI)
+			} else if (eCycloneMetric == CycloneMetric_PDI) {
+				double dTempValue = dUmag * dUmag * dUmag;
+				if (dTempValue > dValue) {
+					dValue = dTempValue;
+				}
+
+			} else {
+				_EXCEPTIONT("Invalid eCycloneMetric value");
+			}
 		}
 	}
 
@@ -1185,14 +1204,47 @@ try {
 			// eval_ace, eval_ike, eval_pdi
 			if (((*pargtree)[2] == "eval_ace") ||
 			    ((*pargtree)[2] == "eval_ike") ||
-			    ((*pargtree)[2] == "eval_pdi")
+			    ((*pargtree)[2] == "eval_pdi") ||
+				((*pargtree)[2] == "eval_acepsl")
 			) {
-				if (nArguments != 3) {
-					_EXCEPTION2("Syntax error: Function \"%s\" "
-						"requires three arguments:\n"
-						"%s(<u variable>, <v variable>, <radius>)",
-						(*pargtree)[2].c_str(),
-						(*pargtree)[2].c_str());
+
+				// Cyclone metric
+				CycloneMetric eCycloneMetric;
+				if ((*pargtree)[2] == "eval_ace") {
+					eCycloneMetric = CycloneMetric_ACE;
+				} else if ((*pargtree)[2] == "eval_acepsl") {
+					eCycloneMetric = CycloneMetric_ACEPSL;
+				} else if ((*pargtree)[2] == "eval_ike") {
+					eCycloneMetric = CycloneMetric_IKE;
+				} else if ((*pargtree)[2] == "eval_pdi") {
+					eCycloneMetric = CycloneMetric_PDI;
+				} else {
+					_EXCEPTION();
+				}
+
+				std::string strRadiusArg;
+
+				if (eCycloneMetric == CycloneMetric_ACEPSL) {
+					if (nArguments != 2) {
+						_EXCEPTION2("Syntax error: Function \"%s\" "
+							"requires three arguments:\n"
+							"%s(<psl variable>, <radius>)",
+							(*pargtree)[2].c_str(),
+							(*pargtree)[2].c_str());
+					}
+
+					strRadiusArg = (*pargfunc)[1];
+
+				} else {
+					if (nArguments != 3) {
+						_EXCEPTION2("Syntax error: Function \"%s\" "
+							"requires three arguments:\n"
+							"%s(<u variable>, <v variable>, <radius>)",
+							(*pargtree)[2].c_str(),
+							(*pargtree)[2].c_str());
+					}
+
+					strRadiusArg = (*pargfunc)[2];
 				}
 
 				// Parse zonal wind variable
@@ -1200,21 +1252,12 @@ try {
 				varU.ParseFromString(varreg, (*pargfunc)[0]);
 				VariableIndex varixU = varreg.FindOrRegister(varU);
 
-				// Parse meridional wind variable
-				Variable varV;
-				varV.ParseFromString(varreg, (*pargfunc)[1]);
-				VariableIndex varixV = varreg.FindOrRegister(varV);
-
-				// Cyclone metric
-				CycloneMetric eCycloneMetric;
-				if ((*pargtree)[2] == "eval_ace") {
-					eCycloneMetric = CycloneMetric_ACE;
-				} else if ((*pargtree)[2] == "eval_ike") {
-					eCycloneMetric = CycloneMetric_IKE;
-				} else if ((*pargtree)[2] == "eval_pdi") {
-					eCycloneMetric = CycloneMetric_PDI;
-				} else {
-					_EXCEPTION();
+				// Parse meridional wind variable (if present)
+				VariableIndex varixV = varixU;
+				if (eCycloneMetric != CycloneMetric_ACEPSL) {
+					Variable varV;
+					varV.ParseFromString(varreg, (*pargfunc)[1]);
+					varixV = varreg.FindOrRegister(varV);
 				}
 
 				// Loop through all Times
@@ -1253,7 +1296,7 @@ try {
 							pathnode,
 							varixU,
 							varixV,
-							(*pargfunc)[2]);
+							strRadiusArg);
 					}
 				}
 
