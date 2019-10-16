@@ -97,6 +97,12 @@ try {
 	// Regional data
 	bool fRegional;
 
+	// Name of longitude variabe
+	std::string strLongitudeName;
+
+	// Name of latitude variable
+	std::string strLatitudeName;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -118,6 +124,8 @@ try {
 		CommandLineString(strAddTimeDimUnits, "addtimedimunits", "");
 		CommandLineBool(fOutputLaplacian, "laplacianout");
 		CommandLineBool(fRegional, "regional");
+		CommandLineString(strLongitudeName, "lonname", "lon");
+		CommandLineString(strLatitudeName, "latname", "lat");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -162,30 +170,30 @@ try {
 	//}
 
 	// Get the longitude dimension
-	NcDim * dimLon = ncInput.get_dim("lon");
+	NcDim * dimLon = ncInput.get_dim(strLongitudeName.c_str());
 	if (dimLon == NULL) {
-		_EXCEPTIONT("Error accessing dimension \"lon\"");
+		_EXCEPTION1("Error accessing dimension \"%s\"", strLongitudeName.c_str());
 	}
 
 	// Get the longitude variable
-	NcVar * varLon = ncInput.get_var("lon");
+	NcVar * varLon = ncInput.get_var(strLongitudeName.c_str());
 	if (varLon == NULL) {
-		_EXCEPTIONT("Error accessing variable \"lon\"");
+		_EXCEPTION1("Error accessing variable \"%s\"", strLongitudeName.c_str());
 	}
 
 	DataArray1D<double> dLonDeg(dimLon->size());
 	varLon->get(&(dLonDeg[0]), dimLon->size());
 
 	// Get the latitude dimension
-	NcDim * dimLat = ncInput.get_dim("lat");
+	NcDim * dimLat = ncInput.get_dim(strLatitudeName.c_str());
 	if (dimLat == NULL) {
-		_EXCEPTIONT("Error accessing dimension \"lat\"");
+		_EXCEPTION1("Error accessing dimension \"%s\"", strLatitudeName.c_str());
 	}
 
 	// Get the latitude variable
-	NcVar * varLat = ncInput.get_var("lat");
+	NcVar * varLat = ncInput.get_var(strLatitudeName.c_str());
 	if (varLat == NULL) {
-		_EXCEPTIONT("Error accessing variable \"lat\"");
+		_EXCEPTION1("Error accessing variable \"%s\"", strLatitudeName.c_str());
 	}
 
 	DataArray1D<double> dLatDeg(dimLat->size());
@@ -239,16 +247,16 @@ try {
 		varTimeOut->add_att("standard_name", "time");
 	}
 
-	CopyNcVar(ncInput, ncOutput, "lat", true);
-	CopyNcVar(ncInput, ncOutput, "lon", true);
+	CopyNcVar(ncInput, ncOutput, strLatitudeName.c_str(), true);
+	CopyNcVar(ncInput, ncOutput, strLongitudeName.c_str(), true);
 
-	NcDim * dimLonOut = ncOutput.get_dim("lon");
+	NcDim * dimLonOut = ncOutput.get_dim(strLongitudeName.c_str());
 	if (dimLonOut == NULL) {
-		_EXCEPTIONT("Error copying variable \"lon\" to output file");
+		_EXCEPTION1("Error copying variable \"%s\" to output file", strLongitudeName.c_str());
 	}
-	NcDim * dimLatOut = ncOutput.get_dim("lat");
+	NcDim * dimLatOut = ncOutput.get_dim(strLatitudeName.c_str());
 	if (dimLatOut == NULL) {
-		_EXCEPTIONT("Error copying variable \"lat\" to output file");
+		_EXCEPTION1("Error copying variable \"%s\" to output file", strLatitudeName.c_str());
 	}
 
 	// Tagged cell array
