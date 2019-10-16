@@ -210,6 +210,13 @@ public:
 		return m_data;
 	}
 
+	///	<summary>
+	///		Get the data associated with this variable.
+	///	</summary>
+	DataArray1D<float> & GetData() {
+		return m_data;
+	}
+
 public:
 	///	<summary>
 	///		Flag indicating this is an operator.

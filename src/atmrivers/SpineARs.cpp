@@ -18,6 +18,7 @@
 #include "Exception.h"
 #include "Announce.h"
 
+#include "Variable.h"
 #include "DataArray1D.h"
 #include "DataArray2D.h"
 
@@ -32,19 +33,54 @@ typedef std::pair<int, int> Point;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Parse the list of input files.
+///	</summary>
+void ParseInputFiles(
+	const std::string & strInputFiles,
+	std::vector<NcFile *> & vecFiles
+) {
+	int iLast = 0;
+	for (int i = 0; i <= strInputFiles.length(); i++) {
+		if ((i == strInputFiles.length()) ||
+		    (strInputFiles[i] == ';')
+		) {
+			std::string strFile =
+				strInputFiles.substr(iLast, i - iLast);
+
+			NcFile * pNewFile = new NcFile(strFile.c_str());
+
+			if (!pNewFile->is_valid()) {
+				_EXCEPTION1("Cannot open input file \"%s\"",
+					strFile.c_str());
+			}
+
+			vecFiles.push_back(pNewFile);
+			iLast = i+1;
+		}
+	}
+
+	if (vecFiles.size() == 0) {
+		_EXCEPTION1("No input files found in \"%s\"",
+			strInputFiles.c_str());
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 	NcError error(NcError::silent_nonfatal);
 
 try {
 	// Input file
-	std::string strInputFile;
+	std::string strInputFiles;
 
 	// Output file
 	std::string strOutputFile;
 
 	// Input integrated water vapor variable name
-	std::string strIWVVariable;
+	std::string strSearchByVariable;
 
 	// Output variable name
 	std::string strOutputVariable;
@@ -105,10 +141,10 @@ try {
 
 	// Parse the command line
 	BeginCommandLine()
-		CommandLineString(strInputFile, "in", "");
-		//CommandLineString(strInputFileList, "inlist", "");
+		CommandLineString(strInputFiles, "in", "");
+		//CommandLineString(strInputFilesList, "inlist", "");
 		CommandLineString(strOutputFile, "out", "");
-		CommandLineString(strIWVVariable, "var", "");
+		CommandLineString(strSearchByVariable, "var", "");
 		CommandLineString(strOutputVariable, "outvar", "");
 		CommandLineInt(iLaplacianSize, "laplaciansize", 5);
 		CommandLineDouble(dMinLaplacian, "minlaplacian", 0.5e4);
@@ -134,8 +170,11 @@ try {
 
 	AnnounceStartBlock("Loading data");
 
+	// Create Variable registry
+	VariableRegistry varreg;
+
 	// Check input
-	if (strInputFile == "") {
+	if (strInputFiles == "") {
 		_EXCEPTIONT("No input file (--in) specified");
 	}
 
@@ -145,38 +184,44 @@ try {
 	}
 
 	// Check variable
-	if (strIWVVariable == "") {
+	if (strSearchByVariable == "") {
 		_EXCEPTIONT("No IWV variable name (--iwvvar) specified");
 	}
 
 	// Check output variable
 	if (strOutputVariable.length() == 0) {
-		strOutputVariable = strIWVVariable + "tag";
+		strOutputVariable = strSearchByVariable + "tag";
 	}
 
-	// Open the NetCDF input file
-	NcFile ncInput(strInputFile.c_str());
+	// Load in the benchmark file
+	NcFileVector vecFiles;
 
-	if (!ncInput.is_valid()) {
-		_EXCEPTION1("Unable to open NetCDF file \"%s\" for reading",
-			strInputFile.c_str());
-	}
+	ParseInputFiles(strInputFiles, vecFiles);
 
+	// Define the SimpleGrid
+	SimpleGrid grid;
+	AnnounceStartBlock("Generating RLL grid data");
+	grid.GenerateLatitudeLongitude(
+		vecFiles[0],
+		fRegional,
+		strLatitudeName,
+		strLongitudeName);
+	AnnounceEndBlock("Done");
 
 	// Get the time dimension
-	NcDim * dimTime = ncInput.get_dim("time");
+	NcDim * dimTime = vecFiles[0]->get_dim("time");
 	//if (dimTime == NULL) {
 	//	_EXCEPTIONT("Error accessing dimension \"time\"");
 	//}
 
 	// Get the longitude dimension
-	NcDim * dimLon = ncInput.get_dim(strLongitudeName.c_str());
+	NcDim * dimLon = vecFiles[0]->get_dim(strLongitudeName.c_str());
 	if (dimLon == NULL) {
 		_EXCEPTION1("Error accessing dimension \"%s\"", strLongitudeName.c_str());
 	}
 
 	// Get the longitude variable
-	NcVar * varLon = ncInput.get_var(strLongitudeName.c_str());
+	NcVar * varLon = vecFiles[0]->get_var(strLongitudeName.c_str());
 	if (varLon == NULL) {
 		_EXCEPTION1("Error accessing variable \"%s\"", strLongitudeName.c_str());
 	}
@@ -185,13 +230,13 @@ try {
 	varLon->get(&(dLonDeg[0]), dimLon->size());
 
 	// Get the latitude dimension
-	NcDim * dimLat = ncInput.get_dim(strLatitudeName.c_str());
+	NcDim * dimLat = vecFiles[0]->get_dim(strLatitudeName.c_str());
 	if (dimLat == NULL) {
 		_EXCEPTION1("Error accessing dimension \"%s\"", strLatitudeName.c_str());
 	}
 
 	// Get the latitude variable
-	NcVar * varLat = ncInput.get_var(strLatitudeName.c_str());
+	NcVar * varLat = vecFiles[0]->get_var(strLatitudeName.c_str());
 	if (varLat == NULL) {
 		_EXCEPTION1("Error accessing variable \"%s\"", strLatitudeName.c_str());
 	}
@@ -200,13 +245,11 @@ try {
 	varLat->get(&(dLatDeg[0]), dimLat->size());
 
 	// Get the integrated water vapor variable
-	NcVar * varIWV = ncInput.get_var(strIWVVariable.c_str());
-	if (varIWV == NULL) {
-		_EXCEPTION1("Error accessing variable \"%s\"",
-			strIWVVariable.c_str());
-	}
+	Variable varSearchByArg;
+	varSearchByArg.ParseFromString(varreg, strSearchByVariable);
+	int ixSearchByVar = varreg.FindOrRegister(varSearchByArg);
 
-	DataArray2D<float> dIWV(dimLat->size(), dimLon->size());
+	DataArray2D<float> dVarData(dimLat->size(), dimLon->size());
 
 	// Open the NetCDF output file
 	NcFile ncOutput(strOutputFile.c_str(), NcFile::Replace, NULL, 0, NcFile::Netcdf4);
@@ -218,7 +261,7 @@ try {
 	// Copy over latitude, longitude and time variables to output file
 	NcDim * dimTimeOut = NULL;
 	if (dimTime != NULL) {
-		CopyNcVar(ncInput, ncOutput, "time", true);
+		CopyNcVar(*(vecFiles[0]), ncOutput, "time", true);
 		dimTimeOut = ncOutput.get_dim("time");
 		if (dimTimeOut == NULL) {
 			_EXCEPTIONT("Error copying variable \"time\" to output file");
@@ -247,8 +290,8 @@ try {
 		varTimeOut->add_att("standard_name", "time");
 	}
 
-	CopyNcVar(ncInput, ncOutput, strLatitudeName.c_str(), true);
-	CopyNcVar(ncInput, ncOutput, strLongitudeName.c_str(), true);
+	CopyNcVar(*(vecFiles[0]), ncOutput, strLatitudeName.c_str(), true);
+	CopyNcVar(*(vecFiles[0]), ncOutput, strLongitudeName.c_str(), true);
 
 	NcDim * dimLonOut = ncOutput.get_dim(strLongitudeName.c_str());
 	if (dimLonOut == NULL) {
@@ -260,7 +303,7 @@ try {
 	}
 
 	// Tagged cell array
-	DataArray2D<int> dIWVtag(dimLat->size(), dimLon->size());
+	DataArray2D<int> dVarDatatag(dimLat->size(), dimLon->size());
 
 	NcVar * varIWVtag = NULL;
 	if (dimTimeOut != NULL) {
@@ -325,16 +368,15 @@ try {
 		sprintf(szBuffer, "Time %i", t);
 		AnnounceStartBlock(szBuffer);
 
-		// Get the IWV array
-		if (dimTime != NULL) {
-			varIWV->set_cur(t, 0, 0);
-			varIWV->get(&(dIWV[0][0]), 1, dimLat->size(), dimLon->size());
-		} else {
-			varIWV->set_cur(0, 0);
-			varIWV->get(&(dIWV[0][0]), dimLat->size(), dimLon->size());
-		}
+		// Get the search-by variable array
+		Variable & varSearchBy = varreg.Get(ixSearchByVar);
+		varSearchBy.LoadGridData(varreg, vecFiles, grid, t);
+		DataArray1D<float> & dataSearchBy = varSearchBy.GetData();
 
-		dIWVtag.Zero();
+		DataArray2D<float> dataSearchBy2D(dimLat->size(), dimLon->size(), false);
+		dataSearchBy2D.AttachToData(&(dataSearchBy[0]));
+
+		dVarDatatag.Zero();
 /*
 		// Identify ridges
 		AnnounceStartBlock("Identify ridges");
@@ -377,15 +419,15 @@ try {
 			int j2 = j + iLaplacianSize;
 
 			dLaplacian[j][i] =
-				  dA * dIWV[j0][i0]
-				+ dB * dIWV[j ][i0]
-				+ dA * dIWV[j2][i0]
-				+ dC * dIWV[j0][i ]
-				+ dD * dIWV[j ][i ]
-				+ dC * dIWV[j2][i ]
-				+ dA * dIWV[j0][i2]
-				+ dB * dIWV[j ][i2]
-				+ dA * dIWV[j2][i2];
+				  dA * dVarData[j0][i0]
+				+ dB * dVarData[j ][i0]
+				+ dA * dVarData[j2][i0]
+				+ dC * dVarData[j0][i ]
+				+ dD * dVarData[j ][i ]
+				+ dC * dVarData[j2][i ]
+				+ dA * dVarData[j0][i2]
+				+ dB * dVarData[j ][i2]
+				+ dA * dVarData[j2][i2];
 /*
 			if (dLaplacian[j][i] > -dMinLaplacian) {
 				dLaplacian[j][i] = 0.0;
@@ -399,11 +441,11 @@ try {
 		// Compute zonal threshold
 		DataArray1D<float> dZonalThreshold(dimLat->size());
 		for (int j = 0; j < dimLat->size(); j++) {
-			float dMaxZonalIWV = dIWV[j][0];
+			float dMaxZonalIWV = dVarData[j][0];
 			for (int i = 0; i < dimLon->size(); i++) {
-				dZonalThreshold[j] += dIWV[j][i];
-				if (dIWV[j][i] > dMaxZonalIWV) {
-					dMaxZonalIWV = dIWV[j][i];
+				dZonalThreshold[j] += dVarData[j][i];
+				if (dVarData[j][i] > dMaxZonalIWV) {
+					dMaxZonalIWV = dVarData[j][i];
 				}
 			}
 			dZonalThreshold[j] /= static_cast<float>(dimLon->size());
@@ -416,18 +458,18 @@ try {
 		// Compute meridional threshold
 		DataArray1D<float> dMeridThreshold(dimLon->size());
 		for (int i = 0; i < dimLon->size(); i++) {
-			float dMaxMeridIWV = dIWV[0][i];
+			float dMaxMeridVarData = dVarData[0][i];
 			for (int j = 0; j < dimLat->size(); j++) {
-				dMeridThreshold[i] += dIWV[j][i];
-				if (dIWV[j][i] > dMaxMeridIWV) {
-					dMaxMeridIWV = dIWV[j][i];
+				dMeridThreshold[i] += dVarData[j][i];
+				if (dVarData[j][i] > dMaxMeridVarData) {
+					dMaxMeridVarData = dVarData[j][i];
 				}
 			}
 			dMeridThreshold[i] /= static_cast<float>(dimLon->size());
 
 			dMeridThreshold[i] =
 				dMeridMeanWeight * dMeridThreshold[i]
-				+ dMeridMaxWeight * dMaxMeridIWV;
+				+ dMeridMaxWeight * dMaxMeridVarData;
 		}
 
 		// Announce
@@ -441,21 +483,21 @@ try {
 			if (fabs(dLatDeg[j]) < dMinAbsLat) {
 				continue;
 			}
-			if (dIWV[j][i] < dMinIWV) {
+			if (dVarData[j][i] < dMinIWV) {
 				continue;
 			}
-			if (dIWV[j][i] < dZonalThreshold[j]) {
+			if (dVarData[j][i] < dZonalThreshold[j]) {
 				continue;
 			}
-			if (dIWV[j][i] < dMeridThreshold[i]) {
+			if (dVarData[j][i] < dMeridThreshold[i]) {
 				continue;
 			}
 
-			//dIWVtag[j][i] = 1 + static_cast<int>(dLaplacian[j][i]);
+			//dVarDatatag[j][i] = 1 + static_cast<int>(dLaplacian[j][i]);
 			if (dLaplacian[j][i] > -dMinLaplacian) {
-				dIWVtag[j][i] = 0;
+				dVarDatatag[j][i] = 0;
 			} else {
-				dIWVtag[j][i] = 1;
+				dVarDatatag[j][i] = 1;
 			}
 		}
 		}
@@ -466,7 +508,7 @@ try {
 
 			for (int j = 0; j < dimLat->size(); j++) {
 			for (int i = 0; i < dimLon->size(); i++) {
-				if (dIWVtag[j][i] != 0) {
+				if (dVarDatatag[j][i] != 0) {
 					setBlobs.insert(std::pair<int,int>(j,i));
 				}
 			}
@@ -520,7 +562,7 @@ try {
 				if (setThisBlob.size() < nMinArea) {
 					std::set<Point>::iterator iter = setThisBlob.begin();
 					for (; iter != setThisBlob.end(); iter++) {
-						dIWVtag[iter->first][iter->second] = 0;
+						dVarDatatag[iter->first][iter->second] = 0;
 					}
 				}
 			}
@@ -535,25 +577,25 @@ try {
 			for (int j = 0; j < dimLat->size(); j++) {
 				if ((!fSouthDone) && (dLatDeg[j] > -dMinAbsLat)) {
 					for (int k = j-1; k > 0; k--) {
-						if (dIWVtag[k][i] == 0) {
+						if (dVarDatatag[k][i] == 0) {
 							break;
 						}
 						if (dLatDeg[k] < -dEqBandMaxLat) {
 							break;
 						}
-						dIWVtag[k][i] = 0;
+						dVarDatatag[k][i] = 0;
 					}
 					fSouthDone = true;
 				}
 				if ((!fNorthDone) && (dLatDeg[j] > dMinAbsLat)) {
 					for (int k = j-1; k < dimLat->size(); k++) {
-						if (dIWVtag[k][i] == 0) {
+						if (dVarDatatag[k][i] == 0) {
 							break;
 						}
 						if (dLatDeg[k] > dEqBandMaxLat) {
 							break;
 						}
-						dIWVtag[k][i] = 0;
+						dVarDatatag[k][i] = 0;
 					}
 					fNorthDone = true;
 				}
@@ -572,7 +614,7 @@ try {
 			}
 
 			varIWVtag->set_cur(t, 0, 0);
-			varIWVtag->put(&(dIWVtag[0][0]), 1, dimLatOut->size(), dimLonOut->size());
+			varIWVtag->put(&(dVarDatatag[0][0]), 1, dimLatOut->size(), dimLonOut->size());
 
 		} else {
 			if (varLaplacian != NULL) {
@@ -581,7 +623,7 @@ try {
 			}
 
 			varIWVtag->set_cur(0, 0);
-			varIWVtag->put(&(dIWVtag[0][0]), dimLatOut->size(), dimLonOut->size());
+			varIWVtag->put(&(dVarDatatag[0][0]), dimLatOut->size(), dimLonOut->size());
 		}
 
 		AnnounceEndBlock("Done");
