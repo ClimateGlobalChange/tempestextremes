@@ -151,10 +151,10 @@ try {
 		CommandLineDouble(dMinAbsLat, "minabslat", 15.0);
 		CommandLineDouble(dEqBandMaxLat, "eqbandmaxlat", 15.0);
 		CommandLineDouble(dMinIWV, "minval", 20.0);
-		CommandLineDouble(dZonalMeanWeight, "zonalmeanwt", 0.7);
-		CommandLineDouble(dZonalMaxWeight, "zonalmaxwt", 0.3);
-		CommandLineDouble(dMeridMeanWeight, "meridmeanwt", 0.9);
-		CommandLineDouble(dMeridMaxWeight, "meridmaxwt", 0.1);
+		CommandLineDoubleD(dZonalMeanWeight, "zonalmeanwt", 0.0, "(suggested 0.7)");
+		CommandLineDoubleD(dZonalMaxWeight, "zonalmaxwt", 0.0, "(suggested 0.3)");
+		CommandLineDoubleD(dMeridMeanWeight, "meridmeanwt", 0.0, "(suggested 0.9)");
+		CommandLineDoubleD(dMeridMaxWeight, "meridmaxwt", 0.0, "(suggested 0.1)");
 		CommandLineInt(nMinArea, "minarea", 0);
 		CommandLineInt(nAddTimeDim, "addtimedim", -1);
 		CommandLineString(strAddTimeDimUnits, "addtimedimunits", "");
@@ -191,6 +191,18 @@ try {
 	// Check output variable
 	if (strOutputVariable.length() == 0) {
 		strOutputVariable = strSearchByVariable + "tag";
+	}
+
+	// Check if zonal weights are specified
+	bool fHasZonalWeight = false;
+	if ((dZonalMeanWeight != 0.0) || (dZonalMaxWeight != 0.0)) {
+		fHasZonalWeight = true;
+	}
+
+	// Check if meridional weights are specified
+	bool fHasMeridWeight = false;
+	if ((dMeridMeanWeight != 0.0) || (dMeridMaxWeight != 0.0)) {
+		fHasMeridWeight = true;
 	}
 
 	// Load in the benchmark file
@@ -248,8 +260,6 @@ try {
 	Variable varSearchByArg;
 	varSearchByArg.ParseFromString(varreg, strSearchByVariable);
 	int ixSearchByVar = varreg.FindOrRegister(varSearchByArg);
-
-	DataArray2D<float> dVarData(dimLat->size(), dimLon->size());
 
 	// Open the NetCDF output file
 	NcFile ncOutput(strOutputFile.c_str(), NcFile::Replace, NULL, 0, NcFile::Netcdf4);
@@ -373,27 +383,14 @@ try {
 		varSearchBy.LoadGridData(varreg, vecFiles, grid, t);
 		DataArray1D<float> & dataSearchBy = varSearchBy.GetData();
 
-		DataArray2D<float> dataSearchBy2D(dimLat->size(), dimLon->size(), false);
-		dataSearchBy2D.AttachToData(&(dataSearchBy[0]));
+		DataArray2D<float> dVarData(dimLat->size(), dimLon->size(), false);
+		dVarData.AttachToData(&(dataSearchBy[0]));
 
 		dVarDatatag.Zero();
-/*
-		// Identify ridges
-		AnnounceStartBlock("Identify ridges");
-		for (int j = iLaplacianSize; j < dimLat->size() - iLaplacianSize; j++) {
-		for (int i = 0; i < dimLon->size(); i++) {
-			const int nPoints = 32;
-			for (int n = 0; n < nPoints; n++) {
-				double dLonPt = 
-			}
-		}
-		}
-		AnnounceEndBlock("Done");
-*/
 
+		// Calculate Laplacian of field at each point
 		AnnounceStartBlock("Compute Laplacian");
 
-		// Compute Laplacian
 		double dA = 1.0 / 12.0 * (1.0/dX2 + 1.0/dY2);
 		double dB = 5.0 / (6.0 * dX2) - 1.0 / (6.0 * dY2);
 		double dC = -1.0 / (6.0 * dX2) + 5.0 / (6.0 * dY2);
@@ -428,51 +425,9 @@ try {
 				+ dA * dVarData[j0][i2]
 				+ dB * dVarData[j ][i2]
 				+ dA * dVarData[j2][i2];
-/*
-			if (dLaplacian[j][i] > -dMinLaplacian) {
-				dLaplacian[j][i] = 0.0;
-			} else {
-				dLaplacian[j][i] = 1.0;
-			}
-*/
 		}
 		}
 
-		// Compute zonal threshold
-		DataArray1D<float> dZonalThreshold(dimLat->size());
-		for (int j = 0; j < dimLat->size(); j++) {
-			float dMaxZonalIWV = dVarData[j][0];
-			for (int i = 0; i < dimLon->size(); i++) {
-				dZonalThreshold[j] += dVarData[j][i];
-				if (dVarData[j][i] > dMaxZonalIWV) {
-					dMaxZonalIWV = dVarData[j][i];
-				}
-			}
-			dZonalThreshold[j] /= static_cast<float>(dimLon->size());
-
-			dZonalThreshold[j] =
-				dZonalMeanWeight * dZonalThreshold[j]
-				+ dZonalMaxWeight * dMaxZonalIWV;
-		}
-
-		// Compute meridional threshold
-		DataArray1D<float> dMeridThreshold(dimLon->size());
-		for (int i = 0; i < dimLon->size(); i++) {
-			float dMaxMeridVarData = dVarData[0][i];
-			for (int j = 0; j < dimLat->size(); j++) {
-				dMeridThreshold[i] += dVarData[j][i];
-				if (dVarData[j][i] > dMaxMeridVarData) {
-					dMaxMeridVarData = dVarData[j][i];
-				}
-			}
-			dMeridThreshold[i] /= static_cast<float>(dimLon->size());
-
-			dMeridThreshold[i] =
-				dMeridMeanWeight * dMeridThreshold[i]
-				+ dMeridMaxWeight * dMaxMeridVarData;
-		}
-
-		// Announce
 		AnnounceEndBlock("Done");
 
 		AnnounceStartBlock("Build tagged cell array");
@@ -486,20 +441,72 @@ try {
 			if (dVarData[j][i] < dMinIWV) {
 				continue;
 			}
-			if (dVarData[j][i] < dZonalThreshold[j]) {
-				continue;
-			}
-			if (dVarData[j][i] < dMeridThreshold[i]) {
+			if (dLaplacian[j][i] > -dMinLaplacian) {
 				continue;
 			}
 
-			//dVarDatatag[j][i] = 1 + static_cast<int>(dLaplacian[j][i]);
-			if (dLaplacian[j][i] > -dMinLaplacian) {
-				dVarDatatag[j][i] = 0;
-			} else {
-				dVarDatatag[j][i] = 1;
+			dVarDatatag[j][i] = 1;
+		}
+		}
+
+		// Has zonal weights
+		if (fHasZonalWeight) {
+
+			// Compute zonal threshold
+			DataArray1D<float> dZonalThreshold(dimLat->size());
+			for (int j = 0; j < dimLat->size(); j++) {
+				float dMaxZonalIWV = dVarData[j][0];
+				for (int i = 0; i < dimLon->size(); i++) {
+					dZonalThreshold[j] += dVarData[j][i];
+					if (dVarData[j][i] > dMaxZonalIWV) {
+						dMaxZonalIWV = dVarData[j][i];
+					}
+				}
+				dZonalThreshold[j] /= static_cast<float>(dimLon->size());
+
+				dZonalThreshold[j] =
+					dZonalMeanWeight * dZonalThreshold[j]
+					+ dZonalMaxWeight * dMaxZonalIWV;
+			}
+
+			// Adjust the tag
+			for (int j = 0; j < dimLat->size(); j++) {
+			for (int i = 0; i < dimLon->size(); i++) {
+				if (dVarData[j][i] < dZonalThreshold[j]) {
+					dVarDatatag[j][i] = 0;
+				}
+			}
 			}
 		}
+
+		// Has meridional weights
+		if (fHasMeridWeight) {
+
+			// Compute meridional threshold
+			DataArray1D<float> dMeridThreshold(dimLon->size());
+			for (int i = 0; i < dimLon->size(); i++) {
+				float dMaxMeridVarData = dVarData[0][i];
+				for (int j = 0; j < dimLat->size(); j++) {
+					dMeridThreshold[i] += dVarData[j][i];
+					if (dVarData[j][i] > dMaxMeridVarData) {
+						dMaxMeridVarData = dVarData[j][i];
+					}
+				}
+				dMeridThreshold[i] /= static_cast<float>(dimLon->size());
+
+				dMeridThreshold[i] =
+					dMeridMeanWeight * dMeridThreshold[i]
+					+ dMeridMaxWeight * dMaxMeridVarData;
+			}
+
+			// Adjust the tag
+			for (int j = 0; j < dimLat->size(); j++) {
+			for (int i = 0; i < dimLon->size(); i++) {
+				if (dVarData[j][i] < dMeridThreshold[i]) {
+					dVarDatatag[j][i] = 0;
+				}
+			}
+			}
 		}
 
 		// Only retain blobs with minimum area
