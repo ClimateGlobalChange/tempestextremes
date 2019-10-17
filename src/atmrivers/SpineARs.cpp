@@ -374,8 +374,8 @@ void SpineARs(
 	}
 
 	// Delta longitude
-	double dDeltaLon = (dLonDeg[1] - dLonDeg[0]) / 180.0 * M_PI;
-	double dDeltaLat = (dLatDeg[1] - dLatDeg[0]) / 180.0 * M_PI;
+	double dDeltaLon = fabs(dLonDeg[1] - dLonDeg[0]) / 180.0 * M_PI;
+	double dDeltaLat = fabs(dLatDeg[1] - dLatDeg[0]) / 180.0 * M_PI;
 
 	double dX = dDeltaLon * static_cast<double>(param.iLaplacianSize);
 	double dY = dDeltaLat * static_cast<double>(param.iLaplacianSize);
@@ -453,7 +453,7 @@ void SpineARs(
 				int j2 = j + param.iLaplacianSize;
 
 				dAbsGrad[j][i] =
-				  fabs(dVarData[j2][i2] - dVarData[j0][i0]) / 2.0 / sqrt(dX2 + dY2)
+				    fabs(dVarData[j2][i2] - dVarData[j0][i0]) / 2.0 / sqrt(dX2 + dY2)
 				  + fabs(dVarData[j2][i0] - dVarData[j0][i2]) / 2.0 / sqrt(dX2 + dY2)
 				  + fabs(dVarData[j ][i2] - dVarData[j ][i0]) / 2.0 / dX
 				  + fabs(dVarData[j2][i ] - dVarData[j0][i ]) / 2.0 / dY;
@@ -477,12 +477,19 @@ void SpineARs(
 			if (dLaplacian[j][i] > -param.dMinLaplacian) {
 				continue;
 			}
-			if (dAbsGrad[j][i] < param.dMinAbsGrad) {
-				continue;
-			}
 
 			dVarDatatag[j][i] = 1;
 		}
+		}
+
+		if (param.dMinAbsGrad != 0.0) {
+			for (int j = 0; j < dimLat->size(); j++) {
+			for (int i = 0; i < dimLon->size(); i++) {
+				if (dAbsGrad[j][i] < param.dMinAbsGrad) {
+					dVarDatatag[j][i] = 0;
+				}
+			}
+			}
 		}
 
 		// Has zonal weights
