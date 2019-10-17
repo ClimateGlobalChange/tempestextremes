@@ -84,6 +84,9 @@ public:
 		strOutputVariable(""),
 		iLaplacianSize(0),
 		dMinLaplacian(0.0),
+		fOutputLaplacian(false),
+		dMinAbsGrad(0.0),
+		fOutputAbsGrad(false),
 		dMinAbsLat(0.0),
 		dEqBandMaxLat(0.0),
 		dMinIWV(0.0),
@@ -96,7 +99,6 @@ public:
 		nMinArea(0),
 		nAddTimeDim(0),
 		strAddTimeDimUnits(""),
-		fOutputLaplacian(false),
 		fRegional(false),
 		strLongitudeName("lon"),
 		strLatitudeName("lat")
@@ -117,6 +119,15 @@ public:
 
 	// Minimum Laplacian
 	double dMinLaplacian;
+
+	// Output Laplacian
+	bool fOutputLaplacian;
+
+	// Minimum absolute gradient
+	double dMinAbsGrad;
+
+	// Output minimum absolute gradient
+	bool fOutputAbsGrad;
 
 	// Minimum absolute latitude
 	double dMinAbsLat;
@@ -154,9 +165,6 @@ public:
 	// Time dimension units
 	std::string strAddTimeDimUnits;
 
-	// Output Laplacian
-	bool fOutputLaplacian;
-
 	// Regional data
 	bool fRegional;
 
@@ -165,7 +173,6 @@ public:
 
 	// Name of latitude variable
 	std::string strLatitudeName;
-
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -175,8 +182,10 @@ void SpineARs(
 	const std::string & strInputFiles,
 	const std::string & strOutputFile,
 	VariableRegistry & varreg,
-	const SpineARsParam & param
+	const SpineARsParam & param,
+	bool fVerbose
 ) {
+	if (fVerbose) AnnounceStartBlock("Processing files \"%s\"", strInputFiles.c_str());
 
 	// Check if zonal weights are specified
 	bool fHasZonalWeight = false;
@@ -200,13 +209,13 @@ void SpineARs(
 
 	// Define the SimpleGrid
 	SimpleGrid grid;
-	AnnounceStartBlock("Generating RLL grid data");
+	if (fVerbose) AnnounceStartBlock("Generating RLL grid data");
 	grid.GenerateLatitudeLongitude(
 		vecFiles[0],
 		param.fRegional,
 		param.strLatitudeName,
 		param.strLongitudeName);
-	AnnounceEndBlock("Done");
+	if (fVerbose) AnnounceEndBlock("Done");
 
 	// Get the time dimension
 	NcDim * dimTime = vecFiles[0]->get_dim("time");
@@ -339,7 +348,30 @@ void SpineARs(
 		}
 	}
 
-	AnnounceEndBlock("Done");
+	// Absolute gradient
+	DataArray2D<double> dAbsGrad;
+	if (param.dMinAbsGrad != 0.0) {
+		dAbsGrad.Allocate(dimLat->size(), dimLon->size());
+	}
+
+	NcVar * varAbsGrad = NULL;
+	if (param.fOutputAbsGrad) {
+		if (dimTimeOut != NULL) {
+			varAbsGrad = ncOutput.add_var(
+				"ar_absgrad",
+				ncDouble,
+				dimTimeOut,
+				dimLatOut,
+				dimLonOut);
+
+		} else {
+			varAbsGrad = ncOutput.add_var(
+				"ar_absgrad",
+				ncDouble,
+				dimLatOut,
+				dimLonOut);
+		}
+	}
 
 	// Delta longitude
 	double dDeltaLon = (dLonDeg[1] - dLonDeg[0]) / 180.0 * M_PI;
@@ -359,9 +391,7 @@ void SpineARs(
 
 	for (int t = 0; t < nTimes; t++) {
 
-		char szBuffer[20];
-		sprintf(szBuffer, "Time %i", t);
-		AnnounceStartBlock(szBuffer);
+		if (fVerbose) AnnounceStartBlock("Time %i", t);
 
 		// Get the search-by variable array
 		Variable & varSearchBy = varreg.Get(param.ixSearchByVar);
@@ -374,7 +404,7 @@ void SpineARs(
 		dVarDatatag.Zero();
 
 		// Calculate Laplacian of field at each point
-		AnnounceStartBlock("Compute Laplacian");
+		if (fVerbose) AnnounceStartBlock("Compute Laplacian");
 
 		double dA = 1.0 / 12.0 * (1.0/dX2 + 1.0/dY2);
 		double dB = 5.0 / (6.0 * dX2) - 1.0 / (6.0 * dY2);
@@ -413,9 +443,27 @@ void SpineARs(
 		}
 		}
 
-		AnnounceEndBlock("Done");
+		if (param.dMinAbsGrad != 0.0) {
+			for (int j = j_begin; j < j_end; j++) {
+			for (int i = i_begin; i < i_end; i++) {
+				int i0 = (i + dimLon->size() - param.iLaplacianSize) % (dimLon->size());
+				int i2 = (i + param.iLaplacianSize) % (dimLon->size());
 
-		AnnounceStartBlock("Build tagged cell array");
+				int j0 = j - param.iLaplacianSize;
+				int j2 = j + param.iLaplacianSize;
+
+				dAbsGrad[j][i] =
+				  fabs(dVarData[j2][i2] - dVarData[j0][i0]) / 2.0 / sqrt(dX2 + dY2)
+				  + fabs(dVarData[j2][i0] - dVarData[j0][i2]) / 2.0 / sqrt(dX2 + dY2)
+				  + fabs(dVarData[j ][i2] - dVarData[j ][i0]) / 2.0 / dX
+				  + fabs(dVarData[j2][i ] - dVarData[j0][i ]) / 2.0 / dY;
+			}
+			}
+		}
+
+		if (fVerbose) AnnounceEndBlock("Done");
+
+		if (fVerbose) AnnounceStartBlock("Build tagged cell array");
 
 		// Build tagged cell array
 		for (int j = 0; j < dimLat->size(); j++) {
@@ -427,6 +475,9 @@ void SpineARs(
 				continue;
 			}
 			if (dLaplacian[j][i] > -param.dMinLaplacian) {
+				continue;
+			}
+			if (dAbsGrad[j][i] < param.dMinAbsGrad) {
 				continue;
 			}
 
@@ -559,15 +610,19 @@ void SpineARs(
 				}
 			}
 		}
-		AnnounceEndBlock("Done");
+		if (fVerbose) AnnounceEndBlock("Done");
 
-		AnnounceStartBlock("Writing results");
+		if (fVerbose) AnnounceStartBlock("Writing results");
 
 		// Output tagged cell array
 		if (dimTimeOut != NULL) {
 			if (varLaplacian != NULL) {
 				varLaplacian->set_cur(t, 0, 0);
 				varLaplacian->put(&(dLaplacian[0][0]), 1, dimLatOut->size(), dimLonOut->size());
+			}
+			if (varAbsGrad != NULL) {
+				varAbsGrad->set_cur(t, 0, 0);
+				varAbsGrad->put(&(dAbsGrad[0][0]), 1, dimLatOut->size(), dimLonOut->size());
 			}
 
 			varIWVtag->set_cur(t, 0, 0);
@@ -578,15 +633,21 @@ void SpineARs(
 				varLaplacian->set_cur(0, 0);
 				varLaplacian->put(&(dLaplacian[0][0]), dimLatOut->size(), dimLonOut->size());
 			}
+			if (varAbsGrad != NULL) {
+				varAbsGrad->set_cur(0, 0);
+				varAbsGrad->put(&(dAbsGrad[0][0]), dimLatOut->size(), dimLonOut->size());
+			}
 
 			varIWVtag->set_cur(0, 0);
 			varIWVtag->put(&(dVarDatatag[0][0]), dimLatOut->size(), dimLonOut->size());
 		}
 
-		AnnounceEndBlock("Done");
+		if (fVerbose) AnnounceEndBlock("Done");
 
-		AnnounceEndBlock(NULL);
+		if (fVerbose) AnnounceEndBlock(NULL);
 	}
+
+	if (fVerbose) AnnounceEndBlock("Done");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -619,6 +680,9 @@ try {
 	// Input integrated water vapor variable name
 	std::string strSearchByVariable;
 
+	// Write logs
+	std::string strLogDir;
+
 	// SpineARs parameter
 	SpineARsParam arparam;
 
@@ -632,6 +696,9 @@ try {
 		CommandLineString(arparam.strOutputVariable, "outvar", "");
 		CommandLineInt(arparam.iLaplacianSize, "laplaciansize", 5);
 		CommandLineDouble(arparam.dMinLaplacian, "minlaplacian", 0.5e4);
+		CommandLineBool(arparam.fOutputLaplacian, "outputlaplacian");
+		CommandLineDouble(arparam.dMinAbsGrad, "minabsgrad", 0.0);
+		CommandLineBool(arparam.fOutputAbsGrad, "outputabsgrad");
 		CommandLineDouble(arparam.dMinAbsLat, "minabslat", 15.0);
 		CommandLineDouble(arparam.dEqBandMaxLat, "eqbandmaxlat", 15.0);
 		CommandLineDouble(arparam.dMinIWV, "minval", 20.0);
@@ -642,17 +709,15 @@ try {
 		CommandLineInt(arparam.nMinArea, "minarea", 0);
 		CommandLineInt(arparam.nAddTimeDim, "addtimedim", -1);
 		CommandLineString(arparam.strAddTimeDimUnits, "addtimedimunits", "");
-		CommandLineBool(arparam.fOutputLaplacian, "laplacianout");
 		CommandLineBool(arparam.fRegional, "regional");
 		CommandLineString(arparam.strLongitudeName, "lonname", "lon");
 		CommandLineString(arparam.strLatitudeName, "latname", "lat");
+		CommandLineString(strLogDir, "logdir", "");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
 
 	AnnounceBanner();
-
-	AnnounceStartBlock("Loading data");
 
 	// Check input
 	if ((strInputFile.length() == 0) && (strInputFileList.length() == 0)) {
@@ -681,6 +746,8 @@ try {
 	if ((strInputFile.length() != 0) && (strOutputFile.length() == 0)) {
 		_EXCEPTIONT("Arguments (--in) and (--out) must be specified together");
 	}
+
+	AnnounceStartBlock("Initializing detector");
 
 	// Load input file list
 	std::vector<std::string> vecInputFiles;
@@ -752,6 +819,9 @@ try {
 
 	int nMPISize;
 	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+
+	Announce("Executing detection with %i threads over %i files",
+		nMPISize, vecInputFiles.size());
 #endif
 
 	// Create Variable registry
@@ -762,11 +832,52 @@ try {
 	varSearchByArg.ParseFromString(varreg, strSearchByVariable);
 	arparam.ixSearchByVar = varreg.FindOrRegister(varSearchByArg);
 
+	AnnounceEndBlock("Done");
+
 	// Loop over all files to be processed
+	AnnounceStartBlock("Performing detection");
+
+#if defined(TEMPEST_MPIOMP)
+	if (strLogDir == "") {
+		Announce("Reporting disabled (if reporting desired, use --logdir)");
+	} else {
+		Announce("Logs will be written to \"%s\"", strLogDir.c_str());
+	}
+#endif
+
+#if defined(TEMPEST_MPIOMP)
+	// Open log file
+	if (strLogDir != "") {
+		std::string strLogFile = strLogDir;
+		if (strLogFile[strLogFile.length()-1] != '/') {
+			strLogFile += "/";
+		}
+		char szTemp[20];
+		sprintf(szTemp, "log%06i.txt", nMPIRank);
+		strLogFile += szTemp;
+
+		arparam.fpLog = fopen(strLogFile.c_str(), "w");
+	}
+#else
+	if (strLogDir != "") {
+		std::string strLogFile = strLogDir;
+		if (strLogFile[strLogFile.length()-1] != '/') {
+			strLogFile += "/log000000.txt";
+		}
+
+		arparam.fpLog = fopen(strLogFile.c_str(), "w");
+	}
+#endif
+
 	for (int f = 0; f < vecInputFiles.size(); f++) {
+		bool fVerbose = true;
+
 #if defined(TEMPEST_MPIOMP)
 		if (f % nMPISize != nMPIRank) {
 			continue;
+		}
+		if (nMPISize > 1) {
+			fVerbose = false;
 		}
 #endif
 
@@ -776,7 +887,12 @@ try {
 			vecInputFiles[f],
 			vecOutputFiles[f],
 			varreg,
-			arparam);
+			arparam,
+			fVerbose);
+	}
+
+	if (arparam.fpLog != NULL) {
+		fclose(arparam.fpLog);
 	}
 
 	AnnounceEndBlock("Done");
