@@ -27,6 +27,10 @@
 
 #include <set>
 
+#if defined(TEMPEST_MPIOMP)
+#include <mpi.h>
+#endif
+
 ///////////////////////////////////////////////////////////////////////////////
 
 typedef std::pair<int, int> Point;
@@ -37,16 +41,16 @@ typedef std::pair<int, int> Point;
 ///		Parse the list of input files.
 ///	</summary>
 void ParseInputFiles(
-	const std::string & strInputFiles,
+	const std::string & strInputFile,
 	std::vector<NcFile *> & vecFiles
 ) {
 	int iLast = 0;
-	for (int i = 0; i <= strInputFiles.length(); i++) {
-		if ((i == strInputFiles.length()) ||
-		    (strInputFiles[i] == ';')
+	for (int i = 0; i <= strInputFile.length(); i++) {
+		if ((i == strInputFile.length()) ||
+		    (strInputFile[i] == ';')
 		) {
 			std::string strFile =
-				strInputFiles.substr(iLast, i - iLast);
+				strInputFile.substr(iLast, i - iLast);
 
 			NcFile * pNewFile = new NcFile(strFile.c_str());
 
@@ -62,25 +66,48 @@ void ParseInputFiles(
 
 	if (vecFiles.size() == 0) {
 		_EXCEPTION1("No input files found in \"%s\"",
-			strInputFiles.c_str());
+			strInputFile.c_str());
 	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-int main(int argc, char** argv) {
+class SpineARsParam {
 
-	NcError error(NcError::silent_nonfatal);
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	SpineARsParam() :
+		fpLog(NULL),
+		ixSearchByVar(0),
+		strOutputVariable(""),
+		iLaplacianSize(0),
+		dMinLaplacian(0.0),
+		dMinAbsLat(0.0),
+		dEqBandMaxLat(0.0),
+		dMinIWV(0.0),
+		dMinArea(0.0),
+		dMaxArealFraction(0.0),
+		dZonalMeanWeight(0.0),
+		dZonalMaxWeight(0.0),
+		dMeridMeanWeight(0.0),
+		dMeridMaxWeight(0.0),
+		nMinArea(0),
+		nAddTimeDim(0),
+		strAddTimeDimUnits(""),
+		fOutputLaplacian(false),
+		fRegional(false),
+		strLongitudeName("lon"),
+		strLatitudeName("lat")
+	{ }
 
-try {
-	// Input file
-	std::string strInputFiles;
+public:
+	// Log
+	FILE * fpLog;
 
-	// Output file
-	std::string strOutputFile;
-
-	// Input integrated water vapor variable name
-	std::string strSearchByVariable;
+	// Variable index to search on
+	VariableIndex ixSearchByVar;
 
 	// Output variable name
 	std::string strOutputVariable;
@@ -139,71 +166,32 @@ try {
 	// Name of latitude variable
 	std::string strLatitudeName;
 
-	// Parse the command line
-	BeginCommandLine()
-		CommandLineString(strInputFiles, "in", "");
-		//CommandLineString(strInputFilesList, "inlist", "");
-		CommandLineString(strOutputFile, "out", "");
-		CommandLineString(strSearchByVariable, "var", "");
-		CommandLineString(strOutputVariable, "outvar", "");
-		CommandLineInt(iLaplacianSize, "laplaciansize", 5);
-		CommandLineDouble(dMinLaplacian, "minlaplacian", 0.5e4);
-		CommandLineDouble(dMinAbsLat, "minabslat", 15.0);
-		CommandLineDouble(dEqBandMaxLat, "eqbandmaxlat", 15.0);
-		CommandLineDouble(dMinIWV, "minval", 20.0);
-		CommandLineDoubleD(dZonalMeanWeight, "zonalmeanwt", 0.0, "(suggested 0.7)");
-		CommandLineDoubleD(dZonalMaxWeight, "zonalmaxwt", 0.0, "(suggested 0.3)");
-		CommandLineDoubleD(dMeridMeanWeight, "meridmeanwt", 0.0, "(suggested 0.9)");
-		CommandLineDoubleD(dMeridMaxWeight, "meridmaxwt", 0.0, "(suggested 0.1)");
-		CommandLineInt(nMinArea, "minarea", 0);
-		CommandLineInt(nAddTimeDim, "addtimedim", -1);
-		CommandLineString(strAddTimeDimUnits, "addtimedimunits", "");
-		CommandLineBool(fOutputLaplacian, "laplacianout");
-		CommandLineBool(fRegional, "regional");
-		CommandLineString(strLongitudeName, "lonname", "lon");
-		CommandLineString(strLatitudeName, "latname", "lat");
+};
 
-		ParseCommandLine(argc, argv);
-	EndCommandLine(argv)
+///////////////////////////////////////////////////////////////////////////////
 
-	AnnounceBanner();
-
-	AnnounceStartBlock("Loading data");
-
-	// Create Variable registry
-	VariableRegistry varreg;
-
-	// Check input
-	if (strInputFiles == "") {
-		_EXCEPTIONT("No input file (--in) specified");
-	}
-
-	// Check output
-	if (strOutputFile == "") {
-		_EXCEPTIONT("No output file (--out) specified");
-	}
-
-	// Check variable
-	if (strSearchByVariable == "") {
-		_EXCEPTIONT("No IWV variable name (--iwvvar) specified");
-	}
-
-	// Check output variable
-	if (strOutputVariable.length() == 0) {
-		strOutputVariable = strSearchByVariable + "tag";
-	}
+void SpineARs(
+	int iFile,
+	const std::string & strInputFiles,
+	const std::string & strOutputFile,
+	VariableRegistry & varreg,
+	const SpineARsParam & param
+) {
 
 	// Check if zonal weights are specified
 	bool fHasZonalWeight = false;
-	if ((dZonalMeanWeight != 0.0) || (dZonalMaxWeight != 0.0)) {
+	if ((param.dZonalMeanWeight != 0.0) || (param.dZonalMaxWeight != 0.0)) {
 		fHasZonalWeight = true;
 	}
 
 	// Check if meridional weights are specified
 	bool fHasMeridWeight = false;
-	if ((dMeridMeanWeight != 0.0) || (dMeridMaxWeight != 0.0)) {
+	if ((param.dMeridMeanWeight != 0.0) || (param.dMeridMaxWeight != 0.0)) {
 		fHasMeridWeight = true;
 	}
+
+	// Unload data from the VariableRegistry
+	varreg.UnloadAllGridData();
 
 	// Load in the benchmark file
 	NcFileVector vecFiles;
@@ -215,9 +203,9 @@ try {
 	AnnounceStartBlock("Generating RLL grid data");
 	grid.GenerateLatitudeLongitude(
 		vecFiles[0],
-		fRegional,
-		strLatitudeName,
-		strLongitudeName);
+		param.fRegional,
+		param.strLatitudeName,
+		param.strLongitudeName);
 	AnnounceEndBlock("Done");
 
 	// Get the time dimension
@@ -227,39 +215,34 @@ try {
 	//}
 
 	// Get the longitude dimension
-	NcDim * dimLon = vecFiles[0]->get_dim(strLongitudeName.c_str());
+	NcDim * dimLon = vecFiles[0]->get_dim(param.strLongitudeName.c_str());
 	if (dimLon == NULL) {
-		_EXCEPTION1("Error accessing dimension \"%s\"", strLongitudeName.c_str());
+		_EXCEPTION1("Error accessing dimension \"%s\"", param.strLongitudeName.c_str());
 	}
 
 	// Get the longitude variable
-	NcVar * varLon = vecFiles[0]->get_var(strLongitudeName.c_str());
+	NcVar * varLon = vecFiles[0]->get_var(param.strLongitudeName.c_str());
 	if (varLon == NULL) {
-		_EXCEPTION1("Error accessing variable \"%s\"", strLongitudeName.c_str());
+		_EXCEPTION1("Error accessing variable \"%s\"", param.strLongitudeName.c_str());
 	}
 
 	DataArray1D<double> dLonDeg(dimLon->size());
 	varLon->get(&(dLonDeg[0]), dimLon->size());
 
 	// Get the latitude dimension
-	NcDim * dimLat = vecFiles[0]->get_dim(strLatitudeName.c_str());
+	NcDim * dimLat = vecFiles[0]->get_dim(param.strLatitudeName.c_str());
 	if (dimLat == NULL) {
-		_EXCEPTION1("Error accessing dimension \"%s\"", strLatitudeName.c_str());
+		_EXCEPTION1("Error accessing dimension \"%s\"", param.strLatitudeName.c_str());
 	}
 
 	// Get the latitude variable
-	NcVar * varLat = vecFiles[0]->get_var(strLatitudeName.c_str());
+	NcVar * varLat = vecFiles[0]->get_var(param.strLatitudeName.c_str());
 	if (varLat == NULL) {
-		_EXCEPTION1("Error accessing variable \"%s\"", strLatitudeName.c_str());
+		_EXCEPTION1("Error accessing variable \"%s\"", param.strLatitudeName.c_str());
 	}
 
 	DataArray1D<double> dLatDeg(dimLat->size());
 	varLat->get(&(dLatDeg[0]), dimLat->size());
-
-	// Get the integrated water vapor variable
-	Variable varSearchByArg;
-	varSearchByArg.ParseFromString(varreg, strSearchByVariable);
-	int ixSearchByVar = varreg.FindOrRegister(varSearchByArg);
 
 	// Open the NetCDF output file
 	NcFile ncOutput(strOutputFile.c_str(), NcFile::Replace, NULL, 0, NcFile::Netcdf4);
@@ -277,7 +260,7 @@ try {
 			_EXCEPTIONT("Error copying variable \"time\" to output file");
 		}
 
-	} else if (nAddTimeDim != -1) {
+	} else if (param.nAddTimeDim != -1) {
 		dimTimeOut = ncOutput.add_dim("time", 0);
 		if (dimTimeOut == NULL) {
 			_EXCEPTIONT("Error creating dimension \"time\" in output file");
@@ -288,28 +271,30 @@ try {
 			_EXCEPTIONT("Error copying variable \"time\" to output file");
 		}
 
-		double dTime = static_cast<double>(nAddTimeDim);
+		double dTime = static_cast<double>(param.nAddTimeDim);
 		varTimeOut->set_cur((long)0);
 		varTimeOut->put(&dTime, 1);
 
-		if (strAddTimeDimUnits != "") {
-			varTimeOut->add_att("units", strAddTimeDimUnits.c_str());
+		if (param.strAddTimeDimUnits != "") {
+			varTimeOut->add_att("units", param.strAddTimeDimUnits.c_str());
 		}
 		varTimeOut->add_att("long_name", "time");
 		varTimeOut->add_att("calendar", "standard");
 		varTimeOut->add_att("standard_name", "time");
 	}
 
-	CopyNcVar(*(vecFiles[0]), ncOutput, strLatitudeName.c_str(), true);
-	CopyNcVar(*(vecFiles[0]), ncOutput, strLongitudeName.c_str(), true);
+	CopyNcVar(*(vecFiles[0]), ncOutput, param.strLatitudeName.c_str(), true);
+	CopyNcVar(*(vecFiles[0]), ncOutput, param.strLongitudeName.c_str(), true);
 
-	NcDim * dimLonOut = ncOutput.get_dim(strLongitudeName.c_str());
+	NcDim * dimLonOut = ncOutput.get_dim(param.strLongitudeName.c_str());
 	if (dimLonOut == NULL) {
-		_EXCEPTION1("Error copying variable \"%s\" to output file", strLongitudeName.c_str());
+		_EXCEPTION1("Error copying variable \"%s\" to output file",
+			param.strLongitudeName.c_str());
 	}
-	NcDim * dimLatOut = ncOutput.get_dim(strLatitudeName.c_str());
+	NcDim * dimLatOut = ncOutput.get_dim(param.strLatitudeName.c_str());
 	if (dimLatOut == NULL) {
-		_EXCEPTION1("Error copying variable \"%s\" to output file", strLatitudeName.c_str());
+		_EXCEPTION1("Error copying variable \"%s\" to output file",
+			param.strLatitudeName.c_str());
 	}
 
 	// Tagged cell array
@@ -336,7 +321,7 @@ try {
 	DataArray2D<double> dLaplacian(dimLat->size(), dimLon->size());
 
 	NcVar * varLaplacian = NULL;
-	if (fOutputLaplacian) {
+	if (param.fOutputLaplacian) {
 		if (dimTimeOut != NULL) {
 			varLaplacian = ncOutput.add_var(
 				"ar_dx2",
@@ -360,8 +345,8 @@ try {
 	double dDeltaLon = (dLonDeg[1] - dLonDeg[0]) / 180.0 * M_PI;
 	double dDeltaLat = (dLatDeg[1] - dLatDeg[0]) / 180.0 * M_PI;
 
-	double dX = dDeltaLon * static_cast<double>(iLaplacianSize);
-	double dY = dDeltaLat * static_cast<double>(iLaplacianSize);
+	double dX = dDeltaLon * static_cast<double>(param.iLaplacianSize);
+	double dY = dDeltaLat * static_cast<double>(param.iLaplacianSize);
 
 	double dX2 = dX * dX;
 	double dY2 = dY * dY;
@@ -379,7 +364,7 @@ try {
 		AnnounceStartBlock(szBuffer);
 
 		// Get the search-by variable array
-		Variable & varSearchBy = varreg.Get(ixSearchByVar);
+		Variable & varSearchBy = varreg.Get(param.ixSearchByVar);
 		varSearchBy.LoadGridData(varreg, vecFiles, grid, t);
 		DataArray1D<float> & dataSearchBy = varSearchBy.GetData();
 
@@ -396,24 +381,24 @@ try {
 		double dC = -1.0 / (6.0 * dX2) + 5.0 / (6.0 * dY2);
 		double dD = -5.0 / 3.0 * (1.0/dX2 + 1.0/dY2);
 
-		int j_begin = iLaplacianSize;
-		int j_end = dimLat->size() - iLaplacianSize;
+		int j_begin = param.iLaplacianSize;
+		int j_end = dimLat->size() - param.iLaplacianSize;
 
 		int i_begin = 0;
 		int i_end = dimLon->size();
 
-		if (fRegional) {
-			i_begin = iLaplacianSize;
-			i_end = dimLon->size() - iLaplacianSize;
+		if (param.fRegional) {
+			i_begin = param.iLaplacianSize;
+			i_end = dimLon->size() - param.iLaplacianSize;
 		}
 
 		for (int j = j_begin; j < j_end; j++) {
 		for (int i = i_begin; i < i_end; i++) {
-			int i0 = (i + dimLon->size() - iLaplacianSize) % (dimLon->size());
-			int i2 = (i + iLaplacianSize) % (dimLon->size());
+			int i0 = (i + dimLon->size() - param.iLaplacianSize) % (dimLon->size());
+			int i2 = (i + param.iLaplacianSize) % (dimLon->size());
 
-			int j0 = j - iLaplacianSize;
-			int j2 = j + iLaplacianSize;
+			int j0 = j - param.iLaplacianSize;
+			int j2 = j + param.iLaplacianSize;
 
 			dLaplacian[j][i] =
 				  dA * dVarData[j0][i0]
@@ -435,13 +420,13 @@ try {
 		// Build tagged cell array
 		for (int j = 0; j < dimLat->size(); j++) {
 		for (int i = 0; i < dimLon->size(); i++) {
-			if (fabs(dLatDeg[j]) < dMinAbsLat) {
+			if (fabs(dLatDeg[j]) < param.dMinAbsLat) {
 				continue;
 			}
-			if (dVarData[j][i] < dMinIWV) {
+			if (dVarData[j][i] < param.dMinIWV) {
 				continue;
 			}
-			if (dLaplacian[j][i] > -dMinLaplacian) {
+			if (dLaplacian[j][i] > -param.dMinLaplacian) {
 				continue;
 			}
 
@@ -465,8 +450,8 @@ try {
 				dZonalThreshold[j] /= static_cast<float>(dimLon->size());
 
 				dZonalThreshold[j] =
-					dZonalMeanWeight * dZonalThreshold[j]
-					+ dZonalMaxWeight * dMaxZonalIWV;
+					param.dZonalMeanWeight * dZonalThreshold[j]
+					+ param.dZonalMaxWeight * dMaxZonalIWV;
 			}
 
 			// Adjust the tag
@@ -495,8 +480,8 @@ try {
 				dMeridThreshold[i] /= static_cast<float>(dimLon->size());
 
 				dMeridThreshold[i] =
-					dMeridMeanWeight * dMeridThreshold[i]
-					+ dMeridMaxWeight * dMaxMeridVarData;
+					param.dMeridMeanWeight * dMeridThreshold[i]
+					+ param.dMeridMaxWeight * dMaxMeridVarData;
 			}
 
 			// Adjust the tag
@@ -510,7 +495,7 @@ try {
 		}
 
 		// Only retain blobs with minimum area
-		if (nMinArea > 0) {
+		if (param.nMinArea > 0) {
 			std::set<Point> setBlobs;
 
 			for (int j = 0; j < dimLat->size(); j++) {
@@ -566,7 +551,7 @@ try {
 					}
 				}
 
-				if (setThisBlob.size() < nMinArea) {
+				if (setThisBlob.size() < param.nMinArea) {
 					std::set<Point>::iterator iter = setThisBlob.begin();
 					for (; iter != setThisBlob.end(); iter++) {
 						dVarDatatag[iter->first][iter->second] = 0;
@@ -574,41 +559,6 @@ try {
 				}
 			}
 		}
-
-/*
-		// Remove points connected with equatorial moisture band
-		for (int i = 0; i < dimLon->size(); i++) {
-			bool fSouthDone = false;
-			bool fNorthDone = false;
-
-			for (int j = 0; j < dimLat->size(); j++) {
-				if ((!fSouthDone) && (dLatDeg[j] > -dMinAbsLat)) {
-					for (int k = j-1; k > 0; k--) {
-						if (dVarDatatag[k][i] == 0) {
-							break;
-						}
-						if (dLatDeg[k] < -dEqBandMaxLat) {
-							break;
-						}
-						dVarDatatag[k][i] = 0;
-					}
-					fSouthDone = true;
-				}
-				if ((!fNorthDone) && (dLatDeg[j] > dMinAbsLat)) {
-					for (int k = j-1; k < dimLat->size(); k++) {
-						if (dVarDatatag[k][i] == 0) {
-							break;
-						}
-						if (dLatDeg[k] > dEqBandMaxLat) {
-							break;
-						}
-						dVarDatatag[k][i] = 0;
-					}
-					fNorthDone = true;
-				}
-			}
-		}
-*/
 		AnnounceEndBlock("Done");
 
 		AnnounceStartBlock("Writing results");
@@ -637,6 +587,197 @@ try {
 
 		AnnounceEndBlock(NULL);
 	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+int main(int argc, char** argv) {
+
+#if defined(TEMPEST_MPIOMP)
+	// Initialize MPI
+	MPI_Init(&argc, &argv);
+#endif
+
+	NcError error(NcError::silent_nonfatal);
+
+	// Enable output only on rank zero
+	AnnounceOnlyOutputOnRankZero();
+
+try {
+	// Input file
+	std::string strInputFile;
+
+	// Input file list
+	std::string strInputFileList;
+
+	// Output file
+	std::string strOutputFile;
+
+	// Output file list
+	std::string strOutputFileList;
+
+	// Input integrated water vapor variable name
+	std::string strSearchByVariable;
+
+	// SpineARs parameter
+	SpineARsParam arparam;
+
+	// Parse the command line
+	BeginCommandLine()
+		CommandLineString(strInputFile, "in", "");
+		CommandLineString(strInputFileList, "in_list", "");
+		CommandLineString(strOutputFile, "out", "");
+		CommandLineString(strOutputFileList, "out_list", "");
+		CommandLineString(strSearchByVariable, "var", "");
+		CommandLineString(arparam.strOutputVariable, "outvar", "");
+		CommandLineInt(arparam.iLaplacianSize, "laplaciansize", 5);
+		CommandLineDouble(arparam.dMinLaplacian, "minlaplacian", 0.5e4);
+		CommandLineDouble(arparam.dMinAbsLat, "minabslat", 15.0);
+		CommandLineDouble(arparam.dEqBandMaxLat, "eqbandmaxlat", 15.0);
+		CommandLineDouble(arparam.dMinIWV, "minval", 20.0);
+		CommandLineDoubleD(arparam.dZonalMeanWeight, "zonalmeanwt", 0.0, "(suggested 0.7)");
+		CommandLineDoubleD(arparam.dZonalMaxWeight, "zonalmaxwt", 0.0, "(suggested 0.3)");
+		CommandLineDoubleD(arparam.dMeridMeanWeight, "meridmeanwt", 0.0, "(suggested 0.9)");
+		CommandLineDoubleD(arparam.dMeridMaxWeight, "meridmaxwt", 0.0, "(suggested 0.1)");
+		CommandLineInt(arparam.nMinArea, "minarea", 0);
+		CommandLineInt(arparam.nAddTimeDim, "addtimedim", -1);
+		CommandLineString(arparam.strAddTimeDimUnits, "addtimedimunits", "");
+		CommandLineBool(arparam.fOutputLaplacian, "laplacianout");
+		CommandLineBool(arparam.fRegional, "regional");
+		CommandLineString(arparam.strLongitudeName, "lonname", "lon");
+		CommandLineString(arparam.strLatitudeName, "latname", "lat");
+
+		ParseCommandLine(argc, argv);
+	EndCommandLine(argv)
+
+	AnnounceBanner();
+
+	AnnounceStartBlock("Loading data");
+
+	// Check input
+	if ((strInputFile.length() == 0) && (strInputFileList.length() == 0)) {
+		_EXCEPTIONT("No input data file (--in) or (--in_list)"
+			" specified");
+	}
+	if ((strInputFile.length() != 0) && (strInputFileList.length() != 0)) {
+		_EXCEPTIONT("Only one of (--in) or (--in_list)"
+			" may be specified");
+	}
+
+	// Check output
+	if ((strOutputFile.length() == 0) && (strOutputFileList.length() == 0)) {
+		_EXCEPTIONT("No output data file (--out) or (--out_list)"
+			" specified");
+	}
+	if ((strOutputFile.length() != 0) && (strOutputFileList.length() != 0)) {
+		_EXCEPTIONT("Only one of (--out) or (--out_list)"
+			" may be specified");
+	}
+
+	// Check input/output
+	if ((strInputFileList.length() != 0) && (strOutputFileList.length() == 0)) {
+		_EXCEPTIONT("Arguments (--in_list) and (--out_list) must be specified together");
+	}
+	if ((strInputFile.length() != 0) && (strOutputFile.length() == 0)) {
+		_EXCEPTIONT("Arguments (--in) and (--out) must be specified together");
+	}
+
+	// Load input file list
+	std::vector<std::string> vecInputFiles;
+
+	if (strInputFile.length() != 0) {
+		vecInputFiles.push_back(strInputFile);
+
+	} else {
+		std::ifstream ifInputFileList(strInputFileList.c_str());
+		if (!ifInputFileList.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\"",
+				strInputFileList.c_str());
+		}
+		std::string strFileLine;
+		while (std::getline(ifInputFileList, strFileLine)) {
+			if (strFileLine.length() == 0) {
+				continue;
+			}
+			if (strFileLine[0] == '#') {
+				continue;
+			}
+			vecInputFiles.push_back(strFileLine);
+		}
+	}
+
+	// Load output file list
+	std::vector<std::string> vecOutputFiles;
+
+	if (strOutputFile.length() != 0) {
+		vecOutputFiles.push_back(strOutputFile);
+
+	} else {
+		std::ifstream ifOutputFileList(strOutputFileList.c_str());
+		if (!ifOutputFileList.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\"",
+				strOutputFileList.c_str());
+		}
+		std::string strFileLine;
+		while (std::getline(ifOutputFileList, strFileLine)) {
+			if (strFileLine.length() == 0) {
+				continue;
+			}
+			if (strFileLine[0] == '#') {
+				continue;
+			}
+			vecOutputFiles.push_back(strFileLine);
+		}
+	}
+
+	// Check length
+	if (vecInputFiles.size() != vecOutputFiles.size()) {
+		_EXCEPTIONT("Input and output file list length mismatch");
+	}
+
+	// Check variable
+	if (strSearchByVariable == "") {
+		_EXCEPTIONT("No search-by variable name (--var) specified");
+	}
+
+	// Check output variable
+	if (arparam.strOutputVariable.length() == 0) {
+		arparam.strOutputVariable = strSearchByVariable + "tag";
+	}
+
+#if defined(TEMPEST_MPIOMP)
+	// Spread files across nodes
+	int nMPIRank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &nMPIRank);
+
+	int nMPISize;
+	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+#endif
+
+	// Create Variable registry
+	VariableRegistry varreg;
+
+	// Get the integrated water vapor variable
+	Variable varSearchByArg;
+	varSearchByArg.ParseFromString(varreg, strSearchByVariable);
+	arparam.ixSearchByVar = varreg.FindOrRegister(varSearchByArg);
+
+	// Loop over all files to be processed
+	for (int f = 0; f < vecInputFiles.size(); f++) {
+#if defined(TEMPEST_MPIOMP)
+		if (f % nMPISize != nMPIRank) {
+			continue;
+		}
+#endif
+
+		// Detect atmospheric rivers
+		SpineARs(
+			f,
+			vecInputFiles[f],
+			vecOutputFiles[f],
+			varreg,
+			arparam);
+	}
 
 	AnnounceEndBlock("Done");
 
@@ -645,6 +786,12 @@ try {
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());
 }
+
+#if defined(TEMPEST_MPIOMP)
+	// Deinitialize MPI
+	MPI_Finalize();
+#endif
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////
