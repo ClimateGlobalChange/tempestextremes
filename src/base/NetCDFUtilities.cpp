@@ -20,6 +20,7 @@
 #include "DataArray1D.h"
 #include "netcdfcpp.h"
 
+#include <cstring>
 #include <vector>
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -33,6 +34,10 @@ void CopyNcFileAttributes(
 		long num_vals = att->num_vals();
 
 		NcValues * pValues = att->values();
+		if (pValues == NULL) {
+			_EXCEPTION1("Invalid attribute type in file \"%s\"",
+				att->name());
+		}
 
 		if (att->type() == ncByte) {
 			fileOut->add_att(att->name(), num_vals,
@@ -59,7 +64,7 @@ void CopyNcFileAttributes(
 				(const double*)(pValues->base()));
 
 		} else if (att->type() == ncString) {
-			fileOut->add_att(att->name(), num_vals,
+			fileOut->add_att(att->name(), strlen((const char *)pValues->base()),
 				(const char*)(pValues->base()));
 
 		} else {
@@ -81,6 +86,10 @@ void CopyNcVarAttributes(
 		long num_vals = att->num_vals();
 
 		NcValues * pValues = att->values();
+		if (pValues == NULL) {
+			_EXCEPTION2("Invalid attribute type \"%s::%s\"",
+				varIn->name(), att->name());
+		}
 
 		if (att->type() == ncByte) {
 			varOut->add_att(att->name(), num_vals,
@@ -107,7 +116,7 @@ void CopyNcVarAttributes(
 				(const double*)(pValues->base()));
 
 		} else if (att->type() == ncString) {
-			varOut->add_att(att->name(), num_vals,
+			varOut->add_att(att->name(), strlen((const char *)pValues->base()),
 				(const char*)(pValues->base()));
 
 		} else {

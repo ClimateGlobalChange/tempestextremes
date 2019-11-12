@@ -591,6 +591,9 @@ NcValues* NcTypedComponent::get_space( long numVals ) const
       case ncChar:
 	valp = new NcValues_char(numVals);
 	break;
+	  case ncString:
+	valp = new NcValues_ncstring(numVals);
+	break;
       case ncNoType:
       default:
 	valp = 0;
@@ -1598,7 +1601,7 @@ long NcAtt::num_vals( void ) const
     size_t len;
     NcError::set_err(
 		     nc_inq_attlen(the_file->id(), the_variable->id(), the_name, &len)
-		     );
+	     	);
     return len;
 }
 
@@ -1614,8 +1617,36 @@ NcBool NcAtt::is_valid( void ) const
 
 NcValues* NcAtt::values( void ) const
 {
-    NcValues* valp = get_space();
     int status;
+    NcValues* valp;
+    if (type() == ncString) {
+		size_t sStrings;
+		status = NcError::set_err(
+				nc_inq_attlen(the_file->id(), the_variable->id(), the_name, &sStrings));
+		if (status != NC_NOERR) {
+			return NULL;
+		}
+		if (sStrings != 1) {
+			NcError::set_err(NC_ECANTCREATE);
+			return NULL;
+		}
+
+		char * szString;
+		status = NcError::set_err(
+				nc_get_att_string(the_file->id(), the_variable->id(), the_name, &szString));
+		if (status != NC_NOERR) {
+			return NULL;
+		}
+
+		valp = get_space(strlen(szString)+1);
+		strcpy((char *)valp->base(), szString);
+
+		nc_free_string(1, &szString);
+		return valp;
+
+	} else {
+		valp = get_space();
+	}
     switch (type()) {
     case ncFloat:
 	status = NcError::set_err(

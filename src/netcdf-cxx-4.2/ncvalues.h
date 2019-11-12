@@ -19,6 +19,7 @@
 // consistency with C interface 
 typedef signed char ncbyte;
 typedef unsigned char ncubyte;
+typedef char ncstring;
 
 #define NC_UNSPECIFIED ((nc_type)0)
 
@@ -66,6 +67,7 @@ static const unsigned short ncBad_ushort = NC_FILL_USHORT;
 static const unsigned int ncBad_uint = NC_FILL_UINT;
 static const ncint64 ncBad_ncint64 = NC_FILL_INT64;
 static const ncuint64 ncBad_ncuint64 = NC_FILL_UINT64;
+static const ncstring ncBad_ncstring = NC_FILL_CHAR;
 
 // macros to glue tokens together to form new names (used to be in generic.h)
 #define name2(a,b) a ## b
@@ -119,6 +121,7 @@ class NcVal(TYPE) : public NcValues					      \
 #define _nc__double ncDouble
 #define _nc__ncint64 ncInt64
 #define _nc__ncuint64 ncUInt64
+#define _nc__ncstring ncString
 #define NcValuesimplement(TYPE)						      \
 NcVal(TYPE)::NcVal(TYPE)( void )					      \
 	: NcValues(NcTypeEnum(TYPE), 0), the_values(0)			      \
@@ -292,7 +295,7 @@ class NcValues			// ABC for value blocks
     virtual double as_double( long n ) const = 0; // nth value as double
     virtual ncint64 as_ncint64( long n ) const = 0; // nth value as ncint64
     virtual ncuint64 as_ncuint64( long n ) const = 0; // nth value as ncuint64
-    virtual char* as_string( long n ) const = 0;  // value as string
+    virtual char* as_string( long n ) const = 0;  // nth value as string
     
   protected:
     NcType the_type;
@@ -310,5 +313,6 @@ declare(NcValues,float)
 declare(NcValues,double)
 declare(NcValues,ncint64)
 declare(NcValues,ncuint64)
+declare(NcValues,ncstring)
 
 #endif
