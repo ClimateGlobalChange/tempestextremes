@@ -58,6 +58,10 @@ void CopyNcFileAttributes(
 			fileOut->add_att(att->name(), num_vals,
 				(const double*)(pValues->base()));
 
+		} else if (att->type() == ncString) {
+			fileOut->add_att(att->name(), num_vals,
+				(const char*)(pValues->base()));
+
 		} else {
 			_EXCEPTIONT("Invalid attribute type");
 		}
@@ -101,6 +105,10 @@ void CopyNcVarAttributes(
 		} else if (att->type() == ncDouble) {
 			varOut->add_att(att->name(), num_vals,
 				(const double*)(pValues->base()));
+
+		} else if (att->type() == ncString) {
+			varOut->add_att(att->name(), num_vals,
+				(const char*)(pValues->base()));
 
 		} else {
 			_EXCEPTIONT("Invalid attribute type");
