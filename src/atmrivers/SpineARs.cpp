@@ -25,6 +25,7 @@
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
 
+#include <algorithm>
 #include <set>
 
 #if defined(TEMPEST_MPIOMP)
@@ -83,6 +84,7 @@ public:
 		ixSearchByVar(0),
 		strOutputVariable(""),
 		iLaplacianSize(0),
+		iSpineWidth(-1),
 		dMinLaplacian(0.0),
 		fOutputLaplacian(false),
 		dMinAbsGrad(0.0),
@@ -116,6 +118,9 @@ public:
 
 	// Size of the Laplacian
 	int iLaplacianSize;
+
+	// Spine width
+	int iSpineWidth;
 
 	// Minimum Laplacian
 	double dMinLaplacian;
@@ -252,6 +257,16 @@ void SpineARs(
 
 	DataArray1D<double> dLatDeg(dimLat->size());
 	varLat->get(&(dLatDeg[0]), dimLat->size());
+
+	// Check iSpineWidth
+	if (param.iSpineWidth != (-1)) {
+		if (param.iSpineWidth >= dimLon->size()) {
+			_EXCEPTIONT("spinewidth must be < longitude dimension size");
+		}
+		if (param.iSpineWidth >= dimLat->size()) {
+			_EXCEPTIONT("spinewidth must be < latitude dimension size");
+		}
+	}
 
 	// Open the NetCDF output file
 	NcFile ncOutput(strOutputFile.c_str(), NcFile::Replace, NULL, 0, NcFile::Netcdf4);
@@ -443,7 +458,11 @@ void SpineARs(
 		}
 		}
 
+		if (fVerbose) AnnounceEndBlock("Done");
+
 		if (param.dMinAbsGrad != 0.0) {
+			if (fVerbose) AnnounceStartBlock("Compute AbsGrad");
+
 			for (int j = j_begin; j < j_end; j++) {
 			for (int i = i_begin; i < i_end; i++) {
 				int i0 = (i + dimLon->size() - param.iLaplacianSize) % (dimLon->size());
@@ -459,9 +478,9 @@ void SpineARs(
 				  + fabs(dVarData[j2][i ] - dVarData[j0][i ]) / 2.0 / dY;
 			}
 			}
-		}
 
-		if (fVerbose) AnnounceEndBlock("Done");
+			if (fVerbose) AnnounceEndBlock("Done");
+		}
 
 		if (fVerbose) AnnounceStartBlock("Build tagged cell array");
 
@@ -479,9 +498,81 @@ void SpineARs(
 			}
 
 			dVarDatatag[j][i] = 1;
+
+			// Tag spines
+			if (param.iSpineWidth != (-1)) {
+
+				// Check for local maximum in each of the four directions
+				bool fLocalMax[4] = {true, true, true, true};
+
+				for (int k = -param.iSpineWidth; k <= param.iSpineWidth; k++) {
+
+					if (k == 0) {
+						continue;
+					}
+
+					int ix = i + k;
+					if (ix < 0) {
+						ix += dimLon->size();
+					}
+					if (ix >= dimLon->size()) {
+						ix -= dimLon->size();
+					}
+
+					int jx1 = j + k;
+					if (jx1 < 0) {
+						jx1 = 0;
+					}
+					if (jx1 >= dimLat->size()) {
+						jx1 = dimLat->size()-1;
+					}
+
+					int jx2 = j - k;
+					if (jx2 < 0) {
+						jx2 = 0;
+					}
+					if (jx2 >= dimLat->size()) {
+						jx2 = dimLat->size()-1;
+					}
+/*
+					if ((i == 175) && (j == 238)) {
+						printf("\n");
+						printf("(%1.10e)\n", dVarData[j][i]);
+						printf("%i %i (%1.10e)\n", jx1, i, dVarData[jx1][i]);
+						printf("%i %i (%1.10e)\n", j, ix, dVarData[j][ix]);
+						printf("%i %i (%1.10e)\n", jx1, ix, dVarData[jx1][ix]);
+						printf("%i %i (%1.10e)\n", jx2, ix, dVarData[jx2][ix]);
+					}
+*/
+					if (dVarData[jx1][i] >= dVarData[j][i]) {
+						fLocalMax[0] = false;
+					}
+					if (dVarData[j][ix] >= dVarData[j][i]) {
+						fLocalMax[1] = false;
+					}
+					//if (dVarData[jx1][ix] >= dVarData[j][i]) {
+					//	fLocalMax[2] = false;
+					//}
+					//if (dVarData[jx2][ix] >= dVarData[j][i]) {
+					//	fLocalMax[3] = false;
+					//}
+				}
+
+				if (fLocalMax[0] || fLocalMax[1]) {
+					//if ((i == 175) && (j == 238)) {
+					//	std::cout << "TEST " << j << std::endl;
+					//}
+					dVarDatatag[j][i] = 2;
+				}
+
+				//if (fLocalMax[0] || fLocalMax[1] || fLocalMax[2] || fLocalMax[3]) {
+				//	dVarDatatag[j][i] = 2;
+				//}
+			}
 		}
 		}
 
+		// Check absolute gradient criteira
 		if (param.dMinAbsGrad != 0.0) {
 			for (int j = 0; j < dimLat->size(); j++) {
 			for (int i = 0; i < dimLon->size(); i++) {
@@ -702,6 +793,7 @@ try {
 		CommandLineString(strSearchByVariable, "var", "");
 		CommandLineString(arparam.strOutputVariable, "outvar", "");
 		CommandLineInt(arparam.iLaplacianSize, "laplaciansize", 5);
+		CommandLineInt(arparam.iSpineWidth, "spinewidth", -1);
 		CommandLineDouble(arparam.dMinLaplacian, "minlaplacian", 0.5e4);
 		CommandLineBool(arparam.fOutputLaplacian, "outputlaplacian");
 		CommandLineDouble(arparam.dMinAbsGrad, "minabsgrad", 0.0);
