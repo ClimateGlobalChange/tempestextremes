@@ -73,6 +73,154 @@ void ParseInputFiles(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+float SampleCurve(
+	double dLon,
+	double dLat,
+	double dLon0,
+	double dLat0,
+	const DataArray1D<float> & dParam
+) {
+	double dYp = (dLat - dLat0);
+	//double dYp = (dLat - dLat0) * cos(dParam[2]) - (dLon - dLon0) * sin(dParam[2]);
+	//return static_cast<float>(dParam[0] + dParam[1] * exp(-dYp * dYp / (dParam[3] * dParam[3])));
+	return static_cast<float>(600.0 + 100.0 * exp(-dYp * dYp / (dParam[3] * dParam[3])));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+float SampleCurveRMSE(
+	const DataArray2D<float> & dVar,
+	const DataArray1D<double> & dLon,
+	const DataArray1D<double> & dLat,
+	int iLon,
+	int iLat,
+	int iFitRadius,
+	double dFalloff,
+	const DataArray1D<float> & dParam
+) {
+	if (iLat < iFitRadius) {
+		_EXCEPTION();
+	}
+	if (iLat >= dLat.GetRows() - iFitRadius) {
+		_EXCEPTION();
+	}
+
+	const double dLon0 = dLon[iLon];
+	const double dLat0 = dLat[iLat];
+
+	float dRMSE = 0.0;
+	for (int jp = -iFitRadius; jp <= iFitRadius; jp++) {
+		double dLatX = dLat[iLat + jp];
+		for (int ip = -iFitRadius; ip <= iFitRadius; ip++) {
+			int ix = iLon + ip;
+			if (ix < 0) {
+				ix += dLon.GetRows();
+			}
+			if (ix >= dLat.GetRows()) {
+				ix -= dLon.GetRows();
+			}
+			double dLonX = dLon[ip];
+
+			float dSample = SampleCurve(dLonX, dLatX, dLon0, dLat0, dParam) - dVar[iLat][ix];
+/*
+			float dDist = 2.0;
+			if ((ip != 0) || (jp != 0)) {
+				dDist = exp(-0.5 * dFalloff * log(
+					static_cast<float>(jp) * static_cast<float>(jp)
+					+ static_cast<float>(ip) * static_cast<float>(ip)));
+			}
+
+			dRMSE += dSample * dSample * dDist;
+*/
+			dRMSE += dSample * dSample;
+		}
+	}
+
+	return dRMSE;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void CurveFit(
+	const DataArray2D<float> & dVar,
+	const DataArray1D<double> & dLon,
+	const DataArray1D<double> & dLat,
+	int iLon,
+	int iLat,
+	int iFitRadius,
+	double dFalloff,
+	DataArray1D<float> & dParam
+) {
+	// Maximum number of iterations
+	static const int MaxIterations = 100;
+
+	// Allocate 4 entries
+	dParam.Allocate(4);
+	dParam[0] = 0.8 * dVar[iLat][iLon];
+	dParam[1] = 0.2 * dVar[iLat][iLon];
+	dParam[2] = 0.0;
+	dParam[3] = 5.0 * M_PI / 180.0;
+
+	// Temp param
+	DataArray1D<float> dTempParam(4);
+
+	// Approximate delta
+	DataArray1D<float> dDelta(4);
+	dDelta[0] = 1.0;
+	dDelta[1] = 1.0;
+	dDelta[2] = 0.0001;
+	dDelta[3] = 0.0001;
+
+	// Gamma in each direction
+	DataArray1D<float> dGamma(4);
+	dGamma[0] = 0.001;
+	dGamma[1] = 0.001;
+	dGamma[2] = 0.00000001;
+	dGamma[3] = 0.0000001;
+
+	// Gradient in each direction
+	DataArray1D<float> dGrad(4);
+
+	// Residual at each iteration
+	for (int i = 0; i < MaxIterations; i++) {
+
+		// Value of the function at this point
+		float dVal =
+			SampleCurveRMSE(
+				dVar, dLon, dLat, iLon, iLat,
+				iFitRadius,
+				dFalloff,
+				dParam);
+
+		printf("%i %1.6e %i %i - %1.6e %1.6e %1.6e %1.6e\n", i, dVal, iLon, iLat, dParam[0], dParam[1], dParam[2], dParam[3]);
+
+		// Calculate gradient in each direction
+		for (int p = 0; p < dParam.GetRows(); p++) {
+			dTempParam = dParam;
+			dTempParam[p] += dDelta[p];
+
+			dGrad[p] =
+				SampleCurveRMSE(
+					dVar, dLon, dLat, iLon, iLat,
+					iFitRadius,
+					dFalloff,
+					dTempParam);
+
+			printf("%1.6e %1.6e %1.6e %1.6e -- %1.6e\n", dTempParam[0], dTempParam[1], dTempParam[2], dTempParam[3], dGrad[p]);
+
+			dGrad[p] = (dGrad[p] - dVal) / dDelta[p];
+		}
+
+		// Gradient descent
+		for (int p = 0; p < dParam.GetRows(); p++) {
+			printf("%1.6e %1.6e %1.6e %1.6e\n", dGrad[0], dGrad[1], dGrad[2], dGrad[3]);
+			dParam[p] -= dGamma[p] * dGrad[p];
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 class SpineARsParam {
 
 public:
@@ -85,6 +233,8 @@ public:
 		strOutputVariable(""),
 		iLaplacianSize(0),
 		iSpineWidth(-1),
+		nSpineOrientationDist(3),
+		fOutputSpineOrientation(false),
 		dMinLaplacian(0.0),
 		fOutputLaplacian(false),
 		dMinAbsGrad(0.0),
@@ -121,6 +271,12 @@ public:
 
 	// Spine width
 	int iSpineWidth;
+
+	// Spine orientation distance
+	int nSpineOrientationDist;
+
+	// Output spine orientation
+	bool fOutputSpineOrientation;
 
 	// Minimum Laplacian
 	double dMinLaplacian;
@@ -243,6 +399,11 @@ void SpineARs(
 	DataArray1D<double> dLonDeg(dimLon->size());
 	varLon->get(&(dLonDeg[0]), dimLon->size());
 
+	DataArray1D<double> dLonRad(dimLon->size());
+	for (int i = 0; i < dLonDeg.GetRows(); i++) {
+		dLonRad[i] = dLonDeg[i] * M_PI / 180.0;
+	}
+
 	// Get the latitude dimension
 	NcDim * dimLat = vecFiles[0]->get_dim(param.strLatitudeName.c_str());
 	if (dimLat == NULL) {
@@ -257,6 +418,11 @@ void SpineARs(
 
 	DataArray1D<double> dLatDeg(dimLat->size());
 	varLat->get(&(dLatDeg[0]), dimLat->size());
+
+	DataArray1D<double> dLatRad(dimLat->size());
+	for (int i = 0; i < dLatDeg.GetRows(); i++) {
+		dLatRad[i] = dLatDeg[i] * M_PI / 180.0;
+	}
 
 	// Check iSpineWidth
 	if (param.iSpineWidth != (-1)) {
@@ -386,6 +552,33 @@ void SpineARs(
 				dimLatOut,
 				dimLonOut);
 		}
+	}
+
+	// Orientation variable
+	DataArray2D<double> dOrientation;
+
+	NcVar * varOrientation = NULL;
+	if (param.fOutputSpineOrientation) {
+		dOrientation.Allocate(dimLat->size(), dimLon->size());
+
+		if (dimTimeOut != NULL) {
+			varOrientation =
+				ncOutput.add_var(
+					"ar_orientation",
+					ncDouble,
+					dimTimeOut,
+					dimLatOut,
+					dimLonOut);
+
+		} else {
+			varOrientation =
+				ncOutput.add_var(
+					"ar_orientation",
+					ncDouble,
+					dimLatOut,
+					dimLonOut);
+		}
+		varOrientation->add_att("_FillValue", -1.0);
 	}
 
 	// Delta longitude
@@ -563,6 +756,22 @@ void SpineARs(
 					//	std::cout << "TEST " << j << std::endl;
 					//}
 					dVarDatatag[j][i] = 2;
+/*
+					if ((i == 225) && (j == 257)) {
+						DataArray1D<float> dParam(4);
+						CurveFit(
+							dVarData,
+							dLonRad,
+							dLatRad,
+							i,
+							j,
+							4,
+							1.0,
+							dParam);
+					}
+*/
+					//_EXCEPTION();
+
 				}
 
 				//if (fLocalMax[0] || fLocalMax[1] || fLocalMax[2] || fLocalMax[3]) {
@@ -710,6 +919,100 @@ void SpineARs(
 		}
 		if (fVerbose) AnnounceEndBlock("Done");
 
+		// Find the orientation at each spine node
+		if (param.fOutputSpineOrientation) {
+
+			if (fVerbose) AnnounceStartBlock("Calculating spine orientation");
+
+			// Create a new orientation array
+			for (int j = 0; j < dimLat->size(); j++) {
+			for (int i = 0; i < dimLon->size(); i++) {
+				dOrientation[j][i] = -1.0;
+			}
+			}
+
+			// Find all spine points
+			for (int j = 0; j < dimLat->size(); j++) {
+			for (int i = 0; i < dimLon->size(); i++) {
+				if (dVarDatatag[j][i] == 2) {
+
+					// Build the set of contiguous spine points
+					std::set< std::pair<int,int> > setSpinePointsVisited;
+					std::vector< std::pair<int,int> > vecSpinePointsToVisit;
+					std::vector< std::pair<int,int> > vecSpinePointsToVisitNext;
+					vecSpinePointsToVisit.push_back(std::pair<int,int>(j,i));
+
+					for (int p = 0; p < param.nSpineOrientationDist; p++) {
+						for (int q = 0; q < vecSpinePointsToVisit.size(); q++) {
+							setSpinePointsVisited.insert(vecSpinePointsToVisit[q]);
+							for (int m = -1; m <= 1; m++) {
+							for (int n = -1; n <= 1; n++) {
+								int jx = vecSpinePointsToVisit[q].first + m;
+								if ((jx < 0) || (jx >= dimLat->size())) {
+									continue;
+								}
+								int ix = vecSpinePointsToVisit[q].second + n;
+								if (ix < 0) {
+									ix += dimLon->size();
+								}
+								if (ix >= dimLon->size()) {
+									ix -= dimLon->size();
+								}
+								if (dVarDatatag[jx][ix] == 2) {
+									std::pair<int,int> px(jx,ix);
+									if (setSpinePointsVisited.find(px) ==
+										setSpinePointsVisited.end()
+									) {
+										vecSpinePointsToVisitNext.push_back(px);
+									}
+								}
+							}
+							}
+						}
+						vecSpinePointsToVisit = vecSpinePointsToVisitNext;
+						vecSpinePointsToVisitNext.clear();
+					}
+
+					// Remove isolated spine points
+					if (setSpinePointsVisited.size() == 1) {
+						dVarDatatag[j][i] = 1;
+					}
+
+					// Calculate the orientation of these points
+					double dInvN = 1.0 / static_cast<double>(setSpinePointsVisited.size());
+					double dSumX = 0.0;
+					double dSumY = 0.0;
+					double dSumX2 = 0.0;
+					double dSumXY = 0.0;
+
+					for (
+						auto iter = setSpinePointsVisited.begin();
+						iter != setSpinePointsVisited.end(); iter++
+					) {
+						double dY = dLatRad[iter->first];
+						double dX = dLonRad[iter->second];
+
+						dSumX += dX;
+						dSumY += dY;
+						dSumX2 += dX * dX;
+						dSumXY += dX * dY;
+					}
+
+					double dCovXY = dSumXY - dInvN * dSumX * dSumY;
+					double dVarX = dSumX2 - dInvN * dSumX * dSumX;
+
+					if (dVarX < 1.0e-12) {
+						dOrientation[j][i] = 90.0;
+					} else {
+						dOrientation[j][i] = atan2(dCovXY, dVarX) * 180.0 / M_PI;
+					}
+				}
+			}
+			}
+
+			if (fVerbose) AnnounceEndBlock("Done");
+		}
+
 		if (fVerbose) AnnounceStartBlock("Writing results");
 
 		// Output tagged cell array
@@ -721,6 +1024,10 @@ void SpineARs(
 			if (varAbsGrad != NULL) {
 				varAbsGrad->set_cur(t, 0, 0);
 				varAbsGrad->put(&(dAbsGrad[0][0]), 1, dimLatOut->size(), dimLonOut->size());
+			}
+			if (varOrientation != NULL) {
+				varOrientation->set_cur(t, 0, 0);
+				varOrientation->put(&(dOrientation[0][0]), 1, dimLatOut->size(), dimLonOut->size());
 			}
 
 			varIWVtag->set_cur(t, 0, 0);
@@ -734,6 +1041,10 @@ void SpineARs(
 			if (varAbsGrad != NULL) {
 				varAbsGrad->set_cur(0, 0);
 				varAbsGrad->put(&(dAbsGrad[0][0]), dimLatOut->size(), dimLonOut->size());
+			}
+			if (varOrientation != NULL) {
+				varOrientation->set_cur(t, 0, 0);
+				varOrientation->put(&(dOrientation[0][0]), dimLatOut->size(), dimLonOut->size());
 			}
 
 			varIWVtag->set_cur(0, 0);
@@ -796,6 +1107,8 @@ try {
 		CommandLineInt(arparam.iSpineWidth, "spinewidth", -1);
 		CommandLineDouble(arparam.dMinLaplacian, "minlaplacian", 0.5e4);
 		CommandLineBool(arparam.fOutputLaplacian, "outputlaplacian");
+		CommandLineInt(arparam.nSpineOrientationDist, "spineorientationdist", 3);
+		CommandLineBool(arparam.fOutputSpineOrientation, "outputspineorientation");
 		CommandLineDouble(arparam.dMinAbsGrad, "minabsgrad", 0.0);
 		CommandLineBool(arparam.fOutputAbsGrad, "outputabsgrad");
 		CommandLineDouble(arparam.dMinAbsLat, "minabslat", 15.0);
