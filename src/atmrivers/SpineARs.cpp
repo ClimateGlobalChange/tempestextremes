@@ -232,9 +232,6 @@ public:
 		ixSearchByVar(0),
 		strOutputVariable(""),
 		iLaplacianSize(0),
-		iSpineWidth(-1),
-		nSpineOrientationDist(3),
-		fOutputSpineOrientation(false),
 		dMinLaplacian(0.0),
 		fOutputLaplacian(false),
 		dMinAbsGrad(0.0),
@@ -249,6 +246,13 @@ public:
 		dMeridMeanWeight(0.0),
 		dMeridMaxWeight(0.0),
 		nMinArea(0),
+		iSpineWidth(-1),
+		fpSpineInfo(NULL),
+		nSpineOrientationDist(5),
+		strSpineOrientationVar("ar_orientation"),
+		nSpineCrossSectionPoints(11),
+		dSpineCrossSectionDist(0.5),
+		fTagSpines(true),
 		nAddTimeDim(0),
 		strAddTimeDimUnits(""),
 		fRegional(false),
@@ -268,15 +272,6 @@ public:
 
 	// Size of the Laplacian
 	int iLaplacianSize;
-
-	// Spine width
-	int iSpineWidth;
-
-	// Spine orientation distance
-	int nSpineOrientationDist;
-
-	// Output spine orientation
-	bool fOutputSpineOrientation;
 
 	// Minimum Laplacian
 	double dMinLaplacian;
@@ -320,6 +315,27 @@ public:
 	// Minimum area
 	int nMinArea;
 
+	// Spine width for locating spines
+	int iSpineWidth;
+
+	// Spine info file
+	FILE * fpSpineInfo;
+
+	// Distance used in spine orientation calculation (grid points)
+	int nSpineOrientationDist;
+
+	// Name of the variable to store the orientation map
+	std::string strSpineOrientationVar;
+
+	// Number of grid points used in spine cross-section
+	int nSpineCrossSectionPoints;
+
+	// Distance between grid points in spine cross-section
+	double dSpineCrossSectionDist;
+
+	// Tag spines in the output map
+	bool fTagSpines;
+
 	// Add a time dimension if absent
 	int nAddTimeDim;
 
@@ -335,6 +351,120 @@ public:
 	// Name of latitude variable
 	std::string strLatitudeName;
 };
+
+///////////////////////////////////////////////////////////////////////////////
+
+void CalculateOrientation(
+	const DataArray1D<double> & dLonRad,
+	const DataArray1D<double> & dLatRad,
+	DataArray2D<int> & dVarDatatag,
+	const std::set< std::pair<int,int> > & setSpinePoints,
+	int nSpineOrientationDist,
+	DataArray1D<double> & dSpineOrientation
+) {
+	_ASSERT(dLonRad.GetRows() > 0);
+	_ASSERT(dLatRad.GetRows() > 0);
+	_ASSERT(dVarDatatag.GetRows() == dLatRad.GetRows());
+	_ASSERT(dVarDatatag.GetColumns() == dLonRad.GetRows());
+	_ASSERT(dSpineOrientation.GetRows() == setSpinePoints.size());
+
+	// Find all spine points
+	int k = 0;
+	for (auto iter = setSpinePoints.begin(); iter != setSpinePoints.end(); iter++, k++) {
+		const int j = iter->first;
+		const int i = iter->second;
+
+		// Build the set of contiguous spine points
+		std::set< std::pair<int,int> > setSpinePointsVisited;
+		std::vector< std::pair<int,int> > vecSpinePointsToVisit;
+		std::vector< std::pair<int,int> > vecSpinePointsToVisitNext;
+		vecSpinePointsToVisit.push_back(std::pair<int,int>(j,i));
+
+		for (int p = 0; p < nSpineOrientationDist; p++) {
+			for (int q = 0; q < vecSpinePointsToVisit.size(); q++) {
+				setSpinePointsVisited.insert(vecSpinePointsToVisit[q]);
+				for (int m = -1; m <= 1; m++) {
+				for (int n = -1; n <= 1; n++) {
+					int jx = vecSpinePointsToVisit[q].first + m;
+					if ((jx < 0) || (jx >= dLatRad.GetRows())) {
+						continue;
+					}
+					int ix = vecSpinePointsToVisit[q].second + n;
+					if (ix < 0) {
+						ix += dLonRad.GetRows();
+					}
+					if (ix >= dLonRad.GetRows()) {
+						ix -= dLonRad.GetRows();
+					}
+					_ASSERT((ix >= 0) && (ix < dLonRad.GetRows()));
+
+					std::pair<int,int> px(jx,ix);
+					if (setSpinePoints.find(px) != setSpinePoints.end()) {
+						if (setSpinePointsVisited.find(px) ==
+							setSpinePointsVisited.end()
+						) {
+							vecSpinePointsToVisitNext.push_back(px);
+						}
+					}
+				}
+				}
+			}
+			vecSpinePointsToVisit = vecSpinePointsToVisitNext;
+			vecSpinePointsToVisitNext.clear();
+		}
+
+		// Set orientation to -360
+		if (setSpinePointsVisited.size() == 1) {
+			dSpineOrientation[k] = -360.0;
+			continue;
+		}
+
+		// Calculate the orientation of these points using linear regression
+		double dInvN = 1.0 / static_cast<double>(setSpinePointsVisited.size());
+		double dSumX = 0.0;
+		double dSumY = 0.0;
+		double dSumX2 = 0.0;
+		double dSumXY = 0.0;
+
+		for (
+			auto iter = setSpinePointsVisited.begin();
+			iter != setSpinePointsVisited.end(); iter++
+		) {
+			double dY = dLatRad[iter->first];
+			double dX = dLonRad[iter->second];
+
+			if (dX > dLonRad[i] + M_PI) {
+				dX -= 2.0 * M_PI;
+			}
+			if (dX < dLonRad[i] - M_PI) {
+				dX += 2.0 * M_PI;
+			}
+
+			dSumX += dX;
+			dSumY += dY;
+			dSumX2 += dX * dX;
+			dSumXY += dX * dY;
+		}
+
+		double dCovXY = dSumXY - dInvN * dSumX * dSumY;
+		double dVarX = dSumX2 - dInvN * dSumX * dSumX;
+
+		if (dVarX < 1.0e-12) {
+			dSpineOrientation[k] = 90.0;
+		} else {
+			dSpineOrientation[k] = atan2(dCovXY, dVarX) * 180.0 / M_PI;
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void CalculateCrossSection(
+	const DataArray1D<double> & dLonRad,
+	const DataArray1D<double> & dLatRad,
+	DataArray2D<int> & dVarDatatag
+) {
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -555,30 +685,30 @@ void SpineARs(
 	}
 
 	// Orientation variable
-	DataArray2D<double> dOrientation;
+	DataArray2D<double> dOrientationMap;
 
-	NcVar * varOrientation = NULL;
-	if (param.fOutputSpineOrientation) {
-		dOrientation.Allocate(dimLat->size(), dimLon->size());
+	NcVar * varOrientationMap = NULL;
+	if (param.strSpineOrientationVar != "") {
+		dOrientationMap.Allocate(dimLat->size(), dimLon->size());
 
 		if (dimTimeOut != NULL) {
-			varOrientation =
+			varOrientationMap =
 				ncOutput.add_var(
-					"ar_orientation",
+					param.strSpineOrientationVar.c_str(),
 					ncDouble,
 					dimTimeOut,
 					dimLatOut,
 					dimLonOut);
 
 		} else {
-			varOrientation =
+			varOrientationMap =
 				ncOutput.add_var(
-					"ar_orientation",
+					param.strSpineOrientationVar.c_str(),
 					ncDouble,
 					dimLatOut,
 					dimLonOut);
 		}
-		varOrientation->add_att("_FillValue", -1.0);
+		varOrientationMap->add_att("_FillValue", -360.0);
 	}
 
 	// Delta longitude
@@ -691,93 +821,6 @@ void SpineARs(
 			}
 
 			dVarDatatag[j][i] = 1;
-
-			// Tag spines
-			if (param.iSpineWidth != (-1)) {
-
-				// Check for local maximum in each of the four directions
-				bool fLocalMax[4] = {true, true, true, true};
-
-				for (int k = -param.iSpineWidth; k <= param.iSpineWidth; k++) {
-
-					if (k == 0) {
-						continue;
-					}
-
-					int ix = i + k;
-					if (ix < 0) {
-						ix += dimLon->size();
-					}
-					if (ix >= dimLon->size()) {
-						ix -= dimLon->size();
-					}
-
-					int jx1 = j + k;
-					if (jx1 < 0) {
-						jx1 = 0;
-					}
-					if (jx1 >= dimLat->size()) {
-						jx1 = dimLat->size()-1;
-					}
-
-					int jx2 = j - k;
-					if (jx2 < 0) {
-						jx2 = 0;
-					}
-					if (jx2 >= dimLat->size()) {
-						jx2 = dimLat->size()-1;
-					}
-/*
-					if ((i == 175) && (j == 238)) {
-						printf("\n");
-						printf("(%1.10e)\n", dVarData[j][i]);
-						printf("%i %i (%1.10e)\n", jx1, i, dVarData[jx1][i]);
-						printf("%i %i (%1.10e)\n", j, ix, dVarData[j][ix]);
-						printf("%i %i (%1.10e)\n", jx1, ix, dVarData[jx1][ix]);
-						printf("%i %i (%1.10e)\n", jx2, ix, dVarData[jx2][ix]);
-					}
-*/
-					if (dVarData[jx1][i] >= dVarData[j][i]) {
-						fLocalMax[0] = false;
-					}
-					if (dVarData[j][ix] >= dVarData[j][i]) {
-						fLocalMax[1] = false;
-					}
-					//if (dVarData[jx1][ix] >= dVarData[j][i]) {
-					//	fLocalMax[2] = false;
-					//}
-					//if (dVarData[jx2][ix] >= dVarData[j][i]) {
-					//	fLocalMax[3] = false;
-					//}
-				}
-
-				if (fLocalMax[0] || fLocalMax[1]) {
-					//if ((i == 175) && (j == 238)) {
-					//	std::cout << "TEST " << j << std::endl;
-					//}
-					dVarDatatag[j][i] = 2;
-/*
-					if ((i == 225) && (j == 257)) {
-						DataArray1D<float> dParam(4);
-						CurveFit(
-							dVarData,
-							dLonRad,
-							dLatRad,
-							i,
-							j,
-							4,
-							1.0,
-							dParam);
-					}
-*/
-					//_EXCEPTION();
-
-				}
-
-				//if (fLocalMax[0] || fLocalMax[1] || fLocalMax[2] || fLocalMax[3]) {
-				//	dVarDatatag[j][i] = 2;
-				//}
-			}
 		}
 		}
 
@@ -919,106 +962,144 @@ void SpineARs(
 		}
 		if (fVerbose) AnnounceEndBlock("Done");
 
-		// Find the orientation at each spine node
-		if (param.fOutputSpineOrientation) {
+		// Calculate information associated with the AR spine
+		if (param.iSpineWidth != (-1)) {
 
-			if (fVerbose) AnnounceStartBlock("Calculating spine orientation");
+			if (fVerbose) AnnounceStartBlock("Identifying spine points");
 
-			// Create a new orientation array
+			// Vector of points considered in AR spines
+			std::set< std::pair<int, int> > setSpinePoints;
+
 			for (int j = 0; j < dimLat->size(); j++) {
 			for (int i = 0; i < dimLon->size(); i++) {
-				dOrientation[j][i] = -1.0;
-			}
-			}
 
-			// Find all spine points
-			for (int j = 0; j < dimLat->size(); j++) {
-			for (int i = 0; i < dimLon->size(); i++) {
-				if (dVarDatatag[j][i] == 2) {
+				if (dVarDatatag[j][i] == 0) {
+					continue;
+				}
 
-					// Build the set of contiguous spine points
-					std::set< std::pair<int,int> > setSpinePointsVisited;
-					std::vector< std::pair<int,int> > vecSpinePointsToVisit;
-					std::vector< std::pair<int,int> > vecSpinePointsToVisitNext;
-					vecSpinePointsToVisit.push_back(std::pair<int,int>(j,i));
+				// Check for local maximum in each of the four directions
+				bool fLocalMax[4] = {true, true, true, true};
+				for (int k = -param.iSpineWidth; k <= param.iSpineWidth; k++) {
 
-					for (int p = 0; p < param.nSpineOrientationDist; p++) {
-						for (int q = 0; q < vecSpinePointsToVisit.size(); q++) {
-							setSpinePointsVisited.insert(vecSpinePointsToVisit[q]);
-							for (int m = -1; m <= 1; m++) {
-							for (int n = -1; n <= 1; n++) {
-								int jx = vecSpinePointsToVisit[q].first + m;
-								if ((jx < 0) || (jx >= dimLat->size())) {
-									continue;
-								}
-								int ix = vecSpinePointsToVisit[q].second + n;
-								if (ix < 0) {
-									ix += dimLon->size();
-								}
-								if (ix >= dimLon->size()) {
-									ix -= dimLon->size();
-								}
-								if (dVarDatatag[jx][ix] == 2) {
-									std::pair<int,int> px(jx,ix);
-									if (setSpinePointsVisited.find(px) ==
-										setSpinePointsVisited.end()
-									) {
-										vecSpinePointsToVisitNext.push_back(px);
-									}
-								}
-							}
-							}
-						}
-						vecSpinePointsToVisit = vecSpinePointsToVisitNext;
-						vecSpinePointsToVisitNext.clear();
-					}
-
-					// Remove isolated spine points
-					if (setSpinePointsVisited.size() == 1) {
-						dVarDatatag[j][i] = 1;
+					if (k == 0) {
 						continue;
 					}
 
-					// Calculate the orientation of these points
-					double dInvN = 1.0 / static_cast<double>(setSpinePointsVisited.size());
-					double dSumX = 0.0;
-					double dSumY = 0.0;
-					double dSumX2 = 0.0;
-					double dSumXY = 0.0;
-
-					for (
-						auto iter = setSpinePointsVisited.begin();
-						iter != setSpinePointsVisited.end(); iter++
-					) {
-						double dY = dLatRad[iter->first];
-						double dX = dLonRad[iter->second];
-
-						if (dX > dLonRad[i] + M_PI) {
-							dX -= 2.0 * M_PI;
-						}
-						if (dX < dLonRad[i] - M_PI) {
-							dX += 2.0 * M_PI;
-						}
-
-						dSumX += dX;
-						dSumY += dY;
-						dSumX2 += dX * dX;
-						dSumXY += dX * dY;
+					int ix = i + k;
+					if (ix < 0) {
+						ix += dimLon->size();
+					}
+					if (ix >= dimLon->size()) {
+						ix -= dimLon->size();
 					}
 
-					double dCovXY = dSumXY - dInvN * dSumX * dSumY;
-					double dVarX = dSumX2 - dInvN * dSumX * dSumX;
-
-					if (dVarX < 1.0e-12) {
-						dOrientation[j][i] = 90.0;
-					} else {
-						dOrientation[j][i] = atan2(dCovXY, dVarX) * 180.0 / M_PI;
+					int jx1 = j + k;
+					if (jx1 < 0) {
+						jx1 = 0;
 					}
+					if (jx1 >= dimLat->size()) {
+						jx1 = dimLat->size()-1;
+					}
+
+					int jx2 = j - k;
+					if (jx2 < 0) {
+						jx2 = 0;
+					}
+					if (jx2 >= dimLat->size()) {
+						jx2 = dimLat->size()-1;
+					}
+/*
+					if ((i == 175) && (j == 238)) {
+						printf("\n");
+						printf("(%1.10e)\n", dVarData[j][i]);
+						printf("%i %i (%1.10e)\n", jx1, i, dVarData[jx1][i]);
+						printf("%i %i (%1.10e)\n", j, ix, dVarData[j][ix]);
+						printf("%i %i (%1.10e)\n", jx1, ix, dVarData[jx1][ix]);
+						printf("%i %i (%1.10e)\n", jx2, ix, dVarData[jx2][ix]);
+					}
+*/
+					if (dVarData[jx1][i] >= dVarData[j][i]) {
+						fLocalMax[0] = false;
+					}
+					if (dVarData[j][ix] >= dVarData[j][i]) {
+						fLocalMax[1] = false;
+					}
+					//if (dVarData[jx1][ix] >= dVarData[j][i]) {
+					//	fLocalMax[2] = false;
+					//}
+					//if (dVarData[jx2][ix] >= dVarData[j][i]) {
+					//	fLocalMax[3] = false;
+					//}
+				}
+
+				// Actually only use zonal and meridional directions
+				if (fLocalMax[0] || fLocalMax[1]) {
+					setSpinePoints.insert(std::pair<int,int>(j,i));
 				}
 			}
 			}
 
 			if (fVerbose) AnnounceEndBlock("Done");
+
+			// Tag spine points in dVarDatatag
+			if (param.fTagSpines) {
+				if (fVerbose) AnnounceStartBlock("Tagging spine points");
+				for (auto iter = setSpinePoints.begin(); iter != setSpinePoints.end(); iter++) {
+					dVarDatatag[iter->first][iter->second] = 2;
+				}
+				if (fVerbose) AnnounceEndBlock("Done");
+			}
+
+			// Calculate spine orientation
+			if ((varOrientationMap != NULL) || (param.fpSpineInfo != NULL)) {
+				if (fVerbose) AnnounceStartBlock("Calculating spine orientation");
+
+				DataArray1D<double> dSpineOrientation(setSpinePoints.size());
+
+				CalculateOrientation(
+					dLonRad,
+					dLatRad,
+					dVarDatatag,
+					setSpinePoints,
+					param.nSpineOrientationDist,
+					dSpineOrientation
+				);
+
+				_ASSERT(dSpineOrientation.GetRows() == setSpinePoints.size());
+
+				// Plot the orientation on a map
+				if (varOrientationMap != NULL) {
+
+					for (int j = 0; j < dimLat->size(); j++) {
+					for (int i = 0; i < dimLon->size(); i++) {
+						dOrientationMap[j][i] = -360.0;
+					}
+					}
+
+					int k = 0;
+					for (
+						auto iter = setSpinePoints.begin();
+						iter != setSpinePoints.end(); iter++, k++
+					) {
+						dOrientationMap[iter->first][iter->second] =
+							dSpineOrientation[k];
+					}
+				}
+
+				// Write orientation data to file
+				if (param.fpSpineInfo != NULL) {
+					int k = 0;
+					for (
+						auto iter = setSpinePoints.begin();
+						iter != setSpinePoints.end(); iter++, k++
+					) {
+						fprintf(param.fpSpineInfo, "\t%i\t%i\t%3.6f\t%3.6f\t%1.5f\n",
+							iter->second, iter->first, dLonDeg[iter->second], dLatDeg[iter->first], dSpineOrientation[k]);
+					}
+				}
+
+				if (fVerbose) AnnounceEndBlock("Done");
+			}
 		}
 
 		if (fVerbose) AnnounceStartBlock("Writing results");
@@ -1033,9 +1114,9 @@ void SpineARs(
 				varAbsGrad->set_cur(t, 0, 0);
 				varAbsGrad->put(&(dAbsGrad[0][0]), 1, dimLatOut->size(), dimLonOut->size());
 			}
-			if (varOrientation != NULL) {
-				varOrientation->set_cur(t, 0, 0);
-				varOrientation->put(&(dOrientation[0][0]), 1, dimLatOut->size(), dimLonOut->size());
+			if (varOrientationMap != NULL) {
+				varOrientationMap->set_cur(t, 0, 0);
+				varOrientationMap->put(&(dOrientationMap[0][0]), 1, dimLatOut->size(), dimLonOut->size());
 			}
 
 			varIWVtag->set_cur(t, 0, 0);
@@ -1050,9 +1131,9 @@ void SpineARs(
 				varAbsGrad->set_cur(0, 0);
 				varAbsGrad->put(&(dAbsGrad[0][0]), dimLatOut->size(), dimLonOut->size());
 			}
-			if (varOrientation != NULL) {
-				varOrientation->set_cur(t, 0, 0);
-				varOrientation->put(&(dOrientation[0][0]), dimLatOut->size(), dimLonOut->size());
+			if (varOrientationMap != NULL) {
+				varOrientationMap->set_cur(t, 0, 0);
+				varOrientationMap->put(&(dOrientationMap[0][0]), dimLatOut->size(), dimLonOut->size());
 			}
 
 			varIWVtag->set_cur(0, 0);
@@ -1094,6 +1175,12 @@ try {
 	// Output file list
 	std::string strOutputFileList;
 
+	// Spine info file
+	std::string strSpineInfoFile;
+
+	// Spine info file list
+	std::string strSpineInfoFileList;
+
 	// Input integrated water vapor variable name
 	std::string strSearchByVariable;
 
@@ -1111,12 +1198,11 @@ try {
 		CommandLineString(strOutputFileList, "out_list", "");
 		CommandLineString(strSearchByVariable, "var", "");
 		CommandLineString(arparam.strOutputVariable, "outvar", "");
+
 		CommandLineInt(arparam.iLaplacianSize, "laplaciansize", 5);
-		CommandLineInt(arparam.iSpineWidth, "spinewidth", -1);
 		CommandLineDouble(arparam.dMinLaplacian, "minlaplacian", 0.5e4);
 		CommandLineBool(arparam.fOutputLaplacian, "outputlaplacian");
-		CommandLineInt(arparam.nSpineOrientationDist, "spineorientationdist", 5);
-		CommandLineBool(arparam.fOutputSpineOrientation, "outputspineorientation");
+
 		CommandLineDouble(arparam.dMinAbsGrad, "minabsgrad", 0.0);
 		CommandLineBool(arparam.fOutputAbsGrad, "outputabsgrad");
 		CommandLineDouble(arparam.dMinAbsLat, "minabslat", 15.0);
@@ -1127,6 +1213,16 @@ try {
 		CommandLineDoubleD(arparam.dMeridMeanWeight, "meridmeanwt", 0.0, "(suggested 0.9)");
 		CommandLineDoubleD(arparam.dMeridMaxWeight, "meridmaxwt", 0.0, "(suggested 0.1)");
 		CommandLineInt(arparam.nMinArea, "minarea", 0);
+
+		CommandLineInt(arparam.iSpineWidth, "spine_width", -1);
+		CommandLineString(strSpineInfoFile, "spine_file", "");
+		CommandLineString(strSpineInfoFileList, "spine_filelist", "");
+		CommandLineInt(arparam.nSpineOrientationDist, "spine_orientdist", 5);
+		CommandLineString(arparam.strSpineOrientationVar, "spine_orientvar", "");
+		CommandLineInt(arparam.nSpineCrossSectionPoints, "spine_xsecpoints", 11);
+		CommandLineDouble(arparam.dSpineCrossSectionDist, "spine_xsecdist", 0.5);
+		CommandLineBool(arparam.fTagSpines, "spine_tag");
+
 		CommandLineInt(arparam.nAddTimeDim, "addtimedim", -1);
 		CommandLineString(arparam.strAddTimeDimUnits, "addtimedimunits", "");
 		CommandLineBool(arparam.fRegional, "regional");
@@ -1165,6 +1261,21 @@ try {
 	}
 	if ((strInputFile.length() != 0) && (strOutputFile.length() == 0)) {
 		_EXCEPTIONT("Arguments (--in) and (--out) must be specified together");
+	}
+
+	// Check spine info output
+	if ((strSpineInfoFile.length() != 0) || (strSpineInfoFileList.length() != 0)) {
+		if ((strSpineInfoFile.length() != 0) && (strSpineInfoFileList.length() != 0)) {
+			_EXCEPTIONT("Only one of (--spine_file) or (--spine_filelist)"
+				" may be specified");
+		}
+		if ((strInputFileList.length() != 0) && (strSpineInfoFileList.length() == 0)) {
+			_EXCEPTIONT("Arguments (--in_list) and (--spine_filelist) must be specified together");
+		}
+		if ((strInputFile.length() != 0) && (strSpineInfoFile.length() == 0)) {
+			_EXCEPTIONT("Arguments (--in) and (--spine_file) must be specified together");
+		}
+
 	}
 
 	AnnounceStartBlock("Initializing detector");
@@ -1217,9 +1328,38 @@ try {
 		}
 	}
 
+	// Load spine info file list
+	std::vector<std::string> vecSpineInfoFiles;
+
+	if (strSpineInfoFile.length() != 0) {
+		vecSpineInfoFiles.push_back(strSpineInfoFile);
+
+	} else if (strSpineInfoFileList.length() != 0) {
+		std::ifstream ifSpineInfoFileList(strSpineInfoFileList.c_str());
+		if (!ifSpineInfoFileList.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\"",
+				strSpineInfoFileList.c_str());
+		}
+		std::string strFileLine;
+		while (std::getline(ifSpineInfoFileList, strFileLine)) {
+			if (strFileLine.length() == 0) {
+				continue;
+			}
+			if (strFileLine[0] == '#') {
+				continue;
+			}
+			vecSpineInfoFiles.push_back(strFileLine);
+		}
+	}
+
 	// Check length
 	if (vecInputFiles.size() != vecOutputFiles.size()) {
-		_EXCEPTIONT("Input and output file list length mismatch");
+		_EXCEPTIONT("--in_list and --out_list file length mismatch");
+	}
+	if (vecSpineInfoFiles.size() != 0) {
+		if (vecInputFiles.size() != vecSpineInfoFiles.size()) {
+			_EXCEPTIONT("--in_list and --spine_filelist length mismatch");
+		}
 	}
 
 	// Check variable
@@ -1301,6 +1441,15 @@ try {
 		}
 #endif
 
+		// Spine info file
+		if (vecSpineInfoFiles.size() != 0) {
+			arparam.fpSpineInfo = fopen(vecSpineInfoFiles[f].c_str(), "w");
+			if (arparam.fpSpineInfo == NULL) {
+				_EXCEPTION1("Unable to open file \"%s\" for writing",
+					vecSpineInfoFiles[f].c_str());
+			}
+		}
+
 		// Detect atmospheric rivers
 		SpineARs(
 			f,
@@ -1309,6 +1458,12 @@ try {
 			varreg,
 			arparam,
 			fVerbose);
+
+		// Close the spine info file
+		if (arparam.fpSpineInfo != NULL) {
+			fclose(arparam.fpSpineInfo);
+			arparam.fpSpineInfo = NULL;
+		}
 	}
 
 	if (arparam.fpLog != NULL) {

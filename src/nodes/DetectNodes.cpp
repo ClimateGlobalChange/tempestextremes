@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
-///	\file    DetectCyclonesUnstructured.cpp
+///	\file    DetectNodes.cpp
 ///	\author  Paul Ullrich
 ///	\version August 14, 2018
 ///
