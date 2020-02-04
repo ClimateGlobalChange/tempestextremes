@@ -976,6 +976,7 @@ void SpineARs(
 					// Remove isolated spine points
 					if (setSpinePointsVisited.size() == 1) {
 						dVarDatatag[j][i] = 1;
+						continue;
 					}
 
 					// Calculate the orientation of these points
@@ -991,6 +992,13 @@ void SpineARs(
 					) {
 						double dY = dLatRad[iter->first];
 						double dX = dLonRad[iter->second];
+
+						if (dX > dLonRad[i] + M_PI) {
+							dX -= 2.0 * M_PI;
+						}
+						if (dX < dLonRad[i] - M_PI) {
+							dX += 2.0 * M_PI;
+						}
 
 						dSumX += dX;
 						dSumY += dY;
@@ -1107,7 +1115,7 @@ try {
 		CommandLineInt(arparam.iSpineWidth, "spinewidth", -1);
 		CommandLineDouble(arparam.dMinLaplacian, "minlaplacian", 0.5e4);
 		CommandLineBool(arparam.fOutputLaplacian, "outputlaplacian");
-		CommandLineInt(arparam.nSpineOrientationDist, "spineorientationdist", 3);
+		CommandLineInt(arparam.nSpineOrientationDist, "spineorientationdist", 5);
 		CommandLineBool(arparam.fOutputSpineOrientation, "outputspineorientation");
 		CommandLineDouble(arparam.dMinAbsGrad, "minabsgrad", 0.0);
 		CommandLineBool(arparam.fOutputAbsGrad, "outputabsgrad");
