@@ -580,7 +580,8 @@ void CalculateCrossSection(
 	const DataArray1D<double> & dSpineOrientationDeg,
 	int nSpineXSecPoints,
 	double dSpineXSecDist,
-	DataArray2D<float> & dSpineXSec
+	DataArray2D<float> & dSpineXSec,
+	DataArray2D<double> & dSpineXSecBeginEnd
 ) {
 	_ASSERT(dLonRad.GetRows() > 0);
 	_ASSERT(dLatRad.GetRows() > 0);
@@ -589,6 +590,8 @@ void CalculateCrossSection(
 	_ASSERT(dSpineOrientationDeg.GetRows() == setSpinePoints.size());
 	_ASSERT(dSpineXSec.GetRows() == setSpinePoints.size());
 	_ASSERT(dSpineXSec.GetColumns() == nSpineXSecPoints);
+	_ASSERT(dSpineXSecBeginEnd.GetRows() == setSpinePoints.size());
+	_ASSERT(dSpineXSecBeginEnd.GetColumns() == 4);
 
 	// Find all spine points
 	int k = 0;
@@ -618,6 +621,15 @@ void CalculateCrossSection(
 					dVarData,
 					dLonXRad,
 					dLatXRad);
+
+			if (p == 0) {
+				dSpineXSecBeginEnd(k,0) = dLonXRad * 180.0 / M_PI;
+				dSpineXSecBeginEnd(k,1) = dLatXRad * 180.0 / M_PI;
+			}
+			if (p == nSpineXSecPoints-1) {
+				dSpineXSecBeginEnd(k,2) = dLonXRad * 180.0 / M_PI;
+				dSpineXSecBeginEnd(k,3) = dLatXRad * 180.0 / M_PI;
+			}
 		}
 	}
 }
@@ -1246,12 +1258,17 @@ void SpineARs(
 
 				// Calculate cross-sections
 				DataArray2D<float> dSpineXSec;
+				DataArray2D<double> dSpineXSecBeginEnd;
 				if (param.nSpineCrossSectionPoints > 0) {
 					if (fVerbose) AnnounceStartBlock("Calculating cross-sections");
 
 					dSpineXSec.Allocate(
 						dSpineOrientation.GetRows(),
 						param.nSpineCrossSectionPoints);
+
+					dSpineXSecBeginEnd.Allocate(
+						dSpineOrientation.GetRows(),
+						4);
 
 					CalculateCrossSection(
 						dLonRad,
@@ -1261,7 +1278,8 @@ void SpineARs(
 						dSpineOrientation,
 						param.nSpineCrossSectionPoints,
 						param.dSpineCrossSectionDist,
-						dSpineXSec
+						dSpineXSec,
+						dSpineXSecBeginEnd
 					);
 
 					if (fVerbose) AnnounceEndBlock("Done");
@@ -1282,6 +1300,14 @@ void SpineARs(
 							dLonDeg[iter->second],
 							dLatDeg[iter->first],
 							dSpineOrientation[k]);
+
+						if (dSpineXSecBeginEnd.GetColumns() > 0) {
+							fprintf(param.fpSpineInfo, "\t%3.6f\t%3.6f\t%3.6f\t%3.6f",
+								dSpineXSecBeginEnd(k,0),
+								dSpineXSecBeginEnd(k,1),
+								dSpineXSecBeginEnd(k,2),
+								dSpineXSecBeginEnd(k,3));
+						}
 
 						if (dSpineXSec.GetColumns() > 0) {
 							fprintf(param.fpSpineInfo, "\t[%1.6e", dSpineXSec(k,0));
