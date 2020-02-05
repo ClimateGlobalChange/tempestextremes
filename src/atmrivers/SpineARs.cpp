@@ -519,7 +519,11 @@ float BilinearInterp(
 		dI = (dLonRad[ix+1] - dLon0Rad) / (dLonRad[ix+1] - dLonRad[ix]);
 	}
 
-	_ASSERT((dI >= 0.0) && (dI <= 1.0));
+	if ((dI < 0.0) || (dI > 1.0)) {
+		printf("DEBUG INFO: %1.15e %1.15e %1.15e\n",
+			dLonRad[0], dLon0Rad, dLonRad[dLonRad.GetRows()-1]);
+		_EXCEPTION1("Logic error; fit out of bounds (%1.15e)", dI);
+	}
 
 	// Get southern latitude index
 	double dLatOrient = 1.0;
@@ -558,7 +562,11 @@ float BilinearInterp(
 
 		double dJ = (dLatRad[jx+1] - dLat0Rad) / (dLatRad[jx+1] - dLatRad[jx]);
 
-		_ASSERT((dJ >= 0.0) && (dJ <= 1.0));
+		if ((dJ < 0.0) || (dJ > 1.0)) {
+			printf("DEBUG INFO: %1.15e %1.15e %1.15e\n",
+				dLatRad[0], dLat0Rad, dLatRad[dLatRad.GetRows()-1]);
+			_EXCEPTION1("Logic error; fit out of bounds (%1.15e)", dJ);
+		}
 
 		//printf("[%1.5e %1.5e] [%1.5e %1.5e %1.5e %1.5e] [%1.5e %1.5e]\n",
 		//	dLon0Rad, dLat0Rad, dLonRad[ix0], dLonRad[ix1], dLatRad[jx], dLatRad[jx+1], dI, dJ);
