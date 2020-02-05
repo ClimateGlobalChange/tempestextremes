@@ -357,7 +357,7 @@ public:
 void CalculateOrientation(
 	const DataArray1D<double> & dLonRad,
 	const DataArray1D<double> & dLatRad,
-	DataArray2D<int> & dVarDatatag,
+	const DataArray2D<int> & dVarDatatag,
 	const std::set< std::pair<int,int> > & setSpinePoints,
 	int nSpineOrientationDist,
 	DataArray1D<double> & dSpineOrientation
@@ -459,11 +459,167 @@ void CalculateOrientation(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Apply bilinear interpolation to a point, without assuming uniform
+///		spacing of the latitude and longitude data.
+///	</summary>
+float BilinearInterp(
+	const DataArray1D<double> & dLonRad,
+	const DataArray1D<double> & dLatRad,
+	const DataArray2D<float> & dVarData,
+	double dLon0Rad,
+	double dLat0Rad
+) {
+	// Get western longitude index
+	int ix0;
+	int ix1;
+	double dI = 0.0;
+
+	// Renormalize the longitude to [dLonRad[0], dLonRad[0] + 2.0 * M_PI)
+	dLon0Rad -= floor((dLon0Rad - dLonRad[0]) / (2.0 * M_PI)) * 2.0 * M_PI;
+	_ASSERT((dLon0Rad >= dLonRad[0]) && (dLon0Rad < dLonRad[0] + 2.0 * M_PI));
+
+	// NOTE: This needs to be modified if the domain is regional
+	if (dLon0Rad >= dLonRad[dLonRad.GetRows()-1]) {
+		ix0 = dLonRad.GetRows()-1;
+		ix1 = 0;
+		dI = (dLonRad[0] + 2.0 * M_PI - dLon0Rad)
+			/ (dLonRad[0] + 2.0 * M_PI - dLonRad[dLonRad.GetRows()-1]);
+
+	} else {
+		int ix =
+			(dLon0Rad - dLonRad[0])
+			/ (dLonRad[dLonRad.GetRows()-1] - dLonRad[0])
+			* static_cast<double>(dLonRad.GetRows()-1);
+
+		//printf("%i %1.15e %1.15e %1.15e\n",
+		//	ix, dLon0Rad, dLonRad[0], dLonRad[dLonRad.GetRows()-1]);
+
+		int it = 0;
+		for (; it < dLonRad.GetRows(); it++) {
+			_ASSERT((ix >= 0) && (ix < dLonRad.GetRows()-1));
+			if (dLonRad[ix] > dLon0Rad) {
+				ix--;
+				continue;
+			}
+			if (dLonRad[ix+1] < dLon0Rad) {
+				ix++;
+				continue;
+			}
+			break;
+		}
+		_ASSERT(it != dLonRad.GetRows());
+		_ASSERT((ix >= 0) && (ix < dLonRad.GetRows()-1));
+
+		ix0 = ix;
+		ix1 = ix+1;
+
+		//printf(":%i %1.15e %1.15e %1.15e\n", ix0, dLonRad[ix0], dLon0Rad, dLonRad[ix1]);
+
+		dI = (dLonRad[ix+1] - dLon0Rad) / (dLonRad[ix+1] - dLonRad[ix]);
+	}
+
+	_ASSERT((dI >= 0.0) && (dI <= 1.0));
+
+	// Get southern latitude index
+	double dLatOrient = 1.0;
+	if (dLatRad[dLatRad.GetRows()-1] < dLatRad[0]) {
+		dLatOrient = -1.0;
+	}
+
+	if (dLat0Rad * dLatOrient < dLatRad[0] * dLatOrient) {
+		return (dI * dVarData[0][ix0] + (1.0 - dI) * dVarData[0][ix1]);
+
+	} else if (dLat0Rad * dLatOrient > dLatRad[dLatRad.GetRows()-1] * dLatOrient) {
+		int jx = dLatRad.GetRows()-1;
+		return (dI * dVarData[jx][ix0] + (1.0 - dI) * dVarData[jx][ix1]);
+
+	} else {
+		int jx =
+			(dLat0Rad - dLatRad[0])
+			/ (dLatRad[dLatRad.GetRows()-1] - dLatRad[0])
+			* static_cast<double>(dLatRad.GetRows()-1);
+
+		int it = 0;
+		for (; it < dLatRad.GetRows(); it++) {
+			_ASSERT((jx >= 0) && (jx < dLatRad.GetRows()-1));
+			if (dLatOrient * dLatRad[jx] > dLatOrient * dLat0Rad) {
+				jx--;
+				continue;
+			}
+			if (dLatOrient * dLatRad[jx+1] < dLatOrient * dLat0Rad) {
+				jx++;
+				continue;
+			}
+			break;
+		}
+		_ASSERT(it != dLatRad.GetRows());
+		_ASSERT((jx >= 0) && (jx < dLatRad.GetRows()-1));
+
+		double dJ = (dLatRad[jx+1] - dLat0Rad) / (dLatRad[jx+1] - dLatRad[jx]);
+
+		_ASSERT((dJ >= 0.0) && (dJ <= 1.0));
+
+		//printf("[%1.5e %1.5e] [%1.5e %1.5e %1.5e %1.5e] [%1.5e %1.5e]\n",
+		//	dLon0Rad, dLat0Rad, dLonRad[ix0], dLonRad[ix1], dLatRad[jx], dLatRad[jx+1], dI, dJ);
+		return (
+			         dI  *        dJ  * dVarData[jx  ][ix0]
+			+ (1.0 - dI) *        dJ  * dVarData[jx  ][ix1]
+			+        dI  * (1.0 - dJ) * dVarData[jx+1][ix0]
+			+ (1.0 - dI) * (1.0 - dJ) * dVarData[jx+1][ix1]);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void CalculateCrossSection(
 	const DataArray1D<double> & dLonRad,
 	const DataArray1D<double> & dLatRad,
-	DataArray2D<int> & dVarDatatag
+	const DataArray2D<float> & dVarData,
+	const std::set< std::pair<int,int> > & setSpinePoints,
+	const DataArray1D<double> & dSpineOrientationDeg,
+	int nSpineXSecPoints,
+	double dSpineXSecDist,
+	DataArray2D<float> & dSpineXSec
 ) {
+	_ASSERT(dLonRad.GetRows() > 0);
+	_ASSERT(dLatRad.GetRows() > 0);
+	_ASSERT(dVarData.GetRows() == dLatRad.GetRows());
+	_ASSERT(dVarData.GetColumns() == dLonRad.GetRows());
+	_ASSERT(dSpineOrientationDeg.GetRows() == setSpinePoints.size());
+	_ASSERT(dSpineXSec.GetRows() == setSpinePoints.size());
+	_ASSERT(dSpineXSec.GetColumns() == nSpineXSecPoints);
+
+	// Find all spine points
+	int k = 0;
+	for (auto iter = setSpinePoints.begin(); iter != setSpinePoints.end(); iter++, k++) {
+		const int j = iter->first;
+		const int i = iter->second;
+
+		double dLon0Rad = dLonRad[i];
+		double dLat0Rad = dLatRad[j];
+
+		for (int p = 0; p < nSpineXSecPoints; p++) {
+
+			// The cross-section is along the line
+			//   Lon(s) = dLon0 - s * sin(dSpineOrientation)
+			//   Lat(s) = dLat0 + s * cos(dSpineOrientation)
+
+			double dS = dSpineXSecDist * M_PI / 180.0
+				* (static_cast<double>(p) - 0.5 * static_cast<double>(nSpineXSecPoints-1));
+
+			double dLonXRad = dLon0Rad - dS * sin(dSpineOrientationDeg[k] * M_PI / 180.0);
+			double dLatXRad = dLat0Rad + dS * cos(dSpineOrientationDeg[k] * M_PI / 180.0);
+
+			dSpineXSec(k,p) =
+				BilinearInterp(
+					dLonRad,
+					dLatRad,
+					dVarData,
+					dLonXRad,
+					dLatXRad);
+		}
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1086,19 +1242,60 @@ void SpineARs(
 					}
 				}
 
+				if (fVerbose) AnnounceEndBlock("Done");
+
+				// Calculate cross-sections
+				DataArray2D<float> dSpineXSec;
+				if (param.nSpineCrossSectionPoints > 0) {
+					if (fVerbose) AnnounceStartBlock("Calculating cross-sections");
+
+					dSpineXSec.Allocate(
+						dSpineOrientation.GetRows(),
+						param.nSpineCrossSectionPoints);
+
+					CalculateCrossSection(
+						dLonRad,
+						dLatRad,
+						dVarData,
+						setSpinePoints,
+						dSpineOrientation,
+						param.nSpineCrossSectionPoints,
+						param.dSpineCrossSectionDist,
+						dSpineXSec
+					);
+
+					if (fVerbose) AnnounceEndBlock("Done");
+				}
+
 				// Write orientation data to file
 				if (param.fpSpineInfo != NULL) {
+					if (fVerbose) AnnounceStartBlock("Writing to file");
+
 					int k = 0;
 					for (
 						auto iter = setSpinePoints.begin();
 						iter != setSpinePoints.end(); iter++, k++
 					) {
-						fprintf(param.fpSpineInfo, "\t%i\t%i\t%3.6f\t%3.6f\t%1.5f\n",
-							iter->second, iter->first, dLonDeg[iter->second], dLatDeg[iter->first], dSpineOrientation[k]);
-					}
-				}
+						fprintf(param.fpSpineInfo, "\t%i\t%i\t%3.6f\t%3.6f\t%+2.5f",
+							iter->second,
+							iter->first,
+							dLonDeg[iter->second],
+							dLatDeg[iter->first],
+							dSpineOrientation[k]);
 
-				if (fVerbose) AnnounceEndBlock("Done");
+						if (dSpineXSec.GetColumns() > 0) {
+							fprintf(param.fpSpineInfo, "\t[%1.6e", dSpineXSec(k,0));
+							for (int p = 1; p < dSpineXSec.GetColumns(); p++) {
+								fprintf(param.fpSpineInfo, ",%1.6e", dSpineXSec(k,p));
+							}
+							fprintf(param.fpSpineInfo, "]");
+						}
+
+						fprintf(param.fpSpineInfo, "\n");
+					}
+
+					if (fVerbose) AnnounceEndBlock("Done");
+				}
 			}
 		}
 
