@@ -519,7 +519,7 @@ float BilinearInterp(
 		dI = (dLonRad[ix+1] - dLon0Rad) / (dLonRad[ix+1] - dLonRad[ix]);
 	}
 
-	if ((dI < 0.0) || (dI > 1.0)) {
+	if ((dI < -1.0e-12) || (dI > 1.0 + 1.0e-12)) {
 		printf("DEBUG INFO: %1.15e %1.15e %1.15e\n",
 			dLonRad[0], dLon0Rad, dLonRad[dLonRad.GetRows()-1]);
 		_EXCEPTION1("Logic error; fit out of bounds (%1.15e)", dI);
@@ -562,7 +562,7 @@ float BilinearInterp(
 
 		double dJ = (dLatRad[jx+1] - dLat0Rad) / (dLatRad[jx+1] - dLatRad[jx]);
 
-		if ((dJ < 0.0) || (dJ > 1.0)) {
+		if ((dJ < -1.0e-12) || (dJ > 1.0 + 1.0e-12)) {
 			printf("DEBUG INFO: %1.15e %1.15e %1.15e\n",
 				dLatRad[0], dLat0Rad, dLatRad[dLatRad.GetRows()-1]);
 			_EXCEPTION1("Logic error; fit out of bounds (%1.15e)", dJ);
@@ -1296,6 +1296,10 @@ void SpineARs(
 				// Write orientation data to file
 				if (param.fpSpineInfo != NULL) {
 					if (fVerbose) AnnounceStartBlock("Writing to file");
+
+					if (dimTimeOut != NULL) {
+						fprintf(param.fpSpineInfo, "Time %i\n", t);
+					}
 
 					int k = 0;
 					for (
