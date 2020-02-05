@@ -1455,7 +1455,7 @@ try {
 		CommandLineInt(arparam.nSpineOrientationDist, "spine_orientdist", 5);
 		CommandLineString(arparam.strSpineOrientationVar, "spine_orientvar", "");
 		CommandLineInt(arparam.nSpineCrossSectionPoints, "spine_xsecpoints", 11);
-		CommandLineDouble(arparam.dSpineCrossSectionDist, "spine_xsecdist", 0.5);
+		CommandLineDouble(arparam.dSpineCrossSectionDist, "spine_xsecdist", 1.0);
 		CommandLineBool(arparam.fTagSpines, "spine_tag");
 
 		CommandLineInt(arparam.nAddTimeDim, "addtimedim", -1);
