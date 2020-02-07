@@ -924,7 +924,7 @@ try {
 
 				const std::string & strVariable = vecVarNames[v];
 
-				AnnounceStartBlock("Processing variable \"%s\"", strVariable.c_str());
+				Announce("Processing variable \"%s\"", strVariable.c_str());
 
 				// Load input and output variables
 				NcVar * varIn = vecNcVarIn[v];
