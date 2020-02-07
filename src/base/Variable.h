@@ -66,6 +66,38 @@ public:
 			delete (*this)[i];
 		}
 	}
+
+	///	<summary>
+	///		Parse from a semi-colon delineated string of file names.
+	///	</summary>
+	void ParseFromString(
+		const std::string & strFiles
+	) {
+		int iLast = 0;
+		for (int i = 0; i <= strFiles.length(); i++) {
+			if ((i == strFiles.length()) ||
+			    (strFiles[i] == ';')
+			) {
+				std::string strFile =
+					strFiles.substr(iLast, i - iLast);
+
+				NcFile * pNewFile = new NcFile(strFile.c_str());
+
+				if (!pNewFile->is_valid()) {
+					_EXCEPTION1("Cannot open input file \"%s\"",
+						strFile.c_str());
+				}
+
+				push_back(pNewFile);
+				iLast = i+1;
+			}
+		}
+
+		if (size() == 0) {
+			_EXCEPTION1("No input files found in \"%s\"",
+				strFiles.c_str());
+		}
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////

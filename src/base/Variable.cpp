@@ -378,15 +378,15 @@ NcVar * Variable::GetFromNetCDF(
 		if ((nVarDims != m_nSpecifiedDim + 2) &&
 			(nVarDims != m_nSpecifiedDim + 3)
 		) {
-			_EXCEPTION1("Dimension size inconsistency in \"%s\"",
-				m_strName.c_str());
+			_EXCEPTION3("Dimension size inconsistency in \"%s\" (%i/%i)",
+				m_strName.c_str(), nVarDims, m_nSpecifiedDim);
 		}
 	} else {
 		if ((nVarDims != m_nSpecifiedDim + 1) &&
 			(nVarDims != m_nSpecifiedDim + 2)
 		) {
-			_EXCEPTION1("Dimension size inconsistency in \"%s\"",
-				m_strName.c_str());
+			_EXCEPTION3("Dimension size inconsistency in \"%s\" (%i/%i)",
+				m_strName.c_str(), nVarDims, m_nSpecifiedDim);
 		}
 	}
 

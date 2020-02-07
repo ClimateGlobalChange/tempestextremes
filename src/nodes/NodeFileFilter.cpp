@@ -24,6 +24,8 @@
 #include "STLStringHelper.h"
 #include "NodeFileUtilities.h"
 #include "NetCDFUtilities.h"
+#include "ClosedContourOp.h"
+#include "SimpleGridUtilities.h"
 
 #include "netcdfcpp.h"
 
@@ -37,16 +39,14 @@
 */
 ///////////////////////////////////////////////////////////////////////////////
 
-void BuildFilter(
+void BuildMask_ByDist(
 	const SimpleGrid & grid,
 	const ColumnDataHeader & cdh,
 	const PathVector & pathvec,
 	const PathNodeIndexVector & vecPathNodes,
 	const std::string & strDist,
-	DataArray1D<double> & dataFilter
+	DataArray1D<double> & dataMask
 ) {
-	dataFilter.Zero();
-
 	// Get filter width (either fixed value or column data header)
 	bool fFixedFilterWidth = false;
 	double dFilterWidth = 0.0;
@@ -139,7 +139,129 @@ void BuildFilter(
 			}
 
 			// Add this point to the filter
-			dataFilter[ix] = 1.0;
+			dataMask[ix] = 1.0;
+
+			// Add all neighbors of this point
+			for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+				queueToVisit.push(grid.m_vecConnectivity[ix][n]);
+			}
+		}
+	}
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+template <typename real>
+void BuildMask_ByContour(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & dataState,
+	const ColumnDataHeader & cdh,
+	const PathVector & pathvec,
+	const PathNodeIndexVector & vecPathNodes,
+	const ClosedContourOp & op,
+	DataArray1D<double> & dataMask
+) {
+	// Get the variable
+	double dDeltaAmt = op.m_dDeltaAmount;
+	double dDeltaDist = op.m_dDistance;
+	double dMinMaxDist = op.m_dMinMaxDist;
+
+	_ASSERT(dDeltaAmt != 0.0);
+	_ASSERT(dDeltaDist > 0.0);
+
+	// Loop through all PathNodes
+	for (int j = 0; j < vecPathNodes.size(); j++) {
+		const Path & path = pathvec[vecPathNodes[j].first];
+		const PathNode & pathnode = path[vecPathNodes[j].second];
+
+		int ix0 = static_cast<int>(pathnode.m_gridix);
+
+		// Find min/max near point
+		int ixOrigin;
+
+		if (dMinMaxDist == 0.0) {
+			ixOrigin = ix0;
+
+		// Find a local minimum / maximum
+		} else {
+			real dValue;
+			float dR;
+
+			FindLocalMinMax<real>(
+				grid,
+				(dDeltaAmt > 0.0),
+				dataState,
+				ix0,
+				dMinMaxDist,
+				ixOrigin,
+				dValue,
+				dR);
+		}
+
+		// Set of visited nodes
+		std::set<int> setNodesVisited;
+
+		// Set of nodes to visit
+		std::queue<int> queueToVisit;
+		queueToVisit.push(ixOrigin);
+
+		// Reference value
+		real dRefValue = dataState[ixOrigin];
+
+		const double dLat0 = grid.m_dLat[ixOrigin];
+		const double dLon0 = grid.m_dLon[ixOrigin];
+
+		// Build up nodes
+		while (queueToVisit.size() != 0) {
+			int ix = queueToVisit.front();
+			queueToVisit.pop();
+
+			if (setNodesVisited.find(ix) != setNodesVisited.end()) {
+				continue;
+			}
+
+			setNodesVisited.insert(ix);
+
+			// Great circle distance to this element
+			double dLatThis = grid.m_dLat[ix];
+			double dLonThis = grid.m_dLon[ix];
+
+			double dR =
+				sin(dLat0) * sin(dLatThis)
+				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
+
+			if (dR >= 1.0) {
+				dR = 0.0;
+			} else if (dR <= -1.0) {
+				dR = 180.0;
+			} else {
+				dR = 180.0 / M_PI * acos(dR);
+			}
+			if (dR != dR) {
+				_EXCEPTIONT("NaN value detected");
+			}
+
+			// Check great circle distance
+			if (dR > dDeltaDist) {
+				continue;
+			}
+
+			// Verify sufficient increase in value
+			if (dDeltaAmt > 0.0) {
+				if (dataState[ix] - dRefValue >= dDeltaAmt) {
+					continue;
+				}
+
+			// Verify sufficient decrease in value
+			} else {
+				if (dRefValue - dataState[ix] >= -dDeltaAmt) {
+					continue;
+				}
+			}
+
+			// Tag this point
+			dataMask[ix] = 1.0;
 
 			// Add all neighbors of this point
 			for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
@@ -195,20 +317,26 @@ try {
 	// Data is regional
 	bool fRegional;
 
-	// List of variables to preserve
-	std::string strPreserve;
-
 	// Output data file
 	std::string strOutputData;
 
 	// Output list of data files
 	std::string strOutputDataList;
 
+	// List of variables to output
+	std::string strVariables;
+
+	// Output the mask to the given variable
+	std::string strMaskVariable;
+
+	// List of variables to preserve
+	std::string strPreserve;
+
 	// Filter variables by distance
 	std::string strFilterByDist;
 
-	// Only output the mask
-	bool fMaskOnly;
+	// Filter variables by contour
+	std::string strFilterByContour;
 
 	// Apply the inverted filter
 	bool fInvert;
@@ -223,12 +351,15 @@ try {
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineBool(fRegional, "regional");
 
-		CommandLineString(strPreserve, "preserve", "");
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineString(strOutputDataList, "out_data_list", "");
 
-		CommandLineString(strFilterByDist, "bydist", "");
-		CommandLineBool(fMaskOnly, "mask_only");
+		CommandLineString(strVariables, "var", "");
+		CommandLineString(strMaskVariable, "maskvar", "");
+		CommandLineString(strPreserve, "preserve", "");
+
+		CommandLineStringD(strFilterByDist, "bydist", "", "[dist]");
+		CommandLineStringD(strFilterByContour, "bycontour", "", "[var,delta,dist,minmaxdist]");
 		CommandLineBool(fInvert, "invert");
 
 		ParseCommandLine(argc, argv);
@@ -259,8 +390,14 @@ try {
 		_EXCEPTIONT("Only one of (--out_data) or (--out_data_list)"
 			" may be specified");
 	}
-	if (strFilterByDist.length() == 0) {
-		_EXCEPTIONT("No filter command (--bydist) specified");
+	if ((strFilterByDist.length() == 0) && (strFilterByContour.length() == 0)) {
+		_EXCEPTIONT("No filter command (--bydist) or (--bycontour) specified");
+	}
+	if ((strFilterByDist.length() != 0) && (strFilterByContour.length() != 0)) {
+		_EXCEPTIONT("Only one filter command (--bydist) or (--bycontour) may be specified");
+	}
+	if ((strVariables.length() == 0) && (strMaskVariable.length() == 0)) {
+		_EXCEPTIONT("One of (--var) or (--maskvar) must be specified");
 	}
 
 	// Input file type
@@ -280,36 +417,84 @@ try {
 	ColumnDataHeader cdhInput;
 	cdhInput.Parse(strInputFormat);
 
-	// Parse --by_dist and check arguments
-	ArgumentTree atFilterByDist(true);
-	atFilterByDist.Parse(strFilterByDist);
-
-	for (int v = 0; v < atFilterByDist.size(); v++) {
-		ArgumentTree * patThisFilterByDist =
-			atFilterByDist.GetSubTree(v);
-
-		if (patThisFilterByDist == NULL) {
-			_EXCEPTION1("Invalid format of --bydist \"%s\"; expected <variable>,<dist>",
-				atFilterByDist.GetArgumentString(v).c_str());
+	// Parse --var argument
+	std::vector<std::string> vecVarNames;
+	std::vector<VariableIndex> vecVarIx;
+	if (strVariables != "") {
+		std::string strVariablesTemp = strVariables;
+		for (;;) {
+			Variable var;
+			int iLast = var.ParseFromString(varreg, strVariablesTemp) + 1;
+			vecVarIx.push_back( varreg.FindOrRegister(var) );
+			vecVarNames.push_back( strVariablesTemp.substr(0,iLast-1) );
+			if (iLast >= strVariables.length()) {
+				break;
+			}
+			strVariablesTemp = strVariablesTemp.substr(iLast);
 		}
-		if (patThisFilterByDist->size() != 2) {
-			_EXCEPTION1("Invalid format of --bydist \"%s\"; expected <variable>,<dist>",
-				atFilterByDist.GetArgumentString(v).c_str());
-		}
-		if (!STLStringHelper::IsFloat((*patThisFilterByDist)[1])) {
+	}
+	_ASSERT(vecVarNames.size() == vecVarIx.size());
+
+	// Parse --bydist
+	if (strFilterByDist != "") {
+		if (!STLStringHelper::IsFloat(strFilterByDist)) {
 			bool fFound = false;
 			for (int i = 0; i < cdhInput.size(); i++) {
-				if (cdhInput[i] == (*patThisFilterByDist)[1]) {
+				if (cdhInput[i] == strFilterByDist) {
 					fFound = true;
 					break;
 				}
 			}
 			if (!fFound) {
 				_EXCEPTION1("Invalid format of --bydist;"
-					" second argument <dist> \"%s\" does not appear in --in_fmt",
-					(*patThisFilterByDist)[1].c_str());
+					" \"%s\" does not appear in --in_fmt",
+					strFilterByDist.c_str());
 			}
 		}
+	}
+/*
+	ArgumentTree atFilterByDist(true);
+	if (strFilterByDist != "") {
+		atFilterByDist.Parse(strFilterByDist);
+
+		for (int v = 0; v < atFilterByDist.size(); v++) {
+			ArgumentTree * patThisFilterByDist =
+				atFilterByDist.GetSubTree(v);
+
+			if (patThisFilterByDist == NULL) {
+				_EXCEPTION1("Invalid format of --bydist \"%s\"; expected <dist>",
+					atFilterByDist.GetArgumentString(v).c_str());
+			}
+			if (patThisFilterByDist->size() != 1) {
+				_EXCEPTION1("Invalid format of --bydist \"%s\"; expected <dist>",
+					atFilterByDist.GetArgumentString(v).c_str());
+			}
+			if (!STLStringHelper::IsFloat((*patThisFilterByDist)[0])) {
+				bool fFound = false;
+				for (int i = 0; i < cdhInput.size(); i++) {
+					if (cdhInput[i] == (*patThisFilterByDist)[0]) {
+						fFound = true;
+						break;
+					}
+				}
+				if (!fFound) {
+					_EXCEPTION1("Invalid format of --bydist;"
+						" argument <dist> \"%s\" does not appear in --in_fmt",
+						(*patThisFilterByDist)[0].c_str());
+				}
+			}
+		}
+	}
+*/
+	// Parse --bycontour
+	std::vector<ClosedContourOp> vecClosedContourOp;
+
+	if (strFilterByContour != "") {
+		AnnounceStartBlock("Parsing --byclosedcontour");
+		ClosedContourOp op;
+		op.Parse(varreg, strFilterByContour);
+		vecClosedContourOp.push_back(op);
+		AnnounceEndBlock(NULL);
 	}
 
 	// Parse variable preservation list
@@ -462,8 +647,8 @@ try {
 	// Create data array
 	DataArray1D<double> data(grid.GetSize());
 
-	// Create filter
-	DataArray1D<double> dataFilter(grid.GetSize());
+	// Create mask
+	DataArray1D<double> dataMask(grid.GetSize());
 
 	// Loop over all files
 	if (vecInputFileList.size() != vecOutputFileList.size()) {
@@ -475,10 +660,14 @@ try {
 		AnnounceStartBlock("Processing input (%s)", vecInputFileList[f].c_str());
 
 		// Open input file
-		NcFile ncinfile(vecInputFileList[f].c_str(), NcFile::ReadOnly);
-		if (!ncinfile.is_valid()) {
-			_EXCEPTIONT("Unable to open input datafile");
-		}
+		NcFileVector vecInFiles;
+		vecInFiles.ParseFromString(vecInputFileList[f]);
+		_ASSERT(vecInFiles.size() > 0);
+
+		NcFile & ncinfile = *(vecInFiles[0]);
+		//if (!ncinfile.is_valid()) {
+		//	_EXCEPTIONT("Unable to open input datafile");
+		//}
 
 		// Get time variable and verify calendar is compatible
 		NcVar * varTime = ncinfile.get_var("time");
@@ -517,6 +706,12 @@ try {
 		// Copy time
 		CopyNcVar(ncinfile, ncoutfile, "time");
 
+		// Get time dimension
+		NcDim * dimTimeOut = ncoutfile.get_dim("time");
+		if (dimTimeOut == NULL) {
+			_EXCEPTIONT("Unable to find \"time\" dimension");
+		}
+
 		// Copy latitude and/or longitude
 		CopyNcVarIfExists(ncinfile, ncoutfile, "lat");
 		CopyNcVarIfExists(ncinfile, ncoutfile, "latitude");
@@ -531,148 +726,280 @@ try {
 		// Copy preserve variables
 		for (int p = 0; p < vecPreserveVariables.size(); p++) {
 			CopyNcVar(ncinfile, ncoutfile, vecPreserveVariables[p]);
+
+			if (vecPreserveVariables[p] == strMaskVariable) {
+				_EXCEPTION1("Variable \"%s\" specified as --maskvar also appears in --preserve",
+					strMaskVariable.c_str());
+			}
 		}
 
-		// Loop through all variables
-		for (int v = 0; v < atFilterByDist.size(); v++) {
-			ArgumentTree * patThisFilterByDist =
-				atFilterByDist.GetSubTree(v);
+		// Copy masked variables
+		std::vector<NcVar *> vecNcVarIn;
+		std::vector<NcVar *> vecNcVarOut;
 
-			const std::string & strVariable = (*patThisFilterByDist)[0];
-			const std::string & strDist = (*patThisFilterByDist)[1];
+		std::vector<std::string> strGridDimNames;
 
-			AnnounceStartBlock("Processing variable \"%s\"", strVariable.c_str());
+		NcDim * dimNcVarOut0 = NULL;
+		NcDim * dimNcVarOut1 = NULL;
 
-			// Create an output variable
+		for (int v = 0; v < vecVarNames.size(); v++) {
+			const std::string & strVariable = vecVarNames[v];
+
+			if (vecVarNames[v] == strMaskVariable) {
+				_EXCEPTION1("Variable \"%s\" specified as --maskvar also appears in --var",
+					strMaskVariable.c_str());
+			}
+
+			// Copy the variable from input file to output file
 			CopyNcVar(ncinfile, ncoutfile, strVariable, true, false);
 
+			// Get pointers to the NcVars associated with these variables
 			NcVar * varIn = ncinfile.get_var(strVariable.c_str());
 			if (varIn == NULL) {
 				_EXCEPTION();
 			}
+			vecNcVarIn.push_back(varIn);
 
 			NcVar * varOut = ncoutfile.get_var(strVariable.c_str());
 			if (varOut == NULL) {
 				_EXCEPTION();
 			}
+			vecNcVarOut.push_back(varOut);
 
-			// Load in data
-			int nGridDims = grid.m_nGridDim.size();
-
-			std::vector<NcDim *> vecDim;
-			for (int d = 0; d < varIn->num_dims(); d++) {
-				vecDim.push_back(varIn->get_dim(d));
-			}
-			if (vecDim.size() < 1 + nGridDims) {
+			// Count variable dimensions
+			long nVarDims = varIn->num_dims();
+			if (nVarDims < 1 + grid.m_nGridDim.size()) {
 				_EXCEPTION2("Insufficient dimensions in variable \"%s\" in file \"%s\"",
-					strVariable.c_str(), vecOutputFileList[f].c_str());
+					strVariable.c_str(), vecOutputFileList[f].c_str()); 
 			}
-			if (strcmp(vecDim[0]->name(), "time") != 0) {
+			if (strcmp(varIn->get_dim(0)->name(), "time") != 0) {
 				_EXCEPTION2("First dimension of variable \"%s\" in file \"%s\" must be \"time\"",
 					strVariable.c_str(), vecOutputFileList[f].c_str());
 			}
-			int nVarSize = 1;
-			for (int d = 0; d < nGridDims; d++) {
-				nVarSize *= vecDim[vecDim.size()-d-1]->size();
+
+			// Get output dimensions
+			if (grid.m_nGridDim.size() == 1) {
+				if (varIn->get_dim(nVarDims-1)->size() != grid.m_nGridDim[0]) {
+					_EXCEPTION3("Last dimension of variable \"%s\" in file \"%s\" must have size equal to grid size (%i)",
+						strVariable.c_str(), vecOutputFileList[f].c_str(), grid.m_nGridDim[0]);
+				}
+				dimNcVarOut0 = ncoutfile.get_dim(varIn->get_dim(nVarDims-1)->name());
+				if (dimNcVarOut0 == NULL) {
+					_EXCEPTION1("Unable to match dimension \"%s\" in output file",
+						varIn->get_dim(nVarDims-1)->name());
+				}
 			}
-			if (grid.GetSize() != nVarSize) {
-				_EXCEPTION2("Variable \"%s\" in file \"%s\" dimensionality inconsistent with grid:"
-					" Verify final variable dimensions match grid",
-					strVariable.c_str(), vecOutputFileList[f].c_str());
+			if (grid.m_nGridDim.size() == 2) {
+				if ((varIn->get_dim(nVarDims-2)->size() != grid.m_nGridDim[0]) &&
+					(varIn->get_dim(nVarDims-1)->size() != grid.m_nGridDim[1])
+				) {
+					_EXCEPTION4("Last dimensions of variable \"%s\" in file \"%s\" must have size equal to grid size (%i,%i)",
+						strVariable.c_str(), vecOutputFileList[f].c_str(), grid.m_nGridDim[0], grid.m_nGridDim[1]);
+				}
+				dimNcVarOut0 = ncoutfile.get_dim(varIn->get_dim(nVarDims-2)->name());
+				if (dimNcVarOut0 == NULL) {
+					_EXCEPTION1("Unable to match dimension \"%s\" in output file",
+						varIn->get_dim(nVarDims-2)->name());
+				}
+				dimNcVarOut1 = ncoutfile.get_dim(varIn->get_dim(nVarDims-1)->name());
+				if (dimNcVarOut1 == NULL) {
+					_EXCEPTION1("Unable to match dimension \"%s\" in output file",
+						varIn->get_dim(nVarDims-1)->name());
+				}
+
+			}
+		}
+		_ASSERT(vecVarNames.size() == vecNcVarIn.size());
+		_ASSERT(vecVarNames.size() == vecNcVarOut.size());
+
+		// No variables specified, try to guess mask variable dimensions
+		if (dimNcVarOut0 == NULL) {
+			if (grid.m_nGridDim.size() == 1) {
+				dimNcVarOut0 = ncoutfile.get_dim("ncol");
+				if (dimNcVarOut0 == NULL) {
+					dimNcVarOut0 = ncoutfile.add_dim("ncol", grid.m_nGridDim[0]);
+				} else if (dimNcVarOut0->size() != grid.m_nGridDim[0]) {
+					_EXCEPTIONT("Unable to determine grid dimension in output file");
+				}
+			}
+			if (grid.m_nGridDim.size() == 2) {
+				dimNcVarOut0 = ncoutfile.get_dim("lat");
+				dimNcVarOut1 = ncoutfile.get_dim("lon");
+				if (dimNcVarOut0 == NULL) {
+					dimNcVarOut0 = ncoutfile.add_dim("lat", grid.m_nGridDim[0]);
+				} else if (dimNcVarOut0->size() != grid.m_nGridDim[0]) {
+					_EXCEPTIONT("Unable to determine grid dimension in output file");
+				}
+				if (dimNcVarOut1 == NULL) {
+					dimNcVarOut1 = ncoutfile.add_dim("lon", grid.m_nGridDim[1]);
+				} else if (dimNcVarOut1->size() != grid.m_nGridDim[1]) {
+					_EXCEPTIONT("Unable to determine grid dimension in output file");
+				}
+			}
+		}
+		_ASSERT(dimNcVarOut0 != NULL);
+		if (grid.m_nGridDim.size() == 2) {
+			_ASSERT(dimNcVarOut1 != NULL);
+		}
+
+		// Create masked variable
+		NcVar * varMask = NULL;
+		if (strMaskVariable != "") {
+			if (grid.m_nGridDim.size() == 1) {
+				varMask = ncoutfile.add_var(
+					strMaskVariable.c_str(),
+					ncDouble,
+					dimTimeOut,
+					dimNcVarOut0
+				);
+
+			} else {
+				varMask = ncoutfile.add_var(
+					strMaskVariable.c_str(),
+					ncDouble,
+					dimTimeOut,
+					dimNcVarOut0,
+					dimNcVarOut1
+				);
+			}
+		}
+
+		// Loop through all times
+		for (int t = 0; t < vecTimes.size(); t++) {
+
+			AnnounceStartBlock("Processing time \"%s\"",
+				vecTimes[t].ToString().c_str());
+	
+			// Build mask
+			TimeToPathNodeMap::const_iterator iter =
+				mapTimeToPathNode.find(vecTimes[t]);
+
+			dataMask.Zero();
+
+			if (iter != mapTimeToPathNode.end()) {
+				if (strFilterByDist != "") {
+					BuildMask_ByDist(
+						grid,
+						cdhInput,
+						pathvec,
+						iter->second,
+						strFilterByDist,
+						dataMask);
+				}
+				if (strFilterByContour != "") {
+					Variable & varOp = varreg.Get(vecClosedContourOp[0].m_varix);
+					varOp.LoadGridData(varreg, vecInFiles, grid, t);
+					const DataArray1D<float> & dataState = varOp.GetData();
+					_ASSERT(dataState.GetRows() == grid.GetSize());
+
+					BuildMask_ByContour<float>(
+						grid,
+						dataState,
+						cdhInput,
+						pathvec,
+						iter->second,
+						vecClosedContourOp[0],
+						dataMask);
+				}
+			}
+			if (fInvert) {
+				for (int i = 0; i < dataMask.GetRows(); i++) {
+					dataMask[i] = 1.0 - dataMask[i];
+				}
 			}
 
-			// Number of auxiliary dimensions and array of sizes for each slice
-			int nAuxDims = 1;
-			for (int d = 0; d < vecDim.size() - nGridDims; d++) {
-				nAuxDims *= vecDim[d]->size();
-			}
-
-			DataArray1D<long> vecDataSize(vecDim.size());
-			for (int d = 0; d < vecDim.size(); d++) {
-				if (d >= vecDim.size() - nGridDims) {
-					vecDataSize[d] = vecDim[d]->size();
+			// Write mask to file
+			if (varMask != NULL) {
+				if (grid.m_nGridDim.size() == 1) {
+					varMask->set_cur(t,0);
+					varMask->put(&(dataMask[0]), 1, grid.m_nGridDim[0]);
 				} else {
-					vecDataSize[d] = 1;
+					varMask->set_cur(t,0,0);
+					varMask->put(&(dataMask[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
 				}
 			}
 
-			// Current time index
-			int iCurrentTime = (-1);
+			// Loop through all variables
+			for (int v = 0; v < vecVarIx.size(); v++) {
 
-			// Loop through all auxiliary dimensions
-			DataArray1D<long> vecDataPos(vecDim.size());
-			for (int i = 0; i < nAuxDims; i++) {
+				const std::string & strVariable = vecVarNames[v];
 
-				// Load data
-				int ixDim = i;
-				for (int d = vecDim.size() - nGridDims - 1; d >= 0; d--) {
-					vecDataPos[d] = ixDim % vecDim[d]->size();
-					ixDim /= vecDim[d]->size();
+				AnnounceStartBlock("Processing variable \"%s\"", strVariable.c_str());
+
+				// Load input and output variables
+				NcVar * varIn = vecNcVarIn[v];
+				NcVar * varOut = vecNcVarOut[v];
+
+				// Load in data
+				int nGridDims = grid.m_nGridDim.size();
+
+				std::vector<NcDim *> vecDim;
+				for (int d = 0; d < varIn->num_dims(); d++) {
+					vecDim.push_back(varIn->get_dim(d));
 				}
-				if (ixDim != 0) {
-					_EXCEPTIONT("Logic error");
+/*
+				if (vecDim.size() < 1 + nGridDims) {
+					_EXCEPTION2("Insufficient dimensions in variable \"%s\" in file \"%s\"",
+						strVariable.c_str(), vecOutputFileList[f].c_str());
+				}
+				if (strcmp(vecDim[0]->name(), "time") != 0) {
+					_EXCEPTION2("First dimension of variable \"%s\" in file \"%s\" must be \"time\"",
+						strVariable.c_str(), vecOutputFileList[f].c_str());
+				}
+*/
+				int nVarSize = 1;
+				for (int d = 0; d < nGridDims; d++) {
+					nVarSize *= vecDim[vecDim.size()-d-1]->size();
+				}
+				if (grid.GetSize() != nVarSize) {
+					_EXCEPTION2("Variable \"%s\" in file \"%s\" dimensionality inconsistent with grid:"
+						" Verify final variable dimensions match grid",
+						strVariable.c_str(), vecOutputFileList[f].c_str());
 				}
 
-				varIn->set_cur(&(vecDataPos[0]));
-				varIn->get(&(data[0]), &(vecDataSize[0]));
+				// Number of auxiliary dimensions and array of sizes for each slice
+				int nAuxDims = 1;
+				for (int d = 1; d < vecDim.size() - nGridDims; d++) {
+					nAuxDims *= vecDim[d]->size();
+				}
 
-				// Check if the time has changed
-				if (iCurrentTime != vecDataPos[0]) {
-					iCurrentTime = vecDataPos[0];
-
-					if (iCurrentTime >= vecTimes.size()) {
-						_EXCEPTION2("Logic error %i %i",
-							iCurrentTime, vecTimes.size());
-					}
-
-					Announce("Processing time \"%s\"",
-						vecTimes[iCurrentTime].ToString().c_str());
-
-					// Build filter
-					TimeToPathNodeMap::const_iterator iter =
-						mapTimeToPathNode.find(vecTimes[iCurrentTime]);
-
-					if (iter == mapTimeToPathNode.end()) {
-						dataFilter.Zero();
+				DataArray1D<long> vecDataSize(vecDim.size());
+				for (int d = 0; d < vecDim.size(); d++) {
+					if (d >= vecDim.size() - nGridDims) {
+						vecDataSize[d] = vecDim[d]->size();
 					} else {
-						BuildFilter(
-							grid,
-							cdhInput,
-							pathvec,
-							iter->second,
-							strDist,
-							dataFilter);
+						vecDataSize[d] = 1;
 					}
 				}
 
-				// Apply filter
-				if (!fMaskOnly) {
-					if (!fInvert) {
-						for (int i = 0; i < data.GetRows(); i++) {
-							data[i] *= dataFilter[i];
-						}
-					} else {
-						for (int i = 0; i < data.GetRows(); i++) {
-							data[i] *= (1.0 - dataFilter[i]);
-						}
+				// Loop through all auxiliary dimensions (holding time fixed)
+				DataArray1D<long> vecDataPos(vecDim.size());
+				vecDataPos[0] = t;
+
+				for (int i = 0; i < nAuxDims; i++) {
+
+					// Load data
+					int ixDim = i;
+					for (int d = vecDim.size() - nGridDims - 1; d >= 1; d--) {
+						vecDataPos[d] = ixDim % vecDim[d]->size();
+						ixDim /= vecDim[d]->size();
+					}
+					if (ixDim != 0) {
+						_EXCEPTIONT("Logic error");
 					}
 
-				// Only output the filter mask
-				} else {
-					if (!fInvert) {
-						for (int i = 0; i < data.GetRows(); i++) {
-							data[i] = dataFilter[i];
-						}
-					} else {
-						for (int i = 0; i < data.GetRows(); i++) {
-							data[i] = 1.0 - dataFilter[i];
-						}
+					varIn->set_cur(&(vecDataPos[0]));
+					varIn->get(&(data[0]), &(vecDataSize[0]));
+
+					// Apply mask
+					for (int i = 0; i < data.GetRows(); i++) {
+						data[i] *= dataMask[i];
 					}
+
+					// Write data
+					varOut->set_cur(&(vecDataPos[0]));
+					varOut->put(&(data[0]), &(vecDataSize[0]));
 				}
-
-				// Write data
-				varOut->set_cur(&(vecDataPos[0]));
-				varOut->put(&(data[0]), &(vecDataSize[0]));
 			}
 
 			AnnounceEndBlock("Done");

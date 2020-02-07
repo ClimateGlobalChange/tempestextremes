@@ -48,7 +48,7 @@ void CopyNcVarAttributes(
 ////////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		Copy a NetCDF varaible from one file to another.
+///		Copy a NetCDF variable from one file to another.
 ///	</summary>
 void CopyNcVar(
 	NcFile & ncIn,
