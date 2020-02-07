@@ -427,7 +427,7 @@ try {
 			int iLast = var.ParseFromString(varreg, strVariablesTemp) + 1;
 			vecVarIx.push_back( varreg.FindOrRegister(var) );
 			vecVarNames.push_back( strVariablesTemp.substr(0,iLast-1) );
-			if (iLast >= strVariables.length()) {
+			if (iLast >= strVariablesTemp.length()) {
 				break;
 			}
 			strVariablesTemp = strVariablesTemp.substr(iLast);
