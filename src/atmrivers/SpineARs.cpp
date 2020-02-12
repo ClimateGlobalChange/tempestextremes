@@ -477,6 +477,12 @@ float BilinearInterp(
 
 	// Renormalize the longitude to [dLonRad[0], dLonRad[0] + 2.0 * M_PI)
 	dLon0Rad -= floor((dLon0Rad - dLonRad[0]) / (2.0 * M_PI)) * 2.0 * M_PI;
+	if (dLon0Rad < dLonRad[0]) {
+		dLon0Rad += 1.0e-12;
+	}
+	if (dLon0Rad >= dLonRad[0] + 2.0 * M_PI) {
+		dLon0Rad -= 1.0e-12;
+	}
 	_ASSERT((dLon0Rad >= dLonRad[0]) && (dLon0Rad < dLonRad[0] + 2.0 * M_PI));
 
 	// NOTE: This needs to be modified if the domain is regional
