@@ -44,6 +44,13 @@ void SimpleGrid::GenerateLatitudeLongitude(
 	int nLat = vecLat.GetRows();
 	int nLon = vecLon.GetRows();
 
+	if (nLat < 2) {
+		_EXCEPTIONT("At least two latitudes needed to generate grid.");
+	}
+	if (nLon < 2) {
+		_EXCEPTIONT("At least two longitudes needed to generate grid.");
+	}
+
 	m_dLat.Allocate(nLon * nLat);
 	m_dLon.Allocate(nLon * nLat);
 	m_dArea.Allocate(nLon * nLat);
@@ -56,12 +63,23 @@ void SimpleGrid::GenerateLatitudeLongitude(
 	// Verify units of latitude and longitude
 	for (int j = 0; j < nLat; j++) {
 		if (fabs(vecLat[j]) > 0.5 * M_PI + 1.0e-12) {
-			_EXCEPTIONT("In SimpleGrid, latitude array must be given in radians");
+			_EXCEPTIONT("Latitude array must be given in radians");
 		}
 	}
 	for (int i = 0; i < nLon; i++) {
 		if (fabs(vecLon[i]) > 2.0 * M_PI + 1.0e-12) {
-			_EXCEPTIONT("In SimpleGrid, longitude array must be given in radians");
+			_EXCEPTIONT("Longitude array must be given in radians");
+		}
+	}
+
+	// Determine orientation of latitude array
+	double dLatOrient = 1.0;
+	if (vecLat[1] < vecLat[0]) {
+		dLatOrient = -1.0;
+	}
+	for (int j = 0; j < nLat-1; j++) {
+		if (dLatOrient * vecLat[1] < dLatOrient * vecLat[0]) {
+			_EXCEPTIONT("Latitude array must be monotone.");
 		}
 	}
 
@@ -84,7 +102,7 @@ void SimpleGrid::GenerateLatitudeLongitude(
 			if (fRegional) {
 				dLatRad1 = vecLat[0] - 0.5 * (vecLat[1] - vecLat[0]);
 			} else {
-				dLatRad1 = -0.5 * M_PI;
+				dLatRad1 = - dLatOrient * 0.5 * M_PI;
 			}
 		} else {
 			dLatRad1 = 0.5 * (vecLat[j-1] + vecLat[j]);
@@ -93,7 +111,7 @@ void SimpleGrid::GenerateLatitudeLongitude(
 			if (fRegional) {
 				dLatRad2 = vecLat[j] + 0.5 * (vecLat[j] - vecLat[j-1]);
 			} else {
-				dLatRad2 = 0.5 * M_PI;
+				dLatRad2 = dLatOrient * 0.5 * M_PI;
 			}
 		} else {
 			dLatRad2 = 0.5 * (vecLat[j+1] + vecLat[j]);
