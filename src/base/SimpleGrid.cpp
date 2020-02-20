@@ -82,41 +82,41 @@ void SimpleGrid::GenerateLatitudeLongitude(
 
 		if (j == 0) {
 			if (fRegional) {
-				dLatRad1 = m_dLat[0] - 0.5 * (m_dLat[1] - m_dLat[0]);
+				dLatRad1 = vecLat[0] - 0.5 * (vecLat[1] - vecLat[0]);
 			} else {
 				dLatRad1 = -0.5 * M_PI;
 			}
 		} else {
-			dLatRad1 = 0.5 * (m_dLat[j-1] + m_dLat[j]);
+			dLatRad1 = 0.5 * (vecLat[j-1] + vecLat[j]);
 		}
 		if (j == nLat-1) {
 			if (fRegional) {
-				dLatRad2 = m_dLat[j] + 0.5 * (m_dLat[j] - m_dLat[j-1]);
+				dLatRad2 = vecLat[j] + 0.5 * (vecLat[j] - vecLat[j-1]);
 			} else {
 				dLatRad2 = 0.5 * M_PI;
 			}
 		} else {
-			dLatRad2 = 0.5 * (m_dLat[j+1] + m_dLat[j]);
+			dLatRad2 = 0.5 * (vecLat[j+1] + vecLat[j]);
 		}
 
 		if (i == 0) {
 			if (fRegional) {
-				dLonRad1 = m_dLon[0] - 0.5 * (m_dLon[1] - m_dLon[0]);
+				dLonRad1 = vecLon[0] - 0.5 * (vecLon[1] - vecLon[0]);
 			} else {
-				dLonRad1 = AverageLongitude_Rad(m_dLon[0], m_dLon[nLon-1]);
+				dLonRad1 = AverageLongitude_Rad(vecLon[0], vecLon[nLon-1]);
 			}
 		} else {
-			dLonRad1 = AverageLongitude_Rad(m_dLon[i-1], m_dLon[i]);
+			dLonRad1 = AverageLongitude_Rad(vecLon[i-1], vecLon[i]);
 		}
 
 		if (i == nLon-1) {
 			if (fRegional) {
-				dLonRad2 = m_dLon[i] + 0.5 * (m_dLon[i] - m_dLon[i-1]);
+				dLonRad2 = vecLon[i] + 0.5 * (vecLon[i] - vecLon[i-1]);
 			} else {
-				dLonRad2 = AverageLongitude_Rad(m_dLon[nLon-1], m_dLon[0]);
+				dLonRad2 = AverageLongitude_Rad(vecLon[nLon-1], vecLon[0]);
 			}
 		} else {
-			dLonRad2 = AverageLongitude_Rad(m_dLon[i], m_dLon[i+1]);
+			dLonRad2 = AverageLongitude_Rad(vecLon[i], vecLon[i+1]);
 		}
 
 		m_dArea[ixs] = fabs(sin(dLatRad2) - sin(dLatRad1)) * fabs(dLonRad2 - dLonRad1);
