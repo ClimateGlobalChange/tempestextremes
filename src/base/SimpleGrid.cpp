@@ -137,7 +137,14 @@ void SimpleGrid::GenerateLatitudeLongitude(
 			dLonRad2 = AverageLongitude_Rad(vecLon[i], vecLon[i+1]);
 		}
 
-		m_dArea[ixs] = fabs(sin(dLatRad2) - sin(dLatRad1)) * fabs(dLonRad2 - dLonRad1);
+		// Because of the way AverageLongitude_Rad works,
+		if (dLonRad1 > dLonRad2) {
+			dLonRad1 -= 2.0 * M_PI;
+		}
+		double dDeltaLon = dLonRad2 - dLonRad1;
+		_ASSERT(dDeltaLon < M_PI);
+
+		m_dArea[ixs] = fabs(sin(dLatRad2) - sin(dLatRad1)) * dDeltaLon;
 
 		// Connectivity in each compass direction
 		if (j != 0) {
