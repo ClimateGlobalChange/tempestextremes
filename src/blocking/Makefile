@@ -26,7 +26,7 @@ EXEC_FILES= BlockingDevs.cpp \
             CombineBlobs.cpp \
 	    DensityCalculations.cpp \
             Var4Dto3D.cpp\
-            split_file.cpp\
+            SplitFile.cpp\
             AvgVar.cpp\
             BlockingDFT.cpp\
             BlockingThresh.cpp\

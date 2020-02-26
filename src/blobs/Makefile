@@ -14,7 +14,7 @@ TEMPESTEXTREMESBASEDIR= $(TEMPESTEXTREMESDIR)/src/base
 
 TEMPESTEXTREMESBASELIB= $(TEMPESTEXTREMESBASEDIR)/libextremesbase.a
 
-EXEC_FILES= StitchBlobs.cpp BlobStats.cpp DetectBlobs.cpp
+EXEC_FILES= StitchBlobs.cpp BlobStats.cpp DetectBlobs_v1.cpp DetectBlobs.cpp
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 

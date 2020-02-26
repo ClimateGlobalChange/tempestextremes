@@ -1383,7 +1383,7 @@ void SpineARs(
 
 				// Write orientation data to file
 				if (param.fpSpineInfo != NULL) {
-					if (fVerbose) AnnounceStartBlock("Writing to file");
+					if (fVerbose) AnnounceStartBlock("Writing spine info to file");
 
 					if (dimTimeOut != NULL) {
 						fprintf(param.fpSpineInfo, "Time %i\n", t);
@@ -1433,7 +1433,7 @@ void SpineARs(
 			}
 		}
 
-		if (fVerbose) AnnounceStartBlock("Writing results");
+		if (fVerbose) AnnounceStartBlock("Writing detection results");
 
 		// Output tagged cell array
 		if (dimTimeOut != NULL) {
