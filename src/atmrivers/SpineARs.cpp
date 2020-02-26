@@ -718,8 +718,8 @@ void CalculateCrossSection(
 				dSpineXSecBeginEnd(k,3) = dLatXRad * 180.0 / M_PI;
 			}
 */
-			dSpineXSecLon(k,p) = static_cast<float>(dLonXRad);
-			dSpineXSecLat(k,p) = static_cast<float>(dLatXRad);
+			dSpineXSecLon(k,p) = static_cast<float>(dLonXRad) * 180.0 / M_PI;
+			dSpineXSecLat(k,p) = static_cast<float>(dLatXRad) * 180.0 / M_PI;
 		}
 	}
 }
