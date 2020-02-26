@@ -70,7 +70,7 @@ void ParseInputFiles(
 			strInputFile.c_str());
 	}
 }
-
+/*
 ///////////////////////////////////////////////////////////////////////////////
 
 float SampleCurve(
@@ -122,7 +122,7 @@ float SampleCurveRMSE(
 			double dLonX = dLon[ip];
 
 			float dSample = SampleCurve(dLonX, dLatX, dLon0, dLat0, dParam) - dVar[iLat][ix];
-/*
+
 			float dDist = 2.0;
 			if ((ip != 0) || (jp != 0)) {
 				dDist = exp(-0.5 * dFalloff * log(
@@ -131,8 +131,6 @@ float SampleCurveRMSE(
 			}
 
 			dRMSE += dSample * dSample * dDist;
-*/
-			dRMSE += dSample * dSample;
 		}
 	}
 
@@ -218,7 +216,7 @@ void CurveFit(
 		}
 	}
 }
-
+*/
 ///////////////////////////////////////////////////////////////////////////////
 
 class SpineARsParam {
@@ -354,6 +352,50 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void StereographicProjection(
+	double dLon0,
+	double dLat0,
+	double dLon,
+	double dLat,
+	double & dX,
+	double & dY
+) {
+	// Forward projection using equations (1)-(3)
+	// http://mathworld.wolfram.com/StereographicProjection.html
+	double dK = 2.0 / (1.0 + sin(dLat0) * sin(dLat) + cos(dLat0) * cos(dLat) * cos(dLon - dLon0));
+	dX = dK * cos(dLat) * sin(dLon - dLon0);
+	dY = dK * (cos(dLat0) * sin(dLat) - sin(dLat0) * cos(dLat) * cos(dLon - dLon0));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void StereographicProjectionInv(
+	double dLon0,
+	double dLat0,
+	double dX,
+	double dY,
+	double & dLon,
+	double & dLat
+) {
+	// Forward projection using equations (3)-(5)
+	// http://mathworld.wolfram.com/StereographicProjection.html
+	double dRho = sqrt(dX * dX + dY * dY);
+	double dC = 2.0 * atan(0.5 * dRho);
+
+	if (dRho < 1.0e-14) {
+		dLat = dLat0;
+		dLon = dLon0;
+		return;
+	}
+
+	dLat = asin(cos(dC) * sin(dLat0) + dY * sin(dC) * cos(dLat0) / dRho);
+	dLon = dLon0 + atan2(
+			dX * sin(dC),
+			dRho * cos(dLat0) * cos(dC) - dY * sin(dLat0) * sin(dC));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void CalculateOrientation(
 	const DataArray1D<double> & dLonRad,
 	const DataArray1D<double> & dLatRad,
@@ -430,20 +472,20 @@ void CalculateOrientation(
 			auto iter = setSpinePointsVisited.begin();
 			iter != setSpinePointsVisited.end(); iter++
 		) {
-			double dY = dLatRad[iter->first];
-			double dX = dLonRad[iter->second];
+			double dXs;
+			double dYs;
 
-			if (dX > dLonRad[i] + M_PI) {
-				dX -= 2.0 * M_PI;
-			}
-			if (dX < dLonRad[i] - M_PI) {
-				dX += 2.0 * M_PI;
-			}
+			StereographicProjection(
+				dLonRad[i],
+				dLatRad[j],
+				dLonRad[iter->second],
+				dLatRad[iter->first],
+				dXs, dYs);
 
-			dSumX += dX;
-			dSumY += dY;
-			dSumX2 += dX * dX;
-			dSumXY += dX * dY;
+			dSumX += dXs;
+			dSumY += dYs;
+			dSumX2 += dXs * dXs;
+			dSumXY += dXs * dYs;
 		}
 
 		double dCovXY = dSumXY - dInvN * dSumX * dSumY;
@@ -595,7 +637,8 @@ void CalculateCrossSection(
 	int nSpineXSecPoints,
 	double dSpineXSecDist,
 	DataArray2D<float> & dSpineXSec,
-	DataArray2D<double> & dSpineXSecBeginEnd
+	DataArray2D<float> & dSpineXSecLon,
+	DataArray2D<float> & dSpineXSecLat
 ) {
 	_ASSERT(dLonRad.GetRows() > 0);
 	_ASSERT(dLatRad.GetRows() > 0);
@@ -604,8 +647,10 @@ void CalculateCrossSection(
 	_ASSERT(dSpineOrientationDeg.GetRows() == setSpinePoints.size());
 	_ASSERT(dSpineXSec.GetRows() == setSpinePoints.size());
 	_ASSERT(dSpineXSec.GetColumns() == nSpineXSecPoints);
-	_ASSERT(dSpineXSecBeginEnd.GetRows() == setSpinePoints.size());
-	_ASSERT(dSpineXSecBeginEnd.GetColumns() == 4);
+	_ASSERT(dSpineXSecLon.GetRows() == setSpinePoints.size());
+	_ASSERT(dSpineXSecLon.GetColumns() == nSpineXSecPoints);
+	_ASSERT(dSpineXSecLat.GetRows() == setSpinePoints.size());
+	_ASSERT(dSpineXSecLat.GetColumns() == nSpineXSecPoints);
 
 	// Find all spine points
 	int k = 0;
@@ -616,18 +661,46 @@ void CalculateCrossSection(
 		double dLon0Rad = dLonRad[i];
 		double dLat0Rad = dLatRad[j];
 
+		double dOrient = dSpineOrientationDeg[k] * M_PI / 180.0;
+
 		for (int p = 0; p < nSpineXSecPoints; p++) {
 
 			// The cross-section is along the line
 			//   Lon(s) = dLon0 - s * sin(dSpineOrientation)
 			//   Lat(s) = dLat0 + s * cos(dSpineOrientation)
-
+/*
 			double dS = dSpineXSecDist * M_PI / 180.0
 				* (static_cast<double>(p) - 0.5 * static_cast<double>(nSpineXSecPoints-1));
 
-			double dLonXRad = dLon0Rad - dS * sin(dSpineOrientationDeg[k] * M_PI / 180.0);
-			double dLatXRad = dLat0Rad + dS * cos(dSpineOrientationDeg[k] * M_PI / 180.0);
+			double dLonXRad = dLon0Rad - dS * sin(dOrient);
+			double dLatXRad = dLat0Rad + dS * cos(dOrient);
+*/
+			// Great-circle cross-section
+			double dS = dSpineXSecDist * M_PI / 180.0
+				* (static_cast<double>(p) - 0.5 * static_cast<double>(nSpineXSecPoints-1));
 
+			double dC = 2.0 * tan(0.5 * dS);
+
+			double dXs = dC * sin(dOrient);
+			double dYs = - dC * cos(dOrient);
+
+			double dLonXRad;
+			double dLatXRad;
+
+			StereographicProjectionInv(
+				dLon0Rad,
+				dLat0Rad,
+				dXs,
+				dYs,
+				dLonXRad,
+				dLatXRad);
+
+			//double dDist = acos(sin(dLat0Rad) * sin(dLatXRad) + cos(dLat0Rad) * cos(dLatXRad) * cos(dLonXRad - dLon0Rad)) * 180.0 / M_PI;
+
+			//if (fabs(dLat0Rad) < 30.0 / 180.0 * M_PI)
+			//printf("%i %2.1f %1.5e %1.5e %1.5e\n", p, dOrient * 180.0 / M_PI, dLonXRad * 180.0 / M_PI, dLatXRad * 180.0 / M_PI, dDist);
+
+			// Interpolate the field at this point
 			dSpineXSec(k,p) =
 				BilinearInterp(
 					dLonRad,
@@ -635,7 +708,7 @@ void CalculateCrossSection(
 					dVarData,
 					dLonXRad,
 					dLatXRad);
-
+/*
 			if (p == 0) {
 				dSpineXSecBeginEnd(k,0) = dLonXRad * 180.0 / M_PI;
 				dSpineXSecBeginEnd(k,1) = dLatXRad * 180.0 / M_PI;
@@ -644,6 +717,9 @@ void CalculateCrossSection(
 				dSpineXSecBeginEnd(k,2) = dLonXRad * 180.0 / M_PI;
 				dSpineXSecBeginEnd(k,3) = dLatXRad * 180.0 / M_PI;
 			}
+*/
+			dSpineXSecLon(k,p) = static_cast<float>(dLonXRad);
+			dSpineXSecLat(k,p) = static_cast<float>(dLatXRad);
 		}
 	}
 }
@@ -1272,7 +1348,8 @@ void SpineARs(
 
 				// Calculate cross-sections
 				DataArray2D<float> dSpineXSec;
-				DataArray2D<double> dSpineXSecBeginEnd;
+				DataArray2D<float> dSpineXSecLon;
+				DataArray2D<float> dSpineXSecLat;
 				if (param.nSpineCrossSectionPoints > 0) {
 					if (fVerbose) AnnounceStartBlock("Calculating cross-sections");
 
@@ -1280,9 +1357,13 @@ void SpineARs(
 						dSpineOrientation.GetRows(),
 						param.nSpineCrossSectionPoints);
 
-					dSpineXSecBeginEnd.Allocate(
+					dSpineXSecLon.Allocate(
 						dSpineOrientation.GetRows(),
-						4);
+						param.nSpineCrossSectionPoints);
+
+					dSpineXSecLat.Allocate(
+						dSpineOrientation.GetRows(),
+						param.nSpineCrossSectionPoints);
 
 					CalculateCrossSection(
 						dLonRad,
@@ -1293,7 +1374,8 @@ void SpineARs(
 						param.nSpineCrossSectionPoints,
 						param.dSpineCrossSectionDist,
 						dSpineXSec,
-						dSpineXSecBeginEnd
+						dSpineXSecLon,
+						dSpineXSecLat
 					);
 
 					if (fVerbose) AnnounceEndBlock("Done");
@@ -1319,12 +1401,20 @@ void SpineARs(
 							dLatDeg[iter->first],
 							dSpineOrientation[k]);
 
-						if (dSpineXSecBeginEnd.GetColumns() > 0) {
-							fprintf(param.fpSpineInfo, "\t%3.6f\t%3.6f\t%3.6f\t%3.6f",
-								dSpineXSecBeginEnd(k,0),
-								dSpineXSecBeginEnd(k,1),
-								dSpineXSecBeginEnd(k,2),
-								dSpineXSecBeginEnd(k,3));
+						if (dSpineXSecLon.GetColumns() > 0) {
+							fprintf(param.fpSpineInfo, "\t[%1.6e", dSpineXSecLon(k,0));
+							for (int p = 1; p < dSpineXSecLon.GetColumns(); p++) {
+								fprintf(param.fpSpineInfo, ",%1.6e", dSpineXSecLon(k,p));
+							}
+							fprintf(param.fpSpineInfo, "]");
+						}
+
+						if (dSpineXSecLat.GetColumns() > 0) {
+							fprintf(param.fpSpineInfo, "\t[%1.6e", dSpineXSecLat(k,0));
+							for (int p = 1; p < dSpineXSecLat.GetColumns(); p++) {
+								fprintf(param.fpSpineInfo, ",%1.6e", dSpineXSecLat(k,p));
+							}
+							fprintf(param.fpSpineInfo, "]");
 						}
 
 						if (dSpineXSec.GetColumns() > 0) {
