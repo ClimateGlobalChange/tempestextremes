@@ -885,14 +885,14 @@ inline double AverageLongitude_Rad(
 ///		Calculate the great circle distance between two RLL points.
 ///	</summary>
 inline double GreatCircleDistance_Deg(
-	double dLon1,
-	double dLat1,
-	double dLon2,
-	double dLat2
+	double dLonRad1,
+	double dLatRad1,
+	double dLonRad2,
+	double dLatRad2
 ) {
 	double dR =
-		sin(dLat1) * sin(dLat2)
-		+ cos(dLat1) * cos(dLat2) * cos(dLon2 - dLon1);
+		sin(dLatRad1) * sin(dLatRad2)
+		+ cos(dLatRad1) * cos(dLatRad2) * cos(dLonRad2 - dLonRad1);
 
 	if (dR >= 1.0) {
 		dR = 0.0;

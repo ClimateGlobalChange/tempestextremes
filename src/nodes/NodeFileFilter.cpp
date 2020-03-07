@@ -525,7 +525,7 @@ void BuildMask_NearbyBlobs(
 	const double dMaxDist = nearbyblobsop.m_dMaxDist;
 
 	_ASSERT(dataState.GetRows() == grid.GetSize());
-	_ASSERT(dDist > 0.0);
+	_ASSERT(dDist >= 0.0);
 	_ASSERT(dDist <= 180.0);
 	_ASSERT(dMaxDist >= dDist);
 	_ASSERT(dMaxDist <= 180.0);
@@ -594,15 +594,15 @@ void BuildMask_NearbyBlobs(
 				int ixblob = queueThresholdedNodes.front();
 				queueThresholdedNodes.pop();
 
-				if ((ix != ixblob) &&
-				    (setNodesVisited.find(ixblob) != setNodesVisited.end())
-				) {
-					continue;
+				if (ix != ixblob) {
+					if (setNodesVisited.find(ixblob) != setNodesVisited.end()) {
+						continue;
+					}
+
+					setNodesVisited.insert(ixblob);
 				}
 
-				setNodesVisited.insert(ixblob);
-
-				// Great circle distance to this dof
+				// Make sure great circle distance to this dof is closer than dMaxDist
 				_ASSERT((ixblob >= 0) && (ixblob < grid.GetSize()));
 
 				double dRblob =
@@ -610,19 +610,11 @@ void BuildMask_NearbyBlobs(
 						dLon0, dLat0,
 						grid.m_dLon[ixblob], grid.m_dLat[ixblob]);
 
-				if ((ixblob != ix) && (dRblob > dMaxDist)) {
+				if ((ix != ixblob) && (dRblob > dMaxDist)) {
 					continue;
 				}
 
-				// Add all neighbors of this point to search
-				for (int n = 0; n < grid.m_vecConnectivity[ixblob].size(); n++) {
-					queueThresholdedNodes.push(grid.m_vecConnectivity[ixblob][n]);
-				}
-
-				if (ixblob == ix) {
-					continue;
-				}
-
+				// Verify this point satisfies the condition
 				if (!nearbyblobsop.SatisfiedBy(static_cast<double>(dataState[ixblob]))) {
 
 					// Isn't part of the blob, but add it to the list of
@@ -631,6 +623,11 @@ void BuildMask_NearbyBlobs(
 						queueNodes.push(ixblob);
 					}
 					continue;
+				}
+
+				// Add all neighbors of this point to search
+				for (int n = 0; n < grid.m_vecConnectivity[ixblob].size(); n++) {
+					queueThresholdedNodes.push(grid.m_vecConnectivity[ixblob][n]);
 				}
 
 				dataMask[ixblob] = 1.0;
