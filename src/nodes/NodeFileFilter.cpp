@@ -26,6 +26,7 @@
 #include "NetCDFUtilities.h"
 #include "ClosedContourOp.h"
 #include "SimpleGridUtilities.h"
+#include "GridElements.h"
 
 #include "netcdfcpp.h"
 
@@ -37,6 +38,243 @@
 #include <mpi.h>
 #endif
 */
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class storing a nearbyblob operator.
+///	</summary>
+class NearbyBlobsOp {
+
+public:
+	///	<summary>
+	///		Possible operations.
+	///	</summary>
+	enum Operation {
+		GreaterThan,
+		LessThan,
+		GreaterThanEqualTo,
+		LessThanEqualTo,
+		EqualTo,
+		NotEqualTo
+	};
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	NearbyBlobsOp() :
+		m_varix(InvalidVariableIndex),
+		m_dDistance(0.0),
+		m_eOp(GreaterThan),
+		m_dValue(0.0),
+		m_dMaxDist(180.0)
+	{ }
+
+public:
+	///	<summary>
+	///		Parse a nearbyblob operator string.
+	///	</summary>
+	void Parse(
+		VariableRegistry & varreg,
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Distance,
+			ReadMode_Op,
+			ReadMode_Value,
+			ReadMode_MaxDist,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Distance;
+
+		// Parse variable
+		Variable var;
+		int iLast = var.ParseFromString(varreg, strOp) + 1;
+		m_varix = varreg.FindOrRegister(var);
+
+		// Loop through string
+		for (int i = iLast; i <= strOp.length(); i++) {
+
+			// Comma-delimited
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in distance
+				if (eReadMode == ReadMode_Distance) {
+					m_dDistance = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Op;
+
+				// Read in operation
+				} else if (eReadMode == ReadMode_Op) {
+					if (strSubStr == ">") {
+						m_eOp = GreaterThan;
+					} else if (strSubStr == "<") {
+						m_eOp = LessThan;
+					} else if (strSubStr == ">=") {
+						m_eOp = GreaterThanEqualTo;
+					} else if (strSubStr == "<=") {
+						m_eOp = LessThanEqualTo;
+					} else if (strSubStr == "=") {
+						m_eOp = EqualTo;
+					} else if (strSubStr == "!=") {
+						m_eOp = NotEqualTo;
+					} else {
+						_EXCEPTION1("Threshold invalid operation \"%s\"",
+							strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Value;
+
+				// Read in value
+				} else if (eReadMode == ReadMode_Value) {
+					m_dValue = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_MaxDist;
+
+				// Read in maximum distance
+				} else if (eReadMode == ReadMode_MaxDist) {
+					m_dMaxDist = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
+							"\nRequired: \"<variable>,<distance>,<operation>,<value>[,<max distance>]\"",
+							strOp.c_str());
+				}
+			}
+		}
+
+		if ((eReadMode != ReadMode_Invalid) && (eReadMode != ReadMode_MaxDist)) {
+			_EXCEPTION1("\nInsufficient entries in --nearbyblobs op \"%s\""
+					"\nRequired: \"<name>,<distance>,<operation>,<value>[,<max distance>]\"",
+					strOp.c_str());
+		}
+
+		if (m_dDistance < 0.0) {
+			_EXCEPTION1("For --nearbyblobs, distance (%2.6f) must be nonnegative", m_dDistance);
+		}
+		if (m_dMaxDist < 0.0) {
+			_EXCEPTION1("For --nearbyblobs, max distance (%2.6f) must be nonnegative", m_dMaxDist);
+		}
+		if (m_dDistance > m_dMaxDist) {
+			_EXCEPTION2("For --nearbyblobs, distance (%2.6f) must be less than or equal to max distance (%2.6f)", m_dDistance, m_dMaxDist);
+		}
+
+		// Output announcement
+		char szBuffer[128];
+
+		sprintf(szBuffer, "%f", m_dDistance);
+		std::string strDescription =
+			std::string("Include blobs with at least 1 point within ") + szBuffer
+			+ std::string(" degrees where ") + var.ToString(varreg);
+		if (m_eOp == GreaterThan) {
+			strDescription += " is greater than ";
+		} else if (m_eOp == LessThan) {
+			strDescription += " is less than ";
+		} else if (m_eOp == GreaterThanEqualTo) {
+			strDescription += " is greater than or equal to ";
+		} else if (m_eOp == LessThanEqualTo) {
+			strDescription += " is less than or equal to ";
+		} else if (m_eOp == EqualTo) {
+			strDescription += " is equal to ";
+		} else if (m_eOp == NotEqualTo) {
+			strDescription += " is not equal to ";
+		}
+
+		if (fabs(m_dValue) < 1.0e-4) {
+			sprintf(szBuffer, "%e", m_dValue);
+		} else {
+			sprintf(szBuffer, "%f", m_dValue);
+		}
+		strDescription += szBuffer;
+
+		sprintf(szBuffer, "%f", m_dMaxDist);
+		strDescription += std::string(" (max dist ") + szBuffer + " degrees)";
+
+		Announce("%s", strDescription.c_str());
+	}
+
+public:
+	///	<summary>
+	///		Determine if a particular value satisfies this threshold.
+	///	</summary>
+	bool SatisfiedBy(
+		double dValue
+	) const {
+		if (m_eOp == GreaterThan) {
+			if (dValue > m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == LessThan) {
+			if (dValue < m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == GreaterThanEqualTo) {
+			if (dValue >= m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == LessThanEqualTo) {
+			if (dValue <= m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == EqualTo) {
+			if (dValue == m_dValue) {
+				return true;	
+			}
+
+		} else if (m_eOp == NotEqualTo) {
+			if (dValue != m_dValue) {
+				return true;
+			}
+
+		} else {
+			_EXCEPTIONT("Invalid operation");
+		}
+
+		return false;
+	}
+
+public:
+	///	<summary>
+	///		Variable to use for nearbyblobs.
+	///	</summary>
+	VariableIndex m_varix;
+
+	///	<summary>
+	///		Distance to search for blob.
+	///	</summary>
+	double m_dDistance;
+
+	///	<summary>
+	///		Operation.
+	///	</summary>
+	Operation m_eOp;
+
+	///	<summary>
+	///		Threshold value.
+	///	</summary>
+	double m_dValue;
+
+	///	<summary>
+	///		Maximum distance.
+	///	</summary>
+	double m_dMaxDist;
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 
 void BuildMask_ByDist(
@@ -148,7 +386,6 @@ void BuildMask_ByDist(
 		}
 	}
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -273,6 +510,137 @@ void BuildMask_ByContour(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+template <typename real>
+void BuildMask_NearbyBlobs(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & dataState,
+	const ColumnDataHeader & cdh,
+	const PathVector & pathvec,
+	const PathNodeIndexVector & vecPathNodes,
+	const NearbyBlobsOp & nearbyblobsop,
+	DataArray1D<double> & dataMask
+) {
+	// Get the variable
+	const double dDist = nearbyblobsop.m_dDistance;
+	const double dMaxDist = nearbyblobsop.m_dMaxDist;
+
+	_ASSERT(dataState.GetRows() == grid.GetSize());
+	_ASSERT(dDist > 0.0);
+	_ASSERT(dDist <= 180.0);
+	_ASSERT(dMaxDist >= dDist);
+	_ASSERT(dMaxDist <= 180.0);
+
+	// Loop through all PathNodes
+	for (int j = 0; j < vecPathNodes.size(); j++) {
+		const Path & path = pathvec[vecPathNodes[j].first];
+		const PathNode & pathnode = path[vecPathNodes[j].second];
+
+		int ix0 = static_cast<int>(pathnode.m_gridix);
+		_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
+
+		// Queue of nodes that remain to be visited
+		std::queue<int> queueNodes;
+		queueNodes.push(ix0);
+
+		// Set of nodes that have already been visited
+		std::set<int> setNodesVisited;
+
+		// Latitude and longitude at the origin
+		const double dLat0 = grid.m_dLat[ix0];
+		const double dLon0 = grid.m_dLon[ix0];
+
+		// Loop through all elements
+		while (queueNodes.size() != 0) {
+			int ix = queueNodes.front();
+			queueNodes.pop();
+
+			if (setNodesVisited.find(ix) != setNodesVisited.end()) {
+				continue;
+			}
+
+			setNodesVisited.insert(ix);
+
+			// Great circle distance to this dof
+			_ASSERT((ix >= 0) && (ix < grid.GetSize()));
+
+			double dR =
+				GreatCircleDistance_Deg(
+					dLon0, dLat0,
+					grid.m_dLon[ix], grid.m_dLat[ix]);
+
+			// Check if we have exceeded the maximum distance to find blobs
+			if ((ix != ix0) && (dR > dDist)) {
+				continue;
+			}
+
+			// Add all neighbors of this point
+			for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+				queueNodes.push(grid.m_vecConnectivity[ix][n]);
+			}
+
+			// Check if this point satisfies the nearbyblobs criteria
+			if (!nearbyblobsop.SatisfiedBy(static_cast<double>(dataState[ix]))) {
+				continue;
+			}
+
+			// Tag this point
+			dataMask[ix] = 1.0;
+
+			// Operator satisfied; add all points in this blob to mask up to maxdist
+			std::queue<int> queueThresholdedNodes;
+			queueThresholdedNodes.push(ix);
+
+			while (queueThresholdedNodes.size() != 0) {
+				int ixblob = queueThresholdedNodes.front();
+				queueThresholdedNodes.pop();
+
+				if ((ix != ixblob) &&
+				    (setNodesVisited.find(ixblob) != setNodesVisited.end())
+				) {
+					continue;
+				}
+
+				setNodesVisited.insert(ixblob);
+
+				// Great circle distance to this dof
+				_ASSERT((ixblob >= 0) && (ixblob < grid.GetSize()));
+
+				double dRblob =
+					GreatCircleDistance_Deg(
+						dLon0, dLat0,
+						grid.m_dLon[ixblob], grid.m_dLat[ixblob]);
+
+				if ((ixblob != ix) && (dRblob > dMaxDist)) {
+					continue;
+				}
+
+				// Add all neighbors of this point to search
+				for (int n = 0; n < grid.m_vecConnectivity[ixblob].size(); n++) {
+					queueThresholdedNodes.push(grid.m_vecConnectivity[ixblob][n]);
+				}
+
+				if (ixblob == ix) {
+					continue;
+				}
+
+				if (!nearbyblobsop.SatisfiedBy(static_cast<double>(dataState[ixblob]))) {
+
+					// Isn't part of the blob, but add it to the list of
+					// nodes to visit.
+					if (dRblob <= dDist) {
+						queueNodes.push(ixblob);
+					}
+					continue;
+				}
+
+				dataMask[ixblob] = 1.0;
+			}
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 /*
 #if defined(TEMPEST_MPIOMP)
@@ -338,6 +706,9 @@ try {
 	// Filter variables by contour
 	std::string strFilterByContour;
 
+	// Detect nearby blobs
+	std::string strNearbyBlobs;
+
 	// Apply the inverted filter
 	bool fInvert;
 
@@ -360,6 +731,7 @@ try {
 
 		CommandLineStringD(strFilterByDist, "bydist", "", "[dist]");
 		CommandLineStringD(strFilterByContour, "bycontour", "", "[var,delta,dist,minmaxdist]");
+		CommandLineStringD(strNearbyBlobs, "nearbyblobs", "", "[var,dist,op,value[,maxdist]]");
 		CommandLineBool(fInvert, "invert");
 
 		ParseCommandLine(argc, argv);
@@ -390,11 +762,14 @@ try {
 		_EXCEPTIONT("Only one of (--out_data) or (--out_data_list)"
 			" may be specified");
 	}
-	if ((strFilterByDist.length() == 0) && (strFilterByContour.length() == 0)) {
-		_EXCEPTIONT("No filter command (--bydist) or (--bycontour) specified");
+	if ((strFilterByDist.length() == 0) &&
+		(strFilterByContour.length() == 0) &&
+		(strNearbyBlobs.length() == 0)
+	) {
+		_EXCEPTIONT("No command (--bydist, --bycontour, or --nearbyblobs) specified");
 	}
 	if ((strFilterByDist.length() != 0) && (strFilterByContour.length() != 0)) {
-		_EXCEPTIONT("Only one filter command (--bydist) or (--bycontour) may be specified");
+		_EXCEPTIONT("Only one filter command (--bydist or --bycontour) may be specified");
 	}
 	if ((strVariables.length() == 0) && (strMaskVariable.length() == 0)) {
 		_EXCEPTIONT("One of (--var) or (--maskvar) must be specified");
@@ -452,40 +827,7 @@ try {
 			}
 		}
 	}
-/*
-	ArgumentTree atFilterByDist(true);
-	if (strFilterByDist != "") {
-		atFilterByDist.Parse(strFilterByDist);
 
-		for (int v = 0; v < atFilterByDist.size(); v++) {
-			ArgumentTree * patThisFilterByDist =
-				atFilterByDist.GetSubTree(v);
-
-			if (patThisFilterByDist == NULL) {
-				_EXCEPTION1("Invalid format of --bydist \"%s\"; expected <dist>",
-					atFilterByDist.GetArgumentString(v).c_str());
-			}
-			if (patThisFilterByDist->size() != 1) {
-				_EXCEPTION1("Invalid format of --bydist \"%s\"; expected <dist>",
-					atFilterByDist.GetArgumentString(v).c_str());
-			}
-			if (!STLStringHelper::IsFloat((*patThisFilterByDist)[0])) {
-				bool fFound = false;
-				for (int i = 0; i < cdhInput.size(); i++) {
-					if (cdhInput[i] == (*patThisFilterByDist)[0]) {
-						fFound = true;
-						break;
-					}
-				}
-				if (!fFound) {
-					_EXCEPTION1("Invalid format of --bydist;"
-						" argument <dist> \"%s\" does not appear in --in_fmt",
-						(*patThisFilterByDist)[0].c_str());
-				}
-			}
-		}
-	}
-*/
 	// Parse --bycontour
 	std::vector<ClosedContourOp> vecClosedContourOp;
 
@@ -494,6 +836,17 @@ try {
 		ClosedContourOp op;
 		op.Parse(varreg, strFilterByContour);
 		vecClosedContourOp.push_back(op);
+		AnnounceEndBlock(NULL);
+	}
+
+	// Parse --nearbyblobs
+	std::vector<NearbyBlobsOp> vecNearbyBlobsOp;
+
+	if (strNearbyBlobs != "") {
+		AnnounceStartBlock("Parsing --nearbyblobs");
+		NearbyBlobsOp op;
+		op.Parse(varreg, strNearbyBlobs);
+		vecNearbyBlobsOp.push_back(op);
 		AnnounceEndBlock(NULL);
 	}
 
@@ -899,6 +1252,21 @@ try {
 						pathvec,
 						iter->second,
 						vecClosedContourOp[0],
+						dataMask);
+				}
+				if (vecNearbyBlobsOp.size() != 0) {
+					Variable & varOp = varreg.Get(vecNearbyBlobsOp[0].m_varix);
+					varOp.LoadGridData(varreg, vecInFiles, grid, t);
+					const DataArray1D<float> & dataState = varOp.GetData();
+					_ASSERT(dataState.GetRows() == grid.GetSize());
+
+					BuildMask_NearbyBlobs<float>(
+						grid,
+						dataState,
+						cdhInput,
+						pathvec,
+						iter->second,
+						vecNearbyBlobsOp[0],
 						dataMask);
 				}
 			}

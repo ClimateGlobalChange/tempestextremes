@@ -30,6 +30,17 @@ class ClosedContourOp {
 
 public:
 	///	<summary>
+	///		Constructor.
+	///	</summary>
+	ClosedContourOp() :
+		m_varix(InvalidVariableIndex),
+		m_dDeltaAmount(0.0),
+		m_dDistance(0.0),
+		m_dMinMaxDist(0.0)
+	{ }
+
+public:
+	///	<summary>
 	///		Parse a closed contour operation string.
 	///	</summary>
 	void Parse(

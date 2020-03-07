@@ -43,6 +43,17 @@ public:
 
 public:
 	///	<summary>
+	///		Constructor.
+	///	</summary>
+	ThresholdOp() :
+		m_varix(InvalidVariableIndex),
+		m_eOp(GreaterThan),
+		m_dValue(0.0),
+		m_dDistance(0.0)
+	{ }
+
+public:
+	///	<summary>
 	///		Parse a threshold operator string.
 	///	</summary>
 	void Parse(
