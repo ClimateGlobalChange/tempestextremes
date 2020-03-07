@@ -590,17 +590,19 @@ void BuildMask_NearbyBlobs(
 			std::queue<int> queueThresholdedNodes;
 			queueThresholdedNodes.push(ix);
 
+			std::set<int> setThresholdNodesVisited;
+
 			while (queueThresholdedNodes.size() != 0) {
 				int ixblob = queueThresholdedNodes.front();
 				queueThresholdedNodes.pop();
 
-				if (ix != ixblob) {
-					if (setNodesVisited.find(ixblob) != setNodesVisited.end()) {
-						continue;
-					}
-
-					setNodesVisited.insert(ixblob);
+				if (setThresholdNodesVisited.find(ixblob) !=
+				    setThresholdNodesVisited.end()
+				) {
+					continue;
 				}
+
+				setThresholdNodesVisited.insert(ixblob);
 
 				// Make sure great circle distance to this dof is closer than dMaxDist
 				_ASSERT((ixblob >= 0) && (ixblob < grid.GetSize()));
@@ -624,6 +626,10 @@ void BuildMask_NearbyBlobs(
 					}
 					continue;
 				}
+
+				// Add this point to the set of visited points to avoid it
+				// again triggering a blob search.
+				setNodesVisited.insert(ixblob);
 
 				// Add all neighbors of this point to search
 				for (int n = 0; n < grid.m_vecConnectivity[ixblob].size(); n++) {
