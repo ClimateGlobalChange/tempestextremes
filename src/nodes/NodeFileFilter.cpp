@@ -1377,6 +1377,21 @@ try {
 					}
 				}
 
+				// Add _FillValue to output variable
+				if ((fHasFillValue) && (strFillValue != "nan")) {
+					NcAtt * attFillValueOut = varOut->get_att("_FillValue");
+					if (attFillValueOut != NULL) {
+						attFillValueOut->remove();
+					}
+					if (varOut->type() == ncFloat) {
+						varOut->add_att("_FillValue", static_cast<float>(dFillValue));
+					} else if (varOut->type() == ncDouble) {
+						varOut->add_att("_FillValue", static_cast<double>(dFillValue));
+					} else {
+						_EXCEPTION1("Invalid type for variable \"%s\": Expected \"float\" or \"double\"", strVariable.c_str());
+					}
+				}
+
 				// Loop through all auxiliary dimensions (holding time fixed)
 				DataArray1D<long> vecDataPos(vecDim.size());
 				vecDataPos[0] = t;
