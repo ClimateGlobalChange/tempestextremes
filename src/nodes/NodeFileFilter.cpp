@@ -33,6 +33,7 @@
 #include <fstream>
 #include <queue>
 #include <set>
+#include <cmath>
 /*
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
@@ -703,6 +704,9 @@ try {
 	// List of variables to preserve
 	std::string strPreserve;
 
+	// Fill value for areas outside of mask
+	std::string strFillValue;
+
 	// Filter variables by distance
 	std::string strFilterByDist;
 
@@ -731,6 +735,7 @@ try {
 		CommandLineString(strVariables, "var", "");
 		CommandLineString(strMaskVariable, "maskvar", "");
 		CommandLineString(strPreserve, "preserve", "");
+		CommandLineStringD(strFillValue, "fillvalue", "", "[<value>|nan|att]");
 
 		CommandLineStringD(strFilterByDist, "bydist", "", "[dist]");
 		CommandLineStringD(strFilterByContour, "bycontour", "", "[var,delta,dist,minmaxdist]");
@@ -776,6 +781,21 @@ try {
 	}
 	if ((strVariables.length() == 0) && (strMaskVariable.length() == 0)) {
 		_EXCEPTIONT("One of (--var) or (--maskvar) must be specified");
+	}
+
+	bool fHasFillValue = false;
+	float dFillValue = 0.0;
+	if (strFillValue != "") {
+		fHasFillValue = true;
+		STLStringHelper::ToLower(strFillValue);
+		if (strFillValue == "att") {
+		} else if (strFillValue == "nan") {
+			dFillValue = nanf(NULL);
+		} else if (STLStringHelper::IsFloat(strFillValue)) {
+			dFillValue = std::stof(strFillValue);
+		} else {
+			_EXCEPTIONT("Invalid value specified for --fillvalue");
+		}
 	}
 
 	// Input file type
@@ -1084,7 +1104,8 @@ try {
 			CopyNcVar(ncinfile, ncoutfile, vecPreserveVariables[p]);
 
 			if (vecPreserveVariables[p] == strMaskVariable) {
-				_EXCEPTION1("Variable \"%s\" specified as --maskvar also appears in --preserve",
+				_EXCEPTION1("Variable \"%s\" specified as --maskvar also "
+					"appears in --preserve",
 					strMaskVariable.c_str());
 			}
 		}
@@ -1343,6 +1364,19 @@ try {
 					}
 				}
 
+				// Check for _FillValue
+				if (strFillValue == "att") {
+					NcAtt * attFillValue = varIn->get_att("_FillValue");
+					if (attFillValue == NULL) {
+						fHasFillValue = false;
+						Announce("WARNING: Variable \"%s\" in file \"%s\" does not have a _FillValue attribute", strVariable.c_str(), vecInputFileList[f].c_str());
+
+					} else {
+						fHasFillValue = true;
+						dFillValue = attFillValue->as_float(0);
+					}
+				}
+
 				// Loop through all auxiliary dimensions (holding time fixed)
 				DataArray1D<long> vecDataPos(vecDim.size());
 				vecDataPos[0] = t;
@@ -1363,8 +1397,17 @@ try {
 					varIn->get(&(data[0]), &(vecDataSize[0]));
 
 					// Apply mask
-					for (int i = 0; i < data.GetRows(); i++) {
-						data[i] *= dataMask[i];
+					if (!fHasFillValue) {
+						for (int i = 0; i < data.GetRows(); i++) {
+							data[i] *= dataMask[i];
+						}
+
+					} else {
+						for (int i = 0; i < data.GetRows(); i++) {
+							if (dataMask[i] == 0.0) {
+								data[i] = dFillValue;
+							}
+						}
 					}
 
 					// Write data
