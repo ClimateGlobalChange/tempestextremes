@@ -29,6 +29,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class kdtree;
 class Mesh;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -44,6 +45,24 @@ public:
 	///		A identifying the connectivity file format.
 	///	</summary>
 	static const char * c_szFileIdentifier;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	SimpleGrid() :
+		m_kdtree(NULL)
+	{ }
+
+	///	<summary>
+	///		Destructor.
+	///	</summary>
+	~SimpleGrid();
+
+	///	<summary>
+	///		Determine if the SimpleGrid is initialized.
+	///	</summary>
+	bool IsInitialized() const;
 
 public:
 	///	<summary>
@@ -77,6 +96,31 @@ public:
 	);
 
 	///	<summary>
+	///		Generate the unstructured grid information for a rectilinear
+	///		stereographic grid at the given point.
+	///	</summary>
+	void GenerateRectilinearStereographic(
+		double dLonRad0,
+		double dLatRad0,
+		int nX,
+		double dDeltaX,
+		bool fCalculateArea = false
+	);
+
+	///	<summary>
+	///		Generate the unstructured grid information for a radial
+	///		stereographic grid at the given point.
+	///	</summary>
+	void GenerateRadialStereographic(
+		double dLonRad0,
+		double dLatRad0,
+		int nR,
+		int nA,
+		double dDeltaR,
+		bool fCalculateArea = false
+	);
+
+	///	<summary>
 	///		Initialize the SimpleGrid from a Mesh assuming the mesh is a finite
 	///		volume mesh.
 	///	</summary>
@@ -106,7 +150,7 @@ public:
 	///	</summary>
 	void ToFile(
 		const std::string & strConnectivityFile
-	);
+	) const;
 
 	///	<summary>
 	///		Get the size of the SimpleGrid (number of points).
@@ -120,7 +164,21 @@ public:
 	///	</summary>
 	int CoordinateVectorToIndex(
 		const std::vector<int> & coordvec
-	);
+	) const;
+
+public:
+	///	<summary>
+	///		Build a kdtree using this SimpleGrid.
+	///	</summary>
+	void BuildKDTree();
+
+	///	<summary>
+	///		Find the nearest node to the given coordinate.
+	///	</summary>
+	size_t NearestNode(
+		double dLonRad,
+		double dLatRad
+	) const;
 
 public:
 	///	<summary>
@@ -147,6 +205,12 @@ public:
 	///		Connectivity of each grid point.
 	///	</summary>
 	std::vector< std::vector<int> > m_vecConnectivity;
+
+private:
+	///	<summary>
+	///		kd tree used for quick lookup of grid points.
+	///	</summary>
+	kdtree * m_kdtree;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

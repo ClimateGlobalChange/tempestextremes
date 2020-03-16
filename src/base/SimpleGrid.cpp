@@ -19,6 +19,7 @@
 #include "FiniteElementTools.h"
 #include "GaussLobattoQuadrature.h"
 #include "Announce.h"
+#include "kdtree.h"
 
 #include <cstdlib>
 #include <cmath>
@@ -36,11 +37,38 @@ const char * SimpleGrid::c_szFileIdentifier =
 
 ///////////////////////////////////////////////////////////////////////////////
 
+SimpleGrid::~SimpleGrid() {
+	if (m_kdtree != NULL) {
+		kd_free(m_kdtree);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool SimpleGrid::IsInitialized() const {
+	if ((m_nGridDim.size() != 0) ||
+	    m_dLon.IsAttached() ||
+	    m_dLat.IsAttached() ||
+	    m_dArea.IsAttached() ||
+	    (m_vecConnectivity.size() != 0) ||
+		(m_kdtree != NULL)
+	) {
+		return true;
+	}
+	return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void SimpleGrid::GenerateLatitudeLongitude(
 	const DataArray1D<double> & vecLat,
 	const DataArray1D<double> & vecLon,
 	bool fRegional
 ) {
+	if (IsInitialized()) {
+		_EXCEPTIONT("Attempting to call GenerateLatitudeLongitude() on previously initialized grid");
+	}
+
 	int nLat = vecLat.GetRows();
 	int nLon = vecLon.GetRows();
 
@@ -142,7 +170,10 @@ void SimpleGrid::GenerateLatitudeLongitude(
 			dLonRad1 -= 2.0 * M_PI;
 		}
 		double dDeltaLon = dLonRad2 - dLonRad1;
-		_ASSERT(dDeltaLon < M_PI);
+		if (dDeltaLon >= M_PI) {
+			_EXCEPTION1("Grid element longitudinal extent too large (%1.7f deg).  Did you mean to specify \"--regional\"?",
+				dDeltaLon * 180.0 / M_PI);
+		}
 
 		m_dArea[ixs] = fabs(sin(dLatRad2) - sin(dLatRad1)) * dDeltaLon;
 
@@ -186,6 +217,10 @@ void SimpleGrid::GenerateLatitudeLongitude(
 	const std::string & strLatitudeName,
 	const std::string & strLongitudeName
 ) {
+	if (IsInitialized()) {
+		_EXCEPTIONT("Attempting to call GenerateLatitudeLongitude() on previously initialized grid");
+	}
+
 	NcDim * dimLat = ncFile->get_dim(strLatitudeName.c_str());
 	if (dimLat == NULL) {
 		_EXCEPTION1("No dimension \"%s\" found in input file",
@@ -242,16 +277,157 @@ void SimpleGrid::GenerateLatitudeLongitude(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void SimpleGrid::GenerateRectilinearStereographic(
+	double dLonRad0,
+	double dLatRad0,
+	int nX,
+	double dDeltaX,
+	bool fCalculateArea
+) {
+	if (IsInitialized()) {
+		_EXCEPTIONT("Attempting to call GenerateLatitudeLongitude() on previously initialized grid");
+	}
+
+	if (fabs(dLatRad0 - 0.5 * M_PI) < ReferenceTolerance) {
+		dLatRad0 = 0.5 * M_PI;
+	}
+	if (fabs(dLatRad0 + 0.5 * M_PI) < ReferenceTolerance) {
+		dLatRad0 = - 0.5 * M_PI;
+	}
+
+	_ASSERT(nX >= 1);
+	_ASSERT(dDeltaX > 0.0);
+	_ASSERT(fabs(dLatRad0 <= 0.5 * M_PI));
+
+	m_nGridDim.resize(2);
+	m_nGridDim[0] = nX;
+	m_nGridDim[1] = nX;
+
+	m_dLon.Allocate(nX * nX);
+	m_dLat.Allocate(nX * nX);
+
+	const double dXgcd0 = - 0.5 * dDeltaX * static_cast<double>(nX - 1);
+
+	if (dXgcd0 < - M_PI + ReferenceTolerance) {
+		_EXCEPTION1("Total angular coverage of rectilinear stereographic "
+			"grid too large (%1.5f <= -pi/2)", dXgcd0);
+	}
+
+	// Get coordinates in the space of the stereographic projection
+	DataArray1D<double> dXs(nX);
+	DataArray1D<double> dYs(nX);
+
+	for (int j = 0; j < nX; j++) {
+		double dYgcd = dXgcd0 + dDeltaX * static_cast<double>(j);
+		dYs[j] = sqrt(4.0 * (1.0 - cos(dYgcd)) / (1.0 + cos(dYgcd)));
+	}
+
+	for (int i = 0; i < nX; i++) {
+		double dXgcd = dXgcd0 + dDeltaX * static_cast<double>(i);
+		dXs[i] = sqrt(4.0 * (1.0 - cos(dXgcd)) / (1.0 + cos(dXgcd)));
+	}
+
+	// Store longitude and latitude of centerpoints
+	int s = 0;
+	for (int j = 0; j < nX; j++) {
+	for (int i = 0; i < nX; i++) {
+		StereographicProjectionInv(
+			dLonRad0,
+			dLatRad0,
+			dXs[i],
+			dYs[j],
+			m_dLon[s],
+			m_dLat[s]);
+
+		s++;
+	}
+	}
+
+	// Calculate the area
+	if (fCalculateArea) {
+		_EXCEPTIONT("Unable to calculate the area of the RectilinearStereographic grid (not impemented)");
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void SimpleGrid::GenerateRadialStereographic(
+	double dLonRad0,
+	double dLatRad0,
+	int nR,
+	int nA,
+	double dDeltaR,
+	bool fCalculateArea
+) {
+	if (IsInitialized()) {
+		_EXCEPTIONT("Attempting to call GenerateLatitudeLongitude() on previously initialized grid");
+	}
+
+	_ASSERT(nR >= 1);
+	_ASSERT(nA >= 8);
+	_ASSERT(dDeltaR > 0.0);
+	_ASSERT(fabs(dLatRad0 <= 0.5 * M_PI));
+
+	const double dRgcdmax = (static_cast<double>(nR-1) + 0.5) * dDeltaR;
+
+	if (dRgcdmax >= M_PI) {
+		_EXCEPTION1("Total angular coverage of radial stereographic "
+			"grid too large (%1.5f >= pi)", dRgcdmax);
+	}
+
+	m_nGridDim.resize(2);
+	m_nGridDim[0] = nA;
+	m_nGridDim[1] = nR;
+
+	m_dLon.Allocate(nR * nA);
+	m_dLat.Allocate(nR * nA);
+
+	// Get the reference coordinates in the azimuthal and radial directions
+	DataArray1D<double> dXs(nA);
+	DataArray1D<double> dYs(nA);
+
+	for (int i = 0; i < nA; i++) {
+		double dFrac = static_cast<double>(i) / static_cast<double>(nA);
+		dXs[i] = cos(dFrac);
+		dYs[i] = sin(dFrac);
+	}
+
+	DataArray1D<double> dRs(nR);
+	for (int i = 0; i < nR; i++) {
+		double dRgcd = (static_cast<double>(i) + 0.5) * dDeltaR;
+		dRs[i] = sqrt(2.0 * (1.0 - cos(dRgcd)) / (1.0 + cos(dRgcd)));
+	}
+
+	// Calculate the lon/lat coordinates
+	int s = 0;
+	for (int j = 0; j < nR; j++) {
+	for (int i = 0; i < nA; i++) {
+		StereographicProjectionInv(
+			dLonRad0,
+			dLatRad0,
+			dXs[i] * dRs[j],
+			dYs[i] * dRs[j],
+			m_dLon[s],
+			m_dLat[s]);
+
+		s++;
+	}
+	}
+
+	// Calculate the area
+	if (fCalculateArea) {
+		_EXCEPTIONT("Unable to calculate the area of the RectilinearStereographic grid (not impemented)");
+	}
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void SimpleGrid::FromMeshFV(
 	const Mesh & mesh
 ) {
-	if ((m_nGridDim.size() != 0) ||
-	    (m_dLon.GetRows() != 0) ||
-	    (m_dLat.GetRows() != 0) ||
-	    (m_dArea.GetRows() != 0) ||
-	    (m_vecConnectivity.size() != 0)
-	) {
-		_EXCEPTIONT("Attempting to read previously initialized SimpleGrid");
+	if (IsInitialized()) {
+		_EXCEPTIONT("Attempting to call FromMeshFV() on previously initialized grid");
 	}
 
 	if (mesh.vecFaceArea.GetRows() == 0) {
@@ -419,13 +595,8 @@ void SimpleGrid::FromMeshFE(
 		_EXCEPTIONT("Sorry, not implemented yet!");
 	}
 
-	if ((m_nGridDim.size() != 0) ||
-	    (m_dLon.GetRows() != 0) ||
-	    (m_dLat.GetRows() != 0) ||
-	    (m_dArea.GetRows() != 0) ||
-	    (m_vecConnectivity.size() != 0)
-	) {
-		_EXCEPTIONT("Attempting to read previously initialized SimpleGrid");
+	if (IsInitialized()) {
+		_EXCEPTIONT("Attempting to call FromMeshFE() on previously initialized grid");
 	}
 
 	if (mesh.vecFaceArea.GetRows() == 0) {
@@ -574,13 +745,8 @@ void SimpleGrid::FromMeshFE(
 void SimpleGrid::FromFile(
 	const std::string & strConnectivityFile
 ) {
-	if ((m_nGridDim.size() != 0) ||
-	    (m_dLon.GetRows() != 0) ||
-	    (m_dLat.GetRows() != 0) ||
-	    (m_dArea.GetRows() != 0) ||
-	    (m_vecConnectivity.size() != 0)
-	) {
-		_EXCEPTIONT("Attempting to read previously initialized SimpleGrid");
+	if (IsInitialized()) {
+		_EXCEPTIONT("Attempting to call FromFile() on previously initialized grid");
 	}
 
 	std::ifstream fsGrid(strConnectivityFile.c_str());
@@ -663,7 +829,7 @@ void SimpleGrid::FromFile(
 
 void SimpleGrid::ToFile(
 	const std::string & strConnectivityFile
-) {
+) const {
 	std::ofstream fsOutput(strConnectivityFile.c_str());
 	if (!fsOutput.is_open()) {
 		_EXCEPTION1("Cannot open output file \"%s\"",
@@ -710,7 +876,7 @@ void SimpleGrid::ToFile(
 
 int SimpleGrid::CoordinateVectorToIndex(
 	const std::vector<int> & coordvec
-) {
+) const {
 	if (m_nGridDim.size() == 0) {
 		_EXCEPTIONT("Invalid SimpleGrid");
 	}
@@ -744,6 +910,65 @@ int SimpleGrid::CoordinateVectorToIndex(
 	}
 
 	return ix;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void SimpleGrid::BuildKDTree() {
+	if (m_kdtree != NULL) {
+		_EXCEPTIONT("kdtree already exists");
+	}
+	if (m_dLon.GetRows() == 0) {
+		_EXCEPTIONT("At least one grid cell needed in SimpleGrid");
+	}
+
+	_ASSERT(m_dLon.GetRows() == m_dLat.GetRows());
+
+	// Create the kd tree
+	m_kdtree = kd_create(3);
+	if (m_kdtree == NULL) {
+		_EXCEPTIONT("kd_create(3) failed");
+	}
+
+	// Insert all nodes from this SimpleGrid into the kdtree
+	for (size_t i = 0; i < m_dLon.GetRows(); i++) {
+		double dX = cos(m_dLon[i]) * cos(m_dLat[i]);
+		double dY = sin(m_dLon[i]) * cos(m_dLat[i]);
+		double dZ = sin(m_dLat[i]);
+
+		kd_insert3(m_kdtree, dX, dY, dZ, (void*)(i));
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+size_t SimpleGrid::NearestNode(
+	double dLonRad,
+	double dLatRad
+) const {
+	if (m_kdtree == NULL) {
+		_EXCEPTIONT("BuildKDTree() must be called before NearestNode()");
+	}
+
+	// Find the nearest node from a given point
+	double dX = cos(dLonRad) * cos(dLatRad);
+	double dY = sin(dLonRad) * cos(dLatRad);
+	double dZ = sin(dLatRad);
+
+	kdres * kdresNearest = kd_nearest3(m_kdtree, dX, dY, dZ);
+	if (kdresNearest == NULL) {
+		_EXCEPTIONT("kd_nearest3() failed");
+	}
+	int nResSize = kd_res_size(kdresNearest);
+	if (nResSize != 1) {
+		_EXCEPTION1("kd_nearest3() returned incorrect result size (%i)", nResSize);
+	}
+
+	size_t i = (size_t)(kd_res_item_data(kdresNearest));
+
+	kd_res_free(kdresNearest);
+
+	return i;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
