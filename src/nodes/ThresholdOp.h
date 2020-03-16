@@ -69,9 +69,7 @@ public:
 		} eReadMode = ReadMode_Op;
 
 		// Parse variable
-		Variable var;
-		int iLast = var.ParseFromString(varreg, strOp) + 1;
-		m_varix = varreg.FindOrRegister(var);
+		int iLast = varreg.FindOrRegisterSubStr(strOp, &m_varix) + 1;
 
 		// Loop through string
 		for (int i = iLast; i <= strOp.length(); i++) {
@@ -139,7 +137,7 @@ public:
 		}
 
 		// Output announcement
-		std::string strDescription = var.ToString(varreg);
+		std::string strDescription = varreg.GetVariableString(m_varix);
 		if (m_eOp == GreaterThan) {
 			strDescription += " is greater than ";
 		} else if (m_eOp == LessThan) {

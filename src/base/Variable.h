@@ -28,6 +28,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 class NcFileVector : public std::vector<NcFile *> {
+
 private:
 	///	<summary>
 	///		Copy constructor.
@@ -61,7 +62,7 @@ public:
 	///		Clear the contents of this NcFileVector.
 	///	</summary>
 	void clear() {
-		for (int i = 0; i < size(); i++) {
+		for (size_t i = 0; i < size(); i++) {
 			(*this)[i]->close();
 			delete (*this)[i];
 		}
@@ -98,18 +99,45 @@ public:
 				strFiles.c_str());
 		}
 	}
+
+	///	<summary>
+	///		Get an iterator to the file containing the specified variable.
+	///	</summary>
+	const_iterator FindContainingVariable(
+		const std::string & strVariable
+	) const {
+		for (const_iterator iter = begin(); iter != end(); iter++) {
+			NcVar * var = (*iter)->get_var(strVariable.c_str());
+			if (var == NULL) {
+				return iter;
+			}
+		}
+		return end();
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 
 class Variable;
 
-typedef std::vector<Variable> VariableVector;
+///	<summary>
+///		A vector of pointers to Variable.
+///	</summary>
+typedef std::vector<Variable *> VariableVector;
 
+///	<summary>
+///		A unique index assigned to each Variable.
+///	</summary>
 typedef int VariableIndex;
 
+///	<summary>
+///		The invalid variable index.
+///	</summary>
 static const VariableIndex InvalidVariableIndex = (-1);
 
+///	<summary>
+///		A vector for storing VariableIndex.
+///	</summary>
 class VariableIndexVector : public std::vector<VariableIndex> {};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -118,7 +146,7 @@ class VariableRegistry {
 
 public:
 	///	<summary>
-	///		Constructor.
+	///		Constructor (build an empty registry).
 	///	</summary>
 	VariableRegistry();
 
@@ -128,16 +156,42 @@ public:
 	~VariableRegistry();
 
 public:
+/*
 	///	<summary>
-	///		Register a variable.  Or return an index if the Variable already
+	///		Register a Variable.  Or return an index if the Variable already
 	///		exists in the registry.
 	///	</summary>
-	int FindOrRegister(const Variable & var);
+	VariableIndex FindOrRegister(
+		const Variable & var
+	);
+*/
+	///	<summary>
+	///		Parse the given recursively string and register all relevant
+	///		Variables.  At the end of the Variable definition return
+	///		the current position in the string.
+	///	</summary>
+	VariableIndex FindOrRegisterSubStr(
+		const std::string & strIn,
+		int * piFinalStringPos
+	);
 
 	///	<summary>
-	///		Get the variable with the specified index.
+	///		Parse the given string recursively and register all
+	///		relevant Variables.
+	///	</summary>
+	VariableIndex FindOrRegister(
+		const std::string & strIn
+	);
+
+	///	<summary>
+	///		Get the Variable with the specified index.
 	///	</summary>
 	Variable & Get(VariableIndex varix);
+
+	///	<summary>
+	///		Get the descriptor for the Variable with the specified index.
+	///	</summary>
+	std::string GetVariableString(VariableIndex varix);
 
 	///	<summary>
 	///		Unload all data.
@@ -165,9 +219,205 @@ private:
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		An object holding dimension indices for a given Variable.
+///	</summary>
+typedef std::vector<long> VariableDimIndex;
+
+///	<summary>
+///		An object holding auxiliary indices for a given Variable.
+///	</summary>
+typedef VariableDimIndex VariableAuxIndex;
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class describing an iterator over the auxiliary indices of a
+///		Variable.
+///	</summary>
+class VariableAuxIndexIterator {
+
+friend class Variable;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	VariableAuxIndexIterator() :
+		m_fEnd(false)
+	{ }
+
+protected:
+	///	<summary>
+	///		Initializer, only accessible from Variable.
+	///	</summary>
+	void Initialize(
+		const VariableAuxIndex & vecSize,
+		bool fEnd
+	) {
+		m_fEnd = fEnd;
+		m_vecSize = vecSize;
+		m_vecValue.resize(m_vecSize.size());
+		for (size_t d = 0; d < m_vecSize.size(); d++) {
+			if (m_vecSize[d] <= 0) {
+				_EXCEPTIONT("Invalid auxiliary index size entry");
+			}
+		}
+		if ((fEnd) && (vecSize.size() > 0)) {
+			m_vecValue[0] = m_vecSize[0];
+		}
+	}
+
+public:
+	///	<summary>
+	///		Remove the dimension with specified index.
+	///	</summary>
+	void RemoveDim(
+		size_t dim
+	) {
+		if (dim >= m_vecSize.size()) {
+			_EXCEPTIONT("Logic errror");
+		}
+		m_vecSize.erase(m_vecSize.begin() + dim);
+		m_vecValue.erase(m_vecValue.begin() + dim);
+	}
+
+public:
+	///	<summary>
+	///		Prefix incrementor.
+	///	</summary>
+	VariableAuxIndexIterator & operator++() {
+		if (m_vecValue.size() == 0) {
+			if (m_fEnd) {
+				_EXCEPTIONT("Iterator exceeded bounds");
+			} else {
+				m_fEnd = true;
+			}
+			return (*this);
+		}
+		for (size_t d = 0; d < m_vecValue.size(); d++) {
+			size_t dx = m_vecValue.size()-d-1;
+			if (m_vecValue[dx] >= m_vecSize[dx]) {
+				_EXCEPTIONT("Iterator exceeded bounds");
+			} else if (m_vecValue[dx] == m_vecSize[dx]-1) {
+				m_vecValue[dx] = 0;
+			} else {
+				m_vecValue[dx]++;
+				return (*this);
+			}
+		}
+		m_fEnd = true;
+		return (*this);
+	}
+
+	///	<summary>
+	///		Postfix incrementor.
+	///	</summary>
+	VariableAuxIndexIterator operator++(int) {
+		this->operator++();
+		return (*this);
+	}
+
+	///	<summary>
+	///		Comparator.
+	///	</summary>
+	bool operator==(const VariableAuxIndexIterator & iter) const {
+		if (m_vecSize.size() != iter.m_vecSize.size()) {
+			_EXCEPTIONT("Invalid comparison");
+		}
+		if ((m_fEnd) && (iter.m_fEnd)) {
+			return true;
+		}
+		if (m_fEnd != iter.m_fEnd) {
+			return false;
+		}
+		for (size_t d = 0; d < m_vecSize.size(); d++) {
+			if (m_vecValue[d] != iter.m_vecValue[d]) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	///	<summary>
+	///		Comparator.
+	///	</summary>
+	bool operator!=(const VariableAuxIndexIterator & iter) const {
+		return !((*this)==(iter));
+	}
+
+	///	<summary>
+	///		Cast to VariableAuxIndex.
+	///	</summary>
+	operator VariableAuxIndex() const {
+		return m_vecValue;
+	}
+
+	///	<summary>
+	///		Get the value of the iterator.
+	///	</summary>
+	const VariableAuxIndex & Value() const {
+		return m_vecValue;
+	}
+
+	///	<summary>
+	///		Convert to a std::string.
+	///	</summary>
+	std::string ToString() const {
+		std::string strOut;
+		for (size_t d = 0; d < m_vecSize.size(); d++) {
+			strOut +=
+				std::string("(")
+				+ std::to_string(m_vecValue[d])
+				+ std::string("/")
+				+ std::to_string(m_vecSize[d])
+				+ std::string(")");
+		}
+		if (m_fEnd) {
+			strOut += std::string("(end)");
+		} else if (m_vecSize.size() == 0) {
+			strOut += std::string("(begin)");
+		}
+
+		return strOut;
+	}
+
+	///	<summary>
+	///		Get the length of this auxiliary index.
+	///	</summary>
+	size_t size() const {
+		return m_vecSize.size();
+	}
+
+protected:
+	///	<summary>
+	///		The sizes of the auxiliary indices.
+	///	</summary>
+	VariableAuxIndex m_vecSize;
+
+	///	<summary>
+	///		The values of the auxiliary indices.
+	///	</summary>
+	VariableAuxIndex m_vecValue;
+
+	///	<summary>
+	///		At the end.
+	///	</summary>
+	bool m_fEnd;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A map between auxiliary indices and the data stored therein.
+///	</summary>
+typedef std::map<VariableAuxIndex, DataArray1D<float> *> DataMap;
+
+///	<summary>
 ///		A class storing a parsed variable name.
 ///	</summary>
 class Variable {
+
+friend class VariableRegistry;
 
 public:
 	///	<summary>
@@ -180,8 +430,8 @@ public:
 	///		Default constructor.
 	///	</summary>
 	Variable() :
-		m_fOp(false),
 		m_strName(),
+		m_fOp(false),
 		m_nSpecifiedDim(0),
 		m_fNoTimeInNcFile(false),
 		m_iTime(-2)
@@ -196,15 +446,6 @@ public:
 	bool operator==(const Variable & var);
 
 public:
-	///	<summary>
-	///		Parse the variable information from a string.  Return the index
-	///		of the first character after the variable information.
-	///	</summary>
-	int ParseFromString(
-		VariableRegistry & varreg,
-		const std::string & strIn
-	);
-
 	///	<summary>
 	///		Get a string representation of this variable.
 	///	</summary>
@@ -249,16 +490,42 @@ public:
 		return m_data;
 	}
 
-public:
-	///	<summary>
-	///		Flag indicating this is an operator.
-	///	</summary>
-	bool m_fOp;
-
+protected:
 	///	<summary>
 	///		Variable name.
 	///	</summary>
 	std::string m_strName;
+/*
+	///	<summary>
+	///		Variable units.
+	///	</summary>
+	std::string m_strUnits;
+
+	///	<summary>
+	///		Auxiliary dimensions associated with this variable.
+	///	</summary>
+	std::vector<std::string> m_vecAuxDimNames;
+
+	///	<summary>
+	///		Index of the record dimension.
+	///	</summary>
+	int m_iTimeDimIx;
+
+	///	<summary>
+	///		Index of the vertical dimension.
+	///	</summary>
+	int m_iVerticalDimIx;
+
+	///	<summary>
+	///		(+1) if the vertical coordinate is bottom-up, (-1) if top-down.
+	///	</summary>
+	int m_nVerticalDimOrder;
+*/
+protected:
+	///	<summary>
+	///		Flag indicating this is an operator.
+	///	</summary>
+	bool m_fOp;
 
 	///	<summary>
 	///		Number of dimensions specified.

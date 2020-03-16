@@ -1248,16 +1248,12 @@ try {
 				}
 
 				// Parse zonal wind variable
-				Variable varU;
-				varU.ParseFromString(varreg, (*pargfunc)[0]);
-				VariableIndex varixU = varreg.FindOrRegister(varU);
+				VariableIndex varixU = varreg.FindOrRegister((*pargfunc)[0]);
 
 				// Parse meridional wind variable (if present)
 				VariableIndex varixV = varixU;
 				if (eCycloneMetric != CycloneMetric_ACEPSL) {
-					Variable varV;
-					varV.ParseFromString(varreg, (*pargfunc)[1]);
-					varixV = varreg.FindOrRegister(varV);
+					varixV = varreg.FindOrRegister((*pargfunc)[1]);
 				}
 
 				// Loop through all Times
@@ -1316,9 +1312,7 @@ try {
 				}
 
 				// Parse zonal wind variable
-				Variable var;
-				var.ParseFromString(varreg, (*pargfunc)[0]);
-				VariableIndex varix = varreg.FindOrRegister(var);
+				VariableIndex varix = varreg.FindOrRegister((*pargfunc)[0]);
 
 				// Loop through all Times
 				TimeToPathNodeMap::iterator iterPathNode =
@@ -1375,14 +1369,10 @@ try {
 				}
 
 				// Parse zonal wind variable
-				Variable varU;
-				varU.ParseFromString(varreg, (*pargfunc)[0]);
-				VariableIndex varixU = varreg.FindOrRegister(varU);
+				VariableIndex varixU = varreg.FindOrRegister((*pargfunc)[0]);
 
 				// Parse meridional wind variable
-				Variable varV;
-				varV.ParseFromString(varreg, (*pargfunc)[1]);
-				VariableIndex varixV = varreg.FindOrRegister(varV);
+				VariableIndex varixV = varreg.FindOrRegister((*pargfunc)[1]);
 
 				// Loop through all Times
 				TimeToPathNodeMap::iterator iterPathNode =
@@ -1647,9 +1637,7 @@ try {
 				}
 
 				// Parse variable
-				Variable var;
-				var.ParseFromString(varreg, (*pargfunc)[0]);
-				VariableIndex varix = varreg.FindOrRegister(var);
+				VariableIndex varix = varreg.FindOrRegister((*pargfunc)[0]);
 
 				// Radius
 				std::string strRadius((*pargfunc)[1]);
@@ -1765,9 +1753,7 @@ try {
 				}
 
 				// Parse variable
-				Variable var;
-				var.ParseFromString(varreg, (*pargfunc)[0]);
-				VariableIndex varix = varreg.FindOrRegister(var);
+				VariableIndex varix = varreg.FindOrRegister((*pargfunc)[0]);
 
 				// Loop through all Times
 				TimeToPathNodeMap::iterator iterPathNode =

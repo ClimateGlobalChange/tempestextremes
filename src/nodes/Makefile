@@ -18,7 +18,8 @@ EXEC_FILES= DetectNodes.cpp \
 			HistogramNodes.cpp \
             StitchNodes.cpp \
 			NodeFileEditor.cpp \
-			NodeFileFilter.cpp
+			NodeFileFilter.cpp \
+			NodeFileCompose.cpp
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 

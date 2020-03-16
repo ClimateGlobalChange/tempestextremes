@@ -56,9 +56,7 @@ public:
 		} eReadMode = ReadMode_Amount;
 
 		// Get variable information
-		Variable var;
-		int iLast = var.ParseFromString(varreg, strOp) + 1;
-		m_varix = varreg.FindOrRegister(var);
+		int iLast = varreg.FindOrRegisterSubStr(strOp, &m_varix) + 1;
 
 		// Loop through string
 		for (int i = iLast; i <= strOp.length(); i++) {
@@ -108,11 +106,6 @@ public:
 		}
 
 		// Output announcement
-		char szBuffer[128];
-
-		std::string strDescription;
-		strDescription += var.ToString(varreg);
-
 		if (m_dDeltaAmount == 0.0) {
 			_EXCEPTIONT("For closed contour op, delta amount must be non-zero");
 		}
@@ -126,7 +119,7 @@ public:
 		if (m_dDeltaAmount < 0.0) {
 			Announce("%s decreases by %f over %f degrees"
 				   " (max search %f deg)",
-				var.ToString(varreg).c_str(),
+				varreg.GetVariableString(m_varix).c_str(),
 				-m_dDeltaAmount,
 				m_dDistance,
 				m_dMinMaxDist);
@@ -134,7 +127,7 @@ public:
 		} else {
 			Announce("%s increases by %f over %f degrees"
 					" (min search %f deg)",
-				var.ToString(varreg).c_str(),
+				varreg.GetVariableString(m_varix).c_str(),
 				m_dDeltaAmount,
 				m_dDistance,
 				m_dMinMaxDist);

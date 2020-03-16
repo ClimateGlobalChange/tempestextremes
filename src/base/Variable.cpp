@@ -41,20 +41,228 @@ VariableRegistry::VariableRegistry() {
 ///////////////////////////////////////////////////////////////////////////////
 
 VariableRegistry::~VariableRegistry() {
+	for (int v = 0; v < m_vecVariables.size(); v++) {
+		delete m_vecVariables[v];
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/*
+VariableIndex VariableRegistry::FindOrRegister(
+	const Variable & var
+) {
+	for (int i = 0; i < m_vecVariables.size(); i++) {
+		if (*(m_vecVariables[i]) == var) {
+			return i;
+		}
+	}
+	Variable * pvar = new Variable(var);
+	_ASSERT(pvar != NULL);
+
+	m_vecVariables.push_back(pvar);
+	return (m_vecVariables.size()-1);
+}
+*/
+///////////////////////////////////////////////////////////////////////////////
+
+int VariableRegistry::FindOrRegisterSubStr(
+	const std::string & strIn,
+	VariableIndex * pvarix
+) {
+	Variable * pvar = new Variable();
+	_ASSERT(pvar != NULL);
+
+	m_vecVariables.push_back(pvar);
+	if (pvarix != NULL) {
+		*pvarix = m_vecVariables.size()-1;
+	}
+
+	// Parse the string
+	bool fParamMode = false;
+	bool fDimMode = false;
+	std::string strDim;
+
+	if (strIn.length() >= 1) {
+		if (strIn[0] == '_') {
+			pvar->m_fOp = true;
+		}
+	}
+
+	for (int n = 0; n <= strIn.length(); n++) {
+
+		// Reading the variable name
+		if (!fDimMode) {
+			if (n == strIn.length()) {
+				if (fParamMode) {
+					_EXCEPTIONT("Unbalanced curly brackets in variable");
+				}
+				pvar->m_strName = strIn;
+				return n;
+			}
+
+			// Items in curly brackets are included in variable name
+			if (fParamMode) {
+				if (strIn[n] == '(') {
+					_EXCEPTIONT("Unexpected \'(\' in variable");
+				}
+				if (strIn[n] == ')') {
+					_EXCEPTIONT("Unexpected \')\' in variable");
+				}
+				if (strIn[n] == '{') {
+					_EXCEPTIONT("Unexpected \'{\' in variable");
+				}
+				if (strIn[n] == '}') {
+					fParamMode = false;
+				}
+				continue;
+			}
+			if (strIn[n] == '{') {
+				fParamMode = true;
+				continue;
+			}
+
+			if (strIn[n] == ',') {
+				pvar->m_strName = strIn.substr(0, n);
+				return n;
+			}
+			if (strIn[n] == '(') {
+				pvar->m_strName = strIn.substr(0, n);
+				fDimMode = true;
+				continue;
+			}
+			if (strIn[n] == ')') {
+				pvar->m_strName = strIn.substr(0, n);
+				return n;
+			}
+
+		// Reading in dimensions
+		} else if (!pvar->m_fOp) {
+			if (pvar->m_nSpecifiedDim == 4) {
+				_EXCEPTIONT("Only 4 dimensions / arguments may "
+					"be specified");
+			}
+			if (n == strIn.length()) {
+				_EXCEPTION1("Variable dimension list must be terminated"
+					" with ): %s", strIn.c_str());
+			}
+			if (strIn[n] == ',') {
+				if (strDim.length() == 0) {
+					_EXCEPTIONT("Invalid dimension index in variable");
+				}
+				pvar->m_iDim[pvar->m_nSpecifiedDim] = atoi(strDim.c_str());
+				pvar->m_nSpecifiedDim++;
+				strDim = "";
+
+			} else if (strIn[n] == ')') {
+				if (strDim.length() == 0) {
+					_EXCEPTIONT("Invalid dimension index in variable");
+				}
+				pvar->m_iDim[pvar->m_nSpecifiedDim] = atoi(strDim.c_str());
+				pvar->m_nSpecifiedDim++;
+
+				return (n+1);
+
+			} else {
+				strDim += strIn[n];
+			}
+
+		// Reading in arguments
+		} else {
+			if (pvar->m_nSpecifiedDim == 4) {
+				_EXCEPTIONT("Only 4 dimensions / arguments may "
+					"be specified");
+			}
+			if (n == strIn.length()) {
+				_EXCEPTION1("Op argument list must be terminated"
+					" with ): %s", strIn.c_str());
+			}
+
+			// No arguments
+			if (strIn[n] == ')') {
+				return (n+1);
+			}
+
+			// Check for floating point argument
+			if (isdigit(strIn[n]) || (strIn[n] == '.') || (strIn[n] == '-')) {
+				int nStart = n;
+				for (; n <= strIn.length(); n++) {
+					if (n == strIn.length()) {
+						_EXCEPTION1("Op argument list must be terminated"
+							" with ): %s", strIn.c_str());
+					}
+					if ((strIn[n] == ',') || (strIn[n] == ')')) {
+						break;
+					}
+				}
+
+				std::string strFloat = strIn.substr(nStart, n-nStart);
+				if (!STLStringHelper::IsFloat(strFloat)) {
+					_EXCEPTION2("Invalid floating point number at position %i in: %s",
+						nStart, strIn.c_str());
+				}
+				pvar->m_strArg.push_back(strFloat);
+				pvar->m_varArg.push_back(InvalidVariableIndex);
+				pvar->m_nSpecifiedDim++;
+
+			// Check for string argument
+			} else if (strIn[n] == '\"') {
+				int nStart = n;
+				for (; n <= strIn.length(); n++) {
+					if (n == strIn.length()) {
+						_EXCEPTION1("String must be terminated with \": %s",
+							strIn.c_str());
+					}
+					if (strIn[n] == '\"') {
+						break;
+					}
+				}
+				if (n >= strIn.length()-1) {
+					_EXCEPTION1("Op argument list must be terminated"
+						" with ): %s", strIn.c_str());
+				}
+				if ((strIn[n+1] != ',') && (strIn[n+1] != ')')) {
+					_EXCEPTION2("Invalid character in argument list after "
+						"string at position %i in: %s",
+						n+1, strIn.c_str());
+				}
+
+				pvar->m_strArg.push_back(strIn.substr(nStart+1,n-nStart-1));
+				pvar->m_varArg.push_back(InvalidVariableIndex);
+				pvar->m_nSpecifiedDim++;
+
+			// Check for variable
+			} else {
+				VariableIndex varix;
+				n += FindOrRegisterSubStr(strIn.substr(n), &varix);
+
+				pvar->m_strArg.push_back("");
+				pvar->m_varArg.push_back(varix);
+				pvar->m_nSpecifiedDim++;
+			}
+
+			if (strIn[n] == ')') {
+				return (n+1);
+			}
+		}
+	}
+
+	_EXCEPTION1("Malformed variable string \"%s\"", strIn.c_str());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-int VariableRegistry::FindOrRegister(
-	const Variable & var
+VariableIndex VariableRegistry::FindOrRegister(
+	const std::string & strIn
 ) {
-	for (int i = 0; i < m_vecVariables.size(); i++) {
-		if (m_vecVariables[i] == var) {
-			return i;
-		}
+	VariableIndex varix;
+	int iFinalStringPos = FindOrRegisterSubStr(strIn, &varix);
+
+	if (iFinalStringPos != strIn.length()) {
+		_EXCEPTION1("Malformed variable: Extra characters found at end of string \"%s\"",
+			strIn.c_str());
 	}
-	m_vecVariables.push_back(var);
-	return (m_vecVariables.size()-1);
+
+	return varix;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -65,14 +273,25 @@ Variable & VariableRegistry::Get(
 	if ((varix < 0) || (varix >= m_vecVariables.size())) {
 		_EXCEPTIONT("Variable index out of range");
 	}
-	return m_vecVariables[varix];
+	return *(m_vecVariables[varix]);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string VariableRegistry::GetVariableString(
+	VariableIndex varix
+) {
+	if ((varix < 0) || (varix >= m_vecVariables.size())) {
+		_EXCEPTIONT("Variable index out of range");
+	}
+	return m_vecVariables[varix]->ToString(*this);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void VariableRegistry::UnloadAllGridData() {
 	for (int i = 0; i < m_vecVariables.size(); i++) {
-		m_vecVariables[i].UnloadGridData();
+		m_vecVariables[i]->UnloadGridData();
 	}
 }
 
@@ -116,187 +335,6 @@ bool Variable::operator==(
 		}
 	}
 	return true;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-int Variable::ParseFromString(
-	VariableRegistry & varreg,
-	const std::string & strIn
-) {
-	m_fOp = false;
-	m_strName = "";
-	m_nSpecifiedDim = 0;
-	m_varArg.clear();
-
-	bool fParamMode = false;
-	bool fDimMode = false;
-	std::string strDim;
-
-	if (strIn.length() >= 1) {
-		if (strIn[0] == '_') {
-			m_fOp = true;
-		}
-	}
-
-	for (int n = 0; n <= strIn.length(); n++) {
-		// Reading the variable name
-		if (!fDimMode) {
-			if (n == strIn.length()) {
-				if (fParamMode) {
-					_EXCEPTIONT("Unbalanced curly brackets in variable");
-				}
-				m_strName = strIn;
-				return n;
-			}
-
-			// Items in curly brackets are included in variable name
-			if (fParamMode) {
-				if (strIn[n] == '(') {
-					_EXCEPTIONT("Unexpected \'(\' in variable");
-				}
-				if (strIn[n] == ')') {
-					_EXCEPTIONT("Unexpected \')\' in variable");
-				}
-				if (strIn[n] == '{') {
-					_EXCEPTIONT("Unexpected \'{\' in variable");
-				}
-				if (strIn[n] == '}') {
-					fParamMode = false;
-				}
-				continue;
-			}
-			if (strIn[n] == '{') {
-				fParamMode = true;
-				continue;
-			}
-
-			if (strIn[n] == ',') {
-				m_strName = strIn.substr(0, n);
-				return n;
-			}
-			if (strIn[n] == '(') {
-				m_strName = strIn.substr(0, n);
-				fDimMode = true;
-				continue;
-			}
-			if (strIn[n] == ')') {
-				m_strName = strIn.substr(0, n);
-				return n;
-			}
-
-		// Reading in dimensions
-		} else if (!m_fOp) {
-			if (m_nSpecifiedDim == 4) {
-				_EXCEPTIONT("Only 4 dimensions / arguments may "
-					"be specified");
-			}
-			if (n == strIn.length()) {
-				_EXCEPTION1("Variable dimension list must be terminated"
-					" with ): %s", strIn.c_str());
-			}
-			if (strIn[n] == ',') {
-				if (strDim.length() == 0) {
-					_EXCEPTIONT("Invalid dimension index in variable");
-				}
-				m_iDim[m_nSpecifiedDim] = atoi(strDim.c_str());
-				m_nSpecifiedDim++;
-				strDim = "";
-
-			} else if (strIn[n] == ')') {
-				if (strDim.length() == 0) {
-					_EXCEPTIONT("Invalid dimension index in variable");
-				}
-				m_iDim[m_nSpecifiedDim] = atoi(strDim.c_str());
-				m_nSpecifiedDim++;
-				return (n+1);
-
-			} else {
-				strDim += strIn[n];
-			}
-
-		// Reading in arguments
-		} else {
-			if (m_nSpecifiedDim == 4) {
-				_EXCEPTIONT("Only 4 dimensions / arguments may "
-					"be specified");
-			}
-			if (n == strIn.length()) {
-				_EXCEPTION1("Op argument list must be terminated"
-					" with ): %s", strIn.c_str());
-			}
-
-			// No arguments
-			if (strIn[n] == ')') {
-				return (n+1);
-			}
-
-			// Check for floating point argument
-			if (isdigit(strIn[n]) || (strIn[n] == '.') || (strIn[n] == '-')) {
-				int nStart = n;
-				for (; n <= strIn.length(); n++) {
-					if (n == strIn.length()) {
-						_EXCEPTION1("Op argument list must be terminated"
-							" with ): %s", strIn.c_str());
-					}
-					if ((strIn[n] == ',') || (strIn[n] == ')')) {
-						break;
-					}
-				}
-
-				std::string strFloat = strIn.substr(nStart, n-nStart);
-				if (!STLStringHelper::IsFloat(strFloat)) {
-					_EXCEPTION2("Invalid floating point number at position %i in: %s",
-						nStart, strIn.c_str());
-				}
-				m_strArg.push_back(strFloat);
-				m_varArg.push_back(InvalidVariableIndex);
-				m_nSpecifiedDim++;
-
-			// Check for string argument
-			} else if (strIn[n] == '\"') {
-				int nStart = n;
-				for (; n <= strIn.length(); n++) {
-					if (n == strIn.length()) {
-						_EXCEPTION1("String must be terminated with \": %s",
-							strIn.c_str());
-					}
-					if (strIn[n] == '\"') {
-						break;
-					}
-				}
-				if (n >= strIn.length()-1) {
-					_EXCEPTION1("Op argument list must be terminated"
-						" with ): %s", strIn.c_str());
-				}
-				if ((strIn[n+1] != ',') && (strIn[n+1] != ')')) {
-					_EXCEPTION2("Invalid character in argument list after "
-						"string at position %i in: %s",
-						n+1, strIn.c_str());
-				}
-
-				m_strArg.push_back(strIn.substr(nStart+1,n-nStart-1));
-				m_varArg.push_back(InvalidVariableIndex);
-				m_nSpecifiedDim++;
-
-			// Check for variable
-			} else {
-				Variable var;
-
-				n += var.ParseFromString(varreg, strIn.substr(n));
-
-				m_strArg.push_back("");
-				m_varArg.push_back(varreg.FindOrRegister(var));
-				m_nSpecifiedDim++;
-			}
-
-			if (strIn[n] == ')') {
-				return (n+1);
-			}
-		}
-	}
-
-	_EXCEPTION1("Malformed variable string \"%s\"", strIn.c_str());
 }
 
 ///////////////////////////////////////////////////////////////////////////////

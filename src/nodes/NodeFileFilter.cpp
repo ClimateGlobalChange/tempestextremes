@@ -90,9 +90,7 @@ public:
 		} eReadMode = ReadMode_Distance;
 
 		// Parse variable
-		Variable var;
-		int iLast = var.ParseFromString(varreg, strOp) + 1;
-		m_varix = varreg.FindOrRegister(var);
+		int iLast = varreg.FindOrRegisterSubStr(strOp, &m_varix) + 1;
 
 		// Loop through string
 		for (int i = iLast; i <= strOp.length(); i++) {
@@ -177,7 +175,7 @@ public:
 		sprintf(szBuffer, "%f", m_dDistance);
 		std::string strDescription =
 			std::string("Include blobs with at least 1 point within ") + szBuffer
-			+ std::string(" degrees where ") + var.ToString(varreg);
+			+ std::string(" degrees where ") + varreg.GetVariableString(m_varix);
 		if (m_eOp == GreaterThan) {
 			strDescription += " is greater than ";
 		} else if (m_eOp == LessThan) {
@@ -821,9 +819,10 @@ try {
 	if (strVariables != "") {
 		std::string strVariablesTemp = strVariables;
 		for (;;) {
-			Variable var;
-			int iLast = var.ParseFromString(varreg, strVariablesTemp) + 1;
-			vecVarIx.push_back( varreg.FindOrRegister(var) );
+			VariableIndex varix;
+			int iLast = varreg.FindOrRegisterSubStr(strVariablesTemp, &varix) + 1;
+
+			vecVarIx.push_back(varix);
 			vecVarNames.push_back( strVariablesTemp.substr(0,iLast-1) );
 			if (iLast >= strVariablesTemp.length()) {
 				break;
@@ -918,7 +917,7 @@ try {
 		vecOutputFileList.push_back(strOutputData);
 
 	} else {
-		AnnounceStartBlock("Building input data list");
+		AnnounceStartBlock("Building output data list");
 		std::ifstream ifOutputDataList(strOutputDataList.c_str());
 		if (!ifOutputDataList.is_open()) {
 			_EXCEPTION1("Unable to open file \"%s\"",
@@ -1027,9 +1026,7 @@ try {
 	DataArray1D<double> dataMask(grid.GetSize());
 
 	// Loop over all files
-	if (vecInputFileList.size() != vecOutputFileList.size()) {
-		_EXCEPTION();
-	}
+	_ASSERT(vecInputFileList.size() == vecOutputFileList.size());
 
 	for (int f = 0; f < vecInputFileList.size(); f++) {
 

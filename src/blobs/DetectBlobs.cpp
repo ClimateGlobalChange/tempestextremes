@@ -200,7 +200,7 @@ bool SatisfiesThreshold(
 ///	<summary>
 ///		A class storing a output operator.
 ///	</summary>
-class OutputOp {
+class BlobOutputOp {
 
 public:
 	///	<summary>
@@ -217,9 +217,7 @@ public:
 		} eReadMode = ReadMode_Name;
 
 		// Parse variable
-		Variable var;
-		int iLast = var.ParseFromString(varreg, strOp) + 1;
-		m_varix = varreg.FindOrRegister(var);
+		int iLast = varreg.FindOrRegisterSubStr(strOp, &m_varix) + 1;
 
 		// Loop through string
 		for (int i = iLast; i <= strOp.length(); i++) {
@@ -252,7 +250,7 @@ public:
 		}
 
 		// Output announcement
-		std::string strDescription = var.ToString(varreg);
+		std::string strDescription = varreg.GetVariableString(m_varix);
 		strDescription += " with name \"";
 		strDescription += m_strName;
 		strDescription += "\"";
@@ -361,7 +359,7 @@ public:
 	std::vector<ThresholdOp> * pvecThresholdOp;
 
 	// Vector of output operators
-	std::vector<OutputOp> * pvecOutputOp;
+	std::vector<BlobOutputOp> * pvecOutputOp;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1010,7 +1008,7 @@ try {
 	}
 
 	// Parse the threshold operator command string
-	std::vector<OutputOp> vecOutputOp;
+	std::vector<BlobOutputOp> vecOutputOp;
 	dbparam.pvecOutputOp = &vecOutputOp;
 
 	if (strOutputCmd != "") {

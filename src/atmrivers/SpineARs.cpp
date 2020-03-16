@@ -24,6 +24,7 @@
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
+#include "CoordTransforms.h"
 
 #include <algorithm>
 #include <set>
@@ -352,50 +353,6 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void StereographicProjection(
-	double dLon0,
-	double dLat0,
-	double dLon,
-	double dLat,
-	double & dX,
-	double & dY
-) {
-	// Forward projection using equations (1)-(3)
-	// http://mathworld.wolfram.com/StereographicProjection.html
-	double dK = 2.0 / (1.0 + sin(dLat0) * sin(dLat) + cos(dLat0) * cos(dLat) * cos(dLon - dLon0));
-	dX = dK * cos(dLat) * sin(dLon - dLon0);
-	dY = dK * (cos(dLat0) * sin(dLat) - sin(dLat0) * cos(dLat) * cos(dLon - dLon0));
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void StereographicProjectionInv(
-	double dLon0,
-	double dLat0,
-	double dX,
-	double dY,
-	double & dLon,
-	double & dLat
-) {
-	// Forward projection using equations (3)-(5)
-	// http://mathworld.wolfram.com/StereographicProjection.html
-	double dRho = sqrt(dX * dX + dY * dY);
-	double dC = 2.0 * atan(0.5 * dRho);
-
-	if (dRho < 1.0e-14) {
-		dLat = dLat0;
-		dLon = dLon0;
-		return;
-	}
-
-	dLat = asin(cos(dC) * sin(dLat0) + dY * sin(dC) * cos(dLat0) / dRho);
-	dLon = dLon0 + atan2(
-			dX * sin(dC),
-			dRho * cos(dLat0) * cos(dC) - dY * sin(dLat0) * sin(dC));
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 void CalculateOrientation(
 	const DataArray1D<double> & dLonRad,
 	const DataArray1D<double> & dLatRad,
@@ -679,10 +636,10 @@ void CalculateCrossSection(
 			double dS = dSpineXSecDist * M_PI / 180.0
 				* (static_cast<double>(p) - 0.5 * static_cast<double>(nSpineXSecPoints-1));
 
-			double dC = 2.0 * tan(0.5 * dS);
+			double dCinv = 2.0 * tan(0.5 * dS);
 
-			double dXs = dC * sin(dOrient);
-			double dYs = - dC * cos(dOrient);
+			double dXs = dCinv * sin(dOrient);
+			double dYs = - dCinv * cos(dOrient);
 
 			double dLonXRad;
 			double dLatXRad;
@@ -1719,9 +1676,7 @@ try {
 	VariableRegistry varreg;
 
 	// Get the integrated water vapor variable
-	Variable varSearchByArg;
-	varSearchByArg.ParseFromString(varreg, strSearchByVariable);
-	arparam.ixSearchByVar = varreg.FindOrRegister(varSearchByArg);
+	arparam.ixSearchByVar = varreg.FindOrRegister(strSearchByVariable);
 
 	AnnounceEndBlock("Done");
 

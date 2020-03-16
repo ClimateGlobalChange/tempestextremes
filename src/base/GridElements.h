@@ -37,6 +37,7 @@
 
 #include "Exception.h"
 #include "DataArray1D.h"
+#include "CoordTransforms.h"
 #include "netcdfcpp.h"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -814,99 +815,6 @@ struct FindFaceStruct {
 };
 
 ///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Calculate latitude and longitude from normalized 3D Cartesian
-///		coordinates, in degrees.
-///	</summary>
-inline void XYZtoRLL_Deg(
-	const double & dX,
-	const double & dY,
-	const double & dZ,
-	double & dLon,
-	double & dLat
-) {
-	assert(fabs(dX * dX + dY * dY + dZ * dZ - 1.0) < HighTolerance);
-
-	if (fabs(dZ) < 1.0 - ReferenceTolerance) {
-		dLon = atan2(dY, dX);
-		dLat = asin(dZ);
-
-		if (dLon < 0.0) {
-			dLon += 2.0 * M_PI;
-		}
-
-		dLon = dLon / M_PI * 180.0;
-		dLat = dLat / M_PI * 180.0;
-
-	} else if (dZ > 0.0) {
-		dLon = 0.0;
-		dLat = 90.0;
-
-	} else {
-		dLon = 0.0;
-		dLat = -90.0;
-	}
-}
-
-///	<summary>
-///		Calculate an average longitude from two given longitudes (in radians).
-///	</summary>
-inline double AverageLongitude_Rad(
-	double dLon1,
-	double dLon2
-) {
-	double dDeltaLon;
-	if (dLon2 > dLon1) {
-		dDeltaLon = fmod(dLon2 - dLon1, 2.0 * M_PI);
-		if (dDeltaLon > M_PI) {
-			dDeltaLon = dDeltaLon - 2.0 * M_PI;
-		}
-	} else {
-		dDeltaLon = - fmod(dLon1 - dLon2, 2.0 * M_PI);
-		if (dDeltaLon < -M_PI) {
-			dDeltaLon = dDeltaLon + 2.0 * M_PI;
-		}
-	}
-
-	double dLonAvg = dLon1 + 0.5 * dDeltaLon;
-
-	if ((dLonAvg < 0.0) && (dLon1 >= 0.0) && (dLon2 >= 0.0)) {
-		dLonAvg += 2.0 * M_PI;
-	}
-	if ((dLonAvg > 2.0 * M_PI) && (dLon1 <= 2.0 * M_PI) && (dLon2 <= 2.0 * M_PI)) {
-		dLonAvg -= 2.0 * M_PI;
-	}
-
-	return dLonAvg;
-}
-
-///	<summary>
-///		Calculate the great circle distance between two RLL points.
-///	</summary>
-inline double GreatCircleDistance_Deg(
-	double dLonRad1,
-	double dLatRad1,
-	double dLonRad2,
-	double dLatRad2
-) {
-	double dR =
-		sin(dLatRad1) * sin(dLatRad2)
-		+ cos(dLatRad1) * cos(dLatRad2) * cos(dLonRad2 - dLonRad1);
-
-	if (dR >= 1.0) {
-		dR = 0.0;
-	} else if (dR <= -1.0) {
-		dR = 180.0;
-	} else {
-		dR = 180.0 / M_PI * acos(dR);
-	}
-	if (dR != dR) {
-		_EXCEPTIONT("NaN value detected");
-	}
-
-	return dR;
-}
 
 ///	<summary>
 ///		Calculate the dot product between two Nodes.

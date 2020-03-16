@@ -24,7 +24,7 @@
 ///	<summary>
 ///		A class storing an output operator.
 ///	</summary>
-class OutputOp {
+class NodeOutputOp {
 
 public:
 	///	<summary>
@@ -58,9 +58,7 @@ public:
 		} eReadMode = ReadMode_Op;
 
 		// Get variable information
-		Variable var;
-		int iLast = var.ParseFromString(varreg, strOp) + 1;
-		m_varix = varreg.FindOrRegister(var);
+		int iLast = varreg.FindOrRegisterSubStr(strOp, &m_varix) + 1;
 
 		// Loop through string
 		for (int i = iLast; i <= strOp.length(); i++) {
@@ -145,11 +143,9 @@ public:
 			strDescription += "Coordinates of minimum of ";
 		}
 
+		strDescription += varreg.GetVariableString(m_varix);
+
 		char szBuffer[128];
-
-		sprintf(szBuffer, "%s", var.ToString(varreg).c_str());
-		strDescription += szBuffer;
-
 		sprintf(szBuffer, " within %f degrees", m_dDistance);
 		strDescription += szBuffer;
 
@@ -176,8 +172,8 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename real>
-void ApplyOutputOp(
-	const OutputOp & op,
+void ApplyNodeOutputOp(
+	const NodeOutputOp & op,
 	const SimpleGrid & grid,
 	VariableRegistry & varreg,
 	NcFileVector & vecFiles,
@@ -199,12 +195,12 @@ void ApplyOutputOp(
 	float dRMax;
 
 	// Value of the minimum or maximum value within given range
-	if ((op.m_eOp == OutputOp::Max) ||
-	    (op.m_eOp == OutputOp::Min)
+	if ((op.m_eOp == NodeOutputOp::Max) ||
+	    (op.m_eOp == NodeOutputOp::Min)
 	) {
 		FindLocalMinMax<real>(
 			grid,
-			(op.m_eOp == OutputOp::Min),
+			(op.m_eOp == NodeOutputOp::Min),
 			dataState,
 			ixCandidate,
 			op.m_dDistance,
@@ -217,12 +213,12 @@ void ApplyOutputOp(
 
 	// Distance to the minimum or maximum value within given range
 	} else if (
-		(op.m_eOp == OutputOp::MaxDist) ||
-		(op.m_eOp == OutputOp::MinDist)
+		(op.m_eOp == NodeOutputOp::MaxDist) ||
+		(op.m_eOp == NodeOutputOp::MinDist)
 	) {
 		FindLocalMinMax<float>(
 			grid,
-			(op.m_eOp == OutputOp::MinDist),
+			(op.m_eOp == NodeOutputOp::MinDist),
 			dataState,
 			ixCandidate,
 			op.m_dDistance,
@@ -235,12 +231,12 @@ void ApplyOutputOp(
 
 	// Coordinates (lon,lat) of the minimum or maximum value within given range
 	} else if (
-		(op.m_eOp == OutputOp::MaxCoordinate) ||
-		(op.m_eOp == OutputOp::MinCoordinate)
+		(op.m_eOp == NodeOutputOp::MaxCoordinate) ||
+		(op.m_eOp == NodeOutputOp::MinCoordinate)
 	) {
 		FindLocalMinMax<float>(
 			grid,
-			(op.m_eOp == OutputOp::MinCoordinate),
+			(op.m_eOp == NodeOutputOp::MinCoordinate),
 			dataState,
 			ixCandidate,
 			op.m_dDistance,
@@ -264,12 +260,12 @@ void ApplyOutputOp(
 
 	// Coordinates (lon,lat) of the minimum or maximum value within given range
 	} else if (
-		(op.m_eOp == OutputOp::MaxIndex) ||
-		(op.m_eOp == OutputOp::MinIndex)
+		(op.m_eOp == NodeOutputOp::MaxIndex) ||
+		(op.m_eOp == NodeOutputOp::MinIndex)
 	) {
 		FindLocalMinMax<float>(
 			grid,
-			(op.m_eOp == OutputOp::MinIndex),
+			(op.m_eOp == NodeOutputOp::MinIndex),
 			dataState,
 			ixCandidate,
 			op.m_dDistance,
@@ -281,7 +277,7 @@ void ApplyOutputOp(
 		strResult = buf;
 
 	// Average of the field over a given distance
-	} else if (op.m_eOp == OutputOp::Avg) {
+	} else if (op.m_eOp == NodeOutputOp::Avg) {
 		FindLocalAverage<float>(
 			grid,
 			dataState,

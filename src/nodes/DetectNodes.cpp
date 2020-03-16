@@ -390,7 +390,7 @@ public:
 	std::vector<ThresholdOp> * pvecThresholdOp;
 
 	// Vector of output operators
-	std::vector<OutputOp> * pvecOutputOp;
+	std::vector<NodeOutputOp> * pvecOutputOp;
 
 	// Time stride
 	int nTimeStride;
@@ -458,7 +458,7 @@ void DetectCyclonesUnstructured(
 	std::vector<ThresholdOp> & vecThresholdOp =
 		*(param.pvecThresholdOp);
 
-	std::vector<OutputOp> & vecOutputOp =
+	std::vector<NodeOutputOp> & vecOutputOp =
 		*(param.pvecOutputOp);
 
 	// Unload data from the VariableRegistry
@@ -685,6 +685,9 @@ void DetectCyclonesUnstructured(
 
 			// Create a new KD Tree containing all nodes
 			kdtree * kdMerge = kd_create(3);
+			if (kdMerge == NULL) {
+				_EXCEPTIONT("kd_create(3) failed");
+			}
 
 			std::set<int>::const_iterator iterCandidate
 				= setCandidates.begin();
@@ -880,26 +883,20 @@ void DetectCyclonesUnstructured(
 		Announce("Rejected (    merged): %i", nRejectedMerge);
 
 		for (int tc = 0; tc < vecRejectedThreshold.GetRows(); tc++) {
-			Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
-
 			Announce("Rejected (thresh. %s): %i",
-					var.m_strName.c_str(),
+					varreg.GetVariableString(vecThresholdOp[tc].m_varix).c_str(),
 					vecRejectedThreshold[tc]);
 		}
 
 		for (int ccc = 0; ccc < vecRejectedClosedContour.GetRows(); ccc++) {
-			Variable & var = varreg.Get(vecClosedContourOp[ccc].m_varix);
-
 			Announce("Rejected (contour %s): %i",
-					var.m_strName.c_str(),
+					varreg.GetVariableString(vecClosedContourOp[ccc].m_varix).c_str(),
 					vecRejectedClosedContour[ccc]);
 		}
 
 		for (int ccc = 0; ccc < vecRejectedNoClosedContour.GetRows(); ccc++) {
-			Variable & var = varreg.Get(vecNoClosedContourOp[ccc].m_varix);
-
 			Announce("Rejected (nocontour %s): %i",
-					var.m_strName.c_str(),
+					varreg.GetVariableString(vecNoClosedContourOp[ccc].m_varix).c_str(),
 					vecRejectedNoClosedContour[ccc]);
 		}
 
@@ -938,7 +935,7 @@ void DetectCyclonesUnstructured(
 
 				iCandidateIx = 0;
 				for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-					ApplyOutputOp<float>(
+					ApplyNodeOutputOp<float>(
 						vecOutputOp[outc],
 						grid,
 						varreg,
@@ -1156,17 +1153,14 @@ try {
 
 	dcuparam.fSearchByMinima = false;
 	{
-		Variable varSearchByArg;
 		if (strSearchByMin != "") {
-			varSearchByArg.ParseFromString(varreg, strSearchByMin);
+			dcuparam.ixSearchBy = varreg.FindOrRegister(strSearchByMin);
 			dcuparam.fSearchByMinima = true;
 		}
 		if (strSearchByMax != "") {
-			varSearchByArg.ParseFromString(varreg, strSearchByMax);
+			dcuparam.ixSearchBy = varreg.FindOrRegister(strSearchByMax);
 			dcuparam.fSearchByMinima = false;
 		}
-
-		dcuparam.ixSearchBy = varreg.FindOrRegister(varSearchByArg);
 	}
 
 	// Parse the closed contour command string
@@ -1254,7 +1248,7 @@ try {
 	}
 
 	// Parse the output operator command string
-	std::vector<OutputOp> vecOutputOp;
+	std::vector<NodeOutputOp> vecOutputOp;
 	dcuparam.pvecOutputOp = &vecOutputOp;
 
 	if (strOutputCmd != "") {
