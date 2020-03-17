@@ -259,9 +259,9 @@ void NodeFile::Read(
 				}
 
 				// Store all other data as strings
-				for (int i = 0; i < nOutputSize-4; i++) {
+				for (int j = 0; j < nOutputSize-4; j++) {
 					pathnode.PushColumnDataString(
-						vecDelimitedOutput[i]);
+						vecDelimitedOutput[j]);
 				}
 
 				// Because nodes in StitchNodes format output are not ordered in

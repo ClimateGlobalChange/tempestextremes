@@ -125,7 +125,7 @@ int main(int argc,char **argv){
 			}
 			//Write the outfile
 			std::string strOutFile;
-			std::string suff ="_"+ std::to_string(hourInt) + "Z.nc";
+			std::string suff ="_"+ std::to_string((long long)hourInt) + "Z.nc";
 			pos = InputFiles[x].find(".nc");
 			len = InputFiles[x].length();
 			strOutFile = InputFiles[x].replace(pos,len,suff);
