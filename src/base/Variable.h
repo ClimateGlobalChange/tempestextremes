@@ -367,9 +367,9 @@ public:
 		for (size_t d = 0; d < m_vecSize.size(); d++) {
 			strOut +=
 				std::string("(")
-				+ std::to_string(m_vecValue[d])
+				+ std::to_string((long long)m_vecValue[d])
 				+ std::string("/")
-				+ std::to_string(m_vecSize[d])
+				+ std::to_string((long long)m_vecSize[d])
 				+ std::string(")");
 		}
 		if (m_fEnd) {
