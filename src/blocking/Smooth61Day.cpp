@@ -324,8 +324,8 @@ int main(int argc, char **argv){
             //std::cout<<"prevYear is "<<prevYear<<" and nextYear is "<<nextYear<<std::endl;
             //If it's reached the end of a year, write the file
             if (nextYear>prevYear){
-                std::string outFileName = prefix + "_" + std::to_string(prevYear) + ".nc";
-                std::string outTimeUnits = "days since " + std::to_string(prevYear);
+                std::string outFileName = prefix + "_" + std::to_string((long long)prevYear) + ".nc";
+                std::string outTimeUnits = "days since " + std::to_string((long long)prevYear);
                 std::cout<<"inside while loop: writing file "<<outFileName<<std::endl;
                 NcFile outfile(outFileName.c_str(),NcFile::Replace,NULL,0,NcFile::Offset64Bits);
                 //Write the variables to the file
@@ -389,8 +389,8 @@ int main(int argc, char **argv){
 
       std::cout<<"Writing last file (did not fill the year out completely)"<<std::endl;
       std::cout<<"the year is "<<nextYear<<std::endl;
-      std::string outFileName = prefix + "_" + std::to_string(prevYear) + ".nc";
-      std::string outTimeUnits = "days since " + std::to_string(prevYear);
+      std::string outFileName = prefix + "_" + std::to_string((long long)prevYear) + ".nc";
+      std::string outTimeUnits = "days since " + std::to_string((long long)prevYear);
 
       NcFile outfile(outFileName.c_str(),NcFile::Replace,NULL,0,NcFile::Offset64Bits);
       //Write the variables to the file
