@@ -536,10 +536,10 @@ float BilinearInterp(
 		dLatOrient = -1.0;
 	}
 
-	if (dLat0Rad * dLatOrient < dLatRad[0] * dLatOrient) {
+	if (dLat0Rad * dLatOrient <= dLatRad[0] * dLatOrient) {
 		return (dI * dVarData[0][ix0] + (1.0 - dI) * dVarData[0][ix1]);
 
-	} else if (dLat0Rad * dLatOrient > dLatRad[dLatRad.GetRows()-1] * dLatOrient) {
+	} else if (dLat0Rad * dLatOrient >= dLatRad[dLatRad.GetRows()-1] * dLatOrient) {
 		int jx = dLatRad.GetRows()-1;
 		return (dI * dVarData[jx][ix0] + (1.0 - dI) * dVarData[jx][ix1]);
 
@@ -548,6 +548,13 @@ float BilinearInterp(
 			(dLat0Rad - dLatRad[0])
 			/ (dLatRad[dLatRad.GetRows()-1] - dLatRad[0])
 			* static_cast<double>(dLatRad.GetRows()-1);
+
+		if (jx < 0) {
+			jx = 0;
+		}
+		if (jx >= dLatRad.GetRows()-1) {
+			jx = dLatRad.GetRows()-2;
+		}
 
 		int it = 0;
 		for (; it < dLatRad.GetRows(); it++) {
