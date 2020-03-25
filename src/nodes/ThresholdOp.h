@@ -109,7 +109,7 @@ public:
 					iLast = i + 1;
 					eReadMode = ReadMode_Distance;
 
-				// Read in minimum count
+				// Read in distance to point that satisfies threshold
 				} else if (eReadMode == ReadMode_Distance) {
 					m_dDistance = atof(strSubStr.c_str());
 

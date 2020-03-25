@@ -198,6 +198,153 @@ bool SatisfiesThreshold(
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		A class storing a filtering operator.
+///	</summary>
+class FilterOp {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	FilterOp() :
+		m_varix(InvalidVariableIndex),
+		m_eOp(ThresholdOp::GreaterThan),
+		m_dValue(0.0),
+		m_nCount(0)
+	{ }
+
+public:
+	///	<summary>
+	///		Parse a filter operator string.
+	///	</summary>
+	void Parse(
+		VariableRegistry & varreg,
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Op,
+			ReadMode_Value,
+			ReadMode_Count,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Op;
+
+		// Parse variable
+		int iLast = varreg.FindOrRegisterSubStr(strOp, &m_varix) + 1;
+
+		// Loop through string
+		for (int i = iLast; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in operation
+				if (eReadMode == ReadMode_Op) {
+					if (strSubStr == ">") {
+						m_eOp = ThresholdOp::GreaterThan;
+					} else if (strSubStr == "<") {
+						m_eOp = ThresholdOp::LessThan;
+					} else if (strSubStr == ">=") {
+						m_eOp = ThresholdOp::GreaterThanEqualTo;
+					} else if (strSubStr == "<=") {
+						m_eOp = ThresholdOp::LessThanEqualTo;
+					} else if (strSubStr == "=") {
+						m_eOp = ThresholdOp::EqualTo;
+					} else if (strSubStr == "!=") {
+						m_eOp = ThresholdOp::NotEqualTo;
+					} else {
+						_EXCEPTION1("Threshold invalid operation \"%s\"",
+							strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Value;
+
+				// Read in value
+				} else if (eReadMode == ReadMode_Value) {
+					m_dValue = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Count;
+
+				// Read in minimum count
+				} else if (eReadMode == ReadMode_Count) {
+					m_nCount = atoi(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nInsufficient entries in filter op \"%s\""
+							"\nRequired: \"<name>,<operation>"
+							",<value>,<count>\"",
+							strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("\nInsufficient entries in filter op \"%s\""
+					"\nRequired: \"<name>,<operation>,<value>,<count>\"",
+					strOp.c_str());
+		}
+
+		if (m_nCount < 1) {
+			_EXCEPTIONT("For filter op, count must be positive");
+		}
+
+		// Output announcement
+		std::string strDescription = varreg.GetVariableString(m_varix);
+
+		if (m_eOp == ThresholdOp::GreaterThan) {
+			strDescription += " is greater than ";
+		} else if (m_eOp == ThresholdOp::LessThan) {
+			strDescription += " is less than ";
+		} else if (m_eOp == ThresholdOp::GreaterThanEqualTo) {
+			strDescription += " is greater than or equal to ";
+		} else if (m_eOp == ThresholdOp::LessThanEqualTo) {
+			strDescription += " is less than or equal to ";
+		} else if (m_eOp == ThresholdOp::EqualTo) {
+			strDescription += " is equal to ";
+		} else if (m_eOp == ThresholdOp::NotEqualTo) {
+			strDescription += " is not equal to ";
+		}
+
+		Announce("%s %f at at least %i points",
+			strDescription.c_str(),
+			m_dValue,
+			m_nCount);
+	}
+
+public:
+	///	<summary>
+	///		Variable to use for filtering.
+	///	</summary>
+	VariableIndex m_varix;
+
+	///	<summary>
+	///		Operation that must be satisfied.
+	///	</summary>
+	ThresholdOp::Operation m_eOp;
+
+	///	<summary>
+	///		Filter threshold value.
+	///	</summary>
+	double m_dValue;
+
+	///	<summary>
+	///		Number of points that exceed the threshold.
+	///	</summary>
+	int m_nCount;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		A class storing a output operator.
 ///	</summary>
 class BlobOutputOp {
@@ -272,6 +419,96 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+template <typename real>
+void ApplyFilters(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & dataState,
+	const ThresholdOp::Operation op,
+	const double dTargetValue,
+	const int nCount,
+	DataArray1D<int> & bTag
+) {
+	_ASSERT(bTag.GetRows() == grid.GetSize());
+	_ASSERT(bTag.GetRows() == dataState.GetRows());
+
+	// Number of blobs
+	int nBlobs = 0;
+	int nBlobsFiltered = 0;
+
+	// Visit all tagged points
+	std::set<int> setNodesVisited;
+	for (int i = 0; i < grid.GetSize(); i++) {
+
+		// Verify point it tagged and we haven't visited before
+		if (bTag[i] == 0) {
+			continue;
+		}
+		if (setNodesVisited.find(i) != setNodesVisited.end()) {
+			continue;
+		}
+
+		// Number of blobs
+		nBlobs++;
+
+		// New blob
+		std::set<int> setCurrentBlob;
+
+		// Number of points within blob that satisfy threshold
+		int nThresholdPoints = 0;
+
+		// Build connectivity
+		std::queue<int> queueToVisit;
+		queueToVisit.push(i);
+
+		while (queueToVisit.size() != 0) {
+			int iNext = queueToVisit.front();
+			queueToVisit.pop();
+
+			// Verify point is tagged and we haven't visited before
+			if (bTag[iNext] == 0) {
+				continue;
+			}
+			if (setNodesVisited.find(iNext) != setNodesVisited.end()) {
+				continue;
+			}
+			setNodesVisited.insert(iNext);
+			setCurrentBlob.insert(iNext);
+
+			// Check if this point satisfies threshold
+			bool fSatisfiesThreshold =
+				SatisfiesThreshold<real>(
+					grid,
+					dataState,
+					iNext,
+					op,
+					dTargetValue,
+					0.0);
+
+			if (fSatisfiesThreshold) {
+				nThresholdPoints++;
+			}
+
+			// Insert all connected neighbors into "to visit" queue
+			for (int n = 0; n < grid.m_vecConnectivity[iNext].size(); n++) {
+				queueToVisit.push(grid.m_vecConnectivity[iNext][n]);
+			}
+		}
+
+		// If not enough points satisfy the filter then eliminate this blob
+		if (nThresholdPoints < nCount) {
+			nBlobsFiltered++;
+			for (auto it = setCurrentBlob.begin(); it != setCurrentBlob.end(); it++) {
+				bTag[*it] = 0;
+			}
+		}
+	}
+
+	// Announce results
+	Announce("Filter removed %i of %i blobs", nBlobsFiltered, nBlobs);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 ///	<summary>
 ///		Parse the list of input files.
 ///	</summary>
@@ -324,6 +561,7 @@ public:
 		strLongitudeName("lon"),
 		strLatitudeName("lat"),
 		pvecThresholdOp(NULL),
+		pvecFilterOp(NULL),
 		pvecOutputOp(NULL)
 	{ }
 
@@ -358,6 +596,9 @@ public:
 	// Vector of threshold operators
 	std::vector<ThresholdOp> * pvecThresholdOp;
 
+	// Vector of filter operators
+	std::vector<FilterOp> * pvecFilterOp;
+
 	// Vector of output operators
 	std::vector<BlobOutputOp> * pvecOutputOp;
 };
@@ -381,8 +622,14 @@ void DetectBlobs(
 	AnnounceOutputOnAllRanks();
 
 	// Dereference pointers to operators
+	_ASSERT(param.pvecThresholdOp != NULL);
 	std::vector<ThresholdOp> & vecThresholdOp =
 		*(param.pvecThresholdOp);
+
+	// Dereference pointers to operators
+	_ASSERT(param.pvecFilterOp != NULL);
+	std::vector<FilterOp> & vecFilterOp =
+		*(param.pvecFilterOp);
 
 	// Unload data from the VariableRegistry
 	varreg.UnloadAllGridData();
@@ -541,25 +788,32 @@ void DetectBlobs(
 		varTimeOut->add_att("standard_name", "time");
 	}*/
 
-	// FIX for unstructured grids
-	CopyNcVar(ncInput, ncOutput, param.strLatitudeName, true);
-	CopyNcVar(ncInput, ncOutput, param.strLongitudeName, true);
+	// Create output variable
+	CopyNcVarIfExists(ncInput, ncOutput, param.strLatitudeName, true);
+	CopyNcVarIfExists(ncInput, ncOutput, param.strLongitudeName, true);
 
-	NcDim * dim0 = ncOutput.get_dim(param.strLatitudeName.c_str());
-	if (dim0 == NULL) {
-		_EXCEPTION1("Error copying variable \"%s\" to output file",
-			param.strLatitudeName.c_str());
-	}
-	NcDim * dim1 = ncOutput.get_dim(param.strLongitudeName.c_str());
-	if (dim1 == NULL) {
-		_EXCEPTION1("Error copying variable \"%s\" to output file",
-			param.strLongitudeName.c_str());
-	}
+	NcDim * dim0 = NULL;
+	NcDim * dim1 = NULL;
 
-	// Create output variables
 	NcVar * varTag = NULL;
 
 	if (grid.m_nGridDim.size() == 1) {
+		dim0 = ncOutput.get_dim("ncol");
+		if (dim0 == NULL) {
+			dim0 = ncOutput.add_dim("ncol", grid.GetSize());
+		}
+		if (dim0 == NULL) {
+			_EXCEPTION1("Error creating dim \"ncol\" in file \"%s\"",
+				strOutputFile.c_str());
+		}
+		if (dim0->size() != grid.GetSize()) {
+			_EXCEPTION4("Dimension \"%s\" in file \"%s\" has inconsistent length (%i vs %i)",
+				dim0->name(),
+				strOutputFile.c_str(),
+				dim0->size(),
+				grid.GetSize());
+		}
+
 		if (dimTimeOut != NULL) {
 			varTag = ncOutput.add_var(
 				param.strTagVar.c_str(),
@@ -575,6 +829,20 @@ void DetectBlobs(
 		}
 
 	} else if (grid.m_nGridDim.size() == 2) {
+
+		// Copy over latitude and longitude variable
+		dim0 = ncOutput.get_dim(param.strLatitudeName.c_str());
+		if (dim0 == NULL) {
+			_EXCEPTION1("Error copying variable \"%s\" to output file",
+				param.strLatitudeName.c_str());
+		}
+		dim1 = ncOutput.get_dim(param.strLongitudeName.c_str());
+		if (dim1 == NULL) {
+			_EXCEPTION1("Error copying variable \"%s\" to output file",
+				param.strLongitudeName.c_str());
+		}
+
+		// Create output tag
 		if (dimTimeOut != NULL) {
 			varTag = ncOutput.add_var(
 				param.strTagVar.c_str(),
@@ -595,6 +863,8 @@ void DetectBlobs(
 		_EXCEPTIONT("Invalid grid dimension -- value must be 1 or 2");
 	}
 
+	_ASSERT(varTag != NULL);
+
 	AnnounceEndBlock("Done");
 
 	// Tagged cell array
@@ -604,58 +874,12 @@ void DetectBlobs(
 	for (int t = 0; t < nTime; t ++) {
 
 		// Announce
-		char szBuffer[20];
-		sprintf(szBuffer, "Time %i", t);
-		AnnounceStartBlock(szBuffer);
-/*
-		// Load in data at this time slice
-		AnnounceStartBlock("Reading data");
-		if (dimTime != NULL) {
-			if (grid.m_nGridDim.size() == 1) {
-				varState->set_cur(t, 0);
-				varState->get(&(dIWV[0]), 1, grid.m_nGridDim[0]);
-			} else if (grid.m_nGridDim.size() == 2) {
-				varState->set_cur(t, 0, 0);
-				varState->get(&(dIWV[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
-			} else {
-				_EXCEPTION();
-			}
-
-		} else {
-			if (grid.m_nGridDim.size() == 1) {
-				varState->set_cur((long)0);
-				varState->get(&(dIWV[0]), grid.m_nGridDim[0]);
-			} else if (grid.m_nGridDim.size() == 2) {
-				varState->set_cur(0, 0);
-				varState->get(&(dIWV[0]), grid.m_nGridDim[0], grid.m_nGridDim[1]);
-			} else {
-				_EXCEPTION();
-			}
-		}
-		AnnounceEndBlock("Done");
-
-		// Compute Laplacian
-		AnnounceStartBlock("Applying Laplacian");
-		opLaplacian.Apply(dIWV, dLaplacian);
-		AnnounceEndBlock("Done");
-*/
-/*
-		// DEBUG: Output Laplacian range
-		double dMinLaplacian = dLaplacian[0];
-		double dMaxLaplacian = dLaplacian[0];
-		for (int i = 0; i < dLaplacian.GetRows(); i++) {
-			if (dLaplacian[i] < dMinLaplacian) {
-				dMinLaplacian = dLaplacian[i];
-			}
-			if (dLaplacian[i] > dMaxLaplacian) {
-				dMaxLaplacian = dLaplacian[i];
-			}
-		}
-		Announce("Laplacian Range: %1.5e %1.5e", dMinLaplacian, dMaxLaplacian);
-*/
+		AnnounceStartBlock("Time %i", t);
 
 		AnnounceStartBlock("Build tagged cell array");
 		bTag.Zero();
+
+		// Set all points within the specified latitude bounds to 1
 		for (int i = 0; i < grid.GetSize(); i++) {
 			if (fabs(grid.m_dLat[i]) < param.dMinAbsLat * M_PI / 180.0) {
 				continue;
@@ -667,16 +891,6 @@ void DetectBlobs(
 				continue;
 			}
 
-/*
-			if (dIWV[i] < dMinIWV) {
-				continue;
-			}
-*/
-/*
-			if (dLaplacian[i] > -dMinLaplacian) {
-				continue;
-			}
-*/
 			bTag[i] = 1;
 		}
 		AnnounceEndBlock("Done");
@@ -714,29 +928,39 @@ void DetectBlobs(
 		}
 		AnnounceEndBlock("Done");
 
+		// Eliminate based on filter commands
+		if (vecFilterOp.size() != 0) {
+			AnnounceStartBlock("Apply filters");
+			for (int fc = 0; fc < vecFilterOp.size(); fc++) {
+
+				// Load the search variable data
+				Variable & var = varreg.Get(vecFilterOp[fc].m_varix);
+				var.LoadGridData(varreg, vecFiles, grid, t);
+				const DataArray1D<float> & dataState = var.GetData();
+
+				// Check the blobs against the filter
+				ApplyFilters<float>(
+					grid,
+					dataState,
+					vecFilterOp[fc].m_eOp,
+					vecFilterOp[fc].m_dValue,
+					vecFilterOp[fc].m_nCount,
+					bTag);
+			}
+			AnnounceEndBlock("Done");
+		}
+
 		// Output tagged cell array
 		AnnounceStartBlock("Writing results");
 		if (dimTimeOut != NULL) {
-/*
-			if (varLaplacian != NULL) {
-				if (grid.m_nGridDim.size() == 1) {
-					varLaplacian->set_cur(t, 0);
-					varLaplacian->put(&(dLaplacian[0]), 1, grid.m_nGridDim[0]);
-				} else if (grid.m_nGridDim.size() == 2) {
-					varLaplacian->set_cur(t, 0, 0);
-					varLaplacian->put(&(dLaplacian[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
-				} else {
-					_EXCEPTION();
-				}
-			}
-*/
 			if (grid.m_nGridDim.size() == 1) {
 				varTag->set_cur(t, 0);
 				varTag->put(&(bTag[0]), 1, grid.m_nGridDim[0]);
-			} else if (grid.m_nGridDim.size() == 2) {
 
+			} else if (grid.m_nGridDim.size() == 2) {
 				varTag->set_cur(t, 0, 0);
 				varTag->put(&(bTag[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
+
 			} else {
 				_EXCEPTION();
 			}
@@ -780,19 +1004,6 @@ void DetectBlobs(
 			}
 
 		} else {
-/*
-			if (varLaplacian != NULL) {
-				if (grid.m_nGridDim.size() == 1) {
-					varLaplacian->set_cur((long)0);
-					varLaplacian->put(&(dLaplacian[0]), grid.m_nGridDim[0]);
-				} else if (grid.m_nGridDim.size() == 2) {
-					varLaplacian->set_cur(0, 0);
-					varLaplacian->put(&(dLaplacian[0]), grid.m_nGridDim[0], grid.m_nGridDim[1]);
-				} else {
-					_EXCEPTION();
-				}
-			}
-*/
 			if (grid.m_nGridDim.size() == 1) {
 				varTag->set_cur((long)0);
 				varTag->put(&(bTag[0]), grid.m_nGridDim[0]);
@@ -878,10 +1089,13 @@ try {
 	// Output file list
 	std::string strOutputFileList;
 
-	// Output file list
+	// Threshold commands
 	std::string strThresholdCmd;
 
-	// Output file list
+	// Filter commands
+	std::string strFilterCmd;
+
+	// Output commands
 	std::string strOutputCmd;
 
 	// Parse the command line
@@ -892,6 +1106,7 @@ try {
 		CommandLineString(strOutput, "out", "");
 		CommandLineString(strOutputFileList, "out_file_list", "");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
+		CommandLineStringD(strFilterCmd, "filtercmd", "", "[var,op,value,count]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,name;...]");
 		CommandLineDouble(dbparam.dMinAbsLat, "minabslat", 0.0);
 		CommandLineDouble(dbparam.dMinLat, "minlat", -90.0);
@@ -999,6 +1214,34 @@ try {
 				int iNextOp = (int)(vecThresholdOp.size());
 				vecThresholdOp.resize(iNextOp + 1);
 				vecThresholdOp[iNextOp].Parse(varreg, strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	// Parse the filter operator command string
+	std::vector<FilterOp> vecFilterOp;
+	dbparam.pvecFilterOp = &vecFilterOp;
+
+	if (strFilterCmd != "") {
+		AnnounceStartBlock("Parsing filter operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strFilterCmd.length(); i++) {
+
+			if ((i == strFilterCmd.length()) ||
+				(strFilterCmd[i] == ';') ||
+				(strFilterCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strFilterCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecFilterOp.size());
+				vecFilterOp.resize(iNextOp + 1);
+				vecFilterOp[iNextOp].Parse(varreg, strSubStr);
 
 				iLast = i + 1;
 			}
