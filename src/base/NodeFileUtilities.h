@@ -624,6 +624,14 @@ public:
 
 public:
 	///	<summary>
+	///		Constructor.
+	///	</summary>
+	NodeFile() :
+		m_ePathType(PathTypeSN)
+	{ }
+
+public:
+	///	<summary>
 	///		Read in a node file and parse it into a PathVector.
 	///	</summary>
 	void Read(

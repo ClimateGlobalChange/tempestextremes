@@ -105,12 +105,13 @@ public:
 		const Time & time
 	) const;
 
+public:
 	///	<summary>
 	///		Generate a NcFileVector and local time index for the given Time.
 	///	</summary>
-	void Find(
+	bool FindFilesAtTime(
 		const Time & time,
-		NcFileVector & vecFiles,
+		NcFileVector & vecncDataFiles,
 		int & iTime
 	) const;
 

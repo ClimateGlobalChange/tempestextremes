@@ -47,34 +47,39 @@ VariableRegistry::~VariableRegistry() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/*
-VariableIndex VariableRegistry::FindOrRegister(
-	const Variable & var
+
+void VariableRegistry::InsertUniqueOrDelete(
+	Variable * pvar,
+	VariableIndex * pvarix
 ) {
-	for (int i = 0; i < m_vecVariables.size(); i++) {
-		if (*(m_vecVariables[i]) == var) {
-			return i;
+	for (int v = 0; v < m_vecVariables.size(); v++) {
+		if (*pvar == *(m_vecVariables[v])) {
+			delete pvar;
+			if (pvarix != NULL) {
+				*pvarix = v;
+			}
+			return;
 		}
 	}
-	Variable * pvar = new Variable(var);
-	_ASSERT(pvar != NULL);
 
 	m_vecVariables.push_back(pvar);
-	return (m_vecVariables.size()-1);
+	if (pvarix != NULL) {
+		*pvarix = m_vecVariables.size()-1;
+	}
 }
-*/
+
 ///////////////////////////////////////////////////////////////////////////////
 
 int VariableRegistry::FindOrRegisterSubStr(
 	const std::string & strIn,
 	VariableIndex * pvarix
 ) {
+	// Does not exist
 	Variable * pvar = new Variable();
 	_ASSERT(pvar != NULL);
 
-	m_vecVariables.push_back(pvar);
 	if (pvarix != NULL) {
-		*pvarix = m_vecVariables.size()-1;
+		*pvarix = InvalidVariableIndex;
 	}
 
 	// Parse the string
@@ -97,6 +102,7 @@ int VariableRegistry::FindOrRegisterSubStr(
 					_EXCEPTIONT("Unbalanced curly brackets in variable");
 				}
 				pvar->m_strName = strIn;
+				InsertUniqueOrDelete(pvar, pvarix);
 				return n;
 			}
 
@@ -123,6 +129,7 @@ int VariableRegistry::FindOrRegisterSubStr(
 
 			if (strIn[n] == ',') {
 				pvar->m_strName = strIn.substr(0, n);
+				InsertUniqueOrDelete(pvar, pvarix);
 				return n;
 			}
 			if (strIn[n] == '(') {
@@ -132,14 +139,15 @@ int VariableRegistry::FindOrRegisterSubStr(
 			}
 			if (strIn[n] == ')') {
 				pvar->m_strName = strIn.substr(0, n);
+				InsertUniqueOrDelete(pvar, pvarix);
 				return n;
 			}
 
 		// Reading in dimensions
 		} else if (!pvar->m_fOp) {
-			if (pvar->m_nSpecifiedDim == 4) {
-				_EXCEPTIONT("Only 4 dimensions / arguments may "
-					"be specified");
+			if (pvar->m_strArg.size() >= MaxVariableArguments) {
+				_EXCEPTION1("Sanity check fail: Only %i dimensions / arguments may "
+					"be specified", MaxVariableArguments);
 			}
 			if (n == strIn.length()) {
 				_EXCEPTION1("Variable dimension list must be terminated"
@@ -149,17 +157,20 @@ int VariableRegistry::FindOrRegisterSubStr(
 				if (strDim.length() == 0) {
 					_EXCEPTIONT("Invalid dimension index in variable");
 				}
-				pvar->m_iDim[pvar->m_nSpecifiedDim] = atoi(strDim.c_str());
-				pvar->m_nSpecifiedDim++;
+				pvar->m_strArg.push_back(strDim);
+				pvar->m_lArg.push_back(std::stol(strDim));
+				pvar->m_varArg.push_back(InvalidVariableIndex);
 				strDim = "";
 
 			} else if (strIn[n] == ')') {
 				if (strDim.length() == 0) {
 					_EXCEPTIONT("Invalid dimension index in variable");
 				}
-				pvar->m_iDim[pvar->m_nSpecifiedDim] = atoi(strDim.c_str());
-				pvar->m_nSpecifiedDim++;
+				pvar->m_strArg.push_back(strDim);
+				pvar->m_lArg.push_back(std::stol(strDim));
+				pvar->m_varArg.push_back(InvalidVariableIndex);
 
+				InsertUniqueOrDelete(pvar, pvarix);
 				return (n+1);
 
 			} else {
@@ -168,9 +179,9 @@ int VariableRegistry::FindOrRegisterSubStr(
 
 		// Reading in arguments
 		} else {
-			if (pvar->m_nSpecifiedDim == 4) {
-				_EXCEPTIONT("Only 4 dimensions / arguments may "
-					"be specified");
+			if (pvar->m_strArg.size() >= MaxVariableArguments) {
+				_EXCEPTION1("Sanity check fail: Only %i dimensions / arguments may "
+					"be specified", MaxVariableArguments);
 			}
 			if (n == strIn.length()) {
 				_EXCEPTION1("Op argument list must be terminated"
@@ -179,6 +190,7 @@ int VariableRegistry::FindOrRegisterSubStr(
 
 			// No arguments
 			if (strIn[n] == ')') {
+				InsertUniqueOrDelete(pvar, pvarix);
 				return (n+1);
 			}
 
@@ -202,7 +214,7 @@ int VariableRegistry::FindOrRegisterSubStr(
 				}
 				pvar->m_strArg.push_back(strFloat);
 				pvar->m_varArg.push_back(InvalidVariableIndex);
-				pvar->m_nSpecifiedDim++;
+				pvar->m_lArg.push_back(Variable::InvalidArgument);
 
 			// Check for string argument
 			} else if (strIn[n] == '\"') {
@@ -228,7 +240,7 @@ int VariableRegistry::FindOrRegisterSubStr(
 
 				pvar->m_strArg.push_back(strIn.substr(nStart+1,n-nStart-1));
 				pvar->m_varArg.push_back(InvalidVariableIndex);
-				pvar->m_nSpecifiedDim++;
+				pvar->m_lArg.push_back(Variable::InvalidArgument);
 
 			// Check for variable
 			} else {
@@ -237,10 +249,11 @@ int VariableRegistry::FindOrRegisterSubStr(
 
 				pvar->m_strArg.push_back("");
 				pvar->m_varArg.push_back(varix);
-				pvar->m_nSpecifiedDim++;
+				pvar->m_lArg.push_back(Variable::InvalidArgument);
 			}
 
 			if (strIn[n] == ')') {
+				InsertUniqueOrDelete(pvar, pvarix);
 				return (n+1);
 			}
 		}
@@ -262,6 +275,8 @@ VariableIndex VariableRegistry::FindOrRegister(
 			strIn.c_str());
 	}
 
+	_ASSERT((varix >= 0) && (varix < m_vecVariables.size()));
+
 	return varix;
 }
 
@@ -280,7 +295,7 @@ Variable & VariableRegistry::Get(
 
 std::string VariableRegistry::GetVariableString(
 	VariableIndex varix
-) {
+) const {
 	if ((varix < 0) || (varix >= m_vecVariables.size())) {
 		_EXCEPTIONT("Variable index out of range");
 	}
@@ -292,6 +307,158 @@ std::string VariableRegistry::GetVariableString(
 void VariableRegistry::UnloadAllGridData() {
 	for (int i = 0; i < m_vecVariables.size(); i++) {
 		m_vecVariables[i]->UnloadGridData();
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VariableRegistry::GetDependentVariableIndicesRecurse(
+	VariableIndex varix,
+	std::vector<VariableIndex> & vecDependentIxs
+) const {
+	if ((varix < 0) || (varix >= m_vecVariables.size())) {
+		_EXCEPTIONT("Variable index out of range");
+	}
+
+	// Recursively add dependent variable indices
+	if (m_vecVariables[varix]->IsOp()) {
+		const VariableIndexVector & varArg =
+			m_vecVariables[varix]->GetArgumentVarIxs();
+		for (int i = 0; i < varArg.size(); i++) {
+			if (varArg[i] != InvalidVariableIndex) {
+				GetDependentVariableIndicesRecurse(varArg[i], vecDependentIxs);
+			}
+		}
+
+	// Reached a Variable that is not an operator; check if it exists already
+	// in the list and if not add it.
+	} else {
+		for (int i = 0; i < vecDependentIxs.size(); i++) {
+			if (vecDependentIxs[i] == varix) {
+				return;
+			}
+		}
+		vecDependentIxs.push_back(varix);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VariableRegistry::GetDependentVariableIndices(
+	VariableIndex varix,
+	std::vector<VariableIndex> & vecDependentIxs
+) const {
+	vecDependentIxs.clear();
+	GetDependentVariableIndicesRecurse(varix, vecDependentIxs);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VariableRegistry::GetDependentVariableNames(
+	VariableIndex varix,
+	std::vector<std::string> & vecDependentVarNames
+) const {
+	vecDependentVarNames.clear();
+	std::vector<VariableIndex> vecDependentIxs;
+	GetDependentVariableIndices(varix, vecDependentIxs);
+	for (int i = 0; i < vecDependentIxs.size(); i++) {
+		vecDependentVarNames.push_back(
+			GetVariableString(vecDependentIxs[i]));
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VariableRegistry::GetAuxiliaryDimInfo(
+	const NcFileVector & vecncDataFiles,
+	const SimpleGrid & grid,
+	const std::string & strVarName,
+	DimInfoVector & vecAuxDimInfo
+) {
+	// Find the first occurrence of this variable in all open NcFiles
+	NcVar * var = NULL;
+	for (int i = 0; i < vecncDataFiles.size(); i++) {
+		var = vecncDataFiles[i]->get_var(strVarName.c_str());
+		if (var != NULL) {
+			break;
+		}
+	}
+	if (var == NULL) {
+		_EXCEPTION1("Variable \"%s\" not found in input files",
+			strVarName.c_str());
+	}
+
+	// First auxiliary dimension
+	long lBegin = 0;
+	long lEnd = var->num_dims() - grid.DimCount();
+
+	// If the first dimension is time then ignore it.
+	if ((var->num_dims() > 0) && (strcmp(var->get_dim(0)->name(), "time") == 0)) {
+		lBegin++;
+	}
+
+	// Ignore grid dimensions at the end
+	if (lEnd - lBegin < 0) {
+		_EXCEPTION1("Missing spatial dimensions in variable \"%s\"",
+			strVarName.c_str());
+	}
+
+	// Story auxiliary sizes
+	vecAuxDimInfo.resize(lEnd - lBegin);
+	for (long d = lBegin; d < lEnd; d++) {
+		vecAuxDimInfo[d-lBegin].name = var->get_dim(d)->name();
+		vecAuxDimInfo[d-lBegin].size = var->get_dim(d)->size();
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VariableRegistry::GetAuxiliaryDimInfoAndVerifyConsistency(
+	const NcFileVector & vecncDataFiles,
+	const SimpleGrid & grid,
+	const std::vector<std::string> & vecVariables,
+	DimInfoVector & vecAuxDimInfo
+) {
+	if (vecVariables.size() == 0) {
+		_EXCEPTIONT("Input vector of variable names must contain at least 1 entry");
+	}
+
+	GetAuxiliaryDimInfo(
+		vecncDataFiles,
+		grid,
+		vecVariables[0],
+		vecAuxDimInfo);
+
+	DimInfoVector vecAuxDimInfoOther;
+	for (int v = 1; v < vecVariables.size(); v++) {
+		GetAuxiliaryDimInfo(
+			vecncDataFiles,
+			grid,
+			vecVariables[v],
+			vecAuxDimInfoOther);
+
+		if (vecAuxDimInfo.size() != vecAuxDimInfoOther.size()) {
+			_EXCEPTION4("Incompatible base variables \"%s\" and \"%s\": Disagreement in number of dimensions (%li vs %li)",
+				vecVariables[0].c_str(),
+				vecVariables[v].c_str(),
+				vecAuxDimInfo.size(),
+				vecAuxDimInfoOther.size());
+		}
+
+		for (int d = 0; d < vecAuxDimInfo.size(); d++) {
+			if ((vecAuxDimInfo[d].name != vecAuxDimInfoOther[d].name) ||
+			    (vecAuxDimInfo[d].size != vecAuxDimInfoOther[d].size)
+			) {
+				_EXCEPTION7("Incompatible base variables \"%s\" and \"%s\": Disagreement in dimension %i (%s:%li) vs (%s:%li)",
+					vecVariables[0].c_str(),
+					vecVariables[v].c_str(),
+					d,
+					vecAuxDimInfo[d].name.c_str(),
+					vecAuxDimInfo[d].size,
+					vecAuxDimInfoOther[d].name.c_str(),
+					vecAuxDimInfoOther[d].size);
+			}
+		}
 	}
 }
 
@@ -312,6 +479,14 @@ DataOp * VariableRegistry::GetDataOp(
 // Variable
 ///////////////////////////////////////////////////////////////////////////////
 
+const long Variable::InvalidTimeIndex = (-2);
+
+const long Variable::NoTimeIndex = (-1);
+
+const long Variable::InvalidArgument = (-1);
+
+///////////////////////////////////////////////////////////////////////////////
+
 bool Variable::operator==(
 	const Variable & var
 ) {
@@ -321,15 +496,20 @@ bool Variable::operator==(
 	if (m_strName != var.m_strName) {
 		return false;
 	}
-	if (m_nSpecifiedDim != var.m_nSpecifiedDim) {
+	if (m_strArg.size() != var.m_strArg.size()) {
 		return false;
 	}
-	for (int i = 0; i < m_nSpecifiedDim; i++) {
-		if (m_iDim[i] != var.m_iDim[i]) {
+	_ASSERT(m_strArg.size() == m_lArg.size());
+	_ASSERT(m_strArg.size() == m_varArg.size());
+	_ASSERT(m_strArg.size() == var.m_lArg.size());
+	_ASSERT(m_strArg.size() == var.m_varArg.size());
+	for (int i = 0; i < m_strArg.size(); i++) {
+		if (m_strArg[i] != var.m_strArg[i]) {
 			return false;
 		}
-	}
-	for (int i = 0; i < m_varArg.size(); i++) {
+		if (m_lArg[i] != var.m_lArg[i]) {
+			return false;
+		}
 		if (m_varArg[i] != var.m_varArg[i]) {
 			return false;
 		}
@@ -340,27 +520,23 @@ bool Variable::operator==(
 ///////////////////////////////////////////////////////////////////////////////
 
 std::string Variable::ToString(
-	VariableRegistry & varreg
+	const VariableRegistry & varreg
 ) const {
 	char szBuffer[20];
 	std::string strOut = m_strName;
-	if (m_nSpecifiedDim == 0) {
+	if (m_varArg.size() == 0) {
 		return strOut;
 	}
 	strOut += "(";
-	for (int d = 0; d < m_nSpecifiedDim; d++) {
-		if (m_fOp) {
-			if (m_varArg[d] != InvalidVariableIndex) {
-				Variable & var = varreg.Get(m_varArg[d]);
-				strOut += var.ToString(varreg);
-			} else {
-				strOut += m_strArg[d];
-			}
+	_ASSERT(m_varArg.size() == m_strArg.size());
+	_ASSERT(m_varArg.size() == m_lArg.size());
+	for (size_t d = 0; d < m_varArg.size(); d++) {
+		if (m_varArg[d] != InvalidVariableIndex) {
+			strOut += varreg.GetVariableString(m_varArg[d]);
 		} else {
-			sprintf(szBuffer, "%i", m_iDim[d]);
-			strOut += szBuffer;
+			strOut += m_strArg[d];
 		}
-		if (d != m_nSpecifiedDim-1) {
+		if (d != m_varArg.size()-1) {
 			strOut += ",";
 		} else {
 			strOut += ")";
@@ -372,8 +548,8 @@ std::string Variable::ToString(
 ///////////////////////////////////////////////////////////////////////////////
 
 NcVar * Variable::GetFromNetCDF(
-	NcFileVector & vecFiles,
-	int iTime
+	const NcFileVector & vecFiles,
+	long lTime
 ) {
 	if (m_fOp) {
 		_EXCEPTION1("Cannot call GetFromNetCDF() on operator \"%s\"",
@@ -396,15 +572,15 @@ NcVar * Variable::GetFromNetCDF(
 	// If the first dimension of the variable is not "time" then
 	// ignore any time index that has been specified.
 	int nVarDims = var->num_dims();
-	if ((nVarDims > 0) && (iTime != (-1))) {
+	if ((nVarDims > 0) && (lTime != NoTimeIndex)) {
 		if (strcmp(var->get_dim(0)->name(), "time") != 0) {
-			iTime = (-1);
+			lTime = NoTimeIndex;
 			m_fNoTimeInNcFile = true;
 		} else {
 			if (var->get_dim(0)->size() == 1) {
-				iTime = 0;
+				lTime = 0;
 				m_fNoTimeInNcFile = true;
-			} else if (iTime >= var->get_dim(0)->size()) {
+			} else if (lTime >= var->get_dim(0)->size()) {
 				_EXCEPTIONT("Requested time index larger than available in input files:\n"
 					"Likely mismatch in time dimension lengths among files");
 			}
@@ -412,41 +588,40 @@ NcVar * Variable::GetFromNetCDF(
 	}
 
 	// Verify correct dimensionality
-	if (iTime != (-1)) {
-		if ((nVarDims != m_nSpecifiedDim + 2) &&
-			(nVarDims != m_nSpecifiedDim + 3)
+	if (lTime != NoTimeIndex) {
+		if ((nVarDims != m_lArg.size() + 2) &&
+			(nVarDims != m_lArg.size() + 3)
 		) {
-			_EXCEPTION3("Dimension size inconsistency in \"%s\" (%i/%i)",
-				m_strName.c_str(), nVarDims, m_nSpecifiedDim);
+			_EXCEPTION3("Dimension size inconsistency in \"%s\" (%i/%lu)",
+				m_strName.c_str(), nVarDims, m_lArg.size());
 		}
 	} else {
-		if ((nVarDims != m_nSpecifiedDim + 1) &&
-			(nVarDims != m_nSpecifiedDim + 2)
+		if ((nVarDims != m_lArg.size() + 1) &&
+			(nVarDims != m_lArg.size() + 2)
 		) {
-			_EXCEPTION3("Dimension size inconsistency in \"%s\" (%i/%i)",
-				m_strName.c_str(), nVarDims, m_nSpecifiedDim);
+			_EXCEPTION3("Dimension size inconsistency in \"%s\" (%i/%lu)",
+				m_strName.c_str(), nVarDims, m_lArg.size());
 		}
 	}
 
+	// Set the current index position for this variable
 	int nSetDims = 0;
-	long iDim[7];
-	memset(&(iDim[0]), 0, sizeof(int) * 7);
+	std::vector<long> lDim;
+	lDim.resize(nVarDims, 0);
 
-	if (iTime != (-1)) {
-		iDim[0] = iTime;
+	if (lTime != NoTimeIndex) {
+		lDim[0] = lTime;
 		nSetDims++;
 	}
 
-	if (m_nSpecifiedDim != 0) {
-		for (int i = 0; i < m_nSpecifiedDim; i++) {
-			iDim[nSetDims] = m_iDim[i];
+	if (m_lArg.size() != 0) {
+		for (int i = 0; i < m_lArg.size(); i++) {
+			lDim[nSetDims] = m_lArg[i];
 			nSetDims++;
 		}
-		iDim[nSetDims  ] = 0;
-		iDim[nSetDims+1] = 0;
 	}
 
-	var->set_cur(&(iDim[0]));
+	var->set_cur(&(lDim[0]));
 
 	return var;
 }
@@ -455,37 +630,38 @@ NcVar * Variable::GetFromNetCDF(
 
 void Variable::LoadGridData(
 	VariableRegistry & varreg,
-	NcFileVector & vecFiles,
+	const NcFileVector & vecFiles,
 	const SimpleGrid & grid,
-	int iTime
+	long lTime
 ) {
 	// Check if data already loaded
-	if (iTime == (-2)) {
+	if (lTime == InvalidTimeIndex) {
 		_EXCEPTIONT("Invalid time index");
 	}
-	if (iTime == m_iTime) {
+	if (lTime == m_lTime) {
 		if (m_data.GetRows() != grid.GetSize()) {
 			_EXCEPTIONT("Logic error");
 		}
 		return;
 	}
-	if ((m_fNoTimeInNcFile) && (m_iTime != (-2))) {
+	if ((m_fNoTimeInNcFile) && (m_lTime != InvalidTimeIndex)) {
 		if (m_data.GetRows() != grid.GetSize()) {
 			_EXCEPTIONT("Logic error");
 		}
 		return;
 	}
 
-	//std::cout << "Loading " << ToString(varreg) << " " << iTime << std::endl;
+	//std::cout << "Loading " << ToString(varreg) << " " << lTime << std::endl;
 
 	// Allocate data
 	m_data.Allocate(grid.GetSize());
-	m_iTime = iTime;
+	m_lTime = lTime;
 
 	// Get the data directly from a variable
 	if (!m_fOp) {
+
 		// Get pointer to variable
-		NcVar * var = GetFromNetCDF(vecFiles, iTime);
+		NcVar * var = GetFromNetCDF(vecFiles, lTime);
 		if (var == NULL) {
 			_EXCEPTION1("Variable \"%s\" not found in NetCDF file",
 				m_strName.c_str());
@@ -502,12 +678,14 @@ void Variable::LoadGridData(
 		int nLat = 0;
 		int nLon = 0;
 
-		long nDataSize[7];
-		for (int i = 0; i < 7; i++) {
-			nDataSize[i] = 1;
-		}
+		std::vector<long> nDataSize;
+		nDataSize.resize(nVarDims, 1);
+		//long nDataSize[7];
+		//for (int i = 0; i < 7; i++) {
+		//	nDataSize[i] = 1;
+		//}
 
-		// Latitude/longitude grid
+		// Rectilinear grid
 		if (grid.m_nGridDim.size() == 2) {
 			nLat = grid.m_nGridDim[0];
 			nLon = grid.m_nGridDim[1];
@@ -567,7 +745,7 @@ void Variable::LoadGridData(
 		for (int i = 0; i < m_varArg.size(); i++) {
 			if (m_varArg[i] != InvalidVariableIndex) {
 				Variable & var = varreg.Get(m_varArg[i]);
-				var.LoadGridData(varreg, vecFiles, grid, iTime);
+				var.LoadGridData(varreg, vecFiles, grid, lTime);
 
 				vecArgData.push_back(&var.GetData());
 			} else {
@@ -590,7 +768,7 @@ void Variable::LoadGridData(
 		Variable & varField = varreg.Get(m_varArg[0]);
 		Variable & varDist = varreg.Get(m_varArg[1]);
 
-		varField.LoadGridData(varreg, vecFiles, grid, iTime);
+		varField.LoadGridData(varreg, vecFiles, grid, lTime);
 
 		// Load distance (in degrees) and convert to radians
 		double dDist = atof(varDist.m_strName.c_str());
@@ -682,7 +860,7 @@ void Variable::LoadGridData(
 void Variable::UnloadGridData() {
 
 	// Force data to be loaded within this structure
-	m_iTime = (-2);
+	m_lTime = InvalidTimeIndex;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

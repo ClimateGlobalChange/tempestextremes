@@ -39,7 +39,7 @@ class DataOp;
 class DataOpManager : protected std::map<std::string, DataOp*> {
 
 protected:
-	typedef std::map<std::string, DataOp*> DataOpMap;
+	typedef std::map<std::string, DataOp *> DataOpMap;
 	typedef DataOpMap::iterator DataOpMapIterator;
 	typedef DataOpMap::value_type DataOpMapPair;
 

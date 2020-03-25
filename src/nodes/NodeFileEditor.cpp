@@ -904,11 +904,11 @@ int main(int argc, char** argv) {
 */
 try {
 
-	// Input text file
-	std::string strInputFile;
+	// Input node file
+	std::string strInputNodeFile;
 
-	// Input list of text files
-	std::string strInputFileList;
+	// Input list of node files
+	std::string strInputNodeFileList;
 
 	// Input file type
 	std::string strPathType;
@@ -948,8 +948,8 @@ try {
 
 	// Parse the command line
 	BeginCommandLine()
-		CommandLineString(strInputFile, "in_file", "");
-		//CommandLineString(strInputFileList, "in_file_list", "");
+		CommandLineString(strInputNodeFile, "in_file", "");
+		//CommandLineString(strInputNodeFileList, "in_file_list", "");
 		CommandLineStringD(strPathType, "in_file_type", "SN", "[DCU|SN]");
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
@@ -978,11 +978,11 @@ try {
 	AutoCurator autocurator;
 
 	// Check arguments
-	if ((strInputFile.length() == 0) && (strInputFileList.length() == 0)) {
+	if ((strInputNodeFile.length() == 0) && (strInputNodeFileList.length() == 0)) {
 		_EXCEPTIONT("No input file (--in_file) or (--in_file_list)"
 			" specified");
 	}
-	if ((strInputFile.length() != 0) && (strInputFileList.length() != 0)) {
+	if ((strInputNodeFile.length() != 0) && (strInputNodeFileList.length() != 0)) {
 		_EXCEPTIONT("Only one of (--in_file) or (--in_file_list)"
 			" may be specified");
 	}
@@ -1014,20 +1014,17 @@ try {
 	// NodeFile
 	NodeFile nodefile;
 
-	// Parse in_fmt string
+	// Parse --in_fmt string
 	ColumnDataHeader cdhInput;
 	cdhInput.Parse(strInputFormat);
 
-	// Parse out_fmt string
+	// Parse --out_fmt string
 	ColumnDataHeader cdhOutput;
 	cdhOutput.Parse(strOutputFormat);
 
-	// Parse calculations
+	// Parse --calculate
 	ArgumentTree calc(true);
 	calc.Parse(strCalculate);
-
-	// Define the SimpleGrid
-	SimpleGrid grid;
 
 	// Curate input data
 	if (strInputData.length() != 0) {
@@ -1054,6 +1051,9 @@ try {
 		}
 	}
 	AnnounceEndBlock("Done");
+
+	// Define the SimpleGrid
+	SimpleGrid grid;
 
 	// Check for connectivity file
 	if (strConnectivity != "") {
@@ -1085,16 +1085,16 @@ try {
 	}
 
 	// Load input file list
-	std::vector<std::string> vecInputFiles;
+	std::vector<std::string> vecInputNodeFiles;
 
-	if (strInputFile.length() != 0) {
-		vecInputFiles.push_back(strInputFile);
+	if (strInputNodeFile.length() != 0) {
+		vecInputNodeFiles.push_back(strInputNodeFile);
 
 	} else {
-		std::ifstream ifInputFileList(strInputFileList.c_str());
+		std::ifstream ifInputFileList(strInputNodeFileList.c_str());
 		if (!ifInputFileList.is_open()) {
 			_EXCEPTION1("Unable to open file \"%s\"",
-				strInputFileList.c_str());
+				strInputNodeFileList.c_str());
 		}
 		std::string strFileLine;
 		while (std::getline(ifInputFileList, strFileLine)) {
@@ -1104,7 +1104,7 @@ try {
 			if (strFileLine[0] == '#') {
 				continue;
 			}
-			vecInputFiles.push_back(strFileLine);
+			vecInputNodeFiles.push_back(strFileLine);
 		}
 	}
 
@@ -1115,20 +1115,18 @@ try {
 	PathVector & pathvec = nodefile.GetPathVector();
 
 	// Loop over all files
-	for (int f = 0; f < vecInputFiles.size(); f++) {
+	for (int f = 0; f < vecInputNodeFiles.size(); f++) {
 
-		AnnounceStartBlock("Processing input (%s)", vecInputFiles[f].c_str());
+		AnnounceStartBlock("Processing input (%s)", vecInputNodeFiles[f].c_str());
 
 		// Read contents of NodeFile into PathVector
 		AnnounceStartBlock("Reading file");
 		nodefile.Read(
-			vecInputFiles[f],
+			vecInputNodeFiles[f],
 			iftype,
 			cdhInput,
 			grid,
 			autocurator.GetCalendarType());
-			//pathvec,
-			//mapTimeToPathNode);
 		AnnounceEndBlock("Done");
 
 		// Working ColumnDataHeader
@@ -1268,7 +1266,7 @@ try {
 					// Open NetCDF files with data at this time
 					NcFileVector vecncDataFiles;
 					int iTime;
-					autocurator.Find(time, vecncDataFiles, iTime);
+					autocurator.FindFilesAtTime(time, vecncDataFiles, iTime);
 					if (vecncDataFiles.size() == 0) {
 						_EXCEPTION1("Time (%s) does not exist in input data fileset",
 							time.ToString().c_str());
@@ -1326,7 +1324,7 @@ try {
 					// Open NetCDF files with data at this time
 					NcFileVector vecncDataFiles;
 					int iTime;
-					autocurator.Find(time, vecncDataFiles, iTime);
+					autocurator.FindFilesAtTime(time, vecncDataFiles, iTime);
 					if (vecncDataFiles.size() == 0) {
 						_EXCEPTION1("Time (%s) does not exist in input data fileset",
 							time.ToString().c_str());
@@ -1386,7 +1384,7 @@ try {
 					// Open NetCDF files with data at this time
 					NcFileVector vecncDataFiles;
 					int iTime;
-					autocurator.Find(time, vecncDataFiles, iTime);
+					autocurator.FindFilesAtTime(time, vecncDataFiles, iTime);
 					if (vecncDataFiles.size() == 0) {
 						_EXCEPTION1("Time (%s) does not exist in input data fileset",
 							time.ToString().c_str());
@@ -1660,7 +1658,7 @@ try {
 					// Open NetCDF files with data at this time
 					NcFileVector vecncDataFiles;
 					int iTime;
-					autocurator.Find(time, vecncDataFiles, iTime);
+					autocurator.FindFilesAtTime(time, vecncDataFiles, iTime);
 					if (vecncDataFiles.size() == 0) {
 						_EXCEPTION1("Time (%s) does not exist in input data fileset",
 							time.ToString().c_str());

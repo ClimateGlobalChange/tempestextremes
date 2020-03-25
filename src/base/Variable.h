@@ -118,106 +118,6 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class Variable;
-
-///	<summary>
-///		A vector of pointers to Variable.
-///	</summary>
-typedef std::vector<Variable *> VariableVector;
-
-///	<summary>
-///		A unique index assigned to each Variable.
-///	</summary>
-typedef int VariableIndex;
-
-///	<summary>
-///		The invalid variable index.
-///	</summary>
-static const VariableIndex InvalidVariableIndex = (-1);
-
-///	<summary>
-///		A vector for storing VariableIndex.
-///	</summary>
-class VariableIndexVector : public std::vector<VariableIndex> {};
-
-///////////////////////////////////////////////////////////////////////////////
-
-class VariableRegistry {
-
-public:
-	///	<summary>
-	///		Constructor (build an empty registry).
-	///	</summary>
-	VariableRegistry();
-
-	///	<summary>
-	///		Destructor.
-	///	</summary>
-	~VariableRegistry();
-
-public:
-/*
-	///	<summary>
-	///		Register a Variable.  Or return an index if the Variable already
-	///		exists in the registry.
-	///	</summary>
-	VariableIndex FindOrRegister(
-		const Variable & var
-	);
-*/
-	///	<summary>
-	///		Parse the given recursively string and register all relevant
-	///		Variables.  At the end of the Variable definition return
-	///		the current position in the string.
-	///	</summary>
-	VariableIndex FindOrRegisterSubStr(
-		const std::string & strIn,
-		int * piFinalStringPos
-	);
-
-	///	<summary>
-	///		Parse the given string recursively and register all
-	///		relevant Variables.
-	///	</summary>
-	VariableIndex FindOrRegister(
-		const std::string & strIn
-	);
-
-	///	<summary>
-	///		Get the Variable with the specified index.
-	///	</summary>
-	Variable & Get(VariableIndex varix);
-
-	///	<summary>
-	///		Get the descriptor for the Variable with the specified index.
-	///	</summary>
-	std::string GetVariableString(VariableIndex varix);
-
-	///	<summary>
-	///		Unload all data.
-	///	</summary>
-	void UnloadAllGridData();
-
-public:
-	///	<summary>
-	///		Get the DataOp with the specified name.
-	///	</summary>
-	DataOp * GetDataOp(const std::string & strName);
-
-private:
-	///	<summary>
-	///		Array of variables.
-	///	</summary>
-	VariableVector m_vecVariables;
-
-	///	<summary>
-	///		Map of data operators.
-	///	</summary>
-	DataOpManager m_domDataOp;
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
 ///	<summary>
 ///		An object holding dimension indices for a given Variable.
 ///	</summary>
@@ -227,6 +127,44 @@ typedef std::vector<long> VariableDimIndex;
 ///		An object holding auxiliary indices for a given Variable.
 ///	</summary>
 typedef VariableDimIndex VariableAuxIndex;
+
+///	<summary>
+///		A structure containing both a dimension name and size.
+///	</summary>
+class DimInfo {
+public:
+	///	<summary>
+	///		Default constructor.
+	///	</summary>
+	DimInfo() : name(), size(0) { }
+
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DimInfo(
+		const std::string & _name,
+		long _size
+	) :
+		name(_name),
+		size(_size)
+	{ }
+
+public:
+	///	<summary>
+	///		Dimension name.
+	///	</summary>
+	std::string name;
+
+	///	<summary>
+	///		Dimension size.
+	///	</summary>
+	long size;
+};
+
+///	<summary>
+///		A vector of DimInfo.
+///	</summary>
+typedef std::vector<DimInfo> DimInfoVector;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -407,13 +345,169 @@ protected:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class Variable;
+
+///	<summary>
+///		A vector of pointers to Variable.
+///	</summary>
+typedef std::vector<Variable *> VariableVector;
+
+///	<summary>
+///		A unique index assigned to each Variable.
+///	</summary>
+typedef int VariableIndex;
+
+///	<summary>
+///		The invalid variable index.
+///	</summary>
+static const VariableIndex InvalidVariableIndex = (-1);
+
+///	<summary>
+///		A vector for storing VariableIndex.
+///	</summary>
+class VariableIndexVector : public std::vector<VariableIndex> {};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class VariableRegistry {
+
+public:
+	///	<summary>
+	///		Maximum number of arguments in variable.
+	///	</summary>
+	static const int MaxVariableArguments = 10;
+
+public:
+	///	<summary>
+	///		Constructor (build an empty registry).
+	///	</summary>
+	VariableRegistry();
+
+	///	<summary>
+	///		Destructor.
+	///	</summary>
+	~VariableRegistry();
+
+protected:
+	///	<summary>
+	///		Find this Variable in the registry.  If it does exist then
+	///		return the corresponding VariableIndex and delete pvar.  If it
+	///		does not exist then insert it into the registry.
+	///	</summary>
+	void InsertUniqueOrDelete(
+		Variable * pvar,
+		VariableIndex * pvarix
+	);
+
+public:
+	///	<summary>
+	///		Parse the given recursively string and register all relevant
+	///		Variables.  At the end of the Variable definition return
+	///		the current position in the string.
+	///	</summary>
+	int FindOrRegisterSubStr(
+		const std::string & strIn,
+		VariableIndex * pvarix
+	);
+
+	///	<summary>
+	///		Parse the given string recursively and register all
+	///		relevant Variables.
+	///	</summary>
+	VariableIndex FindOrRegister(
+		const std::string & strIn
+	);
+
+	///	<summary>
+	///		Get the Variable with the specified index.
+	///	</summary>
+	Variable & Get(VariableIndex varix);
+
+	///	<summary>
+	///		Get the descriptor for the Variable with the specified index.
+	///	</summary>
+	std::string GetVariableString(VariableIndex varix) const;
+
+	///	<summary>
+	///		Unload all data.
+	///	</summary>
+	void UnloadAllGridData();
+
+protected:
+	///	<summary>
+	///		Get the list of base variable indices.
+	///	</summary>
+	void GetDependentVariableIndicesRecurse(
+		VariableIndex varix,
+		std::vector<VariableIndex> & vecDependentIxs
+	) const;
+
+public:
+	///	<summary>
+	///		Get the list of base variable indices.
+	///	</summary>
+	void GetDependentVariableIndices(
+		VariableIndex varix,
+		std::vector<VariableIndex> & vecDependentIxs
+	) const;
+
+	///	<summary>
+	///		Get the list of base variable names.
+	///	</summary>
+	void GetDependentVariableNames(
+		VariableIndex varix,
+		std::vector<std::string> & vecDependentVarNames
+	) const;
+
+public:
+	///	<summary>
+	///		Obtain auxiliary dimension sizes for the specified variables.
+	///	</summary>
+	static void GetAuxiliaryDimInfo(
+		const NcFileVector & vecncDataFiles,
+		const SimpleGrid & grid,
+		const std::string & strVarName,
+		DimInfoVector & vecAuxDimInfo
+	);
+
+	///	<summary>
+	///		Obtain auxiliary dimension sizes for the specified variables,
+	///		and verify consistency among all variables.
+	///	</summary>
+	static void GetAuxiliaryDimInfoAndVerifyConsistency(
+		const NcFileVector & vecncDataFiles,
+		const SimpleGrid & grid,
+		const std::vector<std::string> & vecVariables,
+		DimInfoVector & vecAuxDimInfo
+	);
+
+public:
+	///	<summary>
+	///		Get the DataOp with the specified name.
+	///	</summary>
+	DataOp * GetDataOp(const std::string & strName);
+
+private:
+	///	<summary>
+	///		Array of variables.
+	///	</summary>
+	VariableVector m_vecVariables;
+
+	///	<summary>
+	///		Map of data operators.
+	///	</summary>
+	DataOpManager m_domDataOp;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 ///	<summary>
 ///		A map between auxiliary indices and the data stored therein.
 ///	</summary>
 typedef std::map<VariableAuxIndex, DataArray1D<float> *> DataMap;
 
 ///	<summary>
-///		A class storing a parsed variable name.
+///		A class for storing a 2D slice of data, and associated metadata.
 ///	</summary>
 class Variable {
 
@@ -421,9 +515,19 @@ friend class VariableRegistry;
 
 public:
 	///	<summary>
-	///		Maximum number of arguments in variable.
+	///		An invalid time index.
 	///	</summary>
-	static const int MaxArguments = 4;
+	static const long InvalidTimeIndex;
+
+	///	<summary>
+	///		No time index.
+	///	</summary>
+	static const long NoTimeIndex;
+
+	///	<summary>
+	///		Invalid argument.
+	///	</summary>
+	static const long InvalidArgument;
 
 public:
 	///	<summary>
@@ -432,12 +536,9 @@ public:
 	Variable() :
 		m_strName(),
 		m_fOp(false),
-		m_nSpecifiedDim(0),
 		m_fNoTimeInNcFile(false),
-		m_iTime(-2)
-	{
-		memset(m_iDim, 0, MaxArguments * sizeof(int));
-	}
+		m_lTime(InvalidTimeIndex)
+	{ }
 
 public:
 	///	<summary>
@@ -445,36 +546,96 @@ public:
 	///	</summary>
 	bool operator==(const Variable & var);
 
+	///	<summary>
+	///		Get the name of this Variable.
+	///	</summary>
+	const std::string & GetName() const {
+		return m_strName;
+	}
+
+	///	<summary>
+	///		Check if this Variable is an operator.
+	///	</summary>
+	bool IsOp() const {
+		return m_fOp;
+	}
+
+	///	<summary>
+	///		Get the number of specified arguments.
+	///	</summary>
+	size_t GetArgumentCount() const {
+		_ASSERT(m_strArg.size() == m_varArg.size());
+		_ASSERT(m_strArg.size() == m_lArg.size());
+		return m_strArg.size();
+	}
+
+	///	<summary>
+	///		Get the array of specified operator argument strings.
+	///	</summary>
+	const std::vector<std::string> & GetArgumentStrings() const {
+		return m_strArg;
+	}
+
+	///	<summary>
+	///		Get the array of specified operator arguments (as long).
+	///	</summary>
+	const std::vector<long> & GetArgumentLongs() const {
+		return m_lArg;
+	}
+
+	///	<summary>
+	///		Get the array of specified operator Variables.
+	///	</summary>
+	const VariableIndexVector & GetArgumentVarIxs() const {
+		return m_varArg;
+	}
+
 public:
 	///	<summary>
 	///		Get a string representation of this variable.
 	///	</summary>
 	std::string ToString(
-		VariableRegistry & varreg
+		const VariableRegistry & varreg
 	) const;
 
+protected:
 	///	<summary>
-	///		Get this variable in the given NcFile.
+	///		Get the first instance of this variable in the given NcFileVector.
 	///	</summary>
 	NcVar * GetFromNetCDF(
-		NcFileVector & vecFiles,
-		int iTime = (-1)
+		const NcFileVector & vecFiles,
+		long lTime = (-1)
 	);
 
+public:
 	///	<summary>
 	///		Load a data block from the NcFileVector.
 	///	</summary>
 	void LoadGridData(
 		VariableRegistry & varreg,
-		NcFileVector & vecFiles,
+		const NcFileVector & vecFiles,
 		const SimpleGrid & grid,
-		int iTime = (-1)
+		long lTime = (-1)
+	);
+
+	///	<summary>
+	///		Save a data block to the given NcFile.
+	///	</summary>
+	void SaveGridData(
+		NcFile * ncfile,
+		const SimpleGrid & grid,
+		long lTime = (-1)
 	);
 
 	///	<summary>
 	///		Unload the current data block.
 	///	</summary>
 	void UnloadGridData();
+
+	///	<summary>
+	///		Reset the auxiliary index iterator.
+	///	</summary>
+	//void ResetAuxIndexIteratora
 
 	///	<summary>
 	///		Get the data associated with this variable.
@@ -495,6 +656,28 @@ protected:
 	///		Variable name.
 	///	</summary>
 	std::string m_strName;
+
+	///	<summary>
+	///		Flag indicating this is an operator.
+	///	</summary>
+	bool m_fOp;
+
+	///	<summary>
+	///		Specified operator arguments (as std::string).
+	///	</summary>
+	std::vector<std::string> m_strArg;
+
+	///	<summary>
+	///		Specified operator arguments (as long, for NetCDF file indexing).
+	///	</summary>
+	std::vector<long> m_lArg;
+
+	///	<summary>
+	///		Specified operator arguments (as VariableIndex).
+	///	</summary>
+	VariableIndexVector m_varArg;
+
+protected:
 /*
 	///	<summary>
 	///		Variable units.
@@ -521,31 +704,6 @@ protected:
 	///	</summary>
 	int m_nVerticalDimOrder;
 */
-protected:
-	///	<summary>
-	///		Flag indicating this is an operator.
-	///	</summary>
-	bool m_fOp;
-
-	///	<summary>
-	///		Number of dimensions specified.
-	///	</summary>
-	int m_nSpecifiedDim;
-
-	///	<summary>
-	///		Specified dimension values.
-	///	</summary>
-	int m_iDim[MaxArguments];
-
-	///	<summary>
-	///		Specified operator arguments.
-	///	</summary>
-	std::vector<std::string> m_strArg;
-
-	///	<summary>
-	///		Specified operator arguments.
-	///	</summary>
-	VariableIndexVector m_varArg;
 
 public:
 	///	<summary>
@@ -556,7 +714,7 @@ public:
 	///	<summary>
 	///		Time index associated with data loaded in this Variable.
 	///	</summary>
-	int m_iTime;
+	long m_lTime;
 
 	///	<summary>
 	///		Data associated with this Variable.

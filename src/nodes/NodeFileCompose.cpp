@@ -68,6 +68,9 @@ try {
 	// Input nodefile
 	std::string strInputNodeFile;
 
+	// List of input nodefiles
+	std::string strInputNodeFileList;
+
 	// Input nodefile type
 	std::string strInputNodeFileType;
 
@@ -112,8 +115,9 @@ try {
 
 	// Parse the command line
 	BeginCommandLine()
-		CommandLineString(strInputNodeFile, "in_nodefile", "");
-		CommandLineStringD(strInputNodeFileType, "in_nodefile_type", "SN", "[DCU|SN]");
+		CommandLineString(strInputNodeFile, "in_file", "");
+		//CommandLineString(strInputNodeFileList, "in_file_list", "");
+		CommandLineStringD(strInputNodeFileType, "in_file_type", "SN", "[DCU|SN]");
 		CommandLineString(strInputFormat, "in_fmt", "");
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
@@ -130,15 +134,19 @@ try {
 
 		CommandLineDouble(dDeltaX, "dx", 0.5);
 		CommandLineInt(nResolutionX, "resx", 11);
-		CommandLineInt(nResolutionA, "resa", 10);
+		CommandLineInt(nResolutionA, "resa", 16);
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
 
 	AnnounceBanner();
 
-	// Create Variable registry
+	// Create Variable registries
 	VariableRegistry varregIn;
+	VariableRegistry varregOut;
+
+	// Create autocurator
+	AutoCurator autocurator;
 
 	// Check arguments
 	if (strInputNodeFile.length() == 0) {
@@ -192,35 +200,43 @@ try {
 	cdhInput.Parse(strInputFormat);
 
 	// Parse --var argument
-	std::vector<std::string> vecVarNames;
-	std::vector<VariableIndex> vecVarIx;
+	VariableIndexVector vecVarIxIn;
 	if (strVariables != "") {
 		std::string strVariablesTemp = strVariables;
 		for (;;) {
-			VariableIndex varix;
-			int iLast = varregIn.FindOrRegisterSubStr(strVariablesTemp, &varix) + 1;
+			VariableIndex varixIn;
+			int iLast = varregIn.FindOrRegisterSubStr(strVariablesTemp, &varixIn) + 1;
 
-			vecVarIx.push_back(varix);
-			vecVarNames.push_back( strVariablesTemp.substr(0,iLast-1) );
+			vecVarIxIn.push_back(varixIn);
+
 			if (iLast >= strVariablesTemp.length()) {
 				break;
 			}
 			strVariablesTemp = strVariablesTemp.substr(iLast);
 		}
 	}
-	_ASSERT(vecVarNames.size() == vecVarIx.size());
+ 
+	// Generate a list of dependent base variables for each variable
+	std::vector< std::vector<std::string> > vecvecDependentVarNames;
+	vecvecDependentVarNames.resize(vecVarIxIn.size());
+	for (int v = 0; v < vecVarIxIn.size(); v++) {
+		varregIn.GetDependentVariableNames(
+			vecVarIxIn[v],
+			vecvecDependentVarNames[v]);
 
-	// Define the SimpleGrid
-	SimpleGrid grid;
+		if (vecvecDependentVarNames[v].size() == 0) {
+			_EXCEPTION1("Variable \"%s\" has no dependent base variables",
+				varregIn.GetVariableString(vecVarIxIn[v]).c_str());
+		}
+	}
 
-	// Store input data
-	std::vector<std::string> vecInputFileList;
-
+	// Curate input data
 	if (strInputData.length() != 0) {
-		vecInputFileList.push_back(strInputData);
+		AnnounceStartBlock("Autocurating in_data");
+		autocurator.IndexFiles(strInputData);
 
 	} else {
-		AnnounceStartBlock("Building input data list");
+		AnnounceStartBlock("Autocurating in_data_list");
 		std::ifstream ifInputDataList(strInputDataList.c_str());
 		if (!ifInputDataList.is_open()) {
 			_EXCEPTION1("Unable to open file \"%s\"",
@@ -234,15 +250,14 @@ try {
 			if (strFileLine[0] == '#') {
 				continue;
 			}
-			for (int i = 0; i < strFileLine.length(); i++) {
-				if (strFileLine[i] == ';') {
-					_EXCEPTIONT("Only one filename allowed per line in --in_data_list");
-				}
-			}
-			vecInputFileList.push_back(strFileLine);
+			Announce(strFileLine.c_str());
+			autocurator.IndexFiles(strFileLine);
 		}
-		AnnounceEndBlock("Done");
 	}
+	AnnounceEndBlock("Done");
+
+	// Define the SimpleGrid for the input
+	SimpleGrid grid;
 
 	// Check for connectivity file
 	if (strConnectivity != "") {
@@ -254,14 +269,15 @@ try {
 	} else {
 		AnnounceStartBlock("No connectivity file specified");
 		Announce("Attempting to generate latitude-longitude grid from data file");
+		const std::vector<std::string> & vecFiles = autocurator.GetFilenames();
 
-		if (vecInputFileList.size() < 1) {
+		if (vecFiles.size() < 1) {
 			_EXCEPTIONT("No data files specified; unable to generate grid");
 		}
 
-		NcFile ncFile(vecInputFileList[0].c_str());
+		NcFile ncFile(vecFiles[0].c_str());
 		if (!ncFile.is_valid()) {
-			_EXCEPTION1("Unable to open NetCDF file \"%s\"", vecInputFileList[0].c_str());
+			_EXCEPTION1("Unable to open NetCDF file \"%s\"", vecFiles[0].c_str());
 		}
 
 		grid.GenerateLatitudeLongitude(&ncFile, fRegional);
@@ -272,218 +288,310 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
-	// Get the CalendarType
-	Time::CalendarType caltype;
-	{
-		if (vecInputFileList.size() == 0) {
-			_EXCEPTION();
-		}
-		NcFile ncfile(vecInputFileList[0].c_str(), NcFile::ReadOnly);
-		if (!ncfile.is_valid()) {
-			_EXCEPTION1("Unable to open input datafile \"%s\"",
-				vecInputFileList[0].c_str());
-		}
+	// Build the KD tree for the grid
+	AnnounceStartBlock("Generating KD tree on grid");
+	grid.BuildKDTree();
+	AnnounceEndBlock("Done");
 
-		NcVar * varTime = ncfile.get_var("time");
-		if (varTime == NULL) {
-			_EXCEPTION1("Missing \"time\" variable in datafile \"%s\"",
-				vecInputFileList[0].c_str());
-		}
+	// Load input file list
+	std::vector<std::string> vecInputNodeFiles;
 
-		NcAtt * attCalendar = varTime->get_att("calendar");
-		if (attCalendar == NULL) {
-			_EXCEPTION1("Missing \"calendar\" in datafile \"%s\"",
-				vecInputFileList[0].c_str());
-		}
+	if (strInputNodeFile.length() != 0) {
+		vecInputNodeFiles.push_back(strInputNodeFile);
 
-		caltype = Time::CalendarTypeFromString(attCalendar->as_string(0));
-		if (caltype == Time::CalendarUnknown) {
-			_EXCEPTION1("Invalid \"calendar\" in datafile \"%s\"",
-				vecInputFileList[0].c_str());
+	} else {
+		std::ifstream ifInputFileList(strInputNodeFileList.c_str());
+		if (!ifInputFileList.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\"",
+				strInputNodeFileList.c_str());
+		}
+		std::string strFileLine;
+		while (std::getline(ifInputFileList, strFileLine)) {
+			if (strFileLine.length() == 0) {
+				continue;
+			}
+			if (strFileLine[0] == '#') {
+				continue;
+			}
+			vecInputNodeFiles.push_back(strFileLine);
 		}
 	}
 
-	// Parse NodeFile
-	PathVector & pathvec = nodefile.GetPathVector();
-	TimeToPathNodeMap & mapTimeToPathNode = nodefile.GetTimeToPathNodeMap();
-
-	AnnounceStartBlock("Parsing nodefile");
-	nodefile.Read(
-		strInputNodeFile,
-		iftype,
-		cdhInput,
-		grid,
-		caltype);
-	AnnounceEndBlock("Done");
-
-	// Create data array
-	DataArray1D<double> data(grid.GetSize());
-
 	// Open output file
+	AnnounceStartBlock("Preparing output file");
 	NcFile ncoutfile(strOutputData.c_str(), NcFile::Replace);
 	if (!ncoutfile.is_valid()) {
 		_EXCEPTION1("Unable to open output datafile \"%s\"",
 			strOutputData.c_str());
 	}
 
-	std::vector< std::vector<int> > vecAuxDimSize;
-	std::vector< NcVar * > vecNcVarOut;
+	// Write dimensions
+	NcDim * dimX;
+	NcDim * dimY;
 
-	// Loop over all files
-	for (int f = 0; f < vecInputFileList.size(); f++) {
+	if (strOutputGrid == "xy") {
+		dimX = ncoutfile.add_dim("x", nResolutionX);
+		dimY = ncoutfile.add_dim("y", nResolutionX);
 
-		AnnounceStartBlock("Processing input (%s)", vecInputFileList[f].c_str());
-
-		// Open input file
-		NcFileVector vecInFiles;
-		vecInFiles.ParseFromString(vecInputFileList[f]);
-		_ASSERT(vecInFiles.size() > 0);
-
-		NcFile & ncinfile = *(vecInFiles[0]);
-		//if (!ncinfile.is_valid()) {
-		//	_EXCEPTIONT("Unable to open input datafile");
-		//}
-
-		// Get time variable and verify calendar is compatible
-		NcVar * varTime = ncinfile.get_var("time");
-		if (varTime == NULL) {
-			_EXCEPTION1("Missing \"time\" variable in datafile \"%s\"",
-				vecInputFileList[f].c_str());
+		DataArray1D<double> dX(nResolutionX);
+		for (int i = 0; i < nResolutionX; i++) {
+			dX[i] = dDeltaX * (
+				static_cast<double>(i)
+				- 0.5 * static_cast<double>(nResolutionX-1));
 		}
 
-		NcAtt * attCalendar = varTime->get_att("calendar");
-		if (attCalendar == NULL) {
-			_EXCEPTION1("Missing \"calendar\" metadata in datafile \"%s\"",
-				vecInputFileList[f].c_str());
+		NcVar * varX = ncoutfile.add_var("x", ncDouble, dimX);
+		varX->put(&(dX[0]), nResolutionX);
+
+		NcVar * varY = ncoutfile.add_var("y", ncDouble, dimY);
+		varY->put(&(dX[0]), nResolutionX);
+
+	} else if (strOutputGrid == "rad") {
+		dimX = ncoutfile.add_dim("az", nResolutionA);
+		dimY = ncoutfile.add_dim("r", nResolutionX);
+
+		DataArray1D<double> dAz(nResolutionA);
+		for (int i = 0; i < nResolutionA; i++) {
+			dAz[i] = 360.0 * static_cast<double>(i)
+				/ static_cast<double>(nResolutionA);
 		}
 
-		Time::CalendarType caltypeThis =
-			Time::CalendarTypeFromString(attCalendar->as_string(0));
-		if (caltype != caltypeThis) {
-			_EXCEPTION1("\"calendar\" mismatch in datafile \"%s\" ",
-				vecInputFileList[f].c_str());
+		DataArray1D<double> dR(nResolutionX);
+		for (int i = 0; i < nResolutionA; i++) {
+			dR[i] = dDeltaX * (static_cast<double>(i) + 0.5);
 		}
 
-		// Load in vector of Times from the file
-		std::vector<Time> vecTimes;
-		ReadCFTimeDataFromNcFile(&ncinfile, vecInputFileList[f], vecTimes, true);
+		NcVar * varAz = ncoutfile.add_var("az", ncDouble, dimX);
+		varAz->put(&(dAz[0]), nResolutionA);
 
-		// Initialize the output file
-		if (f == 0) {
-			if (strOutputGrid == "xy") {
-				NcDim * dimX = ncoutfile.add_dim("x", nResolutionX);
-				NcDim * dimY = ncoutfile.add_dim("y", nResolutionX);
+		NcVar * varR = ncoutfile.add_var("r", ncDouble, dimY);
+		varR->put(&(dR[0]), nResolutionX);
 
-			} else if (strOutputGrid == "rad") {
-				NcDim * dimR = ncoutfile.add_dim("r", nResolutionX);
-				NcDim * dimA = ncoutfile.add_dim("az", nResolutionA);
+	} else {
+		_EXCEPTIONT("Invalid grid");
+	}
+	AnnounceEndBlock("Done");
 
-			} else {
-				_EXCEPTIONT("Invalid grid");
+	// Vector of output data
+	int nDataInstances = 0;
+
+	std::vector< DataArray1D<float> > vecOutputData;
+	vecOutputData.resize(vecVarIxIn.size());
+
+	// Vector of output variables
+	std::vector<NcVar*> vecOutputVar;
+
+	// A map from Times to file lines, used for StitchNodes formatted output
+	TimeToPathNodeMap & mapTimeToPathNode = nodefile.GetTimeToPathNodeMap();
+
+	// Vector of Path information
+	PathVector & pathvec = nodefile.GetPathVector();
+
+	// Flag indicating output is initialized
+	bool fOutputInitialized = false;
+
+	// Loop over all nodefiles
+	for (int f = 0; f < vecInputNodeFiles.size(); f++) {
+
+		AnnounceStartBlock("Processing input (%s)", vecInputNodeFiles[f].c_str());
+
+		// Read contents of NodeFile into PathVector
+		AnnounceStartBlock("Reading file");
+		nodefile.Read(
+			vecInputNodeFiles[f],
+			iftype,
+			cdhInput,
+			grid,
+			autocurator.GetCalendarType());
+		AnnounceEndBlock("Done");
+
+		// Loop through all Times in the NodeFile
+		for (auto iter = mapTimeToPathNode.begin(); iter != mapTimeToPathNode.end(); iter++) {
+
+			// Generate a NcFileVector at this Time
+			AnnounceStartBlock("Time %s", iter->first.ToString().c_str());
+
+			NcFileVector vecncDataFiles;
+			int iTime;
+
+			autocurator.FindFilesAtTime(
+				iter->first,
+				vecncDataFiles,
+				iTime);
+
+			if (vecncDataFiles.size() == 0) {
+				_EXCEPTION1("Time (%s) does not exist in input data fileset",
+					iter->first.ToString().c_str());
 			}
-		}
 
-		// Loop through all times
-		for (int t = 0; t < vecTimes.size(); t++) {
+			// If this is the first time through the loop load the aux dimension info
+			// and generate the output data structures and file.
+			if (!fOutputInitialized) {
 
-			AnnounceStartBlock("Processing time \"%s\"",
-				vecTimes[t].ToString().c_str());
+				AnnounceStartBlock("Initializing output variables");
 
-			// Find any PathNodes at this time
-			TimeToPathNodeMap::const_iterator iter =
-				mapTimeToPathNode.find(vecTimes[t]);
+				// Loop through all variables
+				for (int v = 0; v < vecVarIxIn.size(); v++) {
 
-			// No PathNodes at this time; continue to next file
-			if (iter == mapTimeToPathNode.end()) {
-				continue;
+					// Variable name
+					std::string strVarName =
+						varregIn.GetVariableString(vecVarIxIn[v]);
+
+					// Get auxiliary dimension info and verify consistency
+					DimInfoVector vecAuxDimInfo;
+
+					varregIn.GetAuxiliaryDimInfoAndVerifyConsistency(
+						vecncDataFiles,
+						grid,
+						vecvecDependentVarNames[v],
+						vecAuxDimInfo);
+
+					// Generate output variables
+					if (strOutputGrid == "xy") {
+						vecAuxDimInfo.push_back(DimInfo("y", nResolutionX));
+						vecAuxDimInfo.push_back(DimInfo("x", nResolutionX));
+
+						vecOutputData[v].Allocate(nResolutionX * nResolutionX);
+
+					} else if (strOutputGrid == "rad") {
+						vecAuxDimInfo.push_back(DimInfo("r", nResolutionX));
+						vecAuxDimInfo.push_back(DimInfo("az", nResolutionA));
+
+						vecOutputData[v].Allocate(nResolutionA * nResolutionX);
+					}
+
+					std::vector<NcDim *> vecNcDim;
+					vecNcDim.resize(vecAuxDimInfo.size());
+					for (int d = 0; d < vecAuxDimInfo.size(); d++) {
+						vecNcDim[d] = ncoutfile.get_dim(vecAuxDimInfo[d].name.c_str());
+						if (vecNcDim[d] == NULL) {
+							vecNcDim[d] = ncoutfile.add_dim(
+								vecAuxDimInfo[d].name.c_str(),
+								vecAuxDimInfo[d].size);
+						} else {
+							if (vecNcDim[d]->size() != vecAuxDimInfo[d].size) {
+								_EXCEPTION4("Dimension size mismatch when initializing variable \"%s\": Expected dimension \"%s\" to have size \"%li\" (found \"%li\")",
+									strVarName.c_str(),
+									vecAuxDimInfo[d].name.c_str(),
+									vecAuxDimInfo[d].size,
+									vecNcDim[d]->size());
+							}
+						}
+					}
+
+					// Generate variable
+					NcVar * pvar =
+						ncoutfile.add_var(
+							strVarName.c_str(),
+							ncFloat,
+							vecNcDim.size(),
+							const_cast<const NcDim**>(&(vecNcDim[0])));
+
+					vecOutputVar.push_back(pvar);
+				}
+
+				// Done
+				fOutputInitialized = true;
+
+				AnnounceEndBlock("Done");
 			}
 
-			// Loop through all variables
-			for (int v = 0; v < vecVarIx.size(); v++) {
+			// Generate the SimpleGrid for each node
+			AnnounceStartBlock("Building composites");
+			const PathNodeIndexVector & vecPathNodes = iter->second;
 
-				const std::string & strVariable = vecVarNames[v];
+			// Loop through all Variables
+			for (int v = 0; v < vecVarIxIn.size(); v++) {
 
-				Announce("Processing variable \"%s\"", strVariable.c_str());
-/*
-				// Load input and output variables
-				NcVar * varIn = vecNcVarIn[v];
-				NcVar * varOut = vecNcVarOut[v];
+				// Load the data for the search variable
+				Variable & var = varregIn.Get(vecVarIxIn[v]);
+				var.LoadGridData(varregIn, vecncDataFiles, grid, iTime);
+				const DataArray1D<float> & dataState = var.GetData();
+				_ASSERT(dataState.GetRows() == grid.GetSize());
 
-				// Load in data
-				int nGridDims = grid.m_nGridDim.size();
+				// Loop through all PathNodes
+				for (int p = 0; p < vecPathNodes.size(); p++) {
+					nDataInstances++;
 
-				std::vector<NcDim *> vecDim;
-				for (int d = 0; d < varIn->num_dims(); d++) {
-					vecDim.push_back(varIn->get_dim(d));
-				}
-*/
-/*
-				if (vecDim.size() < 1 + nGridDims) {
-					_EXCEPTION2("Insufficient dimensions in variable \"%s\" in file \"%s\"",
-						strVariable.c_str(), vecOutputFileList[f].c_str());
-				}
-				if (strcmp(vecDim[0]->name(), "time") != 0) {
-					_EXCEPTION2("First dimension of variable \"%s\" in file \"%s\" must be \"time\"",
-						strVariable.c_str(), vecOutputFileList[f].c_str());
-				}
-*/
-/*
-				int nVarSize = 1;
-				for (int d = 0; d < nGridDims; d++) {
-					nVarSize *= vecDim[vecDim.size()-d-1]->size();
-				}
-				if (grid.GetSize() != nVarSize) {
-					_EXCEPTION2("Variable \"%s\" in file \"%s\" dimensionality inconsistent with grid:"
-						" Verify final variable dimensions match grid",
-						strVariable.c_str(), vecOutputFileList[f].c_str());
-				}
+					const Path & path = pathvec[vecPathNodes[p].first];
+					const PathNode & pathnode = path[vecPathNodes[p].second];
+					int ixOrigin = static_cast<int>(pathnode.m_gridix);
 
-				// Number of auxiliary dimensions and array of sizes for each slice
-				int nAuxDims = 1;
-				for (int d = 1; d < vecDim.size() - nGridDims; d++) {
-					nAuxDims *= vecDim[d]->size();
-				}
+					_ASSERT((ixOrigin >= 0) && (ixOrigin < grid.GetSize()));
 
-				DataArray1D<long> vecDataSize(vecDim.size());
-				for (int d = 0; d < vecDim.size(); d++) {
-					if (d >= vecDim.size() - nGridDims) {
-						vecDataSize[d] = vecDim[d]->size();
-					} else {
-						vecDataSize[d] = 1;
-					}
-				}
+					// Generate the SimpleGrid for this pathnode
+					SimpleGrid gridNode;
+					if (strOutputGrid == "xy") {
+						gridNode.GenerateRectilinearStereographic(
+							grid.m_dLon[ixOrigin],
+							grid.m_dLat[ixOrigin],
+							nResolutionX,
+							dDeltaX);
 
-				// Loop through all auxiliary dimensions (holding time fixed)
-				DataArray1D<long> vecDataPos(vecDim.size());
-				vecDataPos[0] = t;
-
-				for (int i = 0; i < nAuxDims; i++) {
-
-					// Load data
-					int ixDim = i;
-					for (int d = vecDim.size() - nGridDims - 1; d >= 1; d--) {
-						vecDataPos[d] = ixDim % vecDim[d]->size();
-						ixDim /= vecDim[d]->size();
-					}
-					if (ixDim != 0) {
-						_EXCEPTIONT("Logic error");
+					} else if (strOutputGrid == "rad") {
+						gridNode.GenerateRadialStereographic(
+							grid.m_dLon[ixOrigin],
+							grid.m_dLat[ixOrigin],
+							nResolutionX,
+							nResolutionA,
+							dDeltaX);
 					}
 
-					varIn->set_cur(&(vecDataPos[0]));
-					varIn->get(&(data[0]), &(vecDataSize[0]));
+					// Sample all points on the stereographic grid
+					for (int i = 0; i < gridNode.GetSize(); i++) {
 
-					// Do stuff
+						//printf("%1.5f %1.5f %1.5f %1.5f\n",
+						//	grid.m_dLon[ixOrigin],
+						//	grid.m_dLat[ixOrigin],
+						//	gridNode.m_dLon[i],
+						//	gridNode.m_dLat[i]);
 
-					// Write data
-					varOut->set_cur(&(vecDataPos[0]));
-					varOut->put(&(data[0]), &(vecDataSize[0]));
+						int ixGridIn =
+							grid.NearestNode(
+								gridNode.m_dLon[i],
+								gridNode.m_dLat[i]);
+
+						vecOutputData[v][i] +=
+							dataState[ixGridIn];
+					}
 				}
-*/
 			}
 
 			AnnounceEndBlock("Done");
+			AnnounceEndBlock("Done");
 		}
 
+		// Average all Variables
+		if (nDataInstances != 0) {
+			for (int v = 0; v < vecVarIxIn.size(); v++) {
+				for (int i = 0; i < vecOutputData[v].GetRows(); i++) {
+					vecOutputData[v][i] /= static_cast<float>(nDataInstances);
+				}
+			}
+		}
+
+		// Write output
+		AnnounceStartBlock("Writing output");
+		_ASSERT(vecVarIxIn.size() == vecOutputData.size());
+		if (strOutputGrid == "xy") {
+			for (int v = 0; v < vecVarIxIn.size(); v++) {
+				vecOutputVar[v]->put(
+					&(vecOutputData[v][0]),
+					nResolutionX,
+					nResolutionX);
+			}
+
+		} else if (strOutputGrid == "rad") {
+			for (int v = 0; v < vecVarIxIn.size(); v++) {
+				vecOutputVar[v]->put(
+					&(vecOutputData[v][0]),
+					nResolutionX,
+					nResolutionA);
+			}
+		}
+		AnnounceEndBlock("Done");
+
+		// Done processing this nodefile
 		AnnounceEndBlock("Done");
 	}
 

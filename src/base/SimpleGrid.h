@@ -103,7 +103,7 @@ public:
 		double dLonRad0,
 		double dLatRad0,
 		int nX,
-		double dDeltaX,
+		double dDeltaXDeg,
 		bool fCalculateArea = false
 	);
 
@@ -116,7 +116,7 @@ public:
 		double dLatRad0,
 		int nR,
 		int nA,
-		double dDeltaR,
+		double dDeltaRDeg,
 		bool fCalculateArea = false
 	);
 
@@ -153,10 +153,17 @@ public:
 	) const;
 
 	///	<summary>
+	///		Get the number of dimensions of the SimpleGrid.
+	///	</summary>
+	size_t DimCount() const {
+		return (m_nGridDim.size());
+	}
+
+	///	<summary>
 	///		Get the size of the SimpleGrid (number of points).
 	///	</summary>
 	size_t GetSize() const {
-		return (m_vecConnectivity.size());
+		return (m_dLon.GetRows());
 	}
 
 	///	<summary>

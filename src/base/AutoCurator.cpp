@@ -217,14 +217,14 @@ AutoCurator::FilenameTimePairVector AutoCurator::Find(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void AutoCurator::Find(
+bool AutoCurator::FindFilesAtTime(
 	const Time & time,
-	NcFileVector & vecFiles,
+	NcFileVector & vecncDataFiles,
 	int & iTime
 ) const {
 	FilenameTimePairVector vec = Find(time);
 
-	vecFiles.clear();
+	vecncDataFiles.clear();
 	iTime = (-1);
 
 	for (int i = 0; i < vec.size(); i++) {
@@ -236,7 +236,7 @@ void AutoCurator::Find(
 			_EXCEPTION1("Unable to open data file \"%s\"", vec[i].first.c_str());
 		}
 
-		vecFiles.push_back(pncfile);
+		vecncDataFiles.push_back(pncfile);
 
 		if (iTime == (-1)) {
 			iTime = vec[i].second;
@@ -244,6 +244,11 @@ void AutoCurator::Find(
 			_EXCEPTIONT("Data files have different local time indices (unsupported)");
 		}
 	}
+
+	if (vecncDataFiles.size() == 0) {
+		return false;
+	}
+	return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -281,12 +281,16 @@ void SimpleGrid::GenerateRectilinearStereographic(
 	double dLonRad0,
 	double dLatRad0,
 	int nX,
-	double dDeltaX,
+	double dDeltaXDeg,
 	bool fCalculateArea
 ) {
 	if (IsInitialized()) {
 		_EXCEPTIONT("Attempting to call GenerateLatitudeLongitude() on previously initialized grid");
 	}
+
+	_ASSERT(nX >= 1);
+	_ASSERT(dDeltaXDeg > 0.0);
+	_ASSERT(fabs(dLatRad0 <= 0.5 * M_PI));
 
 	if (fabs(dLatRad0 - 0.5 * M_PI) < ReferenceTolerance) {
 		dLatRad0 = 0.5 * M_PI;
@@ -295,9 +299,7 @@ void SimpleGrid::GenerateRectilinearStereographic(
 		dLatRad0 = - 0.5 * M_PI;
 	}
 
-	_ASSERT(nX >= 1);
-	_ASSERT(dDeltaX > 0.0);
-	_ASSERT(fabs(dLatRad0 <= 0.5 * M_PI));
+	double dDeltaXRad = M_PI / 180.0 * dDeltaXDeg;
 
 	m_nGridDim.resize(2);
 	m_nGridDim[0] = nX;
@@ -306,7 +308,7 @@ void SimpleGrid::GenerateRectilinearStereographic(
 	m_dLon.Allocate(nX * nX);
 	m_dLat.Allocate(nX * nX);
 
-	const double dXgcd0 = - 0.5 * dDeltaX * static_cast<double>(nX - 1);
+	const double dXgcd0 = - 0.5 * dDeltaXRad * static_cast<double>(nX - 1);
 
 	if (dXgcd0 < - M_PI + ReferenceTolerance) {
 		_EXCEPTION1("Total angular coverage of rectilinear stereographic "
@@ -318,12 +320,12 @@ void SimpleGrid::GenerateRectilinearStereographic(
 	DataArray1D<double> dYs(nX);
 
 	for (int j = 0; j < nX; j++) {
-		double dYgcd = dXgcd0 + dDeltaX * static_cast<double>(j);
+		double dYgcd = dXgcd0 + dDeltaXRad * static_cast<double>(j);
 		dYs[j] = sqrt(4.0 * (1.0 - cos(dYgcd)) / (1.0 + cos(dYgcd)));
 	}
 
 	for (int i = 0; i < nX; i++) {
-		double dXgcd = dXgcd0 + dDeltaX * static_cast<double>(i);
+		double dXgcd = dXgcd0 + dDeltaXRad * static_cast<double>(i);
 		dXs[i] = sqrt(4.0 * (1.0 - cos(dXgcd)) / (1.0 + cos(dXgcd)));
 	}
 
@@ -338,7 +340,16 @@ void SimpleGrid::GenerateRectilinearStereographic(
 			dYs[j],
 			m_dLon[s],
 			m_dLat[s]);
-
+/*
+		// DEBUG: Verify that the great circle distance is correct
+		printf("%i %i %1.5f\n", i, j,
+			180.0 / M_PI
+			* GreatCircleDistance_Rad(
+				dLonRad0,
+				dLatRad0,
+				m_dLon[s],
+				m_dLat[s]));
+*/
 		s++;
 	}
 	}
@@ -356,19 +367,24 @@ void SimpleGrid::GenerateRadialStereographic(
 	double dLatRad0,
 	int nR,
 	int nA,
-	double dDeltaR,
+	double dDeltaRDeg,
 	bool fCalculateArea
 ) {
 	if (IsInitialized()) {
 		_EXCEPTIONT("Attempting to call GenerateLatitudeLongitude() on previously initialized grid");
 	}
 
+	if (nA < 8) {
+		_EXCEPTIONT("Minimum of 8 azimuthal slices allowed");
+	}
+
 	_ASSERT(nR >= 1);
-	_ASSERT(nA >= 8);
-	_ASSERT(dDeltaR > 0.0);
+	_ASSERT(dDeltaRDeg > 0.0);
 	_ASSERT(fabs(dLatRad0 <= 0.5 * M_PI));
 
-	const double dRgcdmax = (static_cast<double>(nR-1) + 0.5) * dDeltaR;
+	double dDeltaRRad = M_PI / 180.0 * dDeltaRDeg;
+
+	const double dRgcdmax = (static_cast<double>(nR-1) + 0.5) * dDeltaRRad;
 
 	if (dRgcdmax >= M_PI) {
 		_EXCEPTION1("Total angular coverage of radial stereographic "
@@ -379,23 +395,23 @@ void SimpleGrid::GenerateRadialStereographic(
 	m_nGridDim[0] = nA;
 	m_nGridDim[1] = nR;
 
-	m_dLon.Allocate(nR * nA);
-	m_dLat.Allocate(nR * nA);
+	m_dLon.Allocate(nA * nR);
+	m_dLat.Allocate(nA * nR);
 
 	// Get the reference coordinates in the azimuthal and radial directions
 	DataArray1D<double> dXs(nA);
 	DataArray1D<double> dYs(nA);
 
 	for (int i = 0; i < nA; i++) {
-		double dFrac = static_cast<double>(i) / static_cast<double>(nA);
-		dXs[i] = cos(dFrac);
-		dYs[i] = sin(dFrac);
+		double dAzimuth = 2.0 * M_PI * static_cast<double>(i) / static_cast<double>(nA);
+		dXs[i] = cos(dAzimuth);
+		dYs[i] = sin(dAzimuth);
 	}
 
 	DataArray1D<double> dRs(nR);
 	for (int i = 0; i < nR; i++) {
-		double dRgcd = (static_cast<double>(i) + 0.5) * dDeltaR;
-		dRs[i] = sqrt(2.0 * (1.0 - cos(dRgcd)) / (1.0 + cos(dRgcd)));
+		double dRgcd = (static_cast<double>(i) + 0.5) * dDeltaRRad;
+		dRs[i] = 2.0 * sqrt((1.0 - cos(dRgcd)) / (1.0 + cos(dRgcd)));
 	}
 
 	// Calculate the lon/lat coordinates
@@ -409,7 +425,19 @@ void SimpleGrid::GenerateRadialStereographic(
 			dYs[i] * dRs[j],
 			m_dLon[s],
 			m_dLat[s]);
-
+/*
+		// DEBUG: Verify that the great circle distance is uniform
+		// in the radial direction
+		printf("%i %i %1.5f %1.5f %1.5f\n", i, j,
+			dXs[i] * dRs[j],
+			dYs[i] * dRs[j],
+			180.0 / M_PI
+			* GreatCircleDistance_Rad(
+				dLonRad0,
+				dLatRad0,
+				m_dLon[s],
+				m_dLat[s]));
+*/
 		s++;
 	}
 	}
