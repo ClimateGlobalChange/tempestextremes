@@ -113,6 +113,12 @@ try {
 	// Resolution of the output (azimuthal points)
 	int nResolutionA;
 
+	// Name of latitude dimension
+	std::string strLatitudeName;
+
+	// Name of longitude dimension
+	std::string strLongitudeName;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputNodeFile, "in_file", "");
@@ -135,6 +141,9 @@ try {
 		CommandLineDouble(dDeltaX, "dx", 0.5);
 		CommandLineInt(nResolutionX, "resx", 11);
 		CommandLineInt(nResolutionA, "resa", 16);
+
+		CommandLineString(strLatitudeName, "latname", "lat");
+		CommandLineString(strLongitudeName, "lonname", "lon");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -280,7 +289,11 @@ try {
 			_EXCEPTION1("Unable to open NetCDF file \"%s\"", vecFiles[0].c_str());
 		}
 
-		grid.GenerateLatitudeLongitude(&ncFile, fRegional);
+		grid.GenerateLatitudeLongitude(
+			&ncFile,
+			fRegional,
+			strLatitudeName,
+			strLongitudeName);
 
 		if (grid.m_nGridDim.size() != 2) {
 			_EXCEPTIONT("Logic error when generating connectivity");
