@@ -452,13 +452,13 @@ try {
 
 					// Get auxiliary dimension info and verify consistency
 					DimInfoVector vecAuxDimInfo;
-
+/*
 					varregIn.GetAuxiliaryDimInfoAndVerifyConsistency(
 						vecncDataFiles,
 						grid,
 						vecvecDependentVarNames[v],
 						vecAuxDimInfo);
-
+*/
 					// Generate output variables
 					if (strOutputGrid == "xy") {
 						vecAuxDimInfo.push_back(DimInfo("y", nResolutionX));
