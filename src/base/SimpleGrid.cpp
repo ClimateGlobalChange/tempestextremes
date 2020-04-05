@@ -322,11 +322,17 @@ void SimpleGrid::GenerateRectilinearStereographic(
 	for (int j = 0; j < nX; j++) {
 		double dYgcd = dXgcd0 + dDeltaXRad * static_cast<double>(j);
 		dYs[j] = sqrt(4.0 * (1.0 - cos(dYgcd)) / (1.0 + cos(dYgcd)));
+		if (dYgcd < 0.0) {
+			dYs[j] *= -1.0;
+		}
 	}
 
 	for (int i = 0; i < nX; i++) {
 		double dXgcd = dXgcd0 + dDeltaXRad * static_cast<double>(i);
 		dXs[i] = sqrt(4.0 * (1.0 - cos(dXgcd)) / (1.0 + cos(dXgcd)));
+		if (dXgcd < 0.0) {
+			dXs[i] *= -1.0;
+		}
 	}
 
 	// Store longitude and latitude of centerpoints
