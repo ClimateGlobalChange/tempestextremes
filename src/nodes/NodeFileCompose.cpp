@@ -34,11 +34,118 @@
 #include <queue>
 #include <set>
 #include <cmath>
+#include <cfloat>
 /*
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
 #endif
 */
+
+///////////////////////////////////////////////////////////////////////////////
+
+static const int MaxHistogramGrids = 1000;
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class storing a histogram operator.
+///	</summary>
+class HistogramOp {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	HistogramOp() :
+		m_varix(InvalidVariableIndex),
+		m_dOffset(0.0),
+		m_dBinWidth(0.0)
+	{ }
+
+public:
+	///	<summary>
+	///		Parse a nearbyblob operator string.
+	///	</summary>
+	void Parse(
+		VariableRegistry & varreg,
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Offset,
+			ReadMode_BinWidth,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Offset;
+
+		// Parse variable
+		int iLast = varreg.FindOrRegisterSubStr(strOp, &m_varix) + 1;
+
+		// Loop through string
+		for (int i = iLast; i <= strOp.length(); i++) {
+
+			// Comma-delimited
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in the offset
+				if (eReadMode == ReadMode_Offset) {
+					m_dOffset = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_BinWidth;
+
+				// Read in the bin width
+				} else if (eReadMode == ReadMode_BinWidth) {
+					m_dBinWidth = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nExcess entries in --histogram op \"%s\""
+							"\nRequired: \"<variable>,<offset>,<bin width>\"",
+							strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("\nInsufficient entries in --histogram op \"%s\""
+					"\nRequired: \"<variable>,<offset>,<bin width>]\"",
+					strOp.c_str());
+		}
+
+		if (m_dBinWidth <= 0.0) {
+			_EXCEPTION1("For --histogram, bin width (%2.6f) must be positive", m_dBinWidth);
+		}
+
+		// Output announcement
+		Announce("Histogram of %s with offset %f and bin width %f",
+			varreg.GetVariableString(m_varix).c_str(),
+			m_dOffset,
+			m_dBinWidth);
+	}
+
+public:
+	///	<summary>
+	///		Variable to use for the histogram.
+	///	</summary>
+	VariableIndex m_varix;
+
+	///	<summary>
+	///		Offset for the histogram (the leftmost edge of one of the bins).
+	///	</summary>
+	double m_dOffset;
+
+	///	<summary>
+	///		Bin width for the histogram.
+	///	</summary>
+	double m_dBinWidth;
+};
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -104,6 +211,12 @@ try {
 	// List of variables to output
 	std::string strVariables;
 
+	// List of operators
+	std::string strOperators;
+
+	// Histogram operators
+	std::string strHistogramOp;
+
 	// Grid spacing of output (Cartesian great-circle or radial distance)
 	double dDeltaX;
 
@@ -137,6 +250,8 @@ try {
 		//CommandLineString(strTimeEnd, "time_end", "");
 
 		CommandLineString(strVariables, "var", "");
+		CommandLineStringD(strOperators, "op", "mean", "[mean|min|max,...]");
+		CommandLineStringD(strHistogramOp, "histogram", "", "[var,offset,binsize;...]");
 
 		CommandLineDouble(dDeltaX, "dx", 0.5);
 		CommandLineInt(nResolutionX, "resx", 11);
@@ -174,6 +289,9 @@ try {
 	}
 	if (strVariables.length() == 0) {
 		_EXCEPTIONT("No variables (--var) specified");
+	}
+	if ((strOperators.length() == 0) && (strHistogramOp.length() == 0)) {
+		_EXCEPTIONT("At least one of --op and --histogram must be specified");
 	}
 
 	// Output grid options
@@ -225,6 +343,81 @@ try {
 		}
 	}
  
+	// Parse --op argument
+	bool fCompositeMean = false;
+	bool fCompositeMin = false;
+	bool fCompositeMax = false;
+
+	if (strOperators != "") {
+		int i = 0;
+		int iLast = 0;
+		for (;;) {
+			if ((i == strOperators.length()) || (strOperators[i] == ',')) {
+				std::string strOp = strOperators.substr(iLast, i - iLast);
+				STLStringHelper::ToLower(strOp);
+				if (strOp == "mean") {
+					fCompositeMean = true;
+				} else if (strOp == "min") {
+					fCompositeMin = true;
+				} else if (strOp == "max") {
+					fCompositeMax = true;
+				} else {
+					_EXCEPTION1("Invalid --op argument \"%s\"", strOp.c_str());
+				}
+				iLast = i+1;
+
+				if (i == strOperators.length()) {
+					break;
+				}
+			}
+
+			i++;
+		}
+	}
+
+	// Parse --histogram argument
+	const int NoHistogram = (-1);
+
+	std::vector<int> iVarHistogramOpIx;
+	iVarHistogramOpIx.resize(vecVarIxIn.size(), NoHistogram);
+
+	std::vector<HistogramOp> vecHistogramOps;
+	if (strHistogramOp != "") {
+		int i = 0;
+		int iLast = 0;
+		for (;;) {
+			if ((i == strHistogramOp.length()) || (strHistogramOp[i] == ';')) {
+				HistogramOp opHistogram;
+				opHistogram.Parse(varregIn, strHistogramOp.substr(iLast, i - iLast));
+
+				int v = 0;
+				for (; v < vecVarIxIn.size(); v++) {
+					if (opHistogram.m_varix == vecVarIxIn[v]) {
+						break;
+					}
+				}
+				if (v == vecVarIxIn.size()) {
+					_EXCEPTION1("Variable \"%s\" must appear in --var argument",
+						varregIn.GetVariableString(opHistogram.m_varix).c_str());
+				}
+				if (iVarHistogramOpIx[v] != NoHistogram) {
+					_EXCEPTION1("Variable \"%s\" can only appear once in --histogram",
+						varregIn.GetVariableString(opHistogram.m_varix).c_str());
+				}
+
+				iVarHistogramOpIx[v] = vecHistogramOps.size();
+				vecHistogramOps.push_back(opHistogram);
+
+				iLast = i + 1;
+				if (i == strHistogramOp.length()) {
+					break;
+				}
+			}
+
+			i++;
+		}
+	}
+
 	// Generate a list of dependent base variables for each variable
 	std::vector< std::vector<std::string> > vecvecDependentVarNames;
 	vecvecDependentVarNames.resize(vecVarIxIn.size());
@@ -388,11 +581,24 @@ try {
 	// Vector of output data
 	int nDataInstances = 0;
 
-	std::vector< DataArray1D<float> > vecOutputData;
-	vecOutputData.resize(vecVarIxIn.size());
+	std::vector< DataArray1D<float> > vecOutputDataMean;
+	vecOutputDataMean.resize(vecVarIxIn.size());
 
-	// Vector of output variables
-	std::vector<NcVar*> vecOutputVar;
+	std::vector< DataArray1D<float> > vecOutputDataMin;
+	vecOutputDataMin.resize(vecVarIxIn.size());
+
+	std::vector< DataArray1D<float> > vecOutputDataMax;
+	vecOutputDataMax.resize(vecVarIxIn.size());
+
+	// Vector of output data for histograms
+	int nHistogramGrids = 0;
+	typedef std::map<int, DataArray1D<int> *> HistogramMap;
+	std::vector<HistogramMap> vecmapHistograms;
+	vecmapHistograms.resize(vecVarIxIn.size());
+
+	// Vector of output NcDim * for each variable
+	std::vector< std::vector<NcDim *> > vecOutputNcDim;
+	vecOutputNcDim.resize(vecVarIxIn.size());
 
 	// A map from Times to file lines, used for StitchNodes formatted output
 	TimeToPathNodeMap & mapTimeToPathNode = nodefile.GetTimeToPathNodeMap();
@@ -446,10 +652,6 @@ try {
 				// Loop through all variables
 				for (int v = 0; v < vecVarIxIn.size(); v++) {
 
-					// Variable name
-					std::string strVarName =
-						varregIn.GetVariableString(vecVarIxIn[v]);
-
 					// Get auxiliary dimension info and verify consistency
 					DimInfoVector vecAuxDimInfo;
 /*
@@ -460,47 +662,63 @@ try {
 						vecAuxDimInfo);
 */
 					// Generate output variables
+					int nOutputDimSize0;
+					int nOutputDimSize1;
+
 					if (strOutputGrid == "xy") {
+						nOutputDimSize0 = nResolutionX;
+						nOutputDimSize1 = nResolutionX;
+
 						vecAuxDimInfo.push_back(DimInfo("y", nResolutionX));
 						vecAuxDimInfo.push_back(DimInfo("x", nResolutionX));
 
-						vecOutputData[v].Allocate(nResolutionX * nResolutionX);
-
 					} else if (strOutputGrid == "rad") {
+						nOutputDimSize0 = nResolutionX;
+						nOutputDimSize1 = nResolutionA;
+
 						vecAuxDimInfo.push_back(DimInfo("r", nResolutionX));
 						vecAuxDimInfo.push_back(DimInfo("az", nResolutionA));
-
-						vecOutputData[v].Allocate(nResolutionA * nResolutionX);
 					}
 
-					std::vector<NcDim *> vecNcDim;
-					vecNcDim.resize(vecAuxDimInfo.size());
+					// Initialize data storage for output
+					if (fCompositeMean) {
+						vecOutputDataMean[v].Allocate(nOutputDimSize0 * nOutputDimSize1);
+					}
+					if (fCompositeMin) {
+						vecOutputDataMin[v].Allocate(nOutputDimSize0 * nOutputDimSize1);
+						for (int i = 0; i < vecOutputDataMin[v].GetRows(); i++) {
+							vecOutputDataMin[v][i] = DBL_MAX;
+						}
+					}
+					if (fCompositeMax) {
+						vecOutputDataMax[v].Allocate(nOutputDimSize0 * nOutputDimSize1);
+						for (int i = 0; i < vecOutputDataMin[v].GetRows(); i++) {
+							vecOutputDataMax[v][i] = -DBL_MAX;
+						}
+					}
+
+					// Copy auxiliary dimension variables from input to output
+					vecOutputNcDim[v].resize(vecAuxDimInfo.size());
 					for (int d = 0; d < vecAuxDimInfo.size(); d++) {
-						vecNcDim[d] = ncoutfile.get_dim(vecAuxDimInfo[d].name.c_str());
-						if (vecNcDim[d] == NULL) {
-							vecNcDim[d] = ncoutfile.add_dim(
+						vecOutputNcDim[v][d] =
+							ncoutfile.get_dim(vecAuxDimInfo[d].name.c_str());
+						if (vecOutputNcDim[v][d] == NULL) {
+							vecOutputNcDim[v][d] = ncoutfile.add_dim(
 								vecAuxDimInfo[d].name.c_str(),
 								vecAuxDimInfo[d].size);
 						} else {
-							if (vecNcDim[d]->size() != vecAuxDimInfo[d].size) {
+							if (vecOutputNcDim[v][d]->size() != vecAuxDimInfo[d].size) {
+								std::string strVarName =
+									varregIn.GetVariableString(vecVarIxIn[v]);
+
 								_EXCEPTION4("Dimension size mismatch when initializing variable \"%s\": Expected dimension \"%s\" to have size \"%li\" (found \"%li\")",
 									strVarName.c_str(),
 									vecAuxDimInfo[d].name.c_str(),
 									vecAuxDimInfo[d].size,
-									vecNcDim[d]->size());
+									vecOutputNcDim[v][d]->size());
 							}
 						}
 					}
-
-					// Generate variable
-					NcVar * pvar =
-						ncoutfile.add_var(
-							strVarName.c_str(),
-							ncFloat,
-							vecNcDim.size(),
-							const_cast<const NcDim**>(&(vecNcDim[0])));
-
-					vecOutputVar.push_back(pvar);
 				}
 
 				// Done
@@ -550,22 +768,69 @@ try {
 							dDeltaX);
 					}
 
-					// Sample all points on the stereographic grid
-					for (int i = 0; i < gridNode.GetSize(); i++) {
+					// Only calculate the mean
+					if (fCompositeMean && !fCompositeMin && !fCompositeMax) {
+						for (int i = 0; i < gridNode.GetSize(); i++) {
+							int ixGridIn =
+								grid.NearestNode(
+									gridNode.m_dLon[i],
+									gridNode.m_dLat[i]);
 
-						//printf("%1.5f %1.5f %1.5f %1.5f\n",
-						//	grid.m_dLon[ixOrigin],
-						//	grid.m_dLat[ixOrigin],
-						//	gridNode.m_dLon[i],
-						//	gridNode.m_dLat[i]);
+							vecOutputDataMean[v][i] +=
+								dataState[ixGridIn];
+						}
 
-						int ixGridIn =
-							grid.NearestNode(
-								gridNode.m_dLon[i],
-								gridNode.m_dLat[i]);
+					// Calculate some subset of mean, min, max
+					} else {
+						for (int i = 0; i < gridNode.GetSize(); i++) {
+							int ixGridIn =
+								grid.NearestNode(
+									gridNode.m_dLon[i],
+									gridNode.m_dLat[i]);
 
-						vecOutputData[v][i] +=
-							dataState[ixGridIn];
+							if (fCompositeMean) {
+								vecOutputDataMean[v][i] +=
+									dataState[ixGridIn];
+							}
+							if (fCompositeMin) {
+								if (dataState[ixGridIn] < vecOutputDataMin[v][i]) {
+									vecOutputDataMin[v][i] = dataState[ixGridIn];
+								}
+							}
+							if (fCompositeMax) {
+								if (dataState[ixGridIn] > vecOutputDataMax[v][i]) {
+									vecOutputDataMax[v][i] = dataState[ixGridIn];
+								}
+							}
+
+							// Build histograms
+							if (vecHistogramOps.size() != 0) {
+								for (int hop = 0; hop < vecHistogramOps.size(); hop++) {
+									int iBin =
+										static_cast<int>(
+											dataState[ixGridIn]
+											- vecHistogramOps[hop].m_dOffset
+										) / vecHistogramOps[hop].m_dBinWidth;
+
+									HistogramMap::iterator iter =
+										vecmapHistograms[v].find(iBin);
+
+									DataArray1D<int> * pdata = NULL;
+									if (iter == vecmapHistograms[v].end()) {
+										nHistogramGrids++;
+										pdata = new DataArray1D<int>(gridNode.GetSize());
+										vecmapHistograms[v].insert(
+											HistogramMap::value_type(iBin, pdata));
+									} else {
+										pdata = iter->second;
+									}
+									if (nHistogramGrids > MaxHistogramGrids) {
+										_EXCEPTION1("Sanity check failed: NodeFileCompose limits number of histogram grids to %i", MaxHistogramGrids);
+									}
+									(*pdata)[i]++;
+								}
+							}
+						}
 					}
 				}
 			}
@@ -577,32 +842,202 @@ try {
 		// Average all Variables
 		if (nDataInstances != 0) {
 			for (int v = 0; v < vecVarIxIn.size(); v++) {
-				for (int i = 0; i < vecOutputData[v].GetRows(); i++) {
-					vecOutputData[v][i] /= static_cast<float>(nDataInstances);
+				for (int i = 0; i < vecOutputDataMean[v].GetRows(); i++) {
+					vecOutputDataMean[v][i] /= static_cast<float>(nDataInstances);
 				}
 			}
 		}
 
-		// Write output
-		AnnounceStartBlock("Writing output");
-		_ASSERT(vecVarIxIn.size() == vecOutputData.size());
-		if (strOutputGrid == "xy") {
-			for (int v = 0; v < vecVarIxIn.size(); v++) {
-				vecOutputVar[v]->put(
-					&(vecOutputData[v][0]),
-					nResolutionX,
-					nResolutionX);
+		// Write output variables
+		{
+			AnnounceStartBlock("Writing output");
+			if (fCompositeMean) {
+				_ASSERT(vecVarIxIn.size() == vecOutputDataMean.size());
+			}
+			if (fCompositeMin) {
+				_ASSERT(vecVarIxIn.size() == vecOutputDataMin.size());
+			}
+			if (fCompositeMax) {
+				_ASSERT(vecVarIxIn.size() == vecOutputDataMax.size());
 			}
 
-		} else if (strOutputGrid == "rad") {
+			int nOutputDimSize0;
+			int nOutputDimSize1;
+
+			if (strOutputGrid == "xy") {
+				nOutputDimSize0 = nResolutionX;
+				nOutputDimSize1 = nResolutionX;
+			} else if (strOutputGrid == "rad") {
+				nOutputDimSize0 = nResolutionX;
+				nOutputDimSize1 = nResolutionA;
+			}
+
 			for (int v = 0; v < vecVarIxIn.size(); v++) {
-				vecOutputVar[v]->put(
-					&(vecOutputData[v][0]),
-					nResolutionX,
-					nResolutionA);
+				std::string strVarName =
+					varregIn.GetVariableString(vecVarIxIn[v]);
+
+				AnnounceStartBlock(strVarName.c_str());
+
+				// Mean of composite
+				if (fCompositeMean) {
+					Announce("mean");
+					std::string strVarNameMean = strVarName;
+
+					NcVar * pvar =
+						ncoutfile.add_var(
+							strVarNameMean.c_str(),
+							ncFloat,
+							vecOutputNcDim[v].size(),
+							const_cast<const NcDim**>(&(vecOutputNcDim[v][0])));
+
+					if (pvar == NULL) {
+						_EXCEPTION1("Unable to add variable \"%s\" to output file",
+							strVarNameMean.c_str());
+					}
+
+					pvar->put(
+						&(vecOutputDataMean[v][0]),
+						nOutputDimSize0,
+						nOutputDimSize1);
+				}
+
+				// Min of composite
+				if (fCompositeMin) {
+					Announce("min");
+					std::string strVarNameMin = strVarName + "_min";
+
+					NcVar * pvar =
+						ncoutfile.add_var(
+							strVarNameMin.c_str(),
+							ncFloat,
+							vecOutputNcDim[v].size(),
+							const_cast<const NcDim**>(&(vecOutputNcDim[v][0])));
+
+					if (pvar == NULL) {
+						_EXCEPTION1("Unable to add variable \"%s\" to output file",
+							strVarNameMin.c_str());
+					}
+
+					pvar->put(
+						&(vecOutputDataMin[v][0]),
+						nOutputDimSize0,
+						nOutputDimSize1);
+				}
+
+				// Max of composite
+				if (fCompositeMax) {
+					Announce("max");
+					std::string strVarNameMax = strVarName + "_max";
+
+					NcVar * pvar =
+						ncoutfile.add_var(
+							strVarNameMax.c_str(),
+							ncFloat,
+							vecOutputNcDim[v].size(),
+							const_cast<const NcDim**>(&(vecOutputNcDim[v][0])));
+
+					if (pvar == NULL) {
+						_EXCEPTION1("Unable to add variable \"%s\" to output file",
+							strVarNameMax.c_str());
+					}
+
+					pvar->put(
+						&(vecOutputDataMax[v][0]),
+						nOutputDimSize0,
+						nOutputDimSize1);
+				}
+
+				// Histogram of composite
+				if (iVarHistogramOpIx[v] != NoHistogram) {
+					const HistogramOp & opHist = vecHistogramOps[iVarHistogramOpIx[v]];
+					std::string strVarNameHist = strVarName + "_hist";
+
+					int nBins = vecmapHistograms[v].size();
+
+					Announce("histogram (%i bins)", nBins);
+
+					char szBuffer[128];
+					sprintf(szBuffer, "hist%i", v);
+
+					NcDim * dimHist = ncoutfile.add_dim(szBuffer, nBins);
+					if (dimHist == NULL) {
+						_EXCEPTION1("Unable to add dimension \"%s\" to output file",
+							szBuffer);
+					}
+
+					NcVar * varHist = ncoutfile.add_var(szBuffer, ncDouble, dimHist);
+					if (dimHist == NULL) {
+						_EXCEPTION1("Unable to add variable \"%s\" to output file",
+							szBuffer);
+					}
+
+					DataArray1D<double> dBins(nBins);
+					auto iter = vecmapHistograms[v].begin();
+					for (int b = 0; iter != vecmapHistograms[v].end(); iter++, b++) {
+						dBins[b] =
+							opHist.m_dOffset
+							+ opHist.m_dBinWidth * (static_cast<double>(iter->first) + 0.5);
+					}
+
+					varHist->put(&(dBins[0]), (long)nBins);
+
+					// Add the histogram dimension to the NcDim array for this variable
+					std::vector<NcDim *> vecHistNcDims = vecOutputNcDim[v];
+					_ASSERT(vecHistNcDims.size() >= grid.DimCount());
+
+					int iHistDimPos = vecHistNcDims.size() - grid.DimCount();
+					vecHistNcDims.insert(vecHistNcDims.begin() + iHistDimPos, dimHist);
+
+					// Insert the new variable
+					NcVar * pvar =
+						ncoutfile.add_var(
+							strVarNameHist.c_str(),
+							ncInt,
+							vecHistNcDims.size(),
+							const_cast<const NcDim**>(&(vecHistNcDims[0])));
+
+					if (pvar == NULL) {
+						_EXCEPTION1("Unable to add variable \"%s\" to output file",
+							strVarNameHist.c_str());
+					}
+
+					// Write the data
+					iter = vecmapHistograms[v].begin();
+					for (int b = 0; iter != vecmapHistograms[v].end(); iter++, b++) {
+						DataArray1D<int> & dataHist = *(iter->second);
+						int nNonZeros = 0;
+						for (int i = 0; i < dataHist.GetRows(); i++) {
+							if (dataHist[i] > 0) {
+								nNonZeros++;
+							}
+						}
+
+						pvar->set_cur(b, 0, 0);
+						pvar->put(
+							&(dataHist[0]),
+							1,
+							nOutputDimSize0,
+							nOutputDimSize1);
+					}
+					AnnounceEndBlock("Done");
+				}
+
+				AnnounceEndBlock("Done");
+			}
+			AnnounceEndBlock("Done");
+		}
+
+		// Clear the histogram data
+		{
+			for (int v = 0; v < vecmapHistograms.size(); v++) {
+				for (auto iter = vecmapHistograms[v].begin();
+				     iter != vecmapHistograms[v].end();
+					 iter++
+				) {
+					delete iter->second;
+				}
 			}
 		}
-		AnnounceEndBlock("Done");
 
 		// Done processing this nodefile
 		AnnounceEndBlock("Done");
