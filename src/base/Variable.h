@@ -603,7 +603,9 @@ protected:
 	///		Get the first instance of this variable in the given NcFileVector.
 	///	</summary>
 	NcVar * GetFromNetCDF(
+		VariableRegistry & varreg,
 		const NcFileVector & vecFiles,
+		const SimpleGrid & grid,
 		long lTime = (-1)
 	);
 

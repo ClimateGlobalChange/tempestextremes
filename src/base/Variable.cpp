@@ -548,7 +548,9 @@ std::string Variable::ToString(
 ///////////////////////////////////////////////////////////////////////////////
 
 NcVar * Variable::GetFromNetCDF(
+	VariableRegistry & varreg,
 	const NcFileVector & vecFiles,
+	const SimpleGrid & grid,
 	long lTime
 ) {
 	if (m_fOp) {
@@ -588,20 +590,13 @@ NcVar * Variable::GetFromNetCDF(
 	}
 
 	// Verify correct dimensionality
+	int nRequestedVarDims = m_lArg.size() + grid.DimCount();
 	if (lTime != NoTimeIndex) {
-		if ((nVarDims != m_lArg.size() + 2) &&
-			(nVarDims != m_lArg.size() + 3)
-		) {
-			_EXCEPTION3("Dimension size inconsistency in \"%s\" (%i/%lu)",
-				m_strName.c_str(), nVarDims, m_lArg.size());
-		}
-	} else {
-		if ((nVarDims != m_lArg.size() + 1) &&
-			(nVarDims != m_lArg.size() + 2)
-		) {
-			_EXCEPTION3("Dimension size inconsistency in \"%s\" (%i/%lu)",
-				m_strName.c_str(), nVarDims, m_lArg.size());
-		}
+		nRequestedVarDims++;
+	}
+	if (nVarDims != nRequestedVarDims) {
+		_EXCEPTION3("Inconsistent number of dimensions in \"%s\" (%i found / %i requested)",
+			m_strName.c_str(), nVarDims, nRequestedVarDims);
 	}
 
 	// Set the current index position for this variable
@@ -622,6 +617,11 @@ NcVar * Variable::GetFromNetCDF(
 	}
 
 	var->set_cur(&(lDim[0]));
+
+	NcError err;
+	if (err.get_err() != NC_NOERR) {
+		_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
+	}
 
 	return var;
 }
@@ -661,7 +661,7 @@ void Variable::LoadGridData(
 	if (!m_fOp) {
 
 		// Get pointer to variable
-		NcVar * var = GetFromNetCDF(vecFiles, lTime);
+		NcVar * var = GetFromNetCDF(varreg, vecFiles, grid, lTime);
 		if (var == NULL) {
 			_EXCEPTION1("Variable \"%s\" not found in NetCDF file",
 				m_strName.c_str());
