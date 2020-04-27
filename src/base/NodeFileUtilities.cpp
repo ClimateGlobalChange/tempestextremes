@@ -153,7 +153,7 @@ void NodeFile::Read(
 						0,
 						caltype);
 
-				m_pathvec[m_pathvec.size()-1].m_vecPathNodes.resize(nCount);
+				m_pathvec[m_pathvec.size()-1].resize(nCount);
 			}
 
 			iLine++;
@@ -221,7 +221,7 @@ void NodeFile::Read(
 			// StitchNodes format input
 			if (ePathType == PathTypeSN) {
 				PathNode & pathnode =
-					m_pathvec[m_pathvec.size()-1].m_vecPathNodes[i];
+					m_pathvec[m_pathvec.size()-1][i];
 
 				if (nOutputSize < 4) {
 					_EXCEPTION2("Format error on line %i of \"%s\"",
@@ -306,18 +306,18 @@ void NodeFile::Write(
 		if (eFileFormat == FileFormatGFDL) {
 			for (int p = 0; p < m_pathvec.size(); p++) {
 				Path & path = m_pathvec[p];
-				if (m_pathvec[p].m_vecPathNodes.size() == 0) {
+				if (m_pathvec[p].size() == 0) {
 					_EXCEPTIONT("Zero length Path found");
 				}
 				fprintf(fpOutput, "start\t%i\t%i\t%i\t%i\t%i\n",
-					static_cast<int>(path.m_vecPathNodes.size()),
+					static_cast<int>(path.size()),
 					path.m_timeStart.GetYear(),
 					path.m_timeStart.GetMonth(),
 					path.m_timeStart.GetDay(),
 					path.m_timeStart.GetSecond() / 3600);
 
-				for (int i = 0; i < m_pathvec[p].m_vecPathNodes.size(); i++) {
-					PathNode & pathnode = path.m_vecPathNodes[i];
+				for (int i = 0; i < m_pathvec[p].size(); i++) {
+					PathNode & pathnode = path[i];
 
 					if (pgrid != NULL) {
 						if (pgrid->m_nGridDim.size() == 1) {
@@ -378,12 +378,12 @@ void NodeFile::Write(
 
 			for (int p = 0; p < m_pathvec.size(); p++) {
 				Path & path = m_pathvec[p];
-				if (m_pathvec[p].m_vecPathNodes.size() == 0) {
+				if (m_pathvec[p].size() == 0) {
 					_EXCEPTIONT("Zero length Path found");
 				}
 
-				for (int i = 0; i < m_pathvec[p].m_vecPathNodes.size(); i++) {
-					PathNode & pathnode = path.m_vecPathNodes[i];
+				for (int i = 0; i < m_pathvec[p].size(); i++) {
+					PathNode & pathnode = path[i];
 
 					fprintf(fpOutput, "%i, %i, %i, %i, %i",
 						p,

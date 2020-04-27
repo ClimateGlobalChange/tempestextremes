@@ -285,7 +285,7 @@ void SimpleGrid::GenerateRectilinearStereographic(
 	bool fCalculateArea
 ) {
 	if (IsInitialized()) {
-		_EXCEPTIONT("Attempting to call GenerateLatitudeLongitude() on previously initialized grid");
+		_EXCEPTIONT("Attempting to call GenerateRectilinearStereographic() on previously initialized grid");
 	}
 
 	_ASSERT(nX >= 1);
@@ -377,7 +377,7 @@ void SimpleGrid::GenerateRadialStereographic(
 	bool fCalculateArea
 ) {
 	if (IsInitialized()) {
-		_EXCEPTIONT("Attempting to call GenerateLatitudeLongitude() on previously initialized grid");
+		_EXCEPTIONT("Attempting to call GenerateRadialStereographic() on previously initialized grid");
 	}
 
 	if (nA < 8) {

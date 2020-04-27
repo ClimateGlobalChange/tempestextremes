@@ -1008,14 +1008,14 @@ try {
 
 		for (int i = 0; i < vecPaths.size(); i++) {
 			Path & path = nodefile.m_pathvec[i];
-			path.m_vecPathNodes.resize(vecPaths[i].m_iTimes.size());
+			path.resize(vecPaths[i].m_iTimes.size());
 
 			if (vecPaths[i].m_iTimes.size() == 0) {
 				_EXCEPTIONT("Zero length Path found");
 			}
 
 			for (int t = 0; t < vecPaths[i].m_iTimes.size(); t++) {
-				PathNode & pathnode = path.m_vecPathNodes[t];
+				PathNode & pathnode = path[t];
 
 				int iTime = vecPaths[i].m_iTimes[t];
 				_ASSERT(vecTimes[iTime].size() == 5);
@@ -1027,7 +1027,7 @@ try {
 				int iDay = atoi(vecTimes[iTime][2].c_str());
 				int iSecond = atoi(vecTimes[iTime][4].c_str()) * 3600;
 
-				path.m_vecPathNodes[t].m_time =
+				path[t].m_time =
 					Time(iYear, iMonth, iDay, iSecond, 0, Time::CalendarNone);
 
 				for (int j = 0; j < vecCandidates[iTime][iCandidate].size(); j++) {
@@ -1037,7 +1037,7 @@ try {
 				}
 			}
 
-			path.m_timeStart = path.m_vecPathNodes[0].m_time;
+			path.m_timeStart = path[0].m_time;
 		}
 		if (strOutputFileFormat == "gfdl") {
 			nodefile.Write(strOutputFile);

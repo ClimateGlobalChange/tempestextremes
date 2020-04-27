@@ -434,14 +434,47 @@ public:
 	{ }
 
 	///	<summary>
-	///		Destructor.
+	///		Copy constructor.
 	///	</summary>
-	~PathNode() {
+	PathNode(const PathNode & node) {
+		for (int i = 0; i < node.m_vecColumnData.size(); i++) {
+			m_vecColumnData.push_back(node.m_vecColumnData[i]->Duplicate());
+		}
+		m_gridix = node.m_gridix;
+		m_time = node.m_time;
+	}
+
+	///	<summary>
+	///		Clear column data.
+	///	</summary>
+	void clear() {
 		for (int i = 0; i < m_vecColumnData.size(); i++) {
 			delete m_vecColumnData[i];
 		}
+		m_vecColumnData.clear();
 	}
 
+	///	<summary>
+	///		Destructor.
+	///	</summary>
+	~PathNode() {
+		clear();
+	}
+
+	///	<summary>
+	///		Assignment operator.
+	///	</summary>
+	PathNode & operator=(const PathNode & node) {
+		clear();
+		for (int i = 0; i < node.m_vecColumnData.size(); i++) {
+			m_vecColumnData.push_back(node.m_vecColumnData[i]->Duplicate());
+		}
+		m_gridix = node.m_gridix;
+		m_time = node.m_time;
+		return (*this);
+	}
+
+public:
 	///	<summary>
 	///		Push back a ColumnData object into column.
 	///	</summary>
@@ -544,7 +577,7 @@ public:
 ///	<summary>
 ///		A struct for expressing a path.
 ///	</summary>
-class Path {
+class Path : public std::vector<PathNode> {
 public:
 	///	<summary>
 	///		Duplicate the given data column across all PathNodes.
@@ -552,23 +585,9 @@ public:
 	void Duplicate(
 		int ix
 	) {
-		for (int j = 0; j < m_vecPathNodes.size(); j++) {
-			m_vecPathNodes[j].Duplicate(ix);
+		for (int j = 0; j < size(); j++) {
+			(*this)[j].Duplicate(ix);
 		}
-	}
-
-	///	<summary>
-	///		Array overload to access PathNode.
-	///	</summary>
-	PathNode & operator[](const int & ix) {
-		return m_vecPathNodes[ix];
-	}
-
-	///	<summary>
-	///		Array overload to access PathNode.
-	///	</summary>
-	const PathNode & operator[](const int & ix) const {
-		return m_vecPathNodes[ix];
 	}
 
 public:
@@ -576,11 +595,6 @@ public:
 	///		Start time of the path.
 	///	</summary>
 	Time m_timeStart;
-
-	///	<summary>
-	///		Array of PathNodes in the path, in temporal order.
-	///	</summary>
-	std::vector<PathNode> m_vecPathNodes;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

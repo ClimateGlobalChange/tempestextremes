@@ -32,6 +32,7 @@
 #include <fstream>
 #include <queue>
 #include <set>
+#include <regex>
 /*
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
@@ -505,8 +506,8 @@ void CalculateStormVelocity(
 ) {
 	const double MetersPerRadian = 111.325 * 1000.0 * 180.0 / M_PI;
 
-	int nPathNodes = path.m_vecPathNodes.size();
-	if (path.m_vecPathNodes.size() < 2) {
+	int nPathNodes = path.size();
+	if (nPathNodes < 2) {
 		_EXCEPTIONT("Path must contain at least two nodes");
 	}
 
@@ -521,7 +522,7 @@ void CalculateStormVelocity(
 
 	// Calculate meridional velocity
 	for (int i = 0; i < nPathNodes; i++) {
-		PathNode & pathnode = path.m_vecPathNodes[i];
+		PathNode & pathnode = path[i];
 
 		dX[i] = pathnode.m_time - path.m_timeStart;
 
@@ -549,7 +550,7 @@ void CalculateStormVelocity(
 
 	// Array of velocity column data
 	for (int i = 0; i < nPathNodes-1; i++) {
-		PathNode & pathnode = path.m_vecPathNodes[i];
+		PathNode & pathnode = path[i];
 		vecPathNodeVelocity[i]->m_dV = dC[i][1];
 	}
 	vecPathNodeVelocity[nPathNodes-1]->m_dV =
@@ -558,13 +559,13 @@ void CalculateStormVelocity(
 		+ 3.0 * dC[nPathNodes-2][3] * dFinalDeltaT * dFinalDeltaT;
 
 	for (int i = 0; i < nPathNodes; i++) {
-		PathNode & pathnode = path.m_vecPathNodes[i];
+		PathNode & pathnode = path[i];
 		vecPathNodeVelocity[i]->m_dV *= MetersPerRadian;
 	}
 
 	// Calculate zonal velocity
 	for (int i = 0; i < nPathNodes; i++) {
-		PathNode & pathnode = path.m_vecPathNodes[i];
+		PathNode & pathnode = path[i];
 		dY[i] = grid.m_dLon[pathnode.m_gridix];
 	}
 
@@ -579,22 +580,22 @@ void CalculateStormVelocity(
 		+ 3.0 * dC[nPathNodes-2][3] * dFinalDeltaT * dFinalDeltaT;
 
 	for (int i = 0; i < nPathNodes; i++) {
-		PathNode & pathnode = path.m_vecPathNodes[i];
+		PathNode & pathnode = path[i];
 		vecPathNodeVelocity[i]->m_dU *=
 			MetersPerRadian * cos(grid.m_dLat[pathnode.m_gridix]);
 	}
 
 /*
 	for (int i = 0; i < nPathNodes-1; i++) {
-		printf("%1.5e\n", path.m_vecPathNodes[i].m_dVelocityLat);
-		printf("%1.5e %1.5e :: %1.5e %1.5e %1.5e %1.5e\n", dX[i], dY[i], dC[i][0], dC[i][1], dC[i][2], dC[i][3]); //path.m_vecPathNodes[i].m_dVelocityLat);
+		printf("%1.5e\n", path[i].m_dVelocityLat);
+		printf("%1.5e %1.5e :: %1.5e %1.5e %1.5e %1.5e\n", dX[i], dY[i], dC[i][0], dC[i][1], dC[i][2], dC[i][3]); //path[i].m_dVelocityLat);
 	}
-	printf("%1.5e\n", path.m_vecPathNodes[nPathNodes-1].m_dVelocityLat);
+	printf("%1.5e\n", path[nPathNodes-1].m_dVelocityLat);
 	printf("%1.5e %1.5e\n", dX[nPathNodes-1], dY[nPathNodes-1]);
 */
 /*
 	for (int i = 0; i < nPathNodes; i++) {
-		PathNode & pathnode = path.m_vecPathNodes[i];
+		PathNode & pathnode = path[i];
 		printf("%1.5e %1.5e\n", pathnode.m_dVelocityLat, pathnode.m_dVelocityLon);
 	}
 */
@@ -937,6 +938,12 @@ try {
 	// Output file format
 	std::string strOutputFileFormat;
 
+	// Time subset
+	std::string strTimeSubset;
+
+	// Filter commands
+	std::string strFilter;
+
 	// Calculation commands
 	std::string strCalculate;
 
@@ -948,9 +955,9 @@ try {
 
 	// Parse the command line
 	BeginCommandLine()
-		CommandLineString(strInputNodeFile, "in_file", "");
+		CommandLineString(strInputNodeFile, "in_nodefile", "");
 		//CommandLineString(strInputNodeFileList, "in_file_list", "");
-		CommandLineStringD(strPathType, "in_file_type", "SN", "[DCU|SN]");
+		CommandLineStringD(strPathType, "in_nodefile_type", "SN", "[DCU|SN]");
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
@@ -959,10 +966,12 @@ try {
 		CommandLineString(strInputFormat, "in_fmt", "");
 		CommandLineString(strOutputFormat, "out_fmt", "");
 
-		CommandLineString(strOutputFile, "out_file", "");
-		CommandLineStringD(strOutputFileFormat, "out_file_format", "gfdl", "(gfdl|csv|csvnohead)");
+		CommandLineString(strOutputFile, "out_nodefile", "");
+		CommandLineStringD(strOutputFileFormat, "out_nodefile_format", "gfdl", "[gfdl|csv|csvnohead]");
 		//CommandLineBool(fOutputAppend, "out_append");
 
+		CommandLineString(strTimeSubset, "time_subset", "");
+		//CommandLineString(strFilter, "filter", "", "[col,op,value]");
 		CommandLineString(strCalculate, "calculate", "");
 		CommandLineString(strAppend, "append", "");
 
@@ -986,10 +995,12 @@ try {
 		_EXCEPTIONT("Only one of (--in_file) or (--in_file_list)"
 			" may be specified");
 	}
+/*
 	if ((strInputData.length() == 0) && (strInputDataList.length() == 0)) {
 		_EXCEPTIONT("No input data file (--in_data) or (--in_data_list)"
 			" specified");
 	}
+*/
 	if ((strInputData.length() != 0) && (strInputDataList.length() != 0)) {
 		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list)"
 			" may be specified");
@@ -1022,16 +1033,27 @@ try {
 	ColumnDataHeader cdhOutput;
 	cdhOutput.Parse(strOutputFormat);
 
+	// Parse --time_subset
+	std::regex reTimeSubset;
+	try {
+		reTimeSubset.assign(strTimeSubset);
+	} catch(std::regex_error & reerr) {
+		_EXCEPTION2("Parse error in --time_subset regular expression \"%s\" (code %i)",
+			strTimeSubset.c_str(), reerr.code());
+	}
+
 	// Parse --calculate
 	ArgumentTree calc(true);
-	calc.Parse(strCalculate);
+	if (strCalculate != "") {
+		calc.Parse(strCalculate);
+	}
 
 	// Curate input data
 	if (strInputData.length() != 0) {
 		AnnounceStartBlock("Autocurating in_data");
 		autocurator.IndexFiles(strInputData);
 
-	} else {
+	} else if (strInputDataList.length() != 0) {
 		AnnounceStartBlock("Autocurating in_data_list");
 		std::ifstream ifInputDataList(strInputDataList.c_str());
 		if (!ifInputDataList.is_open()) {
@@ -1129,32 +1151,25 @@ try {
 			autocurator.GetCalendarType());
 		AnnounceEndBlock("Done");
 
-		// Working ColumnDataHeader
-		ColumnDataHeader & cdhWorking = nodefile.m_cdh;
-
-/*
-		// Calculate velocity at each point
-		if (iftype == NodeFile::PathTypeSN) {
-
-			// Calculate trajectory velocity
-			Path & path = vecPaths[vecPaths.size()-1];
-			CalculateStormVelocity(grid, path);
-
-			// Append velocity to file
-			if (fAppendTrajectoryVelocity) {
-				for (int i = 0; i < path.m_vecPathNodes.size(); i++) {
-					PathNode & pathnode = path.m_vecPathNodes[i];
-					if (pathnode.m_vecData.size() < 4) {
-						_EXCEPTIONT("Logic error");
+		// Subset the nodefile
+		if (strTimeSubset != "") {
+			for (int p = 0; p < nodefile.m_pathvec.size(); p++) {
+				Path & path = nodefile.m_pathvec[p];
+				for (int n = 0; n < path.size(); n++) {
+					PathNode & pathnode = path[n];
+					std::string strTime = pathnode.m_time.ToString();
+					std::smatch match;
+					if (!std::regex_search(strTime, match, reTimeSubset)) {
+						path.erase(path.begin()+n);
+						n--;
 					}
-
-					char buf[100];
-					//sprintf(buf, "%3.6f", path.m_vecPathNodes[i].m_dVelocityLon);
-					//sprintf(buf, "%3.6f", path.m_vecPathNodes[i].m_dVelocityLat);
 				}
 			}
 		}
-*/
+
+		// Working ColumnDataHeader
+		ColumnDataHeader & cdhWorking = nodefile.m_cdh;
+
 		// Perform calculations
 		for (int i = 0; i < calc.size(); i++) {
 			AnnounceStartBlock("Calculating \"%s\"",
@@ -1278,7 +1293,7 @@ try {
 						int iPathNode = iterPathNode->second[i].second;
 
 						PathNode & pathnode =
-							pathvec[iPath].m_vecPathNodes[iPathNode];
+							pathvec[iPath][iPathNode];
 
 						CalculateCycloneMetrics(
 							eCycloneMetric,
@@ -1336,7 +1351,7 @@ try {
 						int iPathNode = iterPathNode->second[i].second;
 
 						PathNode & pathnode =
-							pathvec[iPath].m_vecPathNodes[iPathNode];
+							pathvec[iPath][iPathNode];
 
 						CalculateRadialProfile(
 							varreg,
@@ -1396,7 +1411,7 @@ try {
 						int iPathNode = iterPathNode->second[i].second;
 
 						PathNode & pathnode =
-							pathvec[iPath].m_vecPathNodes[iPathNode];
+							pathvec[iPath][iPathNode];
 
 						CalculateRadialWindProfile(
 							varreg,
@@ -1441,8 +1456,8 @@ try {
 				for (int p = 0; p < pathvec.size(); p++) {
 					Path & path = pathvec[p];
 
-					for (int i = 0; i < pathvec[p].m_vecPathNodes.size(); i++) {
-						PathNode & pathnode = path.m_vecPathNodes[i];
+					for (int i = 0; i < pathvec[p].size(); i++) {
+						PathNode & pathnode = path[i];
 
 						ColumnDataDoubleArrayTemplate * pdat =
 							dynamic_cast<ColumnDataDoubleArrayTemplate *>(
@@ -1561,8 +1576,8 @@ try {
 				for (int p = 0; p < pathvec.size(); p++) {
 					Path & path = pathvec[p];
 
-					for (int i = 0; i < pathvec[p].m_vecPathNodes.size(); i++) {
-						PathNode & pathnode = path.m_vecPathNodes[i];
+					for (int i = 0; i < pathvec[p].size(); i++) {
+						PathNode & pathnode = path[i];
 
 						ColumnDataDoubleArrayTemplate * pdat =
 							dynamic_cast<ColumnDataDoubleArrayTemplate *>(
@@ -1670,7 +1685,7 @@ try {
 						int iPathNode = iterPathNode->second[i].second;
 
 						PathNode & pathnode =
-							pathvec[iPath].m_vecPathNodes[iPathNode];
+							pathvec[iPath][iPathNode];
 
 						MaxClosedContourDelta(
 							varreg,
@@ -1719,8 +1734,8 @@ try {
 				for (int p = 0; p < pathvec.size(); p++) {
 					Path & path = pathvec[p];
 
-					for (int i = 0; i < pathvec[p].m_vecPathNodes.size(); i++) {
-						PathNode & pathnode = path.m_vecPathNodes[i];
+					for (int i = 0; i < pathvec[p].size(); i++) {
+						PathNode & pathnode = path[i];
 
 						int ix0 = pathnode.m_gridix;
 
@@ -1777,7 +1792,7 @@ try {
 						int iPathNode = iterPathNode->second[i].second;
 
 						PathNode & pathnode =
-							pathvec[iPath].m_vecPathNodes[iPathNode];
+							pathvec[iPath][iPathNode];
 
 						SumRadius(
 							varreg,
