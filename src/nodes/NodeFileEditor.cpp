@@ -1034,6 +1034,15 @@ try {
 	cdhOutput.Parse(strOutputFormat);
 
 	// Parse --time_subset
+	if (strTimeSubset == "3hr") {
+		strTimeSubset = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
+	}
+	if (strTimeSubset == "6hr") {
+		strTimeSubset = "....-..-.. (00|06|12|18):00:00";
+	}
+	if (strTimeSubset == "daily") {
+		strTimeSubset = "....-..-.. 00:00:00";
+	}
 	std::regex reTimeSubset;
 	try {
 		reTimeSubset.assign(strTimeSubset);
