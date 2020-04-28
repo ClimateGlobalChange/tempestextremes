@@ -821,13 +821,28 @@ void MaxClosedContourDelta(
 	}
 
 	if ((ix0 < 0) || (ix0 >= grid.GetSize())) {
-		_EXCEPTIONT("Initial index point out of range");
+		_EXCEPTION2("Initial index point out of range (%i/%i)",
+			ix0, grid.GetSize());
 	}
 
 	// Load the variable data
 	Variable & var = varreg.Get(varix);
 	var.LoadGridData(varreg, vecFiles, grid, iTime);
 	const DataArray1D<float> & dataState = var.GetData();
+
+	if (dataState.GetRows() != grid.GetSize()) {
+		_EXCEPTION2("Inconsistent data array (size %i) / grid (size %i)",
+			dataState.GetRows(),
+			grid.GetSize());
+	}
+	if ((grid.m_vecConnectivity.size() != grid.m_dLon.GetRows()) ||
+		(grid.m_vecConnectivity.size() != grid.m_dLat.GetRows())
+	) {
+		_EXCEPTION3("Inconsistent SimpleGrid (%i %i %i)",
+			grid.m_vecConnectivity.size(),
+			grid.m_dLon.GetRows(),
+			grid.m_dLat.GetRows());
+	}
 
 	// Maximum closed contour delta
 	double dMaxDelta = 0.0;
@@ -859,6 +874,11 @@ void MaxClosedContourDelta(
 
 		const double dDelta = iter->first;
 		const int ix = iter->second;
+
+		if ((ix < 0) || (ix >= grid.m_vecConnectivity.size())) {
+			_EXCEPTION2("Out of range index in connectivity matrix (%i/%i)",
+				ix, grid.m_vecConnectivity.size());
+		}
 
 		mapPriorityQueue.erase(iter);
 
@@ -902,6 +922,7 @@ void MaxClosedContourDelta(
 	// Store the maximum closed contour delta as new column data
 	ColumnDataDouble * pdat =
 		new ColumnDataDouble(dMaxDelta);
+	_ASSERT(pdat != NULL);
 
 	pathnode.PushColumnData(pdat);
 }

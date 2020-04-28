@@ -177,6 +177,7 @@ public:
 	///		Get the size of the SimpleGrid (number of points).
 	///	</summary>
 	size_t GetSize() const {
+		_ASSERT(m_dLat.GetRows() == m_dLon.GetRows());
 		return (m_dLon.GetRows());
 	}
 
@@ -217,19 +218,20 @@ public:
 	///	</summary>
 	DataArray1D<double> m_dLat;
 
+public:
 	///	<summary>
-	///		Area of the grid cell (in m^2).
+	///		Area of the grid cell (in m^2) (optionally initialized).
 	///	</summary>
 	DataArray1D<double> m_dArea;
 
 	///	<summary>
-	///		Connectivity of each grid point.
+	///		Connectivity of each grid point (optionally initialized).
 	///	</summary>
 	std::vector< std::vector<int> > m_vecConnectivity;
 
 private:
 	///	<summary>
-	///		kd tree used for quick lookup of grid points.
+	///		kd tree used for quick lookup of grid points (optionally initialized).
 	///	</summary>
 	kdtree * m_kdtree;
 };
