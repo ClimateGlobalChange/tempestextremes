@@ -41,6 +41,192 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		A class storing a filtering operator.
+///	</summary>
+class FilterOp {
+
+public:
+	///	<summary>
+	///		Possible operations.
+	///	</summary>
+	enum Operation {
+		GreaterThan,
+		LessThan,
+		GreaterThanEqualTo,
+		LessThanEqualTo,
+		EqualTo,
+		NotEqualTo
+	};
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	FilterOp() :
+		m_iColumn(-1),
+		m_eOp(GreaterThan),
+		m_dValue(0.0)
+	{ }
+
+public:
+	///	<summary>
+	///		Parse a filter operator string.
+	///	</summary>
+	void Parse(
+		const ColumnDataHeader & cdhInput,
+		const std::string & strOp
+	) {
+		// Read mode
+		enum {
+			ReadMode_Column,
+			ReadMode_Op,
+			ReadMode_Value,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Column;
+
+		// Loop through string
+		int iLast = 0;
+		for (int i = iLast; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in column name
+				if (eReadMode == ReadMode_Column) {
+					m_iColumn = cdhInput.GetIndexFromString(strSubStr);
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Op;
+
+				// Read in operation
+				} else if (eReadMode == ReadMode_Op) {
+					if (strSubStr == ">") {
+						m_eOp = GreaterThan;
+					} else if (strSubStr == "<") {
+						m_eOp = LessThan;
+					} else if (strSubStr == ">=") {
+						m_eOp = GreaterThanEqualTo;
+					} else if (strSubStr == "<=") {
+						m_eOp = LessThanEqualTo;
+					} else if (strSubStr == "=") {
+						m_eOp = EqualTo;
+					} else if (strSubStr == "!=") {
+						m_eOp = NotEqualTo;
+					} else {
+						_EXCEPTION1("Filter invalid operation \"%s\"",
+							strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Value;
+
+				// Read in value
+				} else if (eReadMode == ReadMode_Value) {
+					m_dValue = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("\nInsufficient entries in filter op \"%s\""
+							"\nRequired: \"<name>,<operation>,<value>\"",
+							strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("\nInsufficient entries in filter op \"%s\""
+					"\nRequired: \"<name>,<operation>,<value>\"",
+					strOp.c_str());
+		}
+
+		// Output announcement
+		std::string strDescription = cdhInput[m_iColumn];
+		if (m_eOp == GreaterThan) {
+			strDescription += " is greater than ";
+		} else if (m_eOp == LessThan) {
+			strDescription += " is less than ";
+		} else if (m_eOp == GreaterThanEqualTo) {
+			strDescription += " is greater than or equal to ";
+		} else if (m_eOp == LessThanEqualTo) {
+			strDescription += " is less than or equal to ";
+		} else if (m_eOp == EqualTo) {
+			strDescription += " is equal to ";
+		} else if (m_eOp == NotEqualTo) {
+			strDescription += " is not equal to ";
+		}
+
+		Announce("%s %f", strDescription.c_str(), m_dValue);
+	}
+
+	///	<summary>
+	///		Check if the given value satisfies the filter.
+	///	</summary>
+	bool Satisfies(
+		double dValue
+	) const {
+		if (m_eOp == FilterOp::GreaterThan) {
+			if (dValue > m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == FilterOp::LessThan) {
+			if (dValue < m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == FilterOp::GreaterThanEqualTo) {
+			if (dValue >= m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == FilterOp::LessThanEqualTo) {
+			if (dValue <= m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == FilterOp::EqualTo) {
+			if (dValue == m_dValue) {
+				return true;
+			}
+
+		} else if (m_eOp == FilterOp::NotEqualTo) {
+			if (dValue != m_dValue) {
+				return true;
+			}
+
+		} else {
+			_EXCEPTIONT("Invalid operation");
+		}
+
+		return false;
+	}
+
+public:
+	///	<summary>
+	///		Column index to use for filter.
+	///	</summary>
+	int m_iColumn;
+
+	///	<summary>
+	///		Operation.
+	///	</summary>
+	Operation m_eOp;
+
+	///	<summary>
+	///		Threshold value.
+	///	</summary>
+	double m_dValue;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 void CalculateRadialProfile(
 	VariableRegistry & varreg,
 	NcFileVector & vecFiles,
@@ -939,10 +1125,10 @@ try {
 	std::string strOutputFileFormat;
 
 	// Time subset
-	std::string strTimeSubset;
+	std::string strTimeFilter;
 
 	// Filter commands
-	std::string strFilter;
+	std::string strColumnFilter;
 
 	// Calculation commands
 	std::string strCalculate;
@@ -976,8 +1162,8 @@ try {
 		CommandLineStringD(strOutputFileFormat, "out_nodefile_format", "gfdl", "[gfdl|csv|csvnohead]");
 		//CommandLineBool(fOutputAppend, "out_append");
 
-		CommandLineString(strTimeSubset, "time_subset", "");
-		//CommandLineString(strFilter, "filter", "", "[col,op,value]");
+		CommandLineString(strTimeFilter, "time_filter", "");
+		CommandLineStringD(strColumnFilter, "col_filter", "", "[col,op,value;...]");
 		CommandLineString(strCalculate, "calculate", "");
 		CommandLineString(strAppend, "append", "");
 
@@ -1042,22 +1228,48 @@ try {
 	ColumnDataHeader cdhOutput;
 	cdhOutput.Parse(strOutputFormat);
 
-	// Parse --time_subset
-	if (strTimeSubset == "3hr") {
-		strTimeSubset = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
+	// Parse --time_filter
+	if (strTimeFilter == "3hr") {
+		strTimeFilter = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
 	}
-	if (strTimeSubset == "6hr") {
-		strTimeSubset = "....-..-.. (00|06|12|18):00:00";
+	if (strTimeFilter == "6hr") {
+		strTimeFilter = "....-..-.. (00|06|12|18):00:00";
 	}
-	if (strTimeSubset == "daily") {
-		strTimeSubset = "....-..-.. 00:00:00";
+	if (strTimeFilter == "daily") {
+		strTimeFilter = "....-..-.. 00:00:00";
 	}
 	std::regex reTimeSubset;
 	try {
-		reTimeSubset.assign(strTimeSubset);
+		reTimeSubset.assign(strTimeFilter);
 	} catch(std::regex_error & reerr) {
-		_EXCEPTION2("Parse error in --time_subset regular expression \"%s\" (code %i)",
-			strTimeSubset.c_str(), reerr.code());
+		_EXCEPTION2("Parse error in --time_filter regular expression \"%s\" (code %i)",
+			strTimeFilter.c_str(), reerr.code());
+	}
+
+	// Parse --col_filter
+	std::vector<FilterOp> vecFilterOp;
+	if (strColumnFilter != "") {
+		AnnounceStartBlock("Parsing filter operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strColumnFilter.length(); i++) {
+
+			if ((i == strColumnFilter.length()) ||
+				(strColumnFilter[i] == ';') ||
+				(strColumnFilter[i] == ':')
+			) {
+				std::string strSubStr =
+					strColumnFilter.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecFilterOp.size());
+				vecFilterOp.resize(iNextOp + 1);
+				vecFilterOp[iNextOp].Parse(cdhInput, strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
 	}
 
 	// Parse --calculate
@@ -1173,8 +1385,8 @@ try {
 			autocurator.GetCalendarType());
 		AnnounceEndBlock("Done");
 
-		// Subset the nodefile
-		if (strTimeSubset != "") {
+		// Time filter the nodefile
+		if (strTimeFilter != "") {
 			for (int p = 0; p < nodefile.m_pathvec.size(); p++) {
 				Path & path = nodefile.m_pathvec[p];
 				for (int n = 0; n < path.size(); n++) {
@@ -1185,6 +1397,32 @@ try {
 						path.erase(path.begin()+n);
 						n--;
 					}
+				}
+				if (path.size() == 0) {
+					nodefile.m_pathvec.erase(nodefile.m_pathvec.begin()+p);
+					p--;
+				}
+			}
+		}
+
+		// Column filter the nodefile
+		for (int op = 0; op < vecFilterOp.size(); op++) {
+			for (int p = 0; p < nodefile.m_pathvec.size(); p++) {
+				Path & path = nodefile.m_pathvec[p];
+				for (int n = 0; n < path.size(); n++) {
+					PathNode & pathnode = path[n];
+					double dValue =
+						pathnode.GetColumnDataAsDouble(
+							vecFilterOp[op].m_iColumn);
+
+					if (!vecFilterOp[op].Satisfies(dValue)) {
+						path.erase(path.begin()+n);
+						n--;
+					}
+				}
+				if (path.size() == 0) {
+					nodefile.m_pathvec.erase(nodefile.m_pathvec.begin()+p);
+					p--;
 				}
 			}
 		}
