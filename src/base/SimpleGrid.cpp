@@ -63,7 +63,8 @@ bool SimpleGrid::IsInitialized() const {
 void SimpleGrid::GenerateLatitudeLongitude(
 	const DataArray1D<double> & vecLat,
 	const DataArray1D<double> & vecLon,
-	bool fRegional
+	bool fRegional,
+	bool fVerbose
 ) {
 	if (IsInitialized()) {
 		_EXCEPTIONT("Attempting to call GenerateLatitudeLongitude() on previously initialized grid");
@@ -204,7 +205,9 @@ void SimpleGrid::GenerateLatitudeLongitude(
 		for (size_t i = 0; i < m_dArea.GetRows(); i++) {
 			dTotalArea += m_dArea[i];
 		}
-		Announce("Total calculated area: %1.15e", dTotalArea);
+		if (fVerbose) {
+			Announce("Total calculated area: %1.15e", dTotalArea);
+		}
 	}
 
 }
@@ -277,11 +280,56 @@ void SimpleGrid::GenerateLatitudeLongitude(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void SimpleGrid::GenerateRegionalLatitudeLongitude(
+	double dLatRad1,
+	double dLatRad2,
+	double dLonRad1,
+	double dLonRad2,
+	int nLat,
+	int nLon
+) {
+	_ASSERT(nLat >= 1);
+	_ASSERT(nLon >= 1);
+	if ((dLatRad1 < -0.5 * M_PI) || (dLatRad1 > 0.5 * M_PI)) {
+		_EXCEPTION1("Latitude-longitude grid latitude bound out of range (%1.5f)", dLatRad1);
+	}
+	if ((dLatRad2 < -0.5 * M_PI) || (dLatRad2 > 0.5 * M_PI)) {
+		_EXCEPTION1("Latitude-longitude grid latitude bound out of range (%1.5f)", dLatRad2);
+	}
+	if (fabs(dLatRad1 - dLatRad2) < 1.0e-12) {
+		_EXCEPTION1("Latitude-longitude grid latitude bounds must not be equal (%1.5f)", dLatRad1);
+	}
+	if (fabs(dLonRad1 - dLonRad2) < 1.0e-12) {
+		_EXCEPTION1("Latitude-longitude grid longitude bounds must not be equal (%1.5f)", dLonRad1);
+	}
+
+	DataArray1D<double> vecLat(nLat);
+	DataArray1D<double> vecLon(nLon);
+
+	double dDeltaLatRad = (dLatRad2 - dLatRad1) / static_cast<double>(nLat);
+	double dDeltaLonRad = (dLonRad2 - dLonRad1) / static_cast<double>(nLon);
+
+	for (int j = 0; j < nLat; j++) {
+		vecLat[j] = dLatRad1 + dDeltaLatRad * (static_cast<double>(j) + 0.5);
+	}
+	for (int i = 0; i < nLon; i++) {
+		vecLon[i] = dLonRad1 + dDeltaLonRad * (static_cast<double>(i) + 0.5);
+	}
+
+	GenerateLatitudeLongitude(
+		vecLat,
+		vecLon,
+		true,     // Regional
+		false);   // Verbosity disabled
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void SimpleGrid::GenerateRectilinearStereographic(
 	double dLonRad0,
 	double dLatRad0,
 	int nX,
-	double dDeltaXDeg,
+	double dDeltaXRad,
 	bool fCalculateArea
 ) {
 	if (IsInitialized()) {
@@ -289,7 +337,7 @@ void SimpleGrid::GenerateRectilinearStereographic(
 	}
 
 	_ASSERT(nX >= 1);
-	_ASSERT(dDeltaXDeg > 0.0);
+	_ASSERT(dDeltaXRad > 0.0);
 	_ASSERT(fabs(dLatRad0 <= 0.5 * M_PI));
 
 	if (fabs(dLatRad0 - 0.5 * M_PI) < ReferenceTolerance) {
@@ -298,8 +346,6 @@ void SimpleGrid::GenerateRectilinearStereographic(
 	if (fabs(dLatRad0 + 0.5 * M_PI) < ReferenceTolerance) {
 		dLatRad0 = - 0.5 * M_PI;
 	}
-
-	double dDeltaXRad = M_PI / 180.0 * dDeltaXDeg;
 
 	m_nGridDim.resize(2);
 	m_nGridDim[0] = nX;
@@ -373,7 +419,7 @@ void SimpleGrid::GenerateRadialStereographic(
 	double dLatRad0,
 	int nR,
 	int nA,
-	double dDeltaRDeg,
+	double dDeltaRRad,
 	bool fCalculateArea
 ) {
 	if (IsInitialized()) {
@@ -385,10 +431,8 @@ void SimpleGrid::GenerateRadialStereographic(
 	}
 
 	_ASSERT(nR >= 1);
-	_ASSERT(dDeltaRDeg > 0.0);
+	_ASSERT(dDeltaRRad > 0.0);
 	_ASSERT(fabs(dLatRad0 <= 0.5 * M_PI));
-
-	double dDeltaRRad = M_PI / 180.0 * dDeltaRDeg;
 
 	const double dRgcdmax = (static_cast<double>(nR-1) + 0.5) * dDeltaRRad;
 

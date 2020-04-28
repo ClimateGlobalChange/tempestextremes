@@ -218,13 +218,19 @@ try {
 	std::string strHistogramOp;
 
 	// Grid spacing of output (Cartesian great-circle or radial distance)
-	double dDeltaX;
+	double dDeltaXDeg;
 
 	// Resolution of output (Cartesian grid size or number of radial points)
 	int nResolutionX;
 
 	// Resolution of the output (azimuthal points)
 	int nResolutionA;
+
+	// Fixed longitude
+	double dFixedLongitudeDeg;
+
+	// Fixed latitude
+	double dFixedLatitudeDeg;
 
 	// Name of latitude dimension
 	std::string strLatitudeName;
@@ -243,7 +249,7 @@ try {
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineBool(fRegional, "regional");
 
-		CommandLineStringD(strOutputGrid, "out_grid", "XY", "[XY|RAD]");
+		CommandLineStringD(strOutputGrid, "out_grid", "XY", "[XY|RAD|RLL]");
 		CommandLineString(strOutputData, "out_data", "");
 
 		//CommandLineString(strTimeBegin, "time_begin", "");
@@ -253,9 +259,11 @@ try {
 		CommandLineStringD(strOperators, "op", "mean", "[mean|min|max,...]");
 		CommandLineStringD(strHistogramOp, "histogram", "", "[var,offset,binsize;...]");
 
-		CommandLineDouble(dDeltaX, "dx", 0.5);
+		CommandLineDouble(dDeltaXDeg, "dx", 0.5);
 		CommandLineInt(nResolutionX, "resx", 11);
 		CommandLineInt(nResolutionA, "resa", 16);
+		CommandLineDouble(dFixedLongitudeDeg, "fixlon", -999.);
+		CommandLineDouble(dFixedLatitudeDeg, "fixlat", -999.);
 
 		CommandLineString(strLatitudeName, "latname", "lat");
 		CommandLineString(strLongitudeName, "lonname", "lon");
@@ -293,13 +301,29 @@ try {
 	if ((strOperators.length() == 0) && (strHistogramOp.length() == 0)) {
 		_EXCEPTIONT("At least one of --op and --histogram must be specified");
 	}
+	if (dFixedLongitudeDeg != -999.) {
+		if (dFixedLatitudeDeg == -999.) {
+			_EXCEPTIONT("--fixlon and --fixlat must be specified together");
+		}
+		if ((dFixedLongitudeDeg < -360.0) || (dFixedLongitudeDeg > 360.0)) {
+			_EXCEPTION1("--fixlon %1.5f out of range [-360,+360]", dFixedLongitudeDeg);
+		}
+	}
+	if (dFixedLatitudeDeg != -999.) {
+		if (dFixedLongitudeDeg == -999.) {
+			_EXCEPTIONT("--fixlon and --fixlat must be specified together");
+		}
+		if ((dFixedLatitudeDeg < -90.0) || (dFixedLongitudeDeg > 90.0)) {
+			_EXCEPTION1("--fixlat %1.5f out of range [-90,+90]", dFixedLatitudeDeg);
+		}
+	}
 
 	// Output grid options
 	STLStringHelper::ToLower(strOutputGrid);
-	if ((strOutputGrid != "xy") && (strOutputGrid != "rad")) {
-		_EXCEPTIONT("Grid type of output (--out_grid) must be \"xy\" or \"rad\"");
+	if ((strOutputGrid != "xy") && (strOutputGrid != "rad") && (strOutputGrid != "rll")) {
+		_EXCEPTIONT("Grid type of output (--out_grid) must be \"xy\", \"rad\" or \"rll\"");
 	}
-	if (dDeltaX <= 0.0) {
+	if (dDeltaXDeg <= 0.0) {
 		_EXCEPTIONT("Grid spacing of output (--dx) must be nonnegative");
 	}
 	if (nResolutionX < 1) {
@@ -307,6 +331,9 @@ try {
 	}
 	if ((strOutputGrid == "rad") && (nResolutionA < 8)) {
 		_EXCEPTIONT("Resolution of output (--resa) must be >= 8");
+	}
+	if ((strOutputGrid == "rll") && (dFixedLongitudeDeg == -999.)) {
+		_EXCEPTIONT("Grid \"rll\" may only be used with fixed coordinate composites");
 	}
 
 	// Input file type
@@ -319,12 +346,40 @@ try {
 		_EXCEPTIONT("Invalid --in_nodefile_type, expected \"SN\" or \"DCU\"");
 	}
 
+	// Convert degrees to radians
+	double dDeltaXRad = dDeltaXDeg * M_PI / 180.0;
+	double dFixedLongitudeRad = -999.;
+	double dFixedLatitudeRad = -999.;
+
+	if (dFixedLongitudeDeg != -999.) {
+		dFixedLongitudeRad = dFixedLongitudeDeg * M_PI / 180.0;
+	}
+	if (dFixedLatitudeDeg != -999.) {
+		dFixedLatitudeRad = dFixedLatitudeDeg * M_PI / 180.0;
+	}
+
 	// NodeFile
 	NodeFile nodefile;
 
 	// Parse --in_fmt string
 	ColumnDataHeader cdhInput;
 	cdhInput.Parse(strInputFormat);
+
+	int iLonColIx = (-1);
+	int iLatColIx = (-1);
+
+	for (int i = 0; i < cdhInput.size(); i++) {
+		if ((cdhInput[i] == "lon") || (cdhInput[i] == "longitude")) {
+			iLonColIx = i;
+		}
+		if ((cdhInput[i] == "lat") || (cdhInput[i] == "latitude")) {
+			iLatColIx = i;
+		}
+	}
+
+	if ((iLonColIx == (-1)) || (iLatColIx == (-1))) {
+		_EXCEPTIONT("--in_fmt must contain \"lon\" and \"lat\" columns");
+	}
 
 	// Parse --var argument
 	VariableIndexVector vecVarIxIn;
@@ -541,7 +596,7 @@ try {
 
 		DataArray1D<double> dX(nResolutionX);
 		for (int i = 0; i < nResolutionX; i++) {
-			dX[i] = dDeltaX * (
+			dX[i] = dDeltaXDeg * (
 				static_cast<double>(i)
 				- 0.5 * static_cast<double>(nResolutionX-1));
 		}
@@ -564,7 +619,7 @@ try {
 
 		DataArray1D<double> dR(nResolutionX);
 		for (int i = 0; i < nResolutionA; i++) {
-			dR[i] = dDeltaX * (static_cast<double>(i) + 0.5);
+			dR[i] = dDeltaXDeg * (static_cast<double>(i) + 0.5);
 		}
 
 		NcVar * varAz = ncoutfile.add_var("az", ncDouble, dimX);
@@ -572,6 +627,34 @@ try {
 
 		NcVar * varR = ncoutfile.add_var("r", ncDouble, dimY);
 		varR->put(&(dR[0]), nResolutionX);
+
+	} else if (strOutputGrid == "rll") {
+		dimX = ncoutfile.add_dim("lon", nResolutionX);
+		dimY = ncoutfile.add_dim("lat", nResolutionX);
+
+		double dHalfWidthDeg = 0.5 * static_cast<double>(nResolutionX) * dDeltaXDeg;
+
+		DataArray1D<double> dLonDeg(nResolutionX);
+		for (int i = 0; i < nResolutionX; i++) {
+			dLonDeg[i] = dFixedLongitudeDeg
+				- dHalfWidthDeg
+				+ dDeltaXDeg * (static_cast<double>(i) + 0.5);
+		}
+
+		DataArray1D<double> dLatDeg(nResolutionX);
+		for (int j = 0; j < nResolutionX; j++) {
+			dLatDeg[j] = dFixedLatitudeDeg
+				- dHalfWidthDeg
+				+ dDeltaXDeg * (static_cast<double>(j) + 0.5);
+		}
+
+		NcVar * varLon = ncoutfile.add_var("lon", ncDouble, dimX);
+		varLon->put(&(dLonDeg[0]), nResolutionX);
+		varLon->add_att("units", "degrees_east");
+
+		NcVar * varLat = ncoutfile.add_var("lat", ncDouble, dimY);
+		varLat->put(&(dLatDeg[0]), nResolutionX);
+		varLat->add_att("units", "degrees_north");
 
 	} else {
 		_EXCEPTIONT("Invalid grid");
@@ -678,6 +761,13 @@ try {
 
 						vecAuxDimInfo.push_back(DimInfo("r", nResolutionX));
 						vecAuxDimInfo.push_back(DimInfo("az", nResolutionA));
+
+					} else if (strOutputGrid == "rll") {
+						nOutputDimSize0 = nResolutionX;
+						nOutputDimSize1 = nResolutionX;
+
+						vecAuxDimInfo.push_back(DimInfo("lat", nResolutionX));
+						vecAuxDimInfo.push_back(DimInfo("lon", nResolutionX));
 					}
 
 					// Initialize data storage for output
@@ -740,32 +830,63 @@ try {
 				const DataArray1D<float> & dataState = var.GetData();
 				_ASSERT(dataState.GetRows() == grid.GetSize());
 
-				// Loop through all PathNodes
+				/////////////////////////////////
+				// PathNode centered composite
 				for (int p = 0; p < vecPathNodes.size(); p++) {
 					nDataInstances++;
 
 					const Path & path = pathvec[vecPathNodes[p].first];
 					const PathNode & pathnode = path[vecPathNodes[p].second];
+
+					double dPathNodeLonRad =
+						pathnode.GetColumnDataAsDouble(iLonColIx) * M_PI / 180.0;
+					double dPathNodeLatRad =
+						pathnode.GetColumnDataAsDouble(iLatColIx) * M_PI / 180.0;
+/*
 					int ixOrigin = static_cast<int>(pathnode.m_gridix);
 
+					double dPathNodeLon = grid.m_dLon[ixOrigin];
+					double dPathNodeLat = grid.m_dLat[ixOrigin];
+
 					_ASSERT((ixOrigin >= 0) && (ixOrigin < grid.GetSize()));
+*/
+					// Fixed point composites
+					if ((dFixedLatitudeRad != -999.) || (dFixedLongitudeRad != -999.)) {
+						_ASSERT(dFixedLatitudeRad != -999.);
+						_ASSERT(dFixedLongitudeRad != -999.);
+
+						dPathNodeLonRad = dFixedLongitudeRad;
+						dPathNodeLatRad = dFixedLatitudeRad;
+					}
 
 					// Generate the SimpleGrid for this pathnode
 					SimpleGrid gridNode;
 					if (strOutputGrid == "xy") {
 						gridNode.GenerateRectilinearStereographic(
-							grid.m_dLon[ixOrigin],
-							grid.m_dLat[ixOrigin],
+							dPathNodeLonRad,
+							dPathNodeLatRad,
 							nResolutionX,
-							dDeltaX);
+							dDeltaXRad);
 
 					} else if (strOutputGrid == "rad") {
 						gridNode.GenerateRadialStereographic(
-							grid.m_dLon[ixOrigin],
-							grid.m_dLat[ixOrigin],
+							dPathNodeLonRad,
+							dPathNodeLatRad,
 							nResolutionX,
 							nResolutionA,
-							dDeltaX);
+							dDeltaXRad);
+
+					} else if (strOutputGrid == "rll") {
+						double dHalfWidth =
+							0.5 * static_cast<double>(nResolutionX) * dDeltaXRad;
+
+						gridNode.GenerateRegionalLatitudeLongitude(
+							dPathNodeLatRad - dHalfWidth,
+							dPathNodeLatRad + dHalfWidth,
+							dPathNodeLonRad - dHalfWidth,
+							dPathNodeLonRad + dHalfWidth,
+							nResolutionX,
+							nResolutionX);
 					}
 
 					// Only calculate the mean
@@ -775,7 +896,15 @@ try {
 								grid.NearestNode(
 									gridNode.m_dLon[i],
 									gridNode.m_dLat[i]);
-
+/*
+							if (i == 0) {
+								printf("%6f %1.5f %1.5f %1.5f %1.5f\n", dataState[ixGridIn],
+									gridNode.m_dLon[i] * 180.0 / M_PI,
+									gridNode.m_dLat[i] * 180.0 / M_PI,
+									grid.m_dLon[ixGridIn] * 180.0 / M_PI,
+									grid.m_dLat[ixGridIn] * 180.0 / M_PI);
+							}
+*/
 							vecOutputDataMean[v][i] +=
 								dataState[ixGridIn];
 						}
@@ -832,6 +961,11 @@ try {
 							}
 						}
 					}
+
+					// Fixed point composites
+					if ((dFixedLatitudeRad != -999.) || (dFixedLongitudeRad != -999.)) {
+						break;
+					}
 				}
 			}
 
@@ -870,6 +1004,9 @@ try {
 			} else if (strOutputGrid == "rad") {
 				nOutputDimSize0 = nResolutionX;
 				nOutputDimSize1 = nResolutionA;
+			} else if (strOutputGrid == "rll") {
+				nOutputDimSize0 = nResolutionX;
+				nOutputDimSize1 = nResolutionX;
 			}
 
 			for (int v = 0; v < vecVarIxIn.size(); v++) {

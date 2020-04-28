@@ -72,7 +72,8 @@ public:
 	void GenerateLatitudeLongitude(
 		const DataArray1D<double> & vecLat,
 		const DataArray1D<double> & vecLon,
-		bool fRegional
+		bool fRegional,
+		bool fVerbose = true
 	);
 
 	///	<summary>
@@ -96,6 +97,19 @@ public:
 	);
 
 	///	<summary>
+	///		Generate the unstructured grid information for a
+	///		longitude-latitude grid.
+	///	</summary>
+	void GenerateRegionalLatitudeLongitude(
+		double dLatRad1,
+		double dLatRad2,
+		double dLonRad1,
+		double dLonRad2,
+		int nLat,
+		int nLon
+	);
+
+	///	<summary>
 	///		Generate the unstructured grid information for a rectilinear
 	///		stereographic grid at the given point.
 	///	</summary>
@@ -103,7 +117,7 @@ public:
 		double dLonRad0,
 		double dLatRad0,
 		int nX,
-		double dDeltaXDeg,
+		double dDeltaXRad,
 		bool fCalculateArea = false
 	);
 
@@ -116,7 +130,7 @@ public:
 		double dLatRad0,
 		int nR,
 		int nA,
-		double dDeltaRDeg,
+		double dDeltaRRad,
 		bool fCalculateArea = false
 	);
 

@@ -511,9 +511,26 @@ public:
 	///		Get column data as integer.
 	///	</summary>
 	int GetColumnDataAsInteger(
+		int ix
+	) const {
+		if ((ix < 0) || (ix >= m_vecColumnData.size())) {
+			_EXCEPTION();
+		}
+		std::string str = m_vecColumnData[ix]->ToString();
+		if (!STLStringHelper::IsInteger(str)) {
+			_EXCEPTION1("Column data \"%s\" cannot be cast to type integer",
+				str.c_str());
+		}
+		return atoi(str.c_str());
+	}
+
+	///	<summary>
+	///		Get column data as integer.
+	///	</summary>
+	int GetColumnDataAsInteger(
 		const ColumnDataHeader & cdh,
 		const std::string & strColumn
-	) {
+	) const {
 		if (STLStringHelper::IsInteger(strColumn)) {
 			return atoi(strColumn.c_str());
 		}
@@ -522,20 +539,33 @@ public:
 		if (ix == (-1)) {
 			_EXCEPTION1("Invalid column header \"%s\"", strColumn.c_str());
 		}
-		std::string str = m_vecColumnData[ix]->ToString();
-		if (!STLStringHelper::IsInteger(str)) {
-			_EXCEPTIONT("Column header \"%s\" cannot be cast to type integer");
-		}
-		return atoi(str.c_str());
+		return GetColumnDataAsInteger(ix);
 	}
 
 	///	<summary>
-	///		Get column data as double.
+	///		Get column data as double (using a column index).
+	///	</summary>
+	double GetColumnDataAsDouble(
+		int ix
+	) const {
+		if ((ix < 0) || (ix >= m_vecColumnData.size())) {
+			_EXCEPTION();
+		}
+		std::string str = m_vecColumnData[ix]->ToString();
+		if (!STLStringHelper::IsFloat(str)) {
+			_EXCEPTION1("Column data \"%s\" cannot be cast to type double",
+				str.c_str());
+		}
+		return atof(str.c_str());
+	}
+
+	///	<summary>
+	///		Get column data as double (using a column name).
 	///	</summary>
 	double GetColumnDataAsDouble(
 		const ColumnDataHeader & cdh,
 		const std::string & strColumn
-	) {
+	) const {
 		if (STLStringHelper::IsFloat(strColumn)) {
 			return atof(strColumn.c_str());
 		}
@@ -544,15 +574,7 @@ public:
 		if (ix == (-1)) {
 			_EXCEPTION1("Invalid column header \"%s\"", strColumn.c_str());
 		}
-		if ((ix < 0) || (ix >= m_vecColumnData.size())) {
-			_EXCEPTION();
-		}
-		std::string str = m_vecColumnData[ix]->ToString();
-		if (!STLStringHelper::IsFloat(str)) {
-			_EXCEPTION1("Column header \"%s\" cannot be cast to type double",
-				strColumn.c_str());
-		}
-		return atof(str.c_str());
+		return GetColumnDataAsDouble(ix);
 	}
 
 public:
