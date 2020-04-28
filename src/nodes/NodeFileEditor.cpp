@@ -1427,6 +1427,9 @@ try {
 			}
 		}
 
+		// Generate the TimeToPathNodeMap
+		nodefile.GenerateTimeToPathNodeMap();
+
 		// Working ColumnDataHeader
 		ColumnDataHeader & cdhWorking = nodefile.m_cdh;
 

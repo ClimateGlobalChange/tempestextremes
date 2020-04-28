@@ -263,20 +263,6 @@ void NodeFile::Read(
 					pathnode.PushColumnDataString(
 						vecDelimitedOutput[j]);
 				}
-
-				// Because nodes in StitchNodes format output are not ordered in
-				// time, efficient data I/O requires us to reorganize the input
-				// lines by time.
-				TimeToPathNodeMap::iterator iter =
-					m_mapTimeToPathNode.find(time);
-				if (iter == m_mapTimeToPathNode.end()) {
-					iter = m_mapTimeToPathNode.insert(
-						TimeToPathNodeMap::value_type(
-							time, std::vector< std::pair<int,int> >())).first;
-				}
-				iter->second.push_back(
-					std::pair<int,int>(
-						static_cast<int>(m_pathvec.size()-1),i));
 			}
 
 			iLine++;
@@ -427,6 +413,31 @@ void NodeFile::Write(
 		_EXCEPTIONT("Sorry, not yet implemented!");
 	}
 
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void NodeFile::GenerateTimeToPathNodeMap() {
+
+	// Clear the existing map
+	m_mapTimeToPathNode.clear();
+
+	// Loop through all paths and path nodes
+	for (int p = 0; p < m_pathvec.size(); p++) {
+		Path & path = m_pathvec[p];
+		for (int n = 0; n < path.size(); n++) {
+			PathNode & pathnode = path[n];
+
+			TimeToPathNodeMap::iterator iter =
+				m_mapTimeToPathNode.find(pathnode.m_time);
+			if (iter == m_mapTimeToPathNode.end()) {
+				iter = m_mapTimeToPathNode.insert(
+					TimeToPathNodeMap::value_type(
+						pathnode.m_time, std::vector< std::pair<int,int> >())).first;
+			}
+			iter->second.push_back(std::pair<int,int>(p,n));
+		}
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////

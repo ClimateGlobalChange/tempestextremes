@@ -689,6 +689,11 @@ public:
 		bool fIncludeHeader = false
 	);
 
+	///	<summary>
+	///		Generate the TimeToPathNodeMap.
+	///	</summary>
+	void GenerateTimeToPathNodeMap();
+
 public:
 	///	<summary>
 	///		Get the PathType associated with this NodeFile.
@@ -737,6 +742,11 @@ public:
 	///	<summary>
 	///		A map from Times to PathNodes.
 	///	</summary>
+	///	<remarks>
+	///		Because nodes in StitchNodes format output are not ordered in
+	///		time, efficient data I/O requires us to reorganize the input
+	///		lines by time.
+	///	</remarks>
 	TimeToPathNodeMap m_mapTimeToPathNode;
 };
 
