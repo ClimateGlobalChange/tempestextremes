@@ -13,6 +13,8 @@ MPIF90=            mpif90
 
 F90_RUNTIME=       -lgfortran
 
+CXXFLAGS+= -DTEMPEST_NOREGEX
+
 # NetCDF
 NETCDF_ROOT=       /opt/local
 NETCDF_CXXFLAGS=   -I$(NETCDF_ROOT)/include

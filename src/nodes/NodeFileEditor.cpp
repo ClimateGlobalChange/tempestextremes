@@ -1208,11 +1208,11 @@ try {
 
 	// Check arguments
 	if ((strInputNodeFile.length() == 0) && (strInputNodeFileList.length() == 0)) {
-		_EXCEPTIONT("No input file (--in_file) or (--in_file_list)"
+		_EXCEPTIONT("No input file (--in_nodefile) or (--in_nodefile_list)"
 			" specified");
 	}
 	if ((strInputNodeFile.length() != 0) && (strInputNodeFileList.length() != 0)) {
-		_EXCEPTIONT("Only one of (--in_file) or (--in_file_list)"
+		_EXCEPTIONT("Only one of (--in_nodefile) or (--in_nodefile_list)"
 			" may be specified");
 	}
 /*
@@ -1239,7 +1239,7 @@ try {
 	} else if (strPathType == "SN") {
 		iftype = NodeFile::PathTypeSN;
 	} else {
-		_EXCEPTIONT("Invalid --in_file_type, expected \"SN\" or \"DCU\"");
+		_EXCEPTIONT("Invalid --in_nodefile_type, expected \"SN\" or \"DCU\"");
 	}
 
 	// NodeFile
