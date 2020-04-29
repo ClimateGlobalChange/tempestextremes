@@ -14,6 +14,12 @@
 ///		or implied warranty.
 ///	</remarks>
 
+/*
+#if defined(TEMPEST_MPIOMP)
+#include <mpi.h>
+#endif
+*/
+
 #include "Constants.h"
 #include "CommandLine.h"
 #include "Exception.h"
@@ -32,12 +38,10 @@
 #include <fstream>
 #include <queue>
 #include <set>
+
+#ifndef TEMPEST_NOREGEX
 #include <regex>
-/*
-#if defined(TEMPEST_MPIOMP)
-#include <mpi.h>
 #endif
-*/
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1259,6 +1263,13 @@ try {
 	if (strTimeFilter == "daily") {
 		strTimeFilter = "....-..-.. 00:00:00";
 	}
+
+#ifdef TEMPEST_NOREGEX
+	if (strTimeFilter != "") {
+		_EXCEPTIONT("Cannot use --time_filter with -DTEMPEST_NOREGEX compiler flag");
+	}
+#endif
+#ifndef TEMPEST_NOREGEX
 	std::regex reTimeSubset;
 	try {
 		reTimeSubset.assign(strTimeFilter);
@@ -1266,6 +1277,7 @@ try {
 		_EXCEPTION2("Parse error in --time_filter regular expression \"%s\" (code %i)",
 			strTimeFilter.c_str(), reerr.code());
 	}
+#endif
 
 	// Parse --col_filter
 	std::vector<FilterOp> vecFilterOp;
@@ -1408,6 +1420,8 @@ try {
 
 		// Time filter the nodefile
 		if (strTimeFilter != "") {
+#ifndef TEMPEST_NOREGEX
+
 			for (int p = 0; p < nodefile.m_pathvec.size(); p++) {
 				Path & path = nodefile.m_pathvec[p];
 				for (int n = 0; n < path.size(); n++) {
@@ -1424,6 +1438,7 @@ try {
 					p--;
 				}
 			}
+#endif
 		}
 
 		// Column filter the nodefile

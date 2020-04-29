@@ -14,6 +14,10 @@
 ///		or implied warranty.
 ///	</remarks>
 
+#if defined(TEMPEST_MPIOMP)
+#include <mpi.h>
+#endif
+
 #include "Variable.h"
 #include "CommandLine.h"
 #include "Exception.h"
@@ -37,10 +41,6 @@
 #include <string>
 #include <set>
 #include <queue>
-
-#if defined(TEMPEST_MPIOMP)
-#include <mpi.h>
-#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -480,6 +480,8 @@ void DetectCyclonesUnstructured(
 
 	// No connectivity file; check for latitude/longitude dimension
 	} else {
+		_ASSERT(vecFiles.size() > 0);
+
 		AnnounceStartBlock("Generating RLL grid data");
 		grid.GenerateLatitudeLongitude(
 			vecFiles[0],

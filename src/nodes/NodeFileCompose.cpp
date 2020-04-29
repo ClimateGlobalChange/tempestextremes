@@ -14,6 +14,12 @@
 ///		or implied warranty.
 ///	</remarks>
 
+/*
+#if defined(TEMPEST_MPIOMP)
+#include <mpi.h>
+#endif
+*/
+
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
@@ -35,11 +41,6 @@
 #include <set>
 #include <cmath>
 #include <cfloat>
-/*
-#if defined(TEMPEST_MPIOMP)
-#include <mpi.h>
-#endif
-*/
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -14,11 +14,11 @@
 ///		or implied warranty.
 ///	</remarks>
 
-#include "Announce.h"
-
 #ifdef TEMPEST_MPIOMP
 #include <mpi.h>
 #endif
+
+#include "Announce.h"
 
 #include <cstdio>
 #include <cstring>

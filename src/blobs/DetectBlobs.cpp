@@ -14,6 +14,10 @@
 ///		or implied warranty.
 ///	</remarks>
 
+#if defined(TEMPEST_MPIOMP)
+#include <mpi.h>
+#endif
+
 #include "Variable.h"
 #include "CommandLine.h"
 #include "Exception.h"
@@ -30,10 +34,6 @@
 
 #include <set>
 #include <queue>
-
-#if defined(TEMPEST_MPIOMP)
-#include <mpi.h>
-#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
