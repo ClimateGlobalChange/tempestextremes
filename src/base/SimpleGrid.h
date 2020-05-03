@@ -64,6 +64,28 @@ public:
 	///	</summary>
 	bool IsInitialized() const;
 
+	///	<summary>
+	///		Determine if the SimpleGrid has calculated areas.
+	///	</summary>
+	bool HasAreas() const {
+		if (m_dArea.GetRows() == 0) {
+			return false;
+		}
+		_ASSERT(m_dArea.GetRows() == m_dLon.GetRows());
+		return true;
+	}
+
+	///	<summary>
+	///		Determine if the SimpleGrid has connectivity information.
+	///	</summary>
+	bool HasConnectivity() const {
+		if (m_vecConnectivity.size() == 0) {
+			return false;
+		}
+		_ASSERT(m_vecConnectivity.size() == m_dLon.GetRows());
+		return true;
+	}
+
 public:
 	///	<summary>
 	///		Generate the unstructured grid information for a
@@ -73,7 +95,20 @@ public:
 		const DataArray1D<double> & vecLat,
 		const DataArray1D<double> & vecLon,
 		bool fRegional,
-		bool fVerbose = true
+		bool fDiagonalConnectivity,
+		bool fVerbose
+	);
+
+	///	<summary>
+	///		Try to automatically generate the SimpleGrid from a NetCDF
+	///		file with latitude/longitude coordinates.
+	///	</summary>
+	void GenerateLatitudeLongitude(
+		NcFile * ncFile,
+		const std::string & strLatitudeName,
+		const std::string & strLongitudeName,
+		bool fRegional,
+		bool fDiagonalConnectivity
 	);
 
 	///	<summary>
@@ -83,17 +118,7 @@ public:
 	void GenerateLatitudeLongitude(
 		NcFile * ncFile,
 		bool fRegional,
-		const std::string & strLatitudeName,
-		const std::string & strLongitudeName
-	);
-
-	///	<summary>
-	///		Try to automatically generate the SimpleGrid from a NetCDF
-	///		file with latitude/longitude coordinates.
-	///	</summary>
-	void GenerateLatitudeLongitude(
-		NcFile * ncFile,
-		bool fRegional
+		bool fDiagonalConnectivity
 	);
 
 	///	<summary>
@@ -106,7 +131,8 @@ public:
 		double dLonRad1,
 		double dLonRad2,
 		int nLat,
-		int nLon
+		int nLon,
+		bool fDiagonalConnectivity
 	);
 
 	///	<summary>

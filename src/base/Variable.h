@@ -27,7 +27,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class NcFileVector : public std::vector<NcFile *> {
+class NcFileVector : protected std::vector<NcFile *> {
 
 private:
 	///	<summary>
@@ -59,6 +59,13 @@ public:
 	}
 
 	///	<summary>
+	///		Size of this NcFileVector.
+	///	</summary>
+	size_type size() const {
+		return std::vector<NcFile *>::size();
+	}
+
+	///	<summary>
 	///		Clear the contents of this NcFileVector.
 	///	</summary>
 	void clear() {
@@ -69,11 +76,33 @@ public:
 	}
 
 	///	<summary>
+	///		Populate from a vector of file names.
+	///	</summary>
+	void InsertFile(
+		const std::string & strFile
+	) {
+		NcFile * pNewFile = new NcFile(strFile.c_str());
+		if (pNewFile == NULL) {
+			_EXCEPTIONT("Unable to allocate new NcFile");
+		}
+		if (!pNewFile->is_valid()) {
+			_EXCEPTION1("Cannot open input file \"%s\"", strFile.c_str());
+		}
+		push_back(pNewFile);
+		m_vecFilenames.push_back(strFile);
+	}
+
+	///	<summary>
 	///		Parse from a semi-colon delineated string of file names.
 	///	</summary>
 	void ParseFromString(
-		const std::string & strFiles
+		const std::string & strFiles,
+		bool fAppend = true
 	) {
+		if (!fAppend) {
+			clear();
+		}
+
 		int iLast = 0;
 		for (int i = 0; i <= strFiles.length(); i++) {
 			if ((i == strFiles.length()) ||
@@ -82,14 +111,8 @@ public:
 				std::string strFile =
 					strFiles.substr(iLast, i - iLast);
 
-				NcFile * pNewFile = new NcFile(strFile.c_str());
+				InsertFile(strFile);
 
-				if (!pNewFile->is_valid()) {
-					_EXCEPTION1("Cannot open input file \"%s\"",
-						strFile.c_str());
-				}
-
-				push_back(pNewFile);
 				iLast = i+1;
 			}
 		}
@@ -98,6 +121,7 @@ public:
 			_EXCEPTION1("No input files found in \"%s\"",
 				strFiles.c_str());
 		}
+		_ASSERT(size() == m_vecFilenames.size());
 	}
 
 	///	<summary>
@@ -114,6 +138,28 @@ public:
 		}
 		return end();
 	}
+
+	///	<summary>
+	///		Get the filename at the specified position.
+	///	</summary>
+	const std::string & GetFilename(size_t pos) const {
+		_ASSERT(pos < m_vecFilenames.size());
+		return m_vecFilenames[pos];
+	}
+
+public:
+	///	<summary>
+	///		Accessor.
+	///	</summary>
+	NcFile * operator[](size_type pos) const {
+		return at(pos);
+	}
+
+protected:
+	///	<summary>
+	///		Vector of file names.
+	///	</summary>
+	std::vector<std::string> m_vecFilenames;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -621,23 +667,9 @@ public:
 	);
 
 	///	<summary>
-	///		Save a data block to the given NcFile.
-	///	</summary>
-	void SaveGridData(
-		NcFile * ncfile,
-		const SimpleGrid & grid,
-		long lTime = (-1)
-	);
-
-	///	<summary>
 	///		Unload the current data block.
 	///	</summary>
 	void UnloadGridData();
-
-	///	<summary>
-	///		Reset the auxiliary index iterator.
-	///	</summary>
-	//void ResetAuxIndexIteratora
 
 	///	<summary>
 	///		Get the data associated with this variable.

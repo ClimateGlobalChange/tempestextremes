@@ -64,6 +64,7 @@ void SimpleGrid::GenerateLatitudeLongitude(
 	const DataArray1D<double> & vecLat,
 	const DataArray1D<double> & vecLon,
 	bool fRegional,
+	bool fDiagonalConnectivity,
 	bool fVerbose
 ) {
 	if (IsInitialized()) {
@@ -178,21 +179,71 @@ void SimpleGrid::GenerateLatitudeLongitude(
 
 		m_dArea[ixs] = fabs(sin(dLatRad2) - sin(dLatRad1)) * dDeltaLon;
 
-		// Connectivity in each compass direction
-		if (j != 0) {
-			m_vecConnectivity[ixs].push_back((j-1) * nLon + i);
-		}
-		if (j != nLat-1) {
-			m_vecConnectivity[ixs].push_back((j+1) * nLon + i);
-		}
+		// Connectivity in eight directions
+		if (fDiagonalConnectivity) {
+			if (fRegional) {
+				for (int ix = -1; ix <= 1; ix++) {
+				for (int jx = -1; jx <= 1; jx++) {
+					if ((ix == 0) && (jx == 0)) {
+						continue;
+					}
 
-		if ((!fRegional) ||
-		    ((i != 0) && (i != nLon-1))
-		) {
-			m_vecConnectivity[ixs].push_back(
-				j * nLon + ((i + 1) % nLon));
-			m_vecConnectivity[ixs].push_back(
-				j * nLon + ((i + nLon - 1) % nLon));
+					int inew = i + ix;
+					int jnew = j + jx;
+
+					if ((inew < 0) || (inew >= nLon)) {
+						continue;
+					}
+					if ((jnew < 0) || (jnew >= nLat)) {
+						continue;
+					}
+
+					m_vecConnectivity[ixs].push_back(jnew * nLon + inew);
+				}
+				}
+
+			} else {
+				for (int ix = -1; ix <= 1; ix++) {
+				for (int jx = -1; jx <= 1; jx++) {
+					if ((ix == 0) && (jx == 0)) {
+						continue;
+					}
+
+					int inew = i + ix;
+					int jnew = j + jx;
+
+					if ((jnew < 0) || (jnew >= nLat)) {
+						continue;
+					}
+					if (inew < 0) {
+						inew += nLon;
+					}
+					if (inew >= nLon) {
+						inew -= nLon;
+					}
+
+					m_vecConnectivity[ixs].push_back(jnew * nLon + inew);
+				}
+				}
+			}
+
+		// Connectivity in the four primary directions
+		} else {
+			if (j != 0) {
+				m_vecConnectivity[ixs].push_back((j-1) * nLon + i);
+			}
+			if (j != nLat-1) {
+				m_vecConnectivity[ixs].push_back((j+1) * nLon + i);
+			}
+
+			if ((!fRegional) ||
+			    ((i != 0) && (i != nLon-1))
+			) {
+				m_vecConnectivity[ixs].push_back(
+					j * nLon + ((i + 1) % nLon));
+				m_vecConnectivity[ixs].push_back(
+					j * nLon + ((i + nLon - 1) % nLon));
+			}
 		}
 
 		ixs++;
@@ -206,7 +257,7 @@ void SimpleGrid::GenerateLatitudeLongitude(
 			dTotalArea += m_dArea[i];
 		}
 		if (fVerbose) {
-			Announce("Total calculated area: %1.15e", dTotalArea);
+			Announce("Total calculated grid area: %1.15e", dTotalArea);
 		}
 	}
 
@@ -216,9 +267,10 @@ void SimpleGrid::GenerateLatitudeLongitude(
 
 void SimpleGrid::GenerateLatitudeLongitude(
 	NcFile * ncFile,
-	bool fRegional,
 	const std::string & strLatitudeName,
-	const std::string & strLongitudeName
+	const std::string & strLongitudeName,
+	bool fRegional,
+	bool fDiagonalConnectivity
 ) {
 	if (IsInitialized()) {
 		_EXCEPTIONT("Attempting to call GenerateLatitudeLongitude() on previously initialized grid");
@@ -266,16 +318,28 @@ void SimpleGrid::GenerateLatitudeLongitude(
 	}
 
 	// Generate the SimpleGrid
-	GenerateLatitudeLongitude(vecLat, vecLon, fRegional);
+	GenerateLatitudeLongitude(
+		vecLat,
+		vecLon,
+		fRegional,
+		fDiagonalConnectivity,
+		true);                  // Verbosity enabled
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void SimpleGrid::GenerateLatitudeLongitude(
 	NcFile * ncFile,
-	bool fRegional
+	bool fRegional,
+	bool fDiagonalConnectivity
 ) {
-	return GenerateLatitudeLongitude(ncFile, fRegional, "lat", "lon");
+	return
+		GenerateLatitudeLongitude(
+			ncFile,
+			"lat",
+			"lon",
+			fRegional,
+			fDiagonalConnectivity);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -286,7 +350,8 @@ void SimpleGrid::GenerateRegionalLatitudeLongitude(
 	double dLonRad1,
 	double dLonRad2,
 	int nLat,
-	int nLon
+	int nLon,
+	bool fDiagonalConnectivity
 ) {
 	_ASSERT(nLat >= 1);
 	_ASSERT(nLon >= 1);
@@ -319,8 +384,9 @@ void SimpleGrid::GenerateRegionalLatitudeLongitude(
 	GenerateLatitudeLongitude(
 		vecLat,
 		vecLon,
-		true,     // Regional
-		false);   // Verbosity disabled
+		true,                   // Regional
+		fDiagonalConnectivity,
+		false);                 // Verbosity disabled
 }
 
 ///////////////////////////////////////////////////////////////////////////////

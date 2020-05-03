@@ -228,15 +228,7 @@ bool AutoCurator::FindFilesAtTime(
 	iTime = (-1);
 
 	for (int i = 0; i < vec.size(); i++) {
-		NcFile * pncfile = new NcFile(vec[i].first.c_str());
-		if (pncfile == NULL) {
-			_EXCEPTIONT("Unable to allocate new NcFile");
-		}
-		if (!pncfile->is_valid()) {
-			_EXCEPTION1("Unable to open data file \"%s\"", vec[i].first.c_str());
-		}
-
-		vecncDataFiles.push_back(pncfile);
+		vecncDataFiles.InsertFile(vec[i].first.c_str());
 
 		if (iTime == (-1)) {
 			iTime = vec[i].second;

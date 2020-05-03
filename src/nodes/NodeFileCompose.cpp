@@ -197,6 +197,9 @@ try {
 	// Data is regional
 	bool fRegional;
 
+	// Diagonal connectivity for RLL grids
+	bool fDiagonalConnectivity;
+
 	// Output grid type
 	std::string strOutputGrid;
 
@@ -248,6 +251,7 @@ try {
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineBool(fDiagonalConnectivity, "diag_connect");
 		CommandLineBool(fRegional, "regional");
 
 		CommandLineStringD(strOutputGrid, "out_grid", "XY", "[XY|RAD|RLL]");
@@ -263,8 +267,8 @@ try {
 		CommandLineDouble(dDeltaXDeg, "dx", 0.5);
 		CommandLineInt(nResolutionX, "resx", 11);
 		CommandLineInt(nResolutionA, "resa", 16);
-		CommandLineDouble(dFixedLongitudeDeg, "fixlon", -999.);
 		CommandLineDouble(dFixedLatitudeDeg, "fixlat", -999.);
+		CommandLineDouble(dFixedLongitudeDeg, "fixlon", -999.);
 
 		CommandLineString(strLatitudeName, "latname", "lat");
 		CommandLineString(strLongitudeName, "lonname", "lon");
@@ -540,9 +544,10 @@ try {
 
 		grid.GenerateLatitudeLongitude(
 			&ncFile,
-			fRegional,
 			strLatitudeName,
-			strLongitudeName);
+			strLongitudeName,
+			fRegional,
+			fDiagonalConnectivity);
 
 		if (grid.m_nGridDim.size() != 2) {
 			_EXCEPTIONT("Logic error when generating connectivity");
@@ -887,7 +892,8 @@ try {
 							dPathNodeLonRad - dHalfWidth,
 							dPathNodeLonRad + dHalfWidth,
 							nResolutionX,
-							nResolutionX);
+							nResolutionX,
+							fDiagonalConnectivity);
 					}
 
 					// Only calculate the mean

@@ -23,6 +23,7 @@
 #include "Exception.h"
 #include "Announce.h"
 #include "SimpleGrid.h"
+#include "BlobUtilities.h"
 
 #include "DataArray1D.h"
 #include "DataArray2D.h"
@@ -509,41 +510,6 @@ void ApplyFilters(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-///	<summary>
-///		Parse the list of input files.
-///	</summary>
-void ParseInputFiles(
-	const std::string & strInputFile,
-	std::vector<NcFile *> & vecFiles
-) {
-	int iLast = 0;
-	for (int i = 0; i <= strInputFile.length(); i++) {
-		if ((i == strInputFile.length()) ||
-		    (strInputFile[i] == ';')
-		) {
-			std::string strFile =
-				strInputFile.substr(iLast, i - iLast);
-
-			NcFile * pNewFile = new NcFile(strFile.c_str());
-
-			if (!pNewFile->is_valid()) {
-				_EXCEPTION1("Cannot open input file \"%s\"",
-					strFile.c_str());
-			}
-
-			vecFiles.push_back(pNewFile);
-			iLast = i+1;
-		}
-	}
-
-	if (vecFiles.size() == 0) {
-		_EXCEPTION1("No input files found in \"%s\"",
-			strInputFile.c_str());
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 class DetectBlobsParam {
 
 public:
@@ -556,6 +522,7 @@ public:
 		dMinLat(-90.0),
 		dMaxLat(90.0),
 		fRegional(false),
+		fDiagonalConnectivity(false),
 		iVerbosityLevel(0),
 		strTagVar("binary_tag"),
 		strLongitudeName("lon"),
@@ -580,6 +547,9 @@ public:
 
 	// Regional (do not wrap longitudinal boundaries)
 	bool fRegional;
+
+	// Diagonal connectivity for RLL grids
+	bool fDiagonalConnectivity;
 
 	// Verbosity level
 	int iVerbosityLevel;
@@ -644,8 +614,7 @@ void DetectBlobs(
 
 	// Load in the benchmark file
 	NcFileVector vecFiles;
-
-	ParseInputFiles(strInputFiles, vecFiles);
+	vecFiles.ParseFromString(strInputFiles);
 
 	// Check for connectivity file
 	if (strConnectivity != "") {
@@ -698,7 +667,12 @@ void DetectBlobs(
 		}
 
 		// Generate the SimpleGrid
-		grid.GenerateLatitudeLongitude(vecLat, vecLon, param.fRegional);
+		grid.GenerateLatitudeLongitude(
+			vecLat,
+			vecLon,
+			param.fRegional,
+			param.fDiagonalConnectivity,
+			true);
 	}
 
 	// Get time dimension
@@ -789,13 +763,31 @@ void DetectBlobs(
 	}*/
 
 	// Create output variable
+	NcDim * dim0 = NULL;
+	NcDim * dim1 = NULL;
+	NcVar * varTag = NULL;
+
+	PrepareBlobOutputVar(
+		ncInput,
+		ncOutput,
+		strOutputFile,
+		grid,
+		param.strTagVar,
+		param.strLatitudeName,
+		param.strLongitudeName,
+		ncByte,
+		dimTimeOut,
+		&dim0,
+		&dim1,
+		&varTag);
+
+	_ASSERT(varTag != NULL);
+	
+
+/*
 	CopyNcVarIfExists(ncInput, ncOutput, param.strLatitudeName, true);
 	CopyNcVarIfExists(ncInput, ncOutput, param.strLongitudeName, true);
 
-	NcDim * dim0 = NULL;
-	NcDim * dim1 = NULL;
-
-	NcVar * varTag = NULL;
 
 	if (grid.m_nGridDim.size() == 1) {
 		dim0 = ncOutput.get_dim("ncol");
@@ -864,7 +856,7 @@ void DetectBlobs(
 	}
 
 	_ASSERT(varTag != NULL);
-
+*/
 	AnnounceEndBlock("Done");
 
 	// Tagged cell array
@@ -1084,7 +1076,7 @@ try {
 	std::string strConnectivity;
 
 	// Output file
-	std::string strOutput;
+	std::string strOutputFile;
 
 	// Output file list
 	std::string strOutputFileList;
@@ -1103,8 +1095,9 @@ try {
 		CommandLineString(strInputFile, "in_data", "");
 		CommandLineString(strInputFileList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
-		CommandLineString(strOutput, "out", "");
-		CommandLineString(strOutputFileList, "out_file_list", "");
+		CommandLineBool(dbparam.fDiagonalConnectivity, "diag_connect");
+		CommandLineString(strOutputFile, "out", "");
+		CommandLineString(strOutputFileList, "out_list", "");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
 		CommandLineStringD(strFilterCmd, "filtercmd", "", "[var,op,value,count]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,name;...]");
@@ -1139,8 +1132,8 @@ try {
 	}
 
 	// Check output
-	if ((strOutput.length() != 0) && (strOutputFileList.length() != 0)) {
-		_EXCEPTIONT("Only one of (--out) or (--out_data_list)"
+	if ((strOutputFile.length() != 0) && (strOutputFileList.length() != 0)) {
+		_EXCEPTIONT("Only one of (--out) or (--out_list)"
 			" may be specified");
 	}
 
@@ -1291,11 +1284,11 @@ try {
 	if (vecInputFiles.size() != 1) {
 		if (vecOutputFiles.size() != 0) {
 			Announce("Output will be written following --out_file_list");
-		} else if (strOutput == "") {
+		} else if (strOutputFile == "") {
 			Announce("Output will be written to outXXXXXX.dat");
 		} else {
 			Announce("Output will be written to %sXXXXXX.dat",
-				strOutput.c_str());
+				strOutputFile.c_str());
 		}
 		Announce("Logs will be written to logXXXXXX.txt");
 	}
@@ -1308,14 +1301,11 @@ try {
 		}
 #endif
 		// Generate output file name
-		std::string strOutputFile;
 		if (vecInputFiles.size() == 1) {
 			dbparam.fpLog = stdout;
 
-			if (strOutput == "") {
+			if (strOutputFile == "") {
 				strOutputFile = "out.dat";
-			} else {
-				strOutputFile = strOutput;
 			}
 
 		} else {
@@ -1325,12 +1315,12 @@ try {
 			if (vecOutputFiles.size() != 0) {
 				strOutputFile = vecOutputFiles[f];
 			} else {
-				if (strOutput == "") {
+				if (strOutputFile == "") {
 					strOutputFile =
 						"out" + std::string(szFileIndex) + ".dat";
 				} else {
 					strOutputFile =
-						strOutput + std::string(szFileIndex) + ".dat";
+						strOutputFile + std::string(szFileIndex) + ".dat";
 				}
 			}
 

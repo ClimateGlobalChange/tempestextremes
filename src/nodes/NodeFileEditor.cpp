@@ -1134,6 +1134,9 @@ try {
 	// Connectivity file
 	std::string strConnectivity;
 
+	// Diagonal connectivity for RLL grids
+	bool fDiagonalConnectivity;
+
 	// Data is regional
 	bool fRegional;
 
@@ -1178,6 +1181,7 @@ try {
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineBool(fDiagonalConnectivity, "diag_connect");
 		CommandLineBool(fRegional, "regional");
 
 		CommandLineString(strInputFormat, "in_fmt", "");
@@ -1363,9 +1367,10 @@ try {
 
 		grid.GenerateLatitudeLongitude(
 			&ncFile,
-			fRegional,
 			strLatitudeName,
-			strLongitudeName);
+			strLongitudeName,
+			fRegional,
+			fDiagonalConnectivity);
 
 		if (grid.m_nGridDim.size() != 2) {
 			_EXCEPTIONT("Logic error when generating connectivity");

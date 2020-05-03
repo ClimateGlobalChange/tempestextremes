@@ -105,6 +105,13 @@ public:
 		const Time & time
 	) const;
 
+	///	<summary>
+	///		Get the total count of time slices.
+	///	</summary>
+	size_t GetTimeCount() const {
+		return m_mapTimeToTimeFileIx.size();
+	}
+
 public:
 	///	<summary>
 	///		Generate a NcFileVector and local time index for the given Time.

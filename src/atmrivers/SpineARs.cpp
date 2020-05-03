@@ -36,41 +36,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 typedef std::pair<int, int> Point;
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Parse the list of input files.
-///	</summary>
-void ParseInputFiles(
-	const std::string & strInputFile,
-	std::vector<NcFile *> & vecFiles
-) {
-	int iLast = 0;
-	for (int i = 0; i <= strInputFile.length(); i++) {
-		if ((i == strInputFile.length()) ||
-		    (strInputFile[i] == ';')
-		) {
-			std::string strFile =
-				strInputFile.substr(iLast, i - iLast);
-
-			NcFile * pNewFile = new NcFile(strFile.c_str());
-
-			if (!pNewFile->is_valid()) {
-				_EXCEPTION1("Cannot open input file \"%s\"",
-					strFile.c_str());
-			}
-
-			vecFiles.push_back(pNewFile);
-			iLast = i+1;
-		}
-	}
-
-	if (vecFiles.size() == 0) {
-		_EXCEPTION1("No input files found in \"%s\"",
-			strInputFile.c_str());
-	}
-}
 /*
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -717,17 +682,17 @@ void SpineARs(
 
 	// Load in the benchmark file
 	NcFileVector vecFiles;
-
-	ParseInputFiles(strInputFiles, vecFiles);
+	vecFiles.ParseFromString(strInputFiles);
 
 	// Define the SimpleGrid
 	SimpleGrid grid;
 	if (fVerbose) AnnounceStartBlock("Generating RLL grid data");
 	grid.GenerateLatitudeLongitude(
 		vecFiles[0],
-		param.fRegional,
 		param.strLatitudeName,
-		param.strLongitudeName);
+		param.strLongitudeName,
+		param.fRegional,
+		false); // No diagonal connectivity
 	if (fVerbose) AnnounceEndBlock("Done");
 
 	// Get the time dimension

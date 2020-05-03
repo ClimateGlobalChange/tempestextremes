@@ -688,6 +688,9 @@ try {
 	// Data is regional
 	bool fRegional;
 
+	// Diagonal connectivity for RLL grids
+	bool fDiagonalConnectivity;
+
 	// Output data file
 	std::string strOutputData;
 
@@ -726,6 +729,7 @@ try {
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineBool(fDiagonalConnectivity, "diag_connect");
 		CommandLineBool(fRegional, "regional");
 
 		CommandLineString(strOutputData, "out_data", "");
@@ -968,7 +972,10 @@ try {
 			_EXCEPTION1("Unable to open NetCDF file \"%s\"", vecInputFileList[0].c_str());
 		}
 
-		grid.GenerateLatitudeLongitude(&ncFile, fRegional);
+		grid.GenerateLatitudeLongitude(
+			&ncFile,
+			fRegional,
+			fDiagonalConnectivity);
 
 		if (grid.m_nGridDim.size() != 2) {
 			_EXCEPTIONT("Logic error when generating connectivity");

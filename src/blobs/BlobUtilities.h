@@ -23,6 +23,7 @@
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
+#include "SimpleGrid.h"
 
 #include <vector>
 #include <map>
@@ -76,9 +77,115 @@ struct LatLonPair {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void PrepareBlobOutputVar(
+	NcFile & ncInput,
+	NcFile & ncOutput,
+	const std::string & strOutputFile,
+	const SimpleGrid & grid,
+	const std::string & strTagVar,
+	const std::string & strLatitudeName,
+	const std::string & strLongitudeName,
+	NcType nctype,
+	NcDim * dimTime,
+	NcDim ** pdim0,
+	NcDim ** pdim1,
+	NcVar ** pvarTag
+) {
+	_ASSERT(pdim0 != NULL);
+	_ASSERT(pdim1 != NULL);
+	_ASSERT(pvarTag != NULL);
+
+	NcDim * dim0 = NULL;
+	NcDim * dim1 = NULL;
+	NcVar * varTag = NULL;
+
+	// Copy latitude and longitude arrays
+	CopyNcVarIfExists(ncInput, ncOutput, strLatitudeName, true);
+	CopyNcVarIfExists(ncInput, ncOutput, strLongitudeName, true);
+
+	// Allocate tag variable (unstructured grids)
+	if (grid.m_nGridDim.size() == 1) {
+		dim0 = ncOutput.get_dim("ncol");
+		if (dim0 == NULL) {
+			dim0 = ncOutput.add_dim("ncol", grid.GetSize());
+		}
+		if (dim0 == NULL) {
+			_EXCEPTION1("Error creating dim \"ncol\" in file \"%s\"",
+				strOutputFile.c_str());
+		}
+		if (dim0->size() != grid.GetSize()) {
+			_EXCEPTION4("Dimension \"%s\" in file \"%s\" has inconsistent length (%i vs %i)",
+				dim0->name(),
+				strOutputFile.c_str(),
+				dim0->size(),
+				grid.GetSize());
+		}
+
+		if (dimTime != NULL) {
+			varTag = ncOutput.add_var(
+				strTagVar.c_str(),
+				nctype,
+				dimTime,
+				dim0);
+
+		} else {
+			varTag = ncOutput.add_var(
+				strTagVar.c_str(),
+				nctype,
+				dim0);
+		}
+
+	// Allocate tag variable (latitude-longitude grids)
+	} else if (grid.m_nGridDim.size() == 2) {
+
+		// Copy over latitude and longitude variable
+		dim0 = ncOutput.get_dim(strLatitudeName.c_str());
+		if (dim0 == NULL) {
+			_EXCEPTION1("Error copying variable \"%s\" to output file",
+				strLatitudeName.c_str());
+		}
+		dim1 = ncOutput.get_dim(strLongitudeName.c_str());
+		if (dim1 == NULL) {
+			_EXCEPTION1("Error copying variable \"%s\" to output file",
+				strLongitudeName.c_str());
+		}
+
+		// Create output tag
+		if (dimTime != NULL) {
+			varTag = ncOutput.add_var(
+				strTagVar.c_str(),
+				nctype,
+				dimTime,
+				dim0,
+				dim1);
+
+		} else {
+			varTag = ncOutput.add_var(
+				strTagVar.c_str(),
+				nctype,
+				dim0,
+				dim1);
+		}
+
+	} else {
+		_EXCEPTIONT("Invalid grid dimension -- value must be 1 or 2");
+	}
+
+	_ASSERT(varTag != NULL);
+
+	(*pdim0) = dim0;
+	(*pdim1) = dim1;
+	(*pvarTag) = varTag;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 ///	<summary>
 ///		A structure for storing a bounding box in latitude / longitude space.
+///		The box is treated as singularly periodic in the longitudinal direction
+///		if lon_periodic is set to true.
 ///	</summary>
+template <typename Type>
 class LatLonBox {
 
 public:
@@ -88,96 +195,138 @@ public:
 	bool is_null;
 
 	///	<summary>
-	///		Bounding latitudes (endpoints are included).
-	///	</summar>
-	int lat[2];
+	///		Flag indicating this is a regional.
+	///	</summary>
+	bool lon_periodic;
+
+	///	<summary>
+	///		Width of the longitude variable.
+	///	</summary>
+	Type lon_width;
 
 	///	<summary>
 	///		Bounding longitudes (endpoints are included).
 	///	</summary>
-	int lon[2];
+	Type lon[2];
+
+	///	<summary>
+	///		Bounding latitudes (endpoints are included).
+	///	</summar>
+	Type lat[2];
 
 public:
 	///	<summary>
 	///		Constructor.
 	///	</summary>
-	LatLonBox() :
-		is_null(true)
-	{ }
+	LatLonBox(
+		bool a_lon_periodic = true,
+		Type a_lon_width = static_cast<Type>(360)
+	) :
+		is_null(true),
+		lon_periodic(a_lon_periodic),
+		lon_width(a_lon_width)
+	{
+		lon[0] = static_cast<Type>(0);
+		lon[1] = static_cast<Type>(0);
+		lat[0] = static_cast<Type>(0);
+		lat[1] = static_cast<Type>(0);
+	}
 
 	///	<summary>
 	///		Width of this LatLonBox.
 	///	</summary>
-	int Width(
-		int nLonCount
-	) const {
+	Type width() const {
 		if (is_null) {
 			return 0;
 		}
 
-		if (lon[0] == lon[1]) {
-			return (1);
+		if (!lon_periodic) {
+			return (lon[1] - lon[0]);
+		}
 
+		if (lon[0] == lon[1]) {
+			return static_cast<Type>(0);
 		} else if (lon[0] <= lon[1]) {
-			return (lon[1] - lon[0] + 1);
+			return (lon[1] - lon[0]);
 		} else {
-			return (lon[1] - lon[0] + nLonCount + 1);
+			return (lon[1] - lon[0] + lon_width);
 		}
 	}
 
 	///	<summary>
 	///		Insert a point into this LatLonBox.
 	///	</summary>
-	void InsertPoint(
-		int iLat,
-		int iLon,
-		int nLatCount,
-		int nLonCount
+	void insert(
+		const Type & lat_pt,
+		const Type & lon_pt
 	) {
 		if (is_null) {
 			is_null = false;
-			lat[0] = iLat;
-			lat[1] = iLat;
-			lon[0] = iLon;
-			lon[1] = iLon;
+			lat[0] = lat_pt;
+			lat[1] = lat_pt;
+			lon[0] = lon_pt;
+			lon[1] = lon_pt;
 			return;
+		}
+		if (lon_pt < static_cast<Type>(0)) {
+			std::stringstream strError;
+			strError << "lon_pt out of range (" << lon_pt << " < 0)" << std::endl;
+			_EXCEPTIONT(strError.str().c_str());
+		}
+		if (lon_pt > lon_width) {
+			std::stringstream strError;
+			strError << "lon_pt out of range (" << lon_pt << " > ";
+			strError << lon_width << ")" << std::endl;
+			_EXCEPTIONT(strError.str().c_str());
 		}
 
 		// Expand latitudes
-		if (iLat > lat[1]) {
-			lat[1] = iLat;
+		if (lat_pt > lat[1]) {
+			lat[1] = lat_pt;
 		}
-		if (iLat < lat[0]) {
-			lat[0] = iLat;
+		if (lat_pt < lat[0]) {
+			lat[0] = lat_pt;
+		}
+
+		// Expand longitude, if non-periodic
+		if (!lon_periodic) {
+			if (lon_pt > lon[1]) {
+				lon[1] = lon_pt;
+			}
+			if (lon_pt < lon[0]) {
+				lon[0] = lon_pt;
+			}
+			return;
 		}
 
 		// New longitude lies within existing range
 		if (lon[0] <= lon[1]) {
-			if ((iLon >= lon[0]) && (iLon <= lon[1])) {
+			if ((lon_pt >= lon[0]) && (lon_pt <= lon[1])) {
 				return;
 			}
 		} else {
-			if ((iLon >= lon[0]) || (iLon <= lon[1])) {
+			if ((lon_pt >= lon[0]) || (lon_pt <= lon[1])) {
 				return;
 			}
 		}
 
 		// New longitude lies outside of existing range
 		LatLonBox boxA(*this);
-		boxA.lon[0] = iLon;
+		boxA.lon[0] = lon_pt;
 
 		LatLonBox boxB(*this);
-		boxB.lon[1] = iLon;
+		boxB.lon[1] = lon_pt;
 
-		int iWidthNow = Width(nLonCount);
-		int iWidthA = boxA.Width(nLonCount);
-		int iWidthB = boxB.Width(nLonCount);
+		// The updated box is the box of minimum width
+		Type dWidthNow = width();
+		Type dWidthA = boxA.width();
+		Type dWidthB = boxB.width();
 
-		if ((iWidthA < iWidthNow) || (iWidthB < iWidthNow)) {
+		if ((dWidthA < dWidthNow) || (dWidthB < dWidthNow)) {
 			_EXCEPTIONT("Logic error");
 		}
 
-		if (iWidthA < iWidthB) {
+		if (dWidthA < dWidthB) {
 			(*this) = boxA;
 		} else {
 			(*this) = boxB;
@@ -185,124 +334,68 @@ public:
 	}
 
 	///	<summary>
-	///		Determine this LatLonBox overlaps with box.
+	///		Determine if this LatLonBox contains the given point.
 	///	</summary>
-	bool Overlaps(const LatLonBox & box) const {
-
-		// Check latitudes
-		if (lat[0] > box.lat[1]) {
-			return false;
-		}
-		if (lat[1] < box.lat[0]) {
-			return false;
-		}
-
-		// Both boxes cross lon 360
-		if ((lon[0] > lon[1]) && (box.lon[0] > box.lon[1])) {
-			return true;
-		}
-
-		// This box crosses lon 360
-		if (lon[0] > lon[1]) {
-			if (box.lon[1] >= lon[0]) {
-				return true;
-			}
-			if (box.lon[0] <= lon[1]) {
-				return true;
-			}
-			return false;
-		}
-
-		// That box crosses lon 360
-		if (box.lon[0] > box.lon[1]) {
-			if (lon[1] >= box.lon[0]) {
-				return true;
-			}
-			if (lon[0] <= box.lon[1]) {
-				return true;
-			}
-			return false;
-		}
-
-		// No boxes cross lon 360
-		if (box.lon[1] < lon[0]) {
-			return false;
-		}
-		if (box.lon[0] > lon[1]) {
-			return false;
-		}
-		return true;
-	}
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		A structure for storing a bounding box in latitude / longitude space.
-///	</summary>
-class LatLonRegion {
-
-public:
-	///	<summary>
-	///		Flag indicating this is a null box.
-	///	</summary>
-	bool is_null;
-
-	///	<summary>
-	///		Bounding latitudes (endpoints are included).
-	///	</summar>
-	double lat[2];
-
-	///	<summary>
-	///		Bounding longitudes (endpoints are included).
-	///	</summary>
-	double lon[2];
-
-public:
-	///	<summary>
-	///		Constructor.
-	///	</summary>
-	LatLonRegion() :
-		is_null(true)
-	{ }
-
-	///	<summary>
-	///		Determine if this point is within the box.
-	///	</summary>
-	bool ContainsPoint(
-		double dLat,
-		double dLon
+	bool contains(
+		const Type & lat_pt,
+		const Type & lon_pt
 	) {
-		if (lat[0] > lat[1]) {
-			_EXCEPTIONT("lat[0] > lat[1] not allowed");
-		}
-
-		if (dLat < lat[0]) {
+		// Check latitudes
+		if (lat[0] > lat_pt) {
 			return false;
 		}
-		if (dLat > lat[1]) {
+		if (lat[1] < lat_pt) {
 			return false;
 		}
-		if (lon[1] >= lon[0]) {
-			if (dLon < lon[0]) {
-				return false;
-			}
-			if (dLon > lon[1]) {
-				return false;
-			}
 
-		} else {
-			if ((dLon > lon[1]) && (dLon < lon[0])) {
+		// Check longitudes, if non-periodic
+		if (!lon_periodic) {
+			if (lon[0] > lon_pt) {
 				return false;
 			}
+			if (lon[1] < lon_pt) {
+				return false;
+			}
+			return true;
 		}
-		return true;
+
+		// This box crosses lon 360
+		if (lon[0] > lon[1]) {
+			if (lon_pt >= lon[0]) {
+				return true;
+			}
+			if (lon_pt <= lon[1]) {
+				return true;
+			}
+			return false;
+		}
+
+		// This box does not cross lon 360
+		if ((lon_pt >= lon[0]) && (lon_pt <= lon[1])) {
+			return true;
+		}
+		return false;
 	}
 
 	///	<summary>
-	///		Determine this LatLonBox overlaps with box.
+	///		Determine if this LatLonBox overlaps with box.
 	///	</summary>
-	bool Overlaps(const LatLonRegion & box) const {
+	bool overlaps(
+		const LatLonBox<Type> & box
+	) const {
+
+		// Check flags
+		if ((is_null) || (box.is_null)) {
+			return false;
+		}
+		if (lon_periodic != box.lon_periodic) {
+			_EXCEPTION2("Inconsistent periodicity flag (%s/%s)",
+				(lon_periodic)?("true"):("false"),
+				(box.lon_periodic)?("true"):("false"));
+		}
+		if (lon_width != box.lon_width) {
+			_EXCEPTIONT("Inconsistent box lon_width in comparison");
+		}
 
 		// Check latitudes
 		if (lat[0] > box.lat[1]) {
@@ -312,31 +405,35 @@ public:
 			return false;
 		}
 
-		// Both boxes cross lon 360
-		if ((lon[0] > lon[1]) && (box.lon[0] > box.lon[1])) {
-			return true;
-		}
+		// Cases when longitude is periodic
+		if (lon_periodic) {
 
-		// This box crosses lon 360
-		if (lon[0] > lon[1]) {
-			if (box.lon[1] >= lon[0]) {
+			// Both boxes cross lon 360
+			if ((lon[0] > lon[1]) && (box.lon[0] > box.lon[1])) {
 				return true;
 			}
-			if (box.lon[0] <= lon[1]) {
-				return true;
-			}
-			return false;
-		}
 
-		// That box crosses lon 360
-		if (box.lon[0] > box.lon[1]) {
-			if (lon[1] >= box.lon[0]) {
-				return true;
+			// This box crosses lon 360
+			if (lon[0] > lon[1]) {
+				if (box.lon[1] >= lon[0]) {
+					return true;
+				}
+				if (box.lon[0] <= lon[1]) {
+					return true;
+				}
+				return false;
 			}
-			if (lon[0] <= box.lon[1]) {
-				return true;
+
+			// That box crosses lon 360
+			if (box.lon[0] > box.lon[1]) {
+				if (lon[1] >= box.lon[0]) {
+					return true;
+				}
+				if (lon[0] <= box.lon[1]) {
+					return true;
+				}
+				return false;
 			}
-			return false;
 		}
 
 		// No boxes cross lon 360

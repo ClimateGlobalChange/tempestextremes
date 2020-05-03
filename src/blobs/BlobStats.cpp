@@ -60,7 +60,7 @@ struct BlobQuantities {
 	///	<summary>
 	///		Latitude-longitude bounding box for blob.
 	///	</summary>
-	LatLonBox box;
+	LatLonBox<double> box;
 
 	///	<summary>
 	///		Total area of blob.
@@ -436,7 +436,7 @@ try {
 				}
 */
 				// Insert point into array
-				iterBlobQuantities->second.box.InsertPoint(j, i, nLat, nLon);
+				iterBlobQuantities->second.box.insert(dataLat[j], dataLon[i]);
 
 				// Add blob area
 				iterBlobQuantities->second.dArea +=
@@ -477,10 +477,10 @@ try {
 					for (int i = 0; i < vecOutputVars.size(); i++) {
 
 						// Bounding box coordinates
-						double dLat0 = dataLatDeg[quants.box.lat[0]];
-						double dLat1 = dataLatDeg[quants.box.lat[1]];
-						double dLon0 = dataLonDeg[quants.box.lon[0]];
-						double dLon1 = dataLonDeg[quants.box.lon[1]];
+						double dLat0 = quants.box.lat[0];
+						double dLat1 = quants.box.lat[1];
+						double dLon0 = quants.box.lon[0];
+						double dLon1 = quants.box.lon[1];
 
 						// Minimum latitude
 						if (vecOutputVars[i] == BlobQuantities::MinLat) {
