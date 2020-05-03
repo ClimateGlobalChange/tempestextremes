@@ -1,30 +1,20 @@
-# Copyright (c) 2016      Bryce Adelstein-Lelbach aka wash
-# Copyright (c) 2000-2016 Paul Ullrich 
+# Copyright (c) 2020 Paul Ullrich 
 #
 # Distributed under the Boost Software License, Version 1.0. (See accompanying 
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-# Mac OS X (Paul's Laptop)
+# Mac OSX (Darwin)
 
+# C++ compiler without and with MPI
 CXX=               g++
-F90=               gfortran
 MPICXX=            mpic++
-MPIF90=            mpif90
 
-F90_RUNTIME=       -lgfortran
+# Additional C++ command line flags
 
-CXXFLAGS+= -DTEMPEST_NOREGEX
-
-# NetCDF
+# NetCDF C library arguments
 NETCDF_ROOT=       /opt/local
 NETCDF_CXXFLAGS=   -I$(NETCDF_ROOT)/include
 NETCDF_LIBRARIES=  -lnetcdf -lnetcdf_c++
-#NETCDF_LDFLAGS=    -L$(NETCDF_ROOT)/lib
 NETCDF_LDFLAGS=    -L$(NETCDF_ROOT)/lib -Wl,-rpath,$(NETCDF_CXX_ROOT)/lib
-# LAPACK (Mac OS X Accelerate Framework)
-LAPACK_INTERFACE=  FORTRAN
-LAPACK_CXXFLAGS=
-LAPACK_LIBRARIES=  
-LAPACK_LDFLAGS=    -framework accelerate
 
 # DO NOT DELETE
