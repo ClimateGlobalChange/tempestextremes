@@ -608,6 +608,9 @@ try {
 	// Time variable units
 	std::string strOutTimeUnits;
 
+	// Verbose output
+	bool fVerbose;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -635,6 +638,7 @@ try {
 		//CommandLineString(strTimeName, "timename", "time");
 		CommandLineString(strOutTimeUnits,"outtimeunits","");
 		CommandLineString(strThresholdCmd, "thresholdcmd", "");
+		CommandLineBool(fVerbose, "verbose");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -1077,13 +1081,15 @@ try {
 					x, nRejectedThreshold[x]);
 			}
 
-			for (int p = 0; p < vecBlobBoxesDeg.size(); p++) {
-				Announce("Blob %i [%1.5f, %1.5f] x [%1.5f, %1.5f]",
-					p+1,
-					vecBlobBoxesDeg[p].lat[0],
-					vecBlobBoxesDeg[p].lat[1],
-					vecBlobBoxesDeg[p].lon[0],
-					vecBlobBoxesDeg[p].lon[1]);
+			if (fVerbose) {
+				for (int p = 0; p < vecBlobBoxesDeg.size(); p++) {
+					Announce("Blob %i [%1.5f, %1.5f] x [%1.5f, %1.5f]",
+						p+1,
+						vecBlobBoxesDeg[p].lat[0],
+						vecBlobBoxesDeg[p].lat[1],
+						vecBlobBoxesDeg[p].lon[0],
+						vecBlobBoxesDeg[p].lon[1]);
+				}
 			}
 
 			AnnounceEndBlock("Done");
@@ -1096,7 +1102,7 @@ try {
 	// Stitch blobs together in time using graph search
 	///////////////////////////////////////////////////////////////////////////
 
-	AnnounceStartBlock("Stitching Blobs");
+	AnnounceStartBlock("Assign local tags to each blob");
 
 	// Tags for each blob at each time slice
 	std::vector< std::vector<Tag> > vecAllBlobTags;
@@ -1121,6 +1127,8 @@ try {
 		tagNextBlob.time++;
 	}
 
+	AnnounceEndBlock("Done");
+
 	// Array of equivalent tags
 	typedef std::multimap<Tag, Tag> MapGraph;
 	typedef MapGraph::const_iterator MapGraphConstIterator;
@@ -1131,8 +1139,30 @@ try {
 	// Set of Tags that are within the restrict region
 	std::set<Tag> setRestrictRegion;
 
+	AnnounceStartBlock("Building connectivity graph");
+
 	// Loop through all remaining time steps
+	int iFileLocal = 0;
+	int iTimeLocal = 0;
 	for (int t = 1; t < nGlobalTimes; t++) {
+
+		// New announcement block for timestep
+		if (vecGlobalTimes.size() == 1) {
+			_ASSERT((t >= 0) && (t < vecGlobalTimes[0].size()));
+			Announce("Time %i (%s)", t,
+				vecGlobalTimes[0][t].ToString().c_str());
+		} else {
+			iTimeLocal++;
+			_ASSERT(iFileLocal < vecGlobalTimes.size());
+			if (iTimeLocal >= vecGlobalTimes[iFileLocal].size()) {
+				iTimeLocal = 0;
+				iFileLocal++;
+				_ASSERT(iFileLocal < vecGlobalTimes.size());
+			}
+			_ASSERT(iTimeLocal < vecGlobalTimes[iFileLocal].size());
+			Announce("Time %i (%s)", t,
+				vecGlobalTimes[iFileLocal][iTimeLocal].ToString().c_str());
+		}
 
 		// Get the current blob vector
 		const std::vector<Tag> & vecPrevBlobTags = vecAllBlobTags[t-1];
@@ -1270,6 +1300,10 @@ try {
 		}
 	}
 
+	AnnounceEndBlock("Done");
+
+	AnnounceStartBlock("Identify cliques in connectivity graph");
+
 	// Total number of blobs
 	int nTotalBlobCount = 0;
 
@@ -1371,7 +1405,11 @@ try {
 		}
 	}
 
+	AnnounceEndBlock("Done");
+
 	// Merge blobs at each time step with equivalent tags
+	AnnounceStartBlock("Reassign blob tags");
+
 	for (int t = 0; t < nGlobalTimes; t++) {
 
 		std::vector<Tag> & vecBlobTags = vecAllBlobTags[t];
@@ -1386,7 +1424,9 @@ try {
 		}
 	}
 
-	Announce("Blobs found: %i", nTotalBlobCount);
+	Announce("Unique tags found: %i", nTotalBlobCount);
+
+	AnnounceEndBlock("Done");
 /*
 	// Apply post-hoc threshold operators
 	std::vector<bool> fRejectedBlob;
@@ -1484,14 +1524,13 @@ try {
 		AnnounceEndBlock("Done");
 	}
 */
-	AnnounceEndBlock("Done");
 
 
 	///////////////////////////////////////////////////////////////////////////
 	// Output results
 	///////////////////////////////////////////////////////////////////////////
 
-	AnnounceStartBlock("Output Blobs");
+	AnnounceStartBlock("Output blobs");
 
 	{
 		// Load in the benchmark file
