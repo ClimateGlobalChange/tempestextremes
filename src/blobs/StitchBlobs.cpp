@@ -14,6 +14,10 @@
 ///		or implied warranty.
 ///	</remarks>
 
+#if defined(TEMPEST_MPIOMP)
+#include <mpi.h>
+#endif
+
 #include "Constants.h"
 #include "CoordTransforms.h"
 #include "BlobUtilities.h"
@@ -529,9 +533,25 @@ protected:
 
 int main(int argc, char** argv) {
 
+#if defined(TEMPEST_MPIOMP)
+	// Initialize MPI
+	MPI_Init(&argc, &argv);
+#endif
+
 	NcError error(NcError::silent_nonfatal);
 
 try {
+
+#if defined(TEMPEST_MPIOMP)
+	// Throw an error if this executable is being run in parallel
+	int nMPISize;
+	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+
+	if (nMPISize != 1) {
+		_EXCEPTIONT("StitchBlobs does not support parallel MPI operation: "
+			"Rerun with one thread.");
+	}
+#endif
 
 	// Input file
 	std::string strInputFile;
@@ -1728,6 +1748,12 @@ try {
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());
 }
+
+#if defined(TEMPEST_MPIOMP)
+	// Deinitialize MPI
+	MPI_Finalize();
+#endif
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////
