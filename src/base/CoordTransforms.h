@@ -27,6 +27,97 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		Convert radians to degrees.
+///	</summary>
+inline double RadToDeg(
+	double dRad
+) {
+	return (dRad * 180.0 / M_PI);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Convert degrees to radians.
+///	</summary>
+inline double DegToRad(
+	double dDeg
+) {
+	return (dDeg * M_PI / 180.0);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Translate a longitude value to the range [0,360)
+///	</summary>
+inline double LonDegToStandardRange(
+	double dLonDeg
+) {
+	dLonDeg = (dLonDeg - 360.0 * floor(dLonDeg / 360.0));
+	if ((dLonDeg < 0.0) || (dLonDeg >= 360.0)) {
+		return 0.0;
+	}
+	return dLonDeg;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Translate a longitude value to the range [0,360)
+///	</summary>
+inline double LonRadToStandardRange(
+	double dLonRad
+) {
+	dLonRad = (dLonRad - (2.0 * M_PI) * floor(dLonRad / (2.0 * M_PI)));
+	if ((dLonRad < 0.0) || (dLonRad >= (2.0 * M_PI))) {
+		return 0.0;
+	}
+	return dLonRad;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Calculate 3D Cartesian coordinates from latitude and longitude,
+///		in radians.
+///	</summary>
+inline void RLLtoXYZ_Rad(
+	double dLonRad,
+	double dLatRad,
+	double & dX,
+	double & dY,
+	double & dZ
+) {
+	_ASSERT(fabs(dLatRad) <= 0.5 * M_PI + HighTolerance);
+
+	dX = cos(dLonRad) * cos(dLatRad);
+	dY = sin(dLonRad) * cos(dLatRad);
+	dZ = sin(dLatRad);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Calculate 3D Cartesian coordinates from latitude and longitude,
+///		in degrees.
+///	</summary>
+inline void RLLtoXYZ_Deg(
+	double dLonDeg,
+	double dLatDeg,
+	double & dX,
+	double & dY,
+	double & dZ
+) {
+	return RLLtoXYZ_Rad(
+		DegToRad(dLonDeg),
+		DegToRad(dLatDeg),
+		dX, dY, dZ);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Calculate latitude and longitude from normalized 3D Cartesian
 ///		coordinates, in degrees.
 ///	</summary>
@@ -58,6 +149,40 @@ inline void XYZtoRLL_Deg(
 		dLonDeg = 0.0;
 		dLatDeg = -90.0;
 	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Calculate latitude and longitude from normalized 3D Cartesian
+///		coordinates, in radians.
+///	</summary>
+inline void XYZtoRLL_Rad(
+	const double & dX,
+	const double & dY,
+	const double & dZ,
+	double & dLonRad,
+	double & dLatRad
+) {
+	_ASSERT(fabs(dX * dX + dY * dY + dZ * dZ - 1.0) < HighTolerance);
+
+	if (fabs(dZ) < 1.0 - ReferenceTolerance) {
+		dLonRad = atan2(dY, dX);
+		dLatRad = asin(dZ);
+
+		if (dLonRad < 0.0) {
+			dLonRad += 2.0 * M_PI;
+		}
+
+	} else if (dZ > 0.0) {
+		dLonRad = 0.0;
+		dLatRad = 0.5 * M_PI;
+
+	} else {
+		dLonRad = 0.0;
+		dLatRad = -0.5 * M_PI;
+	}
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -180,43 +305,6 @@ inline void StereographicProjectionInv(
 	dLonRad = dLonRad0 + atan2(
 			dXs * sin(dC),
 			dRho * cos(dLatRad0) * cos(dC) - dYs * sin(dLatRad0) * sin(dC));
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Convert radians to degrees.
-///	</summary>
-inline double RadToDeg(
-	double dRad
-) {
-	return (dRad * 180.0 / M_PI);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Convert degrees to radians.
-///	</summary>
-inline double DegToRad(
-	double dDeg
-) {
-	return (dDeg * M_PI / 180.0);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Translate a longitude value to the range [0,360)
-///	</summary>
-inline double LonDegToStandardRange(
-	double dLonDeg
-) {
-	dLonDeg = (dLonDeg - 360.0 * floor(dLonDeg / 360.0));
-	if ((dLonDeg < 0.0) || (dLonDeg >= 360.0)) {
-		return 0.0;
-	}
-	return dLonDeg;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

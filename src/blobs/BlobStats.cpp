@@ -15,6 +15,7 @@
 ///	</remarks>
 
 #include "BlobUtilities.h"
+#include "CoordTransforms.h"
 
 #include "CommandLine.h"
 #include "Exception.h"
@@ -42,8 +43,9 @@
 ///	<summary>
 ///		Storage structure for data associated with Blobs.
 ///	</summary>
-struct BlobQuantities {
+class BlobQuantities {
 
+public:
 	///	<summary>
 	///		Output quantities.
 	///	</summary>
@@ -52,15 +54,44 @@ struct BlobQuantities {
 		MaxLat,
 		MinLon,
 		MaxLon,
+		MeanLat,
+		MeanLon,
 		CentroidLat,
 		CentroidLon,
 		Area
 	};
 
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	BlobQuantities() :
+		dAreaX(0.0),
+		dAreaY(0.0),
+		dAreaZ(0.0),
+		dArea(0.0)
+	{ }
+
+public:
 	///	<summary>
 	///		Latitude-longitude bounding box for blob.
 	///	</summary>
 	LatLonBox<double> box;
+
+	///	<summary>
+	///		Area-weighted 3D X coordinate.
+	///	</summary>
+	double dAreaX;
+
+	///	<summary>
+	///		Area-weighted 3D Y coordinate.
+	///	</summary>
+	double dAreaY;
+
+	///	<summary>
+	///		Area-weighted 3D Z coordinate.
+	///	</summary>
+	double dAreaZ;
 
 	///	<summary>
 	///		Total area of blob.
@@ -97,6 +128,15 @@ try {
 	// Input file list
 	std::string strInputFileList;
 
+	// Connectivity file
+	std::string strConnectivity;
+
+	// Diagonal connectivity for RLL grids
+	bool fDiagonalConnectivity;
+
+	// Data is regional
+	bool fRegional;
+
 	// Output file
 	std::string strOutputFile;
 
@@ -112,6 +152,12 @@ try {
 	// Output the full times rather than time indexes
 	bool fOutputFullTimes;
 
+	// Name of latitude dimension
+	std::string strLatitudeName;
+
+	// Name of longitude dimension
+	std::string strLongitudeName;
+
 	// Display help message
 	bool fHelp;
 
@@ -119,11 +165,18 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputFile, "infile", "");
 		CommandLineString(strInputFileList, "inlist", "");
+		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineBool(fDiagonalConnectivity, "diag_connect");
+		CommandLineBool(fRegional, "regional");
 		CommandLineString(strOutputFile, "outfile", "");
 		CommandLineString(strInputVariable, "invar", "");
 		CommandLineString(strOutputQuantities, "out", "");
 		CommandLineBool(fOutputHeaders, "out_headers");
 		CommandLineBool(fOutputFullTimes, "out_fulltime");
+
+		CommandLineString(strLatitudeName, "latname", "lat");
+		CommandLineString(strLongitudeName, "lonname", "lon");
+
 		CommandLineBool(fHelp, "help");
 
 		ParseCommandLine(argc, argv);
@@ -166,82 +219,43 @@ try {
 
 	int nFiles = vecInputFiles.size();
 
-	// Load in spatial dimension data
-	int nLat;
-	int nLon;
+	// Define the SimpleGrid for the input
+	SimpleGrid grid;
 
-	DataArray1D<double> dataLatDeg;
-	DataArray1D<double> dataLat;
+	// Check for connectivity file
+	if (strConnectivity != "") {
+		AnnounceStartBlock("Generating grid information from connectivity file");
+		grid.FromFile(strConnectivity);
+		AnnounceEndBlock("Done");
 
-	DataArray1D<double> dataLonDeg;
-	DataArray1D<double> dataLon;
+	// No connectivity file; check for latitude/longitude dimension
+	} else {
+		AnnounceStartBlock("No connectivity file specified");
+		Announce("Attempting to generate latitude-longitude grid from data file");
 
-	bool fFlippedLat = false;
-
-	double dAreaElement;
-
-	{
-		// Load the first netcdf input file
-		NcFile ncInput(vecInputFiles[0].c_str());
-
-		if (!ncInput.is_valid()) {
-			_EXCEPTION1("Unable to open NetCDF file \"%s\"",
-				vecInputFiles[0].c_str());
+		if (vecInputFiles.size() < 1) {
+			_EXCEPTIONT("No data files specified; unable to generate grid");
 		}
 
-		// Get latitude/longitude dimensions
-		NcDim * dimLat = ncInput.get_dim("lat");
-		if (dimLat == NULL) {
-			_EXCEPTIONT("No dimension \"lat\" found in input file");
+		NcFile ncFile(vecInputFiles[0].c_str());
+		if (!ncFile.is_valid()) {
+			_EXCEPTION1("Unable to open NetCDF file \"%s\"", vecInputFiles[0].c_str());
 		}
 
-		NcDim * dimLon = ncInput.get_dim("lon");
-		if (dimLon == NULL) {
-			_EXCEPTIONT("No dimension \"lon\" found in input file");
+		grid.GenerateLatitudeLongitude(
+			&ncFile,
+			strLatitudeName,
+			strLongitudeName,
+			fRegional,
+			fDiagonalConnectivity);
+
+		if (grid.m_nGridDim.size() != 2) {
+			_EXCEPTIONT("Logic error when generating connectivity");
 		}
-
-		NcVar * varLat = ncInput.get_var("lat");
-		if (varLat == NULL) {
-			_EXCEPTIONT("No variable \"lat\" found in input file");
-		}
-
-		NcVar * varLon = ncInput.get_var("lon");
-		if (varLon == NULL) {
-			_EXCEPTIONT("No variable \"lon\" found in input file");
-		}
-
-		nLat = dimLat->size();
-		nLon = dimLon->size();
-
-		dataLatDeg.Allocate(nLat);
-		dataLat.Allocate(nLat);
-
-		dataLonDeg.Allocate(nLon);
-		dataLon.Allocate(nLon);
-
-		varLat->get(dataLatDeg, nLat);
-		for (int j = 0; j < nLat; j++) {
-			dataLat[j] = dataLatDeg[j] * M_PI / 180.0;
-		}
-
-		varLon->get(dataLonDeg, nLon);
-		for (int i = 0; i < nLon; i++) {
-			dataLon[i] = dataLonDeg[i] * M_PI / 180.0;
-		}
-
-		dAreaElement =
-			M_PI / static_cast<double>(nLat)
-			* 2.0 * M_PI / static_cast<double>(nLon);
-
-		// Check for flipped latitude
-		if (dataLatDeg.GetRows() >= 2) {
-			if (dataLatDeg[1] < dataLatDeg[0]) {
-				fFlippedLat = true;
-			}
-		}
-
-		// Close first netcdf file
-		ncInput.close();
+		AnnounceEndBlock("Done");
+	}
+	if (!grid.HasAreas()) {
+		_EXCEPTIONT("Grid is missing area information needed by BlobStats");
 	}
 
 	// Parse the list of output quantities
@@ -272,6 +286,10 @@ try {
 					vecOutputVars[iNextOp] = BlobQuantities::MinLon;
 				} else if (strSubStr == "maxlon") {
 					vecOutputVars[iNextOp] = BlobQuantities::MaxLon;
+				} else if (strSubStr == "meanlon") {
+					vecOutputVars[iNextOp] = BlobQuantities::MeanLon;
+				} else if (strSubStr == "meanlat") {
+					vecOutputVars[iNextOp] = BlobQuantities::MeanLat;
 				} else if (strSubStr == "centlat") {
 					vecOutputVars[iNextOp] = BlobQuantities::CentroidLat;
 				} else if (strSubStr == "centlon") {
@@ -280,7 +298,7 @@ try {
 					vecOutputVars[iNextOp] = BlobQuantities::Area;
 				} else {
 					_EXCEPTIONT("Invalid output quantity:  Expected\n"
-						"[minlat, maxlat, minlon, maxlon, "
+						"[minlat, maxlat, minlon, maxlon, meanlat, meanlon,"
 						"centlat, centlon, area]");
 				}
 
@@ -326,7 +344,7 @@ try {
 		}
 
 		// Blob index data
-		DataArray2D<int> dataIndex(nLat, nLon);
+		DataArray1D<int> dataIndex(grid.GetSize());
 
 		// Get current time dimension
 		NcDim * dimTime = ncInput.get_dim("time");
@@ -341,25 +359,50 @@ try {
 			ReadCFTimeDataFromNcFile(&ncInput, vecInputFiles[f], vecFileTimes, true);
 		}
 
-		// Load in indicator variable
+		// Load in indicator variable and validate
 		NcVar * varIndicator = ncInput.get_var(strInputVariable.c_str());
 
 		if (varIndicator == NULL) {
 			_EXCEPTION1("Unable to load variable \"%s\"",
 				strInputVariable.c_str());
 		}
+		if (varIndicator->num_dims() != 1 + grid.DimCount()) {
+			_EXCEPTION2("Incorrect number of dimensions for \"%s\""
+				" (%i expected)", strInputVariable.c_str(), 1 + grid.DimCount());
+		}
+		if (grid.DimCount() == 1) {
+			if (varIndicator->get_dim(1)->size() != grid.GetSize()) {
+				_EXCEPTION2("Variable size mismatch:  Grid size %lu, variable size %lu",
+					grid.GetSize(), varIndicator->get_dim(1)->size());
+			}
+		} else if (grid.DimCount() == 2) {
+			if ((varIndicator->get_dim(1)->size() != grid.m_nGridDim[0]) ||
+			    (varIndicator->get_dim(2)->size() != grid.m_nGridDim[1])
+			) {
+				_EXCEPTION4("Variable size mismatch:  Grid size (%lu,%lu), variable size (%lu,%lu)",
+					grid.m_nGridDim[0],
+					grid.m_nGridDim[1],
+					varIndicator->get_dim(1)->size(),
+					varIndicator->get_dim(2)->size());
+			}
 
-		if (varIndicator->num_dims() != 3) {
-			_EXCEPTION1("Incorrect number of dimensions for \"%s\""
-				" (3 expected)", strInputVariable.c_str());
+		} else {
+			_EXCEPTION();
 		}
 
 		// Loop through all times
 		for (int t = 0; t < nLocalTimes; t++, iTime++) {
 
 			// Load in the data at this time
-			varIndicator->set_cur(t, 0, 0);
-			varIndicator->get(&(dataIndex[0][0]), 1, nLat, nLon);
+			if (grid.DimCount() == 1) {
+				varIndicator->set_cur(t, 0);
+				varIndicator->get(&(dataIndex[0]), 1, grid.GetSize());
+			} else if (grid.DimCount() == 2) {
+				varIndicator->set_cur(t, 0, 0);
+				varIndicator->get(&(dataIndex[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
+			} else {
+				_EXCEPTION();
+			}
 
 			// Last data index
 			int iLastDataIndex = 0;
@@ -368,16 +411,15 @@ try {
 			TimedBlobQuantitiesMap::iterator iterBlobQuantities;
 
 			// Loop over all locations
-			for (int j = 0; j < nLat; j++) {
-			for (int i = 0; i < nLon; i++) {
+			for (int i = 0; i < grid.GetSize(); i++) {
 
 				// Ignore non-blob data
-				if (dataIndex[j][i] == 0) {
+				if (dataIndex[i] == 0) {
 					continue;
 				}
 
 				// Check if iterator already points to correct data
-				if (dataIndex[j][i] != iLastDataIndex) {
+				if (dataIndex[i] != iLastDataIndex) {
 
 					// Iterator to TimedBlobQuantities with iLastDataIndex
 					AllTimedBlobQuantitiesMap::iterator
@@ -386,14 +428,14 @@ try {
 					// Get new iterator for this dataIndex
 					iterTimedBlobQuantities =
 						mapAllQuantities.find(
-							dataIndex[j][i]);
+							dataIndex[i]);
 
 					if (iterTimedBlobQuantities == mapAllQuantities.end()) {
 
 						std::pair<AllTimedBlobQuantitiesMap::iterator,bool> pr =
 							mapAllQuantities.insert(
 								AllTimedBlobQuantitiesMap::value_type(
-									dataIndex[j][i],
+									dataIndex[i],
 									TimedBlobQuantitiesMap()));
 
 						if (pr.second == false) {
@@ -423,31 +465,27 @@ try {
 					}
 
 					// Update last data index
-					iLastDataIndex = dataIndex[j][i];
+					iLastDataIndex = dataIndex[i];
 				}
 
-				//std::cout << iterBlobQuantities->first << std::endl;
-/*
-				if ((dataIndex[j][i] == 1) && (iTime == 1)) {
-					printf("%i %i : %i %i\n",
-						j, i,
-						iterBlobQuantities->second.box.lon[0],
-						iterBlobQuantities->second.box.lon[1]);
-				}
-*/
+				// Associated BlobQuantities
+				BlobQuantities & bq = iterBlobQuantities->second;
+
 				// Insert point into array
-				iterBlobQuantities->second.box.insert(dataLat[j], dataLon[i]);
+				bq.box.insert(
+					grid.m_dLat[i],
+					LonRadToStandardRange(grid.m_dLon[i]));
 
 				// Add blob area
-				iterBlobQuantities->second.dArea +=
-					cos(dataLat[j]) * dAreaElement;
+				bq.dArea +=
+					grid.m_dArea[i];
 
-				if ((t == 3) && (dataIndex[j][i] == 2)) {
-					printf ("%1.5e %1.5e %1.5e %1.5e %1.5e\n",
-						dataLat[j] * 180.0 / M_PI, dataLon[i] * 180.0 / M_PI, cos(dataLat[j]), dAreaElement, iterBlobQuantities->second.dArea);
-				}
-
-			}
+				// Add area-weighted 3D coordinates
+				double dX, dY, dZ;
+				RLLtoXYZ_Rad(grid.m_dLon[i], grid.m_dLat[i], dX, dY, dZ);
+				bq.dAreaX += dX * grid.m_dArea[i];
+				bq.dAreaY += dY * grid.m_dArea[i];
+				bq.dAreaZ += dZ * grid.m_dArea[i];
 			}
 		}
 
@@ -477,64 +515,88 @@ try {
 					for (int i = 0; i < vecOutputVars.size(); i++) {
 
 						// Bounding box coordinates
-						double dLat0 = quants.box.lat[0];
-						double dLat1 = quants.box.lat[1];
-						double dLon0 = quants.box.lon[0];
-						double dLon1 = quants.box.lon[1];
+						double dLatDeg0 = RadToDeg(quants.box.lat[0]);
+						double dLatDeg1 = RadToDeg(quants.box.lat[1]);
+						double dLonDeg0 = RadToDeg(quants.box.lon[0]);
+						double dLonDeg1 = RadToDeg(quants.box.lon[1]);
+
+						// Calculate centroid
+						double dCentX = quants.dAreaX / quants.dArea;
+						double dCentY = quants.dAreaY / quants.dArea;
+						double dCentZ = quants.dAreaZ / quants.dArea;
+
+						double dCentMag =
+							sqrt(dCentX * dCentX + dCentY * dCentY + dCentZ * dCentZ);
+
+						if (dCentMag == 0.0) {
+							dCentX = 0.0;
+							dCentY = 0.0;
+							dCentZ = 1.0;
+						} else {
+							dCentX /= dCentMag;
+							dCentY /= dCentMag;
+							dCentZ /= dCentMag;
+						}
+
+						double dCentLonDeg;
+						double dCentLatDeg;
+						XYZtoRLL_Deg(dCentX, dCentY, dCentZ, dCentLonDeg, dCentLatDeg);
 
 						// Minimum latitude
 						if (vecOutputVars[i] == BlobQuantities::MinLat) {
-							if (fFlippedLat) {
-								fprintf(fpout, "\t%1.5f", dLat1);
-							} else {
-								fprintf(fpout, "\t%1.5f", dLat0);
-							}
+							fprintf(fpout, "\t%1.6f", dLatDeg0);
 						}
 
 						// Maximum latitude
 						if (vecOutputVars[i] == BlobQuantities::MaxLat) {
-							if (fFlippedLat) {
-								fprintf(fpout, "\t%1.5f", dLat0);
-							} else {
-								fprintf(fpout, "\t%1.5f", dLat1);
-							}
+							fprintf(fpout, "\t%1.6f", dLatDeg1);
 						}
 
 						// Minimum longitude
 						if (vecOutputVars[i] == BlobQuantities::MinLon) {
-							fprintf(fpout, "\t%1.5f", dLon0);
+							fprintf(fpout, "\t%1.6f", dLonDeg0);
 						}
 
 						// Maximum longitude
 						if (vecOutputVars[i] == BlobQuantities::MaxLon) {
-							fprintf(fpout, "\t%1.5f", dLon1);
+							fprintf(fpout, "\t%1.6f", dLonDeg1);
+						}
+
+						// Mean latitude
+						if (vecOutputVars[i] == BlobQuantities::MeanLat) {
+							double dMidLatDeg = 0.5 * (dLatDeg0 + dLatDeg1);
+
+							fprintf(fpout, "\t%1.6f", dMidLatDeg);
+						}
+
+						// Mean longitude
+						if (vecOutputVars[i] == BlobQuantities::MeanLon) {
+							double dMidLonDeg;
+							if (dLonDeg0 <= dLonDeg1) {
+								dMidLonDeg = 0.5 * (dLonDeg0 + dLonDeg1);
+							} else {
+								dMidLonDeg = 0.5 * (dLonDeg0 + dLonDeg1 + 360.0);
+								if (dMidLonDeg > 360.0) {
+									dMidLonDeg -= 360.0;
+								}
+							}
+
+							fprintf(fpout, "\t%1.6f", dMidLonDeg);
 						}
 
 						// Centroid latitude
 						if (vecOutputVars[i] == BlobQuantities::CentroidLat) {
-							double dMidLat = 0.5 * (dLat0 + dLat1);
-
-							fprintf(fpout, "\t%1.5f", dMidLat);
+							fprintf(fpout, "\t%1.6f", dCentLatDeg);
 						}
 
 						// Centroid longitude
 						if (vecOutputVars[i] == BlobQuantities::CentroidLon) {
-							double dMidLon;
-							if (dLon0 <= dLon1) {
-								dMidLon = 0.5 * (dLon0 + dLon1);
-							} else {
-								dMidLon = 0.5 * (dLon0 + dLon1 + 360.0);
-								if (dMidLon > 360.0) {
-									dMidLon -= 360.0;
-								}
-							}
-
-							fprintf(fpout, "\t%1.5f", dMidLon);
+							fprintf(fpout, "\t%1.6f", dCentLonDeg);
 						}
 
 						// Area
 						if (vecOutputVars[i] == BlobQuantities::Area) {
-							fprintf(fpout, "\t%1.5f", quants.dArea);
+							fprintf(fpout, "\t%1.6e", quants.dArea);
 						}
 					}
 
