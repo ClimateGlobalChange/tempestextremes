@@ -783,13 +783,13 @@ try {
 					if (fCompositeMin) {
 						vecOutputDataMin[v].Allocate(nOutputDimSize0 * nOutputDimSize1);
 						for (int i = 0; i < vecOutputDataMin[v].GetRows(); i++) {
-							vecOutputDataMin[v][i] = DBL_MAX;
+							vecOutputDataMin[v][i] = FLT_MAX;
 						}
 					}
 					if (fCompositeMax) {
 						vecOutputDataMax[v].Allocate(nOutputDimSize0 * nOutputDimSize1);
 						for (int i = 0; i < vecOutputDataMin[v].GetRows(); i++) {
-							vecOutputDataMax[v][i] = -DBL_MAX;
+							vecOutputDataMax[v][i] = -FLT_MAX;
 						}
 					}
 
