@@ -122,24 +122,34 @@ inline void RLLtoXYZ_Deg(
 ///		coordinates, in degrees.
 ///	</summary>
 inline void XYZtoRLL_Deg(
-	const double & dX,
-	const double & dY,
-	const double & dZ,
+	double dX,
+	double dY,
+	double dZ,
 	double & dLonDeg,
 	double & dLatDeg
 ) {
-	_ASSERT(fabs(dX * dX + dY * dY + dZ * dZ - 1.0) < HighTolerance);
+	double dMag2 = dX * dX + dY * dY + dZ * dZ;
+
+	if (fabs(dMag2 - 1.0) >= 0.01) {
+		_EXCEPTION4("Grid point has non-unit magnitude: "
+			"(%1.15e, %1.15e, %1.15e) (magnitude %1.15e)",
+			dX, dY, dZ, fabs(dX * dX + dY * dY + dZ * dZ));
+
+	}
+
+	double dMag = sqrt(dMag2);
+
+	dX /= dMag;
+	dY /= dMag;
+	dZ /= dMag;
 
 	if (fabs(dZ) < 1.0 - ReferenceTolerance) {
-		dLonDeg = atan2(dY, dX);
-		dLatDeg = asin(dZ);
+		dLonDeg = RadToDeg(atan2(dY, dX));
+		dLatDeg = RadToDeg(asin(dZ));
 
 		if (dLonDeg < 0.0) {
-			dLonDeg += 2.0 * M_PI;
+			dLonDeg += 360.0;
 		}
-
-		dLonDeg = dLonDeg / M_PI * 180.0;
-		dLatDeg = dLatDeg / M_PI * 180.0;
 
 	} else if (dZ > 0.0) {
 		dLonDeg = 0.0;
@@ -158,13 +168,26 @@ inline void XYZtoRLL_Deg(
 ///		coordinates, in radians.
 ///	</summary>
 inline void XYZtoRLL_Rad(
-	const double & dX,
-	const double & dY,
-	const double & dZ,
+	double dX,
+	double dY,
+	double dZ,
 	double & dLonRad,
 	double & dLatRad
 ) {
-	_ASSERT(fabs(dX * dX + dY * dY + dZ * dZ - 1.0) < HighTolerance);
+	double dMag2 = dX * dX + dY * dY + dZ * dZ;
+
+	if (fabs(dMag2 - 1.0) >= 0.01) {
+		_EXCEPTION4("Grid point has non-unit magnitude: "
+			"(%1.15e, %1.15e, %1.15e) (magnitude %1.15e)",
+			dX, dY, dZ, fabs(dX * dX + dY * dY + dZ * dZ));
+
+	}
+
+	double dMag = sqrt(dMag2);
+
+	dX /= dMag;
+	dY /= dMag;
+	dZ /= dMag;
 
 	if (fabs(dZ) < 1.0 - ReferenceTolerance) {
 		dLonRad = atan2(dY, dX);
@@ -259,8 +282,13 @@ inline double GreatCircleDistance_Deg(
 	double dLonRad2,
 	double dLatRad2
 ) {
-	return (180.0 / M_PI) *
-		GreatCircleDistance_Rad(dLonRad1, dLatRad1, dLonRad2, dLatRad2);
+	return
+		RadToDeg(
+			GreatCircleDistance_Rad(
+				dLonRad1,
+				dLatRad1,
+				dLonRad2,
+				dLatRad2));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
