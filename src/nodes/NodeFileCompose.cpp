@@ -1147,7 +1147,7 @@ try {
 								pathnode.m_fileix, sSnapshotCount);
 						}
 
-						std::cout << "Variable " << v << " pos " << pathnode.m_fileix << std::endl;
+						//std::cout << "Variable " << v << " pos " << pathnode.m_fileix << std::endl;
 
 						NcDim * dimSnapshot0 =
 							vecvarSnapshots[v]->get_dim(
