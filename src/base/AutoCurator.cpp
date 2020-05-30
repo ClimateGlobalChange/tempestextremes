@@ -133,6 +133,11 @@ void AutoCurator::IndexFiles(
 				"\"units\" attribute", strFile.c_str());
 		}
 
+		if (m_strNcTimeUnits == "") {
+			m_eNcTimeType = varTime->type();
+			m_strNcTimeUnits = attUnits->as_string(0);
+		}
+
 		Time::CalendarType eCalendarType =
 			Time::CalendarTypeFromString(attCalendar->as_string(0));
 
@@ -170,17 +175,17 @@ void AutoCurator::IndexFiles(
 			Time time(m_eCalendarType);
 			if (varTime->type() == ncInt) {
 				time.FromCFCompliantUnitsOffsetInt(
-					attUnits->as_string(0),
+					m_strNcTimeUnits,
 					vecTimeInt[t]);
 
 			} else if (varTime->type() == ncFloat) {
 				time.FromCFCompliantUnitsOffsetDouble(
-					attUnits->as_string(0),
+					m_strNcTimeUnits,
 					static_cast<double>(vecTimeFloat[t]));
 
 			} else if (varTime->type() == ncDouble) {
 				time.FromCFCompliantUnitsOffsetDouble(
-					attUnits->as_string(0),
+					m_strNcTimeUnits,
 					vecTimeDouble[t]);
 			}
 

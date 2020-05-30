@@ -430,6 +430,7 @@ public:
 	///	</summary>
 	PathNode() :
 		m_gridix(0),
+		m_fileix(-1),
 		m_time()
 	{ }
 
@@ -441,6 +442,7 @@ public:
 			m_vecColumnData.push_back(node.m_vecColumnData[i]->Duplicate());
 		}
 		m_gridix = node.m_gridix;
+		m_fileix = node.m_fileix;
 		m_time = node.m_time;
 	}
 
@@ -470,6 +472,7 @@ public:
 			m_vecColumnData.push_back(node.m_vecColumnData[i]->Duplicate());
 		}
 		m_gridix = node.m_gridix;
+		m_fileix = node.m_fileix;
 		m_time = node.m_time;
 		return (*this);
 	}
@@ -582,6 +585,11 @@ public:
 	///		Index on the grid of this point.
 	///	</summary>
 	size_t m_gridix;
+
+	///	<summary>
+	///		Index of this PathNode in the order it appears in the file.
+	///	</summary>
+	size_t m_fileix;
 
 	///	<summary>
 	///		Time associated with this node.

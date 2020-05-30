@@ -236,6 +236,9 @@ try {
 	// Fixed latitude
 	double dFixedLatitudeDeg;
 
+	// Output a snapshot series rather than the time-average
+	bool fSnapshots;
+
 	// Name of latitude dimension
 	std::string strLatitudeName;
 
@@ -270,6 +273,8 @@ try {
 		CommandLineDouble(dFixedLatitudeDeg, "fixlat", -999.);
 		CommandLineDouble(dFixedLongitudeDeg, "fixlon", -999.);
 
+		CommandLineBool(fSnapshots, "snapshots");
+
 		CommandLineString(strLatitudeName, "latname", "lat");
 		CommandLineString(strLongitudeName, "lonname", "lon");
 
@@ -303,8 +308,11 @@ try {
 	if (strVariables.length() == 0) {
 		_EXCEPTIONT("No variables (--var) specified");
 	}
-	if ((strOperators.length() == 0) && (strHistogramOp.length() == 0)) {
-		_EXCEPTIONT("At least one of --op and --histogram must be specified");
+	if ((strOperators.length() == 0) &&
+		(strHistogramOp.length() == 0) &&
+		(!fSnapshots)
+	) {
+		_EXCEPTIONT("At least one of --op, --histogram or --snapshots must be specified");
 	}
 	if (dFixedLongitudeDeg != -999.) {
 		if (dFixedLatitudeDeg == -999.) {
@@ -320,6 +328,11 @@ try {
 		}
 		if ((dFixedLatitudeDeg < -90.0) || (dFixedLongitudeDeg > 90.0)) {
 			_EXCEPTION1("--fixlat %1.5f out of range [-90,+90]", dFixedLatitudeDeg);
+		}
+	}
+	if (fSnapshots) {
+		if ((dFixedLongitudeDeg != -999.) || (dFixedLatitudeDeg != -999.)) {
+			_EXCEPTIONT("--fixlon and --fixlat cannot be combined with --snapshots");
 		}
 	}
 
@@ -516,7 +529,14 @@ try {
 			autocurator.IndexFiles(strFileLine);
 		}
 	}
+	if (autocurator.GetTimeCount() == 0) {
+		_EXCEPTIONT("No time slices found among input file(s)");
+	}
 	AnnounceEndBlock("Done");
+
+	// Get the time units
+	NcType eNcTimeType = autocurator.GetNcTimeType();
+	std::string strNcTimeUnits = autocurator.GetNcTimeUnits();
 
 	// Define the SimpleGrid for the input
 	SimpleGrid grid;
@@ -584,6 +604,10 @@ try {
 		}
 	}
 
+	if ((vecInputNodeFiles.size() > 1) && (fSnapshots)) {
+		_EXCEPTIONT("Only one nodefile allowed with --snapshotseries");
+	}
+
 	// Open output file
 	AnnounceStartBlock("Preparing output file");
 	NcFile ncoutfile(strOutputData.c_str(), NcFile::Replace);
@@ -593,12 +617,9 @@ try {
 	}
 
 	// Write dimensions
-	NcDim * dimX;
-	NcDim * dimY;
-
 	if (strOutputGrid == "xy") {
-		dimX = ncoutfile.add_dim("x", nResolutionX);
-		dimY = ncoutfile.add_dim("y", nResolutionX);
+		NcDim * dimX = ncoutfile.add_dim("x", nResolutionX);
+		NcDim * dimY = ncoutfile.add_dim("y", nResolutionX);
 
 		DataArray1D<double> dX(nResolutionX);
 		for (int i = 0; i < nResolutionX; i++) {
@@ -609,13 +630,17 @@ try {
 
 		NcVar * varX = ncoutfile.add_var("x", ncDouble, dimX);
 		varX->put(&(dX[0]), nResolutionX);
+		varX->add_att("name", "stereographic x coordinate");
+		varX->add_att("units", "degrees_east");
 
 		NcVar * varY = ncoutfile.add_var("y", ncDouble, dimY);
 		varY->put(&(dX[0]), nResolutionX);
+		varY->add_att("name", "stereographic y coordinate");
+		varY->add_att("units", "degrees_north");
 
 	} else if (strOutputGrid == "rad") {
-		dimX = ncoutfile.add_dim("az", nResolutionA);
-		dimY = ncoutfile.add_dim("r", nResolutionX);
+		NcDim * dimX = ncoutfile.add_dim("az", nResolutionA);
+		NcDim * dimY = ncoutfile.add_dim("r", nResolutionX);
 
 		DataArray1D<double> dAz(nResolutionA);
 		for (int i = 0; i < nResolutionA; i++) {
@@ -630,13 +655,17 @@ try {
 
 		NcVar * varAz = ncoutfile.add_var("az", ncDouble, dimX);
 		varAz->put(&(dAz[0]), nResolutionA);
+		varAz->add_att("name", "stereographic azimuth angle");
+		varAz->add_att("units", "degrees");
 
 		NcVar * varR = ncoutfile.add_var("r", ncDouble, dimY);
 		varR->put(&(dR[0]), nResolutionX);
+		varR->add_att("name", "stereographic great circle distance");
+		varR->add_att("units", "degrees");
 
 	} else if (strOutputGrid == "rll") {
-		dimX = ncoutfile.add_dim("lon", nResolutionX);
-		dimY = ncoutfile.add_dim("lat", nResolutionX);
+		NcDim * dimX = ncoutfile.add_dim("lon", nResolutionX);
+		NcDim * dimY = ncoutfile.add_dim("lat", nResolutionX);
 
 		double dHalfWidthDeg = 0.5 * static_cast<double>(nResolutionX) * dDeltaXDeg;
 
@@ -656,10 +685,12 @@ try {
 
 		NcVar * varLon = ncoutfile.add_var("lon", ncDouble, dimX);
 		varLon->put(&(dLonDeg[0]), nResolutionX);
+		varLon->add_att("name", "longitude");
 		varLon->add_att("units", "degrees_east");
 
 		NcVar * varLat = ncoutfile.add_var("lat", ncDouble, dimY);
 		varLat->put(&(dLatDeg[0]), nResolutionX);
+		varLon->add_att("name", "latitude");
 		varLat->add_att("units", "degrees_north");
 
 	} else {
@@ -669,6 +700,8 @@ try {
 
 	// Vector of output data
 	int nDataInstances = 0;
+
+	DataArray1D<float> dOutputDataSnapshot;
 
 	std::vector< DataArray1D<float> > vecOutputDataMean;
 	vecOutputDataMean.resize(vecVarIxIn.size());
@@ -711,7 +744,112 @@ try {
 			cdhInput,
 			grid,
 			autocurator.GetCalendarType());
+
+		nodefile.GenerateTimeToPathNodeMap();
 		AnnounceEndBlock("Done");
+
+		if (mapTimeToPathNode.size() == 0) {
+			_EXCEPTIONT("No time slices found in file");
+		}
+
+		// Get number of paths and number of snapshots
+		size_t sPathCount = 0;
+		size_t sSnapshotCount = 0;
+		{
+			const PathVector & pathvec = nodefile.GetPathVector();
+			sPathCount = pathvec.size();
+			for (size_t p = 0; p < sPathCount; p++) {
+				sSnapshotCount += pathvec[p].size();
+			}
+			if (sSnapshotCount == 0) {
+				_EXCEPTIONT("No pathnode entries found in nodefile; cannot build composite");
+			}
+			Announce("%lu path snapshots found", sSnapshotCount);
+		}
+
+		// Varaibles used for outputing snapshots
+		NcDim * dimSnapshot = NULL;
+
+		std::vector<NcVar *> vecvarSnapshots;
+		vecvarSnapshots.resize(vecVarIxIn.size());
+
+		if (fSnapshots) {
+			dimSnapshot = ncoutfile.add_dim("snapshot", sSnapshotCount);
+			if (dimSnapshot == NULL) {
+				_EXCEPTION1("Unable to create dimension \"snapshot\" in file %s",
+					strOutputData.c_str());
+			}
+
+			// Create auxiliary variables
+			DataArray1D<int> dataPathId(sSnapshotCount);
+			DataArray1D<double> dataPathLonDeg(sSnapshotCount);
+			DataArray1D<double> dataPathLatDeg(sSnapshotCount);
+			DataArray1D<double> dataPathTimeDouble(sSnapshotCount);
+			size_t ipathnode = 0;
+			for (size_t p = 0; p < pathvec.size(); p++) {
+				for (size_t n = 0; n < pathvec[p].size(); n++) {
+					const PathNode & pn = pathvec[p][n];
+					dataPathId[ipathnode] = p;
+					dataPathLonDeg[ipathnode] = RadToDeg(grid.m_dLon[pn.m_gridix]);
+					dataPathLatDeg[ipathnode] = RadToDeg(grid.m_dLat[pn.m_gridix]);
+
+					dataPathTimeDouble[ipathnode] =
+						pn.m_time.GetCFCompliantUnitsOffsetDouble(strNcTimeUnits);
+
+					ipathnode++;
+				}
+			}
+
+			// Output auxiliary variables
+			NcVar * varSnapPathId = ncoutfile.add_var("snap_pathid", ncInt, dimSnapshot);
+			if (varSnapPathId == NULL) {
+				_EXCEPTION1("Unable to create variable \"snap_pathid\" in file %s",
+					strOutputData.c_str());
+			}
+			varSnapPathId->put(&(dataPathId[0]), sSnapshotCount);
+
+			NcVar * varSnapLon = ncoutfile.add_var("snap_lon", ncDouble, dimSnapshot);
+			if (varSnapLon == NULL) {
+				_EXCEPTION1("Unable to create variable \"snap_lon\" in file %s",
+					strOutputData.c_str());
+			}
+			varSnapLon->put(&(dataPathLonDeg[0]), sSnapshotCount);
+			varSnapLon->add_att("units", "degrees_east");
+
+			NcVar * varSnapLat = ncoutfile.add_var("snap_lat", ncDouble, dimSnapshot);
+			if (varSnapLat == NULL) {
+				_EXCEPTION1("Unable to create variable \"snap_lat\" in file %s",
+					strOutputData.c_str());
+			}
+			varSnapLat->put(&(dataPathLatDeg[0]), sSnapshotCount);
+			varSnapLat->add_att("units", "degrees_north");
+
+			NcVar * varSnapTime = ncoutfile.add_var("snap_time", eNcTimeType, dimSnapshot);
+			if (varSnapTime == NULL) {
+				_EXCEPTION1("Unable to create variable \"snap_time\" in file %s",
+					strOutputData.c_str());
+			}
+			varSnapTime->add_att("units", strNcTimeUnits.c_str());
+
+			if (eNcTimeType == ncInt) {
+				DataArray1D<double> dataPathTimeInt(sSnapshotCount);
+				for (size_t i = 0; i < sSnapshotCount; i++) {
+					dataPathTimeInt[i] = static_cast<int>(dataPathTimeDouble[i]);
+				}
+				varSnapTime->put(&(dataPathTimeInt[0]), sSnapshotCount);
+
+			} else if (eNcTimeType == ncFloat) {
+				DataArray1D<double> dataPathTimeFloat(sSnapshotCount);
+				for (size_t i = 0; i < sSnapshotCount; i++) {
+					dataPathTimeFloat[i] = static_cast<float>(dataPathTimeDouble[i]);
+				}
+				varSnapTime->put(&(dataPathTimeFloat[0]), sSnapshotCount);
+
+			} else if (eNcTimeType == ncDouble) {
+				varSnapTime->put(&(dataPathTimeDouble[0]), sSnapshotCount);
+			}
+
+		}
 
 		// Loop through all Times in the NodeFile
 		for (auto iter = mapTimeToPathNode.begin(); iter != mapTimeToPathNode.end(); iter++) {
@@ -777,6 +915,9 @@ try {
 					}
 
 					// Initialize data storage for output
+					if (fSnapshots) {
+						dOutputDataSnapshot.Allocate(nOutputDimSize0 * nOutputDimSize1);
+					}
 					if (fCompositeMean) {
 						vecOutputDataMean[v].Allocate(nOutputDimSize0 * nOutputDimSize1);
 					}
@@ -815,6 +956,32 @@ try {
 							}
 						}
 					}
+
+					// Initialize snapshot variables
+					if (fSnapshots) {
+						std::vector<NcDim *> vecSnapshotDims;
+						vecSnapshotDims.push_back(dimSnapshot);
+						for (int d = 0; d < vecOutputNcDim[v].size(); d++) {
+							vecSnapshotDims.push_back(vecOutputNcDim[v][d]);
+						}
+
+						std::string strVarName = std::string("snap_");
+						strVarName += varregIn.GetVariableString(vecVarIxIn[v]);
+
+						NcVar * varSnapshots =
+							ncoutfile.add_var(
+								strVarName.c_str(),
+								ncFloat,
+								vecSnapshotDims.size(),
+								const_cast<const NcDim**>(&(vecSnapshotDims[0])));
+
+						if (varSnapshots == NULL) {
+							_EXCEPTION1("Unable to create variable \"%s\" in output file",
+								strVarName.c_str());
+						}
+
+						vecvarSnapshots[v] = varSnapshots;
+					}
 				}
 
 				// Done
@@ -839,8 +1006,6 @@ try {
 				/////////////////////////////////
 				// PathNode centered composite
 				for (int p = 0; p < vecPathNodes.size(); p++) {
-					nDataInstances++;
-
 					const Path & path = pathvec[vecPathNodes[p].first];
 					const PathNode & pathnode = path[vecPathNodes[p].second];
 
@@ -897,7 +1062,7 @@ try {
 					}
 
 					// Only calculate the mean
-					if (fCompositeMean && !fCompositeMin && !fCompositeMax) {
+					if (fCompositeMean && !fCompositeMin && !fCompositeMax && !fSnapshots) {
 						for (int i = 0; i < gridNode.GetSize(); i++) {
 							int ixGridIn =
 								grid.NearestNode(
@@ -924,6 +1089,10 @@ try {
 									gridNode.m_dLon[i],
 									gridNode.m_dLat[i]);
 
+							if (fSnapshots) {
+								dOutputDataSnapshot[i] =
+									dataState[ixGridIn];
+							}
 							if (fCompositeMean) {
 								vecOutputDataMean[v][i] +=
 									dataState[ixGridIn];
@@ -969,7 +1138,39 @@ try {
 						}
 					}
 
-					// Fixed point composites
+					// Output snapshots
+					if (fSnapshots) {
+						if ((pathnode.m_fileix < 0) ||
+						    (pathnode.m_fileix >= sSnapshotCount)
+						) {
+							_EXCEPTION2("pathnode file index out of range (%lu/%lu)",
+								pathnode.m_fileix, sSnapshotCount);
+						}
+
+						std::cout << "Variable " << v << " pos " << pathnode.m_fileix << std::endl;
+
+						NcDim * dimSnapshot0 =
+							vecvarSnapshots[v]->get_dim(
+								vecvarSnapshots[v]->num_dims()-2);
+
+						NcDim * dimSnapshot1 =
+							vecvarSnapshots[v]->get_dim(
+								vecvarSnapshots[v]->num_dims()-1);
+
+						_ASSERT(dimSnapshot0->size() * dimSnapshot1->size()
+							== dOutputDataSnapshot.GetRows());
+
+						vecvarSnapshots[v]->set_cur(
+							pathnode.m_fileix);
+
+						vecvarSnapshots[v]->put(
+							&(dOutputDataSnapshot[0]),
+							1,
+							dimSnapshot0->size(),
+							dimSnapshot1->size());
+					}
+
+					// Fixed point composites only use the time, not the location
 					if ((dFixedLatitudeRad != -999.) || (dFixedLongitudeRad != -999.)) {
 						break;
 					}
@@ -981,16 +1182,28 @@ try {
 		}
 
 		// Average all Variables
-		if (nDataInstances != 0) {
+		if ((dFixedLatitudeRad != -999.) || (dFixedLongitudeRad != -999.)) {
 			for (int v = 0; v < vecVarIxIn.size(); v++) {
 				for (int i = 0; i < vecOutputDataMean[v].GetRows(); i++) {
-					vecOutputDataMean[v][i] /= static_cast<float>(nDataInstances);
+					vecOutputDataMean[v][i] /=
+						static_cast<float>(sPathCount);
+				}
+			}
+		} else {
+			for (int v = 0; v < vecVarIxIn.size(); v++) {
+				for (int i = 0; i < vecOutputDataMean[v].GetRows(); i++) {
+					vecOutputDataMean[v][i] /=
+						static_cast<float>(sSnapshotCount);
 				}
 			}
 		}
 
 		// Write output variables
 		{
+			if (!fOutputInitialized) {
+				_EXCEPTIONT("Failed to initialize output (no time slices found)");
+			}
+
 			AnnounceStartBlock("Writing output");
 			if (fCompositeMean) {
 				_ASSERT(vecVarIxIn.size() == vecOutputDataMean.size());

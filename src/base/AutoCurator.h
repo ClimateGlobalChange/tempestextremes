@@ -20,6 +20,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include "netcdfcpp.h"
 
 #include "TimeObj.h"
 
@@ -62,7 +63,9 @@ public:
 	///		Constructor.
 	///	</summary>
 	AutoCurator() :
-		m_eCalendarType(Time::CalendarUnknown)
+		m_eCalendarType(Time::CalendarUnknown),
+		m_eNcTimeType(ncNoType),
+		m_strNcTimeUnits("")
 	{ }
 
 protected:
@@ -112,6 +115,20 @@ public:
 		return m_mapTimeToTimeFileIx.size();
 	}
 
+	///	<summary>
+	///		Get the type used to store time.
+	///	</summary>
+	NcType GetNcTimeType() const {
+		return m_eNcTimeType;
+	}
+
+	///	<summary>
+	///		Get the units used to store time.
+	///	</summary>
+	const std::string & GetNcTimeUnits() const {
+		return m_strNcTimeUnits;
+	}
+
 public:
 	///	<summary>
 	///		Generate a NcFileVector and local time index for the given Time.
@@ -127,6 +144,16 @@ protected:
 	///		CalendarType for all Time objects.
 	///	</summary>
 	Time::CalendarType m_eCalendarType;
+
+	///	<summary>
+	///		NcType used for time in the dataset.
+	///	</summary>
+	NcType m_eNcTimeType;
+
+	///	<summary>
+	///		Time units used in the dataset.
+	///	</summary>
+	std::string m_strNcTimeUnits;
 
 	///	<summary>
 	///		List of filenames.

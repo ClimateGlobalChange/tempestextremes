@@ -528,7 +528,7 @@ public:
 	///	</summary>
 	double GetCFCompliantUnitsOffsetDouble(
 		const std::string & strFormattedTime
-	);
+	) const;
 
 	///	<summary>
 	///		Get the name of the calendar.

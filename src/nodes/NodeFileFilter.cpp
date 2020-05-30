@@ -1025,6 +1025,8 @@ try {
 		cdhInput,
 		grid,
 		caltype);
+
+	nodefile.GenerateTimeToPathNodeMap();
 	AnnounceEndBlock("Done");
 
 	// Create data array

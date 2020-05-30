@@ -922,7 +922,7 @@ void Time::FromCFCompliantUnitsOffsetDouble(
 
 double Time::GetCFCompliantUnitsOffsetDouble(
 	const std::string & strFormattedTime
-) {
+) const {
 	// Time format is "days since ..."
 	if ((strFormattedTime.length() >= 11) &&
 	    (strncmp(strFormattedTime.c_str(), "days since ", 11) == 0)

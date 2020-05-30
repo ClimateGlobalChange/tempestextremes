@@ -7,7 +7,7 @@
 
 # C++ compiler without and with MPI
 CXX=               g++
-MPICXX=            mpic++
+MPICXX=            mpicxx
 
 # Additional C++ command line flags
 

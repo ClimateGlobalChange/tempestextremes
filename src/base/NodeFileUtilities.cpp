@@ -65,6 +65,9 @@ void NodeFile::Read(
 		_EXCEPTION1("Unable to open input file \"%s\"", strNodeFile.c_str());
 	}
 
+	// Current pathnode index
+	size_t ixpathnode = 0;
+
 	// Loop through all lines
 	int iLine = 1;
 	for (;;) {
@@ -243,6 +246,10 @@ void NodeFile::Read(
 					caltype);
 
 				pathnode.m_time = time;
+
+				// Store file position
+				pathnode.m_fileix = ixpathnode;
+				ixpathnode++;
 
 				// Store coordinate
 				if (coord.size() == 1) {
