@@ -607,20 +607,37 @@ void DetectBlobs(
 	// Define the SimpleGrid
 	SimpleGrid grid;
 
-	// Dimensions
-	int nSize = 0;
-	int nLon = 0;
-	int nLat = 0;
-
 	// Load in the benchmark file
 	NcFileVector vecFiles;
 	vecFiles.ParseFromString(strInputFiles);
 
 	// Check for connectivity file
 	if (strConnectivity != "") {
+		AnnounceStartBlock("Generating grid information from connectivity file");
 		grid.FromFile(strConnectivity);
+		AnnounceEndBlock("Done");
 
-		nSize = grid.GetSize();
+	// No connectivity file; check for latitude/longitude dimension
+	} else {
+		AnnounceStartBlock("No connectivity file specified");
+		Announce("Attempting to generate latitude-longitude grid from data file");
+
+		grid.GenerateLatitudeLongitude(
+			vecFiles[0],
+			param.strLatitudeName,
+			param.strLongitudeName,
+			param.fRegional,
+			param.fDiagonalConnectivity);
+
+		if (grid.m_nGridDim.size() != 2) {
+			_EXCEPTIONT("Logic error when generating connectivity");
+		}
+		AnnounceEndBlock("Done");
+	}
+/*
+	// Check for connectivity file
+	if (strConnectivity != "") {
+		grid.FromFile(strConnectivity);
 
 	// No connectivity file; check for latitude/longitude dimension
 	} else {
@@ -649,8 +666,8 @@ void DetectBlobs(
 			_EXCEPTION1("Error accessing variable \"%s\"", param.strLatitudeName.c_str());
 		}
 
-		nLat = dimLat->size();
-		nLon = dimLon->size();
+		int nLat = dimLat->size();
+		int nLon = dimLon->size();
 
 		DataArray1D<double> vecLat(nLat);
 		varLat->get(vecLat, nLat);
@@ -674,7 +691,7 @@ void DetectBlobs(
 			param.fDiagonalConnectivity,
 			true);
 	}
-
+*/
 	// Get time dimension
 	NcDim * dimTime = vecFiles[0]->get_dim("time");
 	NcVar * varTime = NULL;

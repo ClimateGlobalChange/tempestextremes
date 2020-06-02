@@ -91,14 +91,36 @@ void SimpleGrid::GenerateLatitudeLongitude(
 	m_nGridDim[1] = nLon;
 
 	// Verify units of latitude and longitude
+	bool fCalculateArea = true;
+
 	for (int j = 0; j < nLat; j++) {
 		if (fabs(vecLat[j]) > 0.5 * M_PI + 1.0e-12) {
-			_EXCEPTIONT("Latitude array must be given in radians");
+			if (fRegional) {
+				Announce("WARNING: Latitude array out of bounds [-90,90] "
+					"(%1.5f); defaulting grid areas to 1.",
+					RadToDeg(vecLat[j]));
+				fCalculateArea = false;
+				break;
+			} else {
+				_EXCEPTION1("Latitude array out of bounds [-90,90] (%1.5f). "
+					 "Did you mean to specify \"--regional\"?",
+					 RadToDeg(vecLat[j]));
+			}
 		}
 	}
 	for (int i = 0; i < nLon; i++) {
 		if (fabs(vecLon[i]) > 2.0 * M_PI + 1.0e-12) {
-			_EXCEPTIONT("Longitude array must be given in radians");
+			if (fRegional) {
+				Announce("WARNING: Latitude array out of bounds [-360,360] "
+					"(%1.5f); defaulting grid areas to 1.",
+					RadToDeg(vecLon[i]));
+				fCalculateArea = false;
+				break;
+			} else {
+				_EXCEPTION1("Latitude array out of bounds [-360,360] (%1.5f). "
+					"Did you mean to specify \"--regional\"?",
+					RadToDeg(vecLon[i]));
+			}
 		}
 	}
 
@@ -172,12 +194,16 @@ void SimpleGrid::GenerateLatitudeLongitude(
 			dLonRad1 -= 2.0 * M_PI;
 		}
 		double dDeltaLon = dLonRad2 - dLonRad1;
-		if (dDeltaLon >= M_PI) {
+		if (!fRegional && (dDeltaLon >= M_PI)) {
 			_EXCEPTION1("Grid element longitudinal extent too large (%1.7f deg).  Did you mean to specify \"--regional\"?",
 				dDeltaLon * 180.0 / M_PI);
 		}
 
-		m_dArea[ixs] = fabs(sin(dLatRad2) - sin(dLatRad1)) * dDeltaLon;
+		if (fCalculateArea) {
+			m_dArea[ixs] = fabs(sin(dLatRad2) - sin(dLatRad1)) * dDeltaLon;
+		} else {
+			m_dArea[ixs] = 1.0;
+		}
 
 		// Connectivity in eight directions
 		if (fDiagonalConnectivity) {
