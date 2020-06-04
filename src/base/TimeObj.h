@@ -305,6 +305,16 @@ public:
 	int DayNumber() const;
 
 	///	<summary>
+	///		Returns true if this is a leap day.
+	///	</summary>
+	bool IsLeapDay() const;
+
+	///	<summary>
+	///		Returns true if this is a leap year.
+	///	</summary>
+	bool IsLeapYear() const;
+
+	///	<summary>
 	///		Determine the number of seconds between two Times.
 	///	</summary>
 	double operator-(const Time & time) const;

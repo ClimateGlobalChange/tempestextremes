@@ -346,6 +346,44 @@ int Time::DayNumber() const {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+bool Time::IsLeapDay() const {
+	if ((m_eCalendarType == CalendarUnknown) ||
+	    (m_eCalendarType == CalendarNone) ||
+	    (m_eCalendarType == CalendarNoLeap) ||
+	    (m_eCalendarType == Calendar360Day)
+	) {
+		return false;
+	}
+
+	if ((m_iMonth == 1) && (m_iDay == 28)) {
+		return true;
+	}
+
+	return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool Time::IsLeapYear() const {
+	if ((m_eCalendarType == CalendarUnknown) ||
+	    (m_eCalendarType == CalendarNone) ||
+	    (m_eCalendarType == CalendarNoLeap) ||
+	    (m_eCalendarType == Calendar360Day)
+	) {
+		return false;
+	}
+	if ((m_iYear % 4) == 0) {
+		if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
+			return false;
+		}
+		return true;
+	}
+
+	return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 double Time::operator-(const Time & time) const {
 	return -DeltaSeconds(time);
 }

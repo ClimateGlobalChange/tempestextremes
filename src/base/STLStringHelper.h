@@ -114,7 +114,8 @@ inline static bool IsFloat(const std::string &str) {
 
 static void ParseVariableList(
 	const std::string & strVariables,
-	std::vector< std::string > & vecVariableStrings
+	std::vector< std::string > & vecVariableStrings,
+	const std::string & strDelimiters = std::string(" ,;")
 ) {
 	int iVarBegin = 0;
 	int iVarCurrent = 0;
@@ -122,8 +123,7 @@ static void ParseVariableList(
 	// Parse variable name
 	for (;;) {
 		if ((iVarCurrent >= strVariables.length()) ||
-			(strVariables[iVarCurrent] == ',') ||
-			(strVariables[iVarCurrent] == ' ')
+			(strDelimiters.find(strVariables[iVarCurrent]) != std::string::npos)
 		) {
 			if (iVarCurrent == iVarBegin) {
 				if (iVarCurrent >= strVariables.length()) {

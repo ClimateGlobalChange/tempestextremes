@@ -195,6 +195,19 @@ public:
 		size(_size)
 	{ }
 
+	///	<summary>
+	///		Comparator (needed to have sets of DimInfo).
+	///	</summary>
+	bool operator< (const DimInfo & di) const {
+		if (name < di.name) {
+			return true;
+		}
+		if (size < di.size) {
+			return true;
+		}
+		return false;
+	}
+
 public:
 	///	<summary>
 	///		Dimension name.

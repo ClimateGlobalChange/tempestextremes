@@ -14,7 +14,7 @@ TEMPESTEXTREMESBASEDIR= $(TEMPESTEXTREMESDIR)/src/base
 
 TEMPESTEXTREMESBASELIB= $(TEMPESTEXTREMESBASEDIR)/libextremesbase.a
 
-EXEC_FILES= GenerateConnectivityFile.cpp
+EXEC_FILES= GenerateConnectivityFile.cpp Climatology.cpp
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 
