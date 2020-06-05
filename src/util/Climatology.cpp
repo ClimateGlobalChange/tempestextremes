@@ -26,6 +26,7 @@
 
 #include "netcdfcpp.h"
 
+#include <complex>
 #include <vector>
 #include <set>
 #include <map>
@@ -33,6 +34,74 @@
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
 #endif
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Apply a Fourier filter to a given data sequence.
+///	</summary>
+void fourier_filter(
+	double * const data,
+	size_t sCount,
+	size_t sStride,
+	size_t sModes,
+	DataArray1D<double> & an,
+	DataArray1D<double> & bn
+) {
+	_ASSERT(an.GetRows() >= sModes);
+	_ASSERT(bn.GetRows() >= sModes);
+
+	an.Zero();
+	bn.Zero();
+
+	{
+		for (int n = 0; n < sCount; n++) {
+			an[0] += data[n*sStride];
+		}
+
+		double dProd0 = 2.0 * M_PI / static_cast<double>(sCount);
+		for (int k = 1; k < sModes; k++) {
+			double dProd1 = dProd0 * static_cast<double>(k);
+			for (int n = 0; n < sCount; n++) {
+				double dProd2 = dProd1 * static_cast<double>(n);
+				an[k] += data[n*sStride] * cos(dProd2);
+				bn[k] -= data[n*sStride] * sin(dProd2);
+			}
+
+			//an[sCount-k] = an[k];
+			//bn[sCount-k] = -bn[k];
+		}
+	}
+	{
+		for (int n = 0; n < sCount; n++) {
+			data[n*sStride] = 0.0;
+		}
+
+		double dProd0 = 2.0 * M_PI / static_cast<double>(sCount);
+		for (int n = 0; n < sCount; n++) {
+			data[n*sStride] += an[0];
+
+			double dProd1 = dProd0 * static_cast<double>(n);
+			for (int k = 1; k < sModes; k++) {
+				double dProd2 = dProd1 * static_cast<double>(k);
+				double dProd3 = dProd1 * static_cast<double>(sCount-k);
+				data[n*sStride] += an[k] * cos(dProd2) - bn[k] * sin(dProd2);
+				data[n*sStride] += an[k] * cos(dProd3) + bn[k] * sin(dProd3);
+
+				//printf("%1.15e %1.15e : ", cos(dProd2), cos(dProd3));
+				//printf("%1.15e %1.15e\n", sin(dProd2), sin(dProd3));
+			}
+			//for (int k = sCount-sModes+1; k < sCount; k++) {
+			//	double dProd2 = dProd1 * static_cast<double>(k);
+			//	data[n*sStride] += an[k] * cos(dProd2) - bn[k] * sin(dProd2);
+			//}
+		}
+
+		for (int n = 0; n < sCount; n++) {
+			data[n*sStride] /= static_cast<double>(sCount);
+		}
+	}
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -191,6 +260,7 @@ long long NcGetPutSpecifiedDataSize(
 		llNcArrayPos += lReadWriteSize;
 
 		// Read data
+/*
 		if (eGetPut == NetCDF_Get) {
 			printf("get ");
 		} else {
@@ -205,7 +275,7 @@ long long NcGetPutSpecifiedDataSize(
 		}
 		printf(" :: %lu read/written %lu remaining", lReadWriteSize, lSizePerIteration);
 		printf("\n");
-
+*/
 		ncvar->set_cur(&(lPos[0]));
 		if (eGetPut == NetCDF_Get) {
 			ncvar->get(&(data[llTotalReadWriteSize]), &(lSize[0]));
@@ -267,6 +337,12 @@ try {
 	// Number of Fourier modes to retain
 	int nFourierModes;
 
+	// Dataset has missing data
+	bool fMissingData;
+
+	// Verbose
+	bool fVerbose;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in_data", "");
@@ -276,7 +352,9 @@ try {
 		CommandLineStringD(strMemoryMax, "memmax", "2G", "[#K,#M,#G]");	
 		CommandLineStringD(strMeanType, "mean", "daily", "[daily|monthly|seasonal|annual]");
 		CommandLineBool(fIncludeLeapDays, "include_leap_days");
-		CommandLineInt(nFourierModes, "time_modes", -1);
+		CommandLineInt(nFourierModes, "time_modes", 0);
+		CommandLineBool(fMissingData, "missingdata");
+		CommandLineBool(fVerbose, "verbose");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -584,11 +662,22 @@ try {
 		// Loop through each iteration of this variable
 		for (int c = 0; c < vecOutputAuxCount[v]; c++) {
 
+			if (vecOutputAuxCount[v] > 1) {
+				AnnounceStartBlock("Iteration %i/%i", c, vecOutputAuxCount[v]);
+			}
+
 			// Number of time slices
 			DataArray1D<int> nTimeSlices(sOutputTimes);
 
 			// Accumulated data array for mean
 			DataArray2D<double> dAccumulatedData(sOutputTimes, vecOutputAuxSize[v]);
+
+			// If missing data is present need to count number of data points
+			// at each location.
+			DataArray2D<int> nTimeSlicesGrid;
+			if (fMissingData) {
+				nTimeSlicesGrid.Allocate(sOutputTimes, vecOutputAuxSize[v]);
+			}
 
 			// Loop through each input file
 			for (int f = 0; f < vecInputFileList.size(); f++) {
@@ -645,18 +734,36 @@ try {
 						vecVariableStrings[v].c_str(),
 						vecInputFileList[f].c_str());
 				}
+				
+				// Get the fill value
+				float dFillValue;
+				if (fMissingData) {
+					NcAtt * attFillValue = varIn->get_att("_FillValue");
+					if (attFillValue == NULL) {
+						_EXCEPTION2("Variable \"%s\" missing _FillValue attribute, "
+							"needed for --missingdata in NetCDF file \"%s\"",
+							vecVariableStrings[v].c_str(),
+							vecInputFileList[f].c_str());
+					}
+
+					dFillValue = attFillValue->as_float(0);
+				}
 
 				// TODO: Verify variable dimensionality
 
 				// Daily mean
 				for (int t = 0; t < vecTimes.size(); t++) {
 					if (vecTimes[t].IsLeapDay()) {
-						Announce("Time %s (leap day; skipping)",
-							vecTimes[t].ToString().c_str());
+						if (fVerbose) {
+							Announce("Time %s (leap day; skipping)",
+								vecTimes[t].ToString().c_str());
+						}
 						continue;
 					} else {
-						Announce("Time %s",
-							vecTimes[t].ToString().c_str());
+						if (fVerbose) {
+							Announce("Time %s",
+								vecTimes[t].ToString().c_str());
+						}
 					}
 
 					lPos0[0] = t;
@@ -669,7 +776,7 @@ try {
 							dDataIn,
 							NetCDF_Get);
 
-					std::cout << sGetRows << " read" << std::endl;
+					//std::cout << sGetRows << " read" << std::endl;
 
 					Time timeJan01 = vecTimes[t];
 					timeJan01.SetMonth(1);
@@ -682,26 +789,68 @@ try {
 
 					_ASSERT((iDay >= 0) && (iDay < 365));
 
-					nTimeSlices[iDay]++;
-					for (size_t i = 0; i < sGetRows; i++) {
-						dAccumulatedData[iDay][i] += static_cast<double>(dDataIn[i]);
+					if (fMissingData) {
+						for (size_t i = 0; i < sGetRows; i++) {
+							if (dDataIn[i] != dFillValue) {
+								nTimeSlicesGrid[iDay][i]++;
+								dAccumulatedData[iDay][i] += static_cast<double>(dDataIn[i]);
+							}
+						}
+					} else {
+						nTimeSlices[iDay]++;
+						for (size_t i = 0; i < sGetRows; i++) {
+							dAccumulatedData[iDay][i] += static_cast<double>(dDataIn[i]);
+						}
 					}
 				}
 			}
 
-			// Loop through all accumulated data
+			// Calculate the mean over all data
 			for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
 				if (nTimeSlices[t] == 0) {
 					continue;
 				}
 
 				// Take mean
-				for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
-					dAccumulatedData[t][i] /= static_cast<double>(nTimeSlices[t]);
+				if (fMissingData) {
+					for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
+						if (nTimeSlicesGrid[t][i] != 0) {
+							dAccumulatedData[t][i] /=
+								static_cast<double>(nTimeSlicesGrid[t][i]);
+						} else {
+							dAccumulatedData[t][i] = 0.0;
+						}
+					}
+				} else {
+					for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
+						dAccumulatedData[t][i] /= static_cast<double>(nTimeSlices[t]);
+					}
 				}
+			}
 
-				// TODO: Fourier transform
+			// Apply Fourier smoothing in time
+			if ((nFourierModes != 0) &&
+			    (nFourierModes < dAccumulatedData.GetColumns() / 2)
+			) {
+				AnnounceStartBlock("Performing Fourier filtering");
+				DataArray1D<double> an(dAccumulatedData.GetRows());
+				DataArray1D<double> bn(dAccumulatedData.GetRows());
 
+				for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
+					fourier_filter(
+						&(dAccumulatedData[0][i]),
+						dAccumulatedData.GetRows(),
+						dAccumulatedData.GetColumns(),
+						nFourierModes,
+						an,
+						bn);
+				}
+				AnnounceEndBlock("Done");
+			}
+
+			// Write data
+			AnnounceStartBlock("Writing data to file");
+			for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
 				// Convert to float and write to disk
 				DataArray1D<float> dMeanData(dAccumulatedData.GetColumns());
 				for (size_t i = 0; i < dMeanData.GetRows(); i++) {
@@ -716,6 +865,11 @@ try {
 					c,
 					dMeanData,
 					NetCDF_Put);
+			}
+			AnnounceEndBlock("Done");
+
+			if (vecOutputAuxCount[v] > 1) {
+				AnnounceEndBlock("Done");
 			}
 		}
 	}
