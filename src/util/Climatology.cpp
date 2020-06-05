@@ -40,6 +40,8 @@
 ///	<summary>
 ///		Apply a Fourier filter to a given data sequence.
 ///	</summary>
+
+// TODO: Test this function
 void fourier_filter(
 	double * const data,
 	size_t sCount,
@@ -807,11 +809,8 @@ try {
 
 			// Calculate the mean over all data
 			for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
-				if (nTimeSlices[t] == 0) {
-					continue;
-				}
 
-				// Take mean
+				// ..with missing data
 				if (fMissingData) {
 					for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
 						if (nTimeSlicesGrid[t][i] != 0) {
@@ -821,7 +820,12 @@ try {
 							dAccumulatedData[t][i] = 0.0;
 						}
 					}
+
+				// ..without missing data
 				} else {
+					if (nTimeSlices[t] == 0) {
+						continue;
+					}
 					for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
 						dAccumulatedData[t][i] /= static_cast<double>(nTimeSlices[t]);
 					}
