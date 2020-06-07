@@ -215,6 +215,9 @@ try {
 	// List of variables to output
 	std::string strVariables;
 
+	// List of variables to output
+	std::string strOutputVariables;
+
 	// Data contains missing values
 	//bool fMissingData;
 
@@ -267,6 +270,7 @@ try {
 		CommandLineString(strOutputData, "out_data", "");
 
 		CommandLineString(strVariables, "var", "");
+		CommandLineString(strOutputVariables, "varout", "");
 		//CommandLineBool(fMissingData, "missingdata");
 		CommandLineStringD(strOperators, "op", "mean", "[mean|min|max,...]");
 		CommandLineStringD(strHistogramOp, "histogram", "", "[var,offset,binsize;...]");
@@ -405,6 +409,7 @@ try {
 	}
 
 	// Parse --var argument
+	std::vector<std::string> vecVariableNamesIn;
 	VariableIndexVector vecVarIxIn;
 	if (strVariables != "") {
 		std::string strVariablesTemp = strVariables;
@@ -413,14 +418,29 @@ try {
 			int iLast = varregIn.FindOrRegisterSubStr(strVariablesTemp, &varixIn) + 1;
 
 			vecVarIxIn.push_back(varixIn);
+			vecVariableNamesIn.push_back(varregIn.GetVariableString(varixIn));
 
 			if (iLast >= strVariablesTemp.length()) {
 				break;
 			}
 			strVariablesTemp = strVariablesTemp.substr(iLast);
 		}
+
+		_ASSERT(vecVariableNamesIn.size() == vecVarIxIn.size());
 	}
  
+	// Parse --varout argument
+	std::vector<std::string> vecVariableNamesOut;
+	if (strOutputVariables != "") {
+		STLStringHelper::ParseVariableList(strOutputVariables, vecVariableNamesOut);
+	} else {
+		vecVariableNamesOut = vecVariableNamesIn;
+	}
+	if (vecVariableNamesOut.size() != vecVariableNamesIn.size()) {
+		_EXCEPTION2("Inconsistent number of variables in --var (%lu) and --varout (%lu)",
+			vecVarIxIn.size(), vecVariableNamesOut.size());
+	}
+
 	// Parse --op argument
 	bool fCompositeMean = false;
 	bool fCompositeMin = false;
@@ -983,7 +1003,7 @@ try {
 						}
 
 						std::string strVarName = std::string("snap_");
-						strVarName += varregIn.GetVariableString(vecVarIxIn[v]);
+						strVarName += vecVariableNamesOut[v];
 
 						NcVar * varSnapshots =
 							ncoutfile.add_var(
@@ -1248,7 +1268,7 @@ try {
 
 			for (int v = 0; v < vecVarIxIn.size(); v++) {
 				std::string strVarName =
-					varregIn.GetVariableString(vecVarIxIn[v]);
+					vecVariableNamesOut[v];
 
 				AnnounceStartBlock(strVarName.c_str());
 
