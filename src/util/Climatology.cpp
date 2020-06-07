@@ -584,6 +584,7 @@ try {
 			varOutTime->add_att("calendar", "noleap");
 		}
 		varOutTime->add_att("units", strTimeUnits.c_str());
+		varOutTime->add_att("type", "daily mean climatology");
 
 		if (varOutTime->type() == ncInt) {
 			DataArray1D<int> nTimes(sOutputTimes);
@@ -637,9 +638,10 @@ try {
 				_ASSERT(itNcDim != mapOutputNcDim.end());
 				vecVarNcDims.push_back(itNcDim->second);
 			}
+			std::string strOutVar = std::string("dailymean_") + vecVariableStrings[v];
 			NcVar * varOut =
 				ncoutfile.add_var(
-					vecVariableStrings[v].c_str(),
+					strOutVar.c_str(),
 					ncFloat,
 					vecVarNcDims.size(),
 					const_cast<const NcDim**>(&(vecVarNcDims[0])));
@@ -652,8 +654,6 @@ try {
 			NcVar * varIn = ncinfile.get_var(vecVariableStrings[v].c_str());
 			_ASSERT(varIn != NULL);
 			CopyNcVarAttributes(varIn, varOut);
-
-			varOut->add_att("climatology", "daily mean");
 
 			vecNcVarOut[v] = varOut;
 		}

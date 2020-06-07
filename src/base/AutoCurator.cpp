@@ -23,8 +23,10 @@
 #include "netcdfcpp.h"
 
 ///////////////////////////////////////////////////////////////////////////////
+// AutoCuratorDataset
+///////////////////////////////////////////////////////////////////////////////
 
-void AutoCurator::InsertTimeToFileTimeIx(
+void AutoCuratorDataset::InsertTimeToFileTimeIx(
 	const Time & time,
 	const int & iFileIx,
 	const int & iTimeIx
@@ -38,11 +40,36 @@ void AutoCurator::InsertTimeToFileTimeIx(
 				time, FileTimeIxVector())).first;
 	}
 
-	//std::cout << time.ToString() << " " << iFileIx << " " << iTimeIx << std::endl;
-
 	iter->second.push_back(FileTimeIx(iFileIx, iTimeIx));
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+AutoCuratorDataset::FilenameTimePairVector AutoCuratorDataset::Find(
+	const Time & time
+) const {
+	FilenameTimePairVector vec;
+
+	TimeToFileTimeIxMap::const_iterator iter =
+		m_mapTimeToTimeFileIx.find(time);
+
+	if (iter == m_mapTimeToTimeFileIx.end()) {
+		return vec;
+	}
+
+	const FileTimeIxVector & vecFileTimeIx = iter->second;
+	for (int f = 0; f < vecFileTimeIx.size(); f++) {
+		vec.push_back(
+			FilenameTimePair(
+				m_vecFiles[vecFileTimeIx[f].first],
+				vecFileTimeIx[f].second));
+	}
+
+	return vec;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// AutoCurator
 ///////////////////////////////////////////////////////////////////////////////
 
 void AutoCurator::IndexFiles(
@@ -67,10 +94,6 @@ void AutoCurator::IndexFiles(
 			_EXCEPTION1("Duplicated filename \"%s\"", strFile.c_str());
 		}
 	}
-
-	// Add file to list of files indexed
-	int iFileIx = static_cast<int>(m_vecFiles.size());
-	m_vecFiles.push_back(strFile);
 
 	// Open file
 	NcFile ncFile(strFile.c_str());
@@ -101,6 +124,11 @@ void AutoCurator::IndexFiles(
 				"although \"time\" dimension is present", strFile.c_str());
 		}
 
+		// Add file to list of files indexed
+		int iFileIx = static_cast<int>(m_vecFiles.size());
+		m_vecFiles.push_back(strFile);
+
+		// Index file
 		for (int t = 0; t < dimTime->size(); t++) {
 			Time time(m_eCalendarType);
 			time.SetYear(iFileIx);
@@ -134,19 +162,39 @@ void AutoCurator::IndexFiles(
 				"\"units\" attribute", strFile.c_str());
 		}
 
-		if (m_strNcTimeUnits == "") {
-			m_eNcTimeType = varTime->type();
-			m_strNcTimeUnits = attUnits->as_string(0);
+		// Check if this file is a daily mean climatology
+		bool fDailyMeanClimatology = false;
+		NcAtt * attType = varTime->get_att("type");
+		if (attType != NULL) {
+			std::string strType = attType->as_string(0);
+			if (strType == "daily mean climatology") {
+				fDailyMeanClimatology = true;
+			}
+		}
+
+		AutoCuratorDataset * pacd = this;
+		if (fDailyMeanClimatology) {
+			pacd = &m_acdDailyMean;
+		}
+
+		// Index file
+		int iFileIx = static_cast<int>(pacd->m_vecFiles.size());
+		pacd->m_vecFiles.push_back(strFile);
+
+		if (pacd->m_strNcTimeUnits == "") {
+			pacd->m_eNcTimeType = varTime->type();
+			pacd->m_strNcTimeUnits = attUnits->as_string(0);
 		}
 
 		Time::CalendarType eCalendarType =
 			Time::CalendarTypeFromString(attCalendar->as_string(0));
 
-		if (m_eCalendarType == Time::CalendarUnknown) {
-			m_eCalendarType = eCalendarType;
-		} else if (m_eCalendarType != eCalendarType) {
+		if (pacd->m_eCalendarType == Time::CalendarUnknown) {
+			pacd->m_eCalendarType = eCalendarType;
+		} else if (pacd->m_eCalendarType != eCalendarType) {
 			_EXCEPTION2("CalendarType mismatch in \"%s\", found \"%s\"",
-				strFile.c_str(), attCalendar->as_string(0));
+				strFile.c_str(),
+				attCalendar->as_string(0));
 		}
 
 		DataArray1D<int> vecTimeInt;
@@ -173,51 +221,26 @@ void AutoCurator::IndexFiles(
 		}
 
 		for (int t = 0; t < dimTime->size(); t++) {
-			Time time(m_eCalendarType);
+			Time time(pacd->m_eCalendarType);
 			if (varTime->type() == ncInt) {
 				time.FromCFCompliantUnitsOffsetInt(
-					m_strNcTimeUnits,
+					pacd->m_strNcTimeUnits,
 					vecTimeInt[t]);
 
 			} else if (varTime->type() == ncFloat) {
 				time.FromCFCompliantUnitsOffsetDouble(
-					m_strNcTimeUnits,
+					pacd->m_strNcTimeUnits,
 					static_cast<double>(vecTimeFloat[t]));
 
 			} else if (varTime->type() == ncDouble) {
 				time.FromCFCompliantUnitsOffsetDouble(
-					m_strNcTimeUnits,
+					pacd->m_strNcTimeUnits,
 					vecTimeDouble[t]);
 			}
 
-			InsertTimeToFileTimeIx(time, iFileIx, t);
+			pacd->InsertTimeToFileTimeIx(time, iFileIx, t);
 		}
 	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-AutoCurator::FilenameTimePairVector AutoCurator::Find(
-	const Time & time
-) const {
-	FilenameTimePairVector vec;
-
-	TimeToFileTimeIxMap::const_iterator iter =
-		m_mapTimeToTimeFileIx.find(time);
-
-	if (iter == m_mapTimeToTimeFileIx.end()) {
-		return vec;
-	}
-
-	const FileTimeIxVector & vecFileTimeIx = iter->second;
-	for (int f = 0; f < vecFileTimeIx.size(); f++) {
-		vec.push_back(
-			FilenameTimePair(
-				m_vecFiles[vecFileTimeIx[f].first],
-				vecFileTimeIx[f].second));
-	}
-
-	return vec;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -226,14 +249,39 @@ bool AutoCurator::FindFilesAtTime(
 	const Time & time,
 	NcFileVector & vecncDataFiles
 ) const {
-	FilenameTimePairVector vec = Find(time);
 
-	vecncDataFiles.clear();
-	vecncDataFiles.SetTime(time);
-	for (int i = 0; i < vec.size(); i++) {
-		vecncDataFiles.InsertFile(
-			vec[i].first.c_str(),
-			vec[i].second);
+	// Get normal files at this time
+	{
+		FilenameTimePairVector vec = Find(time);
+
+		vecncDataFiles.clear();
+		vecncDataFiles.SetTime(time);
+		for (int i = 0; i < vec.size(); i++) {
+			vecncDataFiles.InsertFile(
+				vec[i].first.c_str(),
+				vec[i].second);
+		}
+	}
+
+	// Get daily mean climatology at this time
+	{
+		Time timeDailyMean(m_acdDailyMean.m_eCalendarType);
+		timeDailyMean.SetYear(1);
+		timeDailyMean.SetMonth(time.GetMonth());
+		timeDailyMean.SetDay(time.GetDay());
+		if ((time.IsLeapDay()) &&
+		    (m_acdDailyMean.m_eCalendarType == Time::CalendarNoLeap)
+		) {
+			timeDailyMean.SetDay(28);
+		}
+
+		FilenameTimePairVector vec = m_acdDailyMean.Find(timeDailyMean);
+
+		for (int i = 0; i < vec.size(); i++) {
+			vecncDataFiles.InsertFile(
+				vec[i].first.c_str(),
+				vec[i].second);
+		}
 	}
 
 	if (vecncDataFiles.size() == 0) {

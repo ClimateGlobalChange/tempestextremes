@@ -30,7 +30,7 @@ class NcFileVector;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class AutoCurator {
+class AutoCuratorDataset {
 
 public:
 	///	<summary>
@@ -58,17 +58,18 @@ public:
 	///	</summary>
 	typedef std::vector<FilenameTimePair> FilenameTimePairVector;
 
+
 public:
 	///	<summary>
 	///		Constructor.
 	///	</summary>
-	AutoCurator() :
+	AutoCuratorDataset() :
 		m_eCalendarType(Time::CalendarUnknown),
 		m_eNcTimeType(ncNoType),
 		m_strNcTimeUnits("")
 	{ }
 
-protected:
+public:
 	///	<summary>
 	///		Create a new entry in m_mapTimeToTimeFileIx for the given Time.
 	///	</summary>
@@ -77,6 +78,51 @@ protected:
 		const int & iFileIx,
 		const int & iTimeIx
 	);
+
+	///	<summary>
+	///		Find the file/time pair associated with a given Time.
+	///	</summary>
+	FilenameTimePairVector Find(
+		const Time & time
+	) const;
+
+public:
+	///	<summary>
+	///		CalendarType for all Time objects.
+	///	</summary>
+	Time::CalendarType m_eCalendarType;
+
+	///	<summary>
+	///		NcType used for time in the NetCDF files.
+	///	</summary>
+	NcType m_eNcTimeType;
+
+	///	<summary>
+	///		CF-compliant time units.
+	///	</summary>
+	std::string m_strNcTimeUnits;
+
+	///	<summary>
+	///		List of filenames.
+	///	</summary>
+	std::vector<std::string> m_vecFiles;
+
+	///	<summary>
+	///		A map between Time and (file,time) index.
+	///	</summary>
+	TimeToFileTimeIxMap m_mapTimeToTimeFileIx;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class AutoCurator : public AutoCuratorDataset {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	AutoCurator()
+	{ }
 
 public:
 	///	<summary>
@@ -100,13 +146,6 @@ public:
 	const std::vector<std::string> & GetFilenames() const {
 		return m_vecFiles;
 	}
-
-	///	<summary>
-	///		Find the file/time pair associated with a given Time.
-	///	</summary>
-	FilenameTimePairVector Find(
-		const Time & time
-	) const;
 
 	///	<summary>
 	///		Get the total count of time slices.
@@ -150,29 +189,9 @@ public:
 
 protected:
 	///	<summary>
-	///		CalendarType for all Time objects.
+	///		Daily mean dataset.
 	///	</summary>
-	Time::CalendarType m_eCalendarType;
-
-	///	<summary>
-	///		NcType used for time in the dataset.
-	///	</summary>
-	NcType m_eNcTimeType;
-
-	///	<summary>
-	///		Time units used in the dataset.
-	///	</summary>
-	std::string m_strNcTimeUnits;
-
-	///	<summary>
-	///		List of filenames.
-	///	</summary>
-	std::vector<std::string> m_vecFiles;
-
-	///	<summary>
-	///		A map between Time, and (file,time) index.
-	///	</summary>
-	TimeToFileTimeIxMap m_mapTimeToTimeFileIx;
+	AutoCuratorDataset m_acdDailyMean;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
