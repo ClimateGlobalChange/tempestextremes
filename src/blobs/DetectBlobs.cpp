@@ -910,7 +910,8 @@ void DetectBlobs(
 
 			// Load the search variable data
 			Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
-			var.LoadGridData(varreg, vecFiles, grid, t);
+			vecFiles.SetConstantTimeIx(t);
+			var.LoadGridData(varreg, vecFiles, grid);
 			const DataArray1D<float> & dataState = var.GetData();
 
 			// Loop through data
@@ -944,7 +945,8 @@ void DetectBlobs(
 
 				// Load the search variable data
 				Variable & var = varreg.Get(vecFilterOp[fc].m_varix);
-				var.LoadGridData(varreg, vecFiles, grid, t);
+				vecFiles.SetConstantTimeIx(t);
+				var.LoadGridData(varreg, vecFiles, grid);
 				const DataArray1D<float> & dataState = var.GetData();
 
 				// Check the blobs against the filter
@@ -984,7 +986,8 @@ void DetectBlobs(
 							dim0);
 
 					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
-					var.LoadGridData(varreg, vecFiles, grid, t);
+					vecFiles.SetConstantTimeIx(t);
+					var.LoadGridData(varreg, vecFiles, grid);
 					const DataArray1D<float> & dataState = var.GetData();
 
 					ncvar->set_cur(t, 0);
@@ -1000,7 +1003,8 @@ void DetectBlobs(
 							dim1);
 
 					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
-					var.LoadGridData(varreg, vecFiles, grid, t);
+					vecFiles.SetConstantTimeIx(t);
+					var.LoadGridData(varreg, vecFiles, grid);
 					const DataArray1D<float> & dataState = var.GetData();
 
 					ncvar->set_cur(t, 0, 0);
@@ -1032,7 +1036,8 @@ void DetectBlobs(
 							dim0);
 
 					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
-					var.LoadGridData(varreg, vecFiles, grid, t);
+					vecFiles.SetConstantTimeIx(t);
+					var.LoadGridData(varreg, vecFiles, grid);
 					const DataArray1D<float> & dataState = var.GetData();
 
 					ncvar->set_cur((long)0);
@@ -1047,7 +1052,8 @@ void DetectBlobs(
 							dim1);
 
 					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
-					var.LoadGridData(varreg, vecFiles, grid, t);
+					vecFiles.SetConstantTimeIx(t);
+					var.LoadGridData(varreg, vecFiles, grid);
 					const DataArray1D<float> & dataState = var.GetData();
 
 					ncvar->set_cur(0, 0);

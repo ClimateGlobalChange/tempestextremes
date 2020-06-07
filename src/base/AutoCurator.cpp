@@ -18,6 +18,7 @@
 #include "Exception.h"
 #include "DataArray1D.h"
 #include "Variable.h"
+#include "Announce.h"
 
 #include "netcdfcpp.h"
 
@@ -209,7 +210,6 @@ AutoCurator::FilenameTimePairVector AutoCurator::Find(
 	}
 
 	const FileTimeIxVector & vecFileTimeIx = iter->second;
-
 	for (int f = 0; f < vecFileTimeIx.size(); f++) {
 		vec.push_back(
 			FilenameTimePair(
@@ -224,28 +224,75 @@ AutoCurator::FilenameTimePairVector AutoCurator::Find(
 
 bool AutoCurator::FindFilesAtTime(
 	const Time & time,
-	NcFileVector & vecncDataFiles,
-	int & iTime
+	NcFileVector & vecncDataFiles
 ) const {
 	FilenameTimePairVector vec = Find(time);
 
 	vecncDataFiles.clear();
-	iTime = (-1);
-
+	vecncDataFiles.SetTime(time);
 	for (int i = 0; i < vec.size(); i++) {
-		vecncDataFiles.InsertFile(vec[i].first.c_str());
-
-		if (iTime == (-1)) {
-			iTime = vec[i].second;
-		} else if (iTime != vec[i].second) {
-			_EXCEPTIONT("Data files have different local time indices (unsupported)");
-		}
+		vecncDataFiles.InsertFile(
+			vec[i].first.c_str(),
+			vec[i].second);
 	}
 
 	if (vecncDataFiles.size() == 0) {
 		return false;
 	}
 	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool AutoCurator::FindFilesNearTime(
+	const Time & time,
+	NcFileVector & vecncDataFiles,
+	const Time & timeMaxDelta,
+	bool fVerbose
+) const {
+	if (m_mapTimeToTimeFileIx.size() == 0) {
+		return false;
+	}
+
+	// Find first element before time and store in iter0
+	// Find first element after time and store in iter1
+	TimeToFileTimeIxMap::const_iterator iter1 =
+		m_mapTimeToTimeFileIx.lower_bound(time);
+
+	TimeToFileTimeIxMap::const_iterator iter0 = iter1;
+
+	if (iter0 != m_mapTimeToTimeFileIx.begin()) {
+		iter0--;
+	}
+	if (iter1 == m_mapTimeToTimeFileIx.end()) {
+		iter1--;
+	}
+
+	// TODO: Use exact arithmetic
+	double dMaxDeltaSeconds = timeMaxDelta.AsSeconds();
+	_ASSERT(dMaxDeltaSeconds >= 0.0);
+
+	// Find the closest time within timeMaxDelta and use that instead
+	double dTimeDelta0 = fabs(time.DeltaSeconds(iter0->first));
+	double dTimeDelta1 = fabs(time.DeltaSeconds(iter1->first));
+
+	if (dTimeDelta0 < dTimeDelta1) {
+		if (dTimeDelta0 <= dMaxDeltaSeconds) {
+			if (dTimeDelta0 != 0.0) {
+				Announce("Substituting time %s", iter0->first.ToString().c_str());
+			}
+			return FindFilesAtTime(iter0->first, vecncDataFiles);
+		}
+	} else {
+		if (dTimeDelta1 <= dMaxDeltaSeconds) {
+			if (dTimeDelta1 != 0.0) {
+				Announce("Substituting time %s", iter1->first.ToString().c_str());
+			}
+			return FindFilesAtTime(iter1->first, vecncDataFiles);
+		}
+	}
+
+	return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

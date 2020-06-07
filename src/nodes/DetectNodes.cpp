@@ -538,7 +538,8 @@ void DetectCyclonesUnstructured(
 
 		// Load the data for the search variable
 		Variable & varSearchBy = varreg.Get(param.ixSearchBy);
-		varSearchBy.LoadGridData(varreg, vecFiles, grid, t);
+		vecFiles.SetConstantTimeIx(t);
+		varSearchBy.LoadGridData(varreg, vecFiles, grid);
 
 		const DataArray1D<float> & dataSearch = varSearchBy.GetData();
 
@@ -742,7 +743,8 @@ void DetectCyclonesUnstructured(
 
 			// Load the search variable data
 			Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
-			var.LoadGridData(varreg, vecFiles, grid, t);
+			vecFiles.SetConstantTimeIx(t);
+			var.LoadGridData(varreg, vecFiles, grid);
 			const DataArray1D<float> & dataState = var.GetData();
 
 			// Loop through all pressure minima
@@ -779,7 +781,8 @@ void DetectCyclonesUnstructured(
 
 			// Load the search variable data
 			Variable & var = varreg.Get(vecClosedContourOp[ccc].m_varix);
-			var.LoadGridData(varreg, vecFiles, grid, t);
+			vecFiles.SetConstantTimeIx(t);
+			var.LoadGridData(varreg, vecFiles, grid);
 			const DataArray1D<float> & dataState = var.GetData();
 
 			// Loop through all pressure minima
@@ -816,7 +819,8 @@ void DetectCyclonesUnstructured(
 
 			// Load the search variable data
 			Variable & var = varreg.Get(vecNoClosedContourOp[ccc].m_varix);
-			var.LoadGridData(varreg, vecFiles, grid, t);
+			vecFiles.SetConstantTimeIx(t);
+			var.LoadGridData(varreg, vecFiles, grid);
 			const DataArray1D<float> & dataState = var.GetData();
 
 			// Loop through all pressure minima

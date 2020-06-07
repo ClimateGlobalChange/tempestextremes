@@ -215,6 +215,9 @@ try {
 	// List of variables to output
 	std::string strVariables;
 
+	// Data contains missing values
+	//bool fMissingData;
+
 	// List of operators
 	std::string strOperators;
 
@@ -236,6 +239,9 @@ try {
 	// Fixed latitude
 	double dFixedLatitudeDeg;
 
+	// Maximum time difference
+	std::string strMaxTimeDelta;
+
 	// Output a snapshot series rather than the time-average
 	bool fSnapshots;
 
@@ -247,9 +253,9 @@ try {
 
 	// Parse the command line
 	BeginCommandLine()
-		CommandLineString(strInputNodeFile, "in_file", "");
+		CommandLineString(strInputNodeFile, "in_nodefile", "");
 		//CommandLineString(strInputNodeFileList, "in_file_list", "");
-		CommandLineStringD(strInputNodeFileType, "in_file_type", "SN", "[DCU|SN]");
+		CommandLineStringD(strInputNodeFileType, "in_nodefile_type", "SN", "[DCU|SN]");
 		CommandLineString(strInputFormat, "in_fmt", "");
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
@@ -260,10 +266,8 @@ try {
 		CommandLineStringD(strOutputGrid, "out_grid", "XY", "[XY|RAD|RLL]");
 		CommandLineString(strOutputData, "out_data", "");
 
-		//CommandLineString(strTimeBegin, "time_begin", "");
-		//CommandLineString(strTimeEnd, "time_end", "");
-
 		CommandLineString(strVariables, "var", "");
+		//CommandLineBool(fMissingData, "missingdata");
 		CommandLineStringD(strOperators, "op", "mean", "[mean|min|max,...]");
 		CommandLineStringD(strHistogramOp, "histogram", "", "[var,offset,binsize;...]");
 
@@ -273,6 +277,7 @@ try {
 		CommandLineDouble(dFixedLatitudeDeg, "fixlat", -999.);
 		CommandLineDouble(dFixedLongitudeDeg, "fixlon", -999.);
 
+		CommandLineString(strMaxTimeDelta, "max_time_delta", "");
 		CommandLineBool(fSnapshots, "snapshots");
 
 		CommandLineString(strLatitudeName, "latname", "lat");
@@ -488,6 +493,15 @@ try {
 			}
 
 			i++;
+		}
+	}
+
+	// Parse --max_time_delta
+	Time timeMaxDelta(Time::CalendarNone);
+	if (strMaxTimeDelta != "") {
+		timeMaxDelta.FromFormattedString(strMaxTimeDelta);
+		if (timeMaxDelta.GetTimeType() != Time::TypeDelta) {
+			_EXCEPTIONT("--max_time_delta must be specified as a time difference ([#d][#h][#m][#s])");
 		}
 	}
 
@@ -848,7 +862,6 @@ try {
 			} else if (eNcTimeType == ncDouble) {
 				varSnapTime->put(&(dataPathTimeDouble[0]), sSnapshotCount);
 			}
-
 		}
 
 		// Loop through all Times in the NodeFile
@@ -858,12 +871,16 @@ try {
 			AnnounceStartBlock("Time %s", iter->first.ToString().c_str());
 
 			NcFileVector vecncDataFiles;
-			int iTime;
-
-			autocurator.FindFilesAtTime(
-				iter->first,
-				vecncDataFiles,
-				iTime);
+			if (strMaxTimeDelta == "") {
+				autocurator.FindFilesAtTime(
+					iter->first,
+					vecncDataFiles);
+			} else {
+				autocurator.FindFilesNearTime(
+					iter->first,
+					vecncDataFiles,
+					timeMaxDelta);
+			}
 
 			if (vecncDataFiles.size() == 0) {
 				_EXCEPTION1("Time (%s) does not exist in input data fileset",
@@ -999,7 +1016,7 @@ try {
 
 				// Load the data for the search variable
 				Variable & var = varregIn.Get(vecVarIxIn[v]);
-				var.LoadGridData(varregIn, vecncDataFiles, grid, iTime);
+				var.LoadGridData(varregIn, vecncDataFiles, grid);
 				const DataArray1D<float> & dataState = var.GetData();
 				_ASSERT(dataState.GetRows() == grid.GetSize());
 

@@ -22,145 +22,9 @@
 #include "DataArray1D.h"
 #include "SimpleGrid.h"
 #include "DataOp.h"
+#include "NcFileVector.h"
 
 #include <vector>
-
-///////////////////////////////////////////////////////////////////////////////
-
-class NcFileVector : protected std::vector<NcFile *> {
-
-private:
-	///	<summary>
-	///		Copy constructor.
-	///	</summary>
-	NcFileVector(const NcFileVector & vecFiles) {
-	}
-
-	///	<summary>
-	///		Assignment operator.
-	///	</summary>
-	NcFileVector & operator= (const NcFileVector & vecFiles) {
-		return (*this);
-	}
-
-public:
-	///	<summary>
-	///		Default constructor.
-	///	</summary>
-	NcFileVector() :
-		std::vector<NcFile *>()
-	{ }
-
-	///	<summary>
-	///		Destructor.
-	///	</summary>
-	~NcFileVector() {
-		NcFileVector::clear();
-	}
-
-	///	<summary>
-	///		Size of this NcFileVector.
-	///	</summary>
-	size_type size() const {
-		return std::vector<NcFile *>::size();
-	}
-
-	///	<summary>
-	///		Clear the contents of this NcFileVector.
-	///	</summary>
-	void clear() {
-		for (size_t i = 0; i < size(); i++) {
-			(*this)[i]->close();
-			delete (*this)[i];
-		}
-	}
-
-	///	<summary>
-	///		Populate from a vector of file names.
-	///	</summary>
-	void InsertFile(
-		const std::string & strFile
-	) {
-		NcFile * pNewFile = new NcFile(strFile.c_str());
-		if (pNewFile == NULL) {
-			_EXCEPTIONT("Unable to allocate new NcFile");
-		}
-		if (!pNewFile->is_valid()) {
-			_EXCEPTION1("Cannot open input file \"%s\"", strFile.c_str());
-		}
-		push_back(pNewFile);
-		m_vecFilenames.push_back(strFile);
-	}
-
-	///	<summary>
-	///		Parse from a semi-colon delineated string of file names.
-	///	</summary>
-	void ParseFromString(
-		const std::string & strFiles,
-		bool fAppend = true
-	) {
-		if (!fAppend) {
-			clear();
-		}
-
-		int iLast = 0;
-		for (int i = 0; i <= strFiles.length(); i++) {
-			if ((i == strFiles.length()) ||
-			    (strFiles[i] == ';')
-			) {
-				std::string strFile =
-					strFiles.substr(iLast, i - iLast);
-
-				InsertFile(strFile);
-
-				iLast = i+1;
-			}
-		}
-
-		if (size() == 0) {
-			_EXCEPTION1("No input files found in \"%s\"",
-				strFiles.c_str());
-		}
-		_ASSERT(size() == m_vecFilenames.size());
-	}
-
-	///	<summary>
-	///		Get an iterator to the file containing the specified variable.
-	///	</summary>
-	const_iterator FindContainingVariable(
-		const std::string & strVariable
-	) const {
-		for (const_iterator iter = begin(); iter != end(); iter++) {
-			NcVar * var = (*iter)->get_var(strVariable.c_str());
-			if (var == NULL) {
-				return iter;
-			}
-		}
-		return end();
-	}
-
-	///	<summary>
-	///		Get the filename at the specified position.
-	///	</summary>
-	const std::string & GetFilename(size_t pos) const {
-		_ASSERT(pos < m_vecFilenames.size());
-		return m_vecFilenames[pos];
-	}
-
-public:
-	///	<summary>
-	///		Accessor.
-	///	</summary>
-	NcFile * operator[](size_type pos) const {
-		return at(pos);
-	}
-
-protected:
-	///	<summary>
-	///		Vector of file names.
-	///	</summary>
-	std::vector<std::string> m_vecFilenames;
-};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -574,16 +438,6 @@ friend class VariableRegistry;
 
 public:
 	///	<summary>
-	///		An invalid time index.
-	///	</summary>
-	static const long InvalidTimeIndex;
-
-	///	<summary>
-	///		No time index.
-	///	</summary>
-	static const long NoTimeIndex;
-
-	///	<summary>
 	///		Invalid argument.
 	///	</summary>
 	static const long InvalidArgument;
@@ -596,7 +450,8 @@ public:
 		m_strName(),
 		m_fOp(false),
 		m_fNoTimeInNcFile(false),
-		m_lTime(InvalidTimeIndex)
+		m_timeStored(Time::CalendarUnknown)
+		//m_lTime(NcFileVector::InvalidTimeIndex)
 	{ }
 
 public:
@@ -661,11 +516,9 @@ protected:
 	///	<summary>
 	///		Get the first instance of this variable in the given NcFileVector.
 	///	</summary>
-	NcVar * GetFromNetCDF(
-		VariableRegistry & varreg,
-		const NcFileVector & vecFiles,
-		const SimpleGrid & grid,
-		long lTime = (-1)
+	NcVar * GetNcVarFromNcFileVector(
+		const NcFileVector & ncfilevec,
+		const SimpleGrid & grid
 	);
 
 public:
@@ -675,8 +528,7 @@ public:
 	void LoadGridData(
 		VariableRegistry & varreg,
 		const NcFileVector & vecFiles,
-		const SimpleGrid & grid,
-		long lTime = (-1)
+		const SimpleGrid & grid
 	);
 
 	///	<summary>
@@ -757,11 +609,21 @@ public:
 	///		Flag indicating this Variable has no time index in NetCDF file.
 	///	</summary>
 	bool m_fNoTimeInNcFile;
+/*
+	///	<summary>
+	///		Filename associated with data loaded in this Variable.
+	///	</summary>
+	std::string m_strFilename;
 
 	///	<summary>
 	///		Time index associated with data loaded in this Variable.
 	///	</summary>
 	long m_lTime;
+*/
+	///	<summary>
+	///		Time currently stored in this Variable.
+	///	</summary>
+	Time m_timeStored;
 
 	///	<summary>
 	///		Data associated with this Variable.

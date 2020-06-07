@@ -54,10 +54,10 @@ public:
 
 public:
 	///	<summary>
-	///		Constructor.
+	///		Default constructor.
 	///	</summary>
 	Time(
-		CalendarType eCalendarType = CalendarNoLeap,
+		CalendarType eCalendarType = CalendarUnknown,
 		TimeType eTimeType = TypeFixed
 	) :
 		m_iYear(0),
@@ -68,9 +68,6 @@ public:
 		m_eCalendarType(eCalendarType),
 		m_eTimeType(eTimeType)
 	{
-		if (m_eCalendarType == CalendarUnknown) {
-			_EXCEPTIONT("Invalid CalendarType");
-		}
 	}
 
 	///	<summary>
@@ -313,6 +310,11 @@ public:
 	///		Returns true if this is a leap year.
 	///	</summary>
 	bool IsLeapYear() const;
+
+	///	<summary>
+	///		Convert a delta time into a number of seconds.
+	///	</summary>
+	double AsSeconds() const;
 
 	///	<summary>
 	///		Determine the number of seconds between two Times.

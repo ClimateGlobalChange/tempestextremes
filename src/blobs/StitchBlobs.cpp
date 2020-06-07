@@ -949,7 +949,8 @@ try {
 
 			// Load the search variable data
 			Variable & var = varreg.Get(varix);
-			var.LoadGridData(varreg, vecNcFiles, grid, t);
+			vecNcFiles.SetConstantTimeIx(t);
+			var.LoadGridData(varreg, vecNcFiles, grid);
 			const DataArray1D<float> & dataIndicator = var.GetData();
 /*
 			float dChecksum = 0.0;

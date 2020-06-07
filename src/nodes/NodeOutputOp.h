@@ -186,7 +186,8 @@ void ApplyNodeOutputOp(
 
 	// Load the search variable data
 	Variable & var = varreg.Get(op.m_varix);
-	var.LoadGridData(varreg, vecFiles, grid, ixTime);
+	vecFiles.SetConstantTimeIx(ixTime);
+	var.LoadGridData(varreg, vecFiles, grid);
 	const DataArray1D<float> & dataState = var.GetData();
 
 	// Return values from the output operators

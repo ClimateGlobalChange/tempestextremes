@@ -236,7 +236,6 @@ void CalculateRadialProfile(
 	NcFileVector & vecFiles,
 	const SimpleGrid & grid,
 	const ColumnDataHeader & cdh,
-	int iTime,
 	PathNode & pathnode,
 	VariableIndex varix,
 	std::string strBins,
@@ -264,7 +263,7 @@ void CalculateRadialProfile(
 
 	// Load the data
 	Variable & var = varreg.Get(varix);
-	var.LoadGridData(varreg, vecFiles, grid, iTime);
+	var.LoadGridData(varreg, vecFiles, grid);
 	const DataArray1D<float> & dataState = var.GetData();
 
 	// Verify that dRadius is less than 180.0
@@ -374,7 +373,6 @@ void CalculateRadialWindProfile(
 	NcFileVector & vecFiles,
 	const SimpleGrid & grid,
 	const ColumnDataHeader & cdh,
-	int iTime,
 	PathNode & pathnode,
 	VariableIndex varixU,
 	VariableIndex varixV,
@@ -403,12 +401,12 @@ void CalculateRadialWindProfile(
 
 	// Load the zonal wind data
 	Variable & varU = varreg.Get(varixU);
-	varU.LoadGridData(varreg, vecFiles, grid, iTime);
+	varU.LoadGridData(varreg, vecFiles, grid);
 	const DataArray1D<float> & dataStateU = varU.GetData();
 
 	// Load the meridional wind data
 	Variable & varV = varreg.Get(varixV);
-	varV.LoadGridData(varreg, vecFiles, grid, iTime);
+	varV.LoadGridData(varreg, vecFiles, grid);
 	const DataArray1D<float> & dataStateV = varV.GetData();
 
 	// Verify that dRadius is less than 180.0
@@ -582,7 +580,6 @@ void SumRadius(
 	NcFileVector & vecFiles,
 	const SimpleGrid & grid,
 	const ColumnDataHeader & cdh,
-	int iTime,
 	PathNode & pathnode,
 	VariableIndex varix,
 	std::string strRadius
@@ -799,7 +796,6 @@ void MaxClosedContourDelta(
 	NcFileVector & vecFiles,
 	const SimpleGrid & grid,
 	const ColumnDataHeader & cdh,
-	int iTime,
 	PathNode & pathnode,
 	VariableIndex varix,
 	std::string strRadius,
@@ -831,7 +827,7 @@ void MaxClosedContourDelta(
 
 	// Load the variable data
 	Variable & var = varreg.Get(varix);
-	var.LoadGridData(varreg, vecFiles, grid, iTime);
+	var.LoadGridData(varreg, vecFiles, grid);
 	const DataArray1D<float> & dataState = var.GetData();
 
 	if (dataState.GetRows() != grid.GetSize()) {
@@ -955,7 +951,6 @@ void CalculateCycloneMetrics(
 	NcFileVector & vecFiles,
 	const SimpleGrid & grid,
 	const ColumnDataHeader & cdh,
-	int iTime,
 	PathNode & pathnode,
 	VariableIndex varixU,
 	VariableIndex varixV,
@@ -974,12 +969,12 @@ void CalculateCycloneMetrics(
 
 	// Load the zonal wind data
 	Variable & varU = varreg.Get(varixU);
-	varU.LoadGridData(varreg, vecFiles, grid, iTime);
+	varU.LoadGridData(varreg, vecFiles, grid);
 	const DataArray1D<float> & dataStateU = varU.GetData();
 
 	// Load the meridional wind data
 	Variable & varV = varreg.Get(varixV);
-	varV.LoadGridData(varreg, vecFiles, grid, iTime);
+	varV.LoadGridData(varreg, vecFiles, grid);
 	const DataArray1D<float> & dataStateV = varV.GetData();
 
 	// Check grid index
@@ -1344,22 +1339,22 @@ try {
 	// Define the SimpleGrid
 	SimpleGrid grid;
 
+	const std::vector<std::string> & vecFiles = autocurator.GetFilenames();
+
 	// Check for connectivity file
 	if (strConnectivity != "") {
 		AnnounceStartBlock("Generating grid information from connectivity file");
 		grid.FromFile(strConnectivity);
 		AnnounceEndBlock("Done");
 
+	// No data files
+	//} else if (vecFiles.size() < 1) {
+	//	Announce("No data files specified; operations requiring a grid not supported");
+
 	// No connectivity file; check for latitude/longitude dimension
 	} else {
 		AnnounceStartBlock("No connectivity file specified");
 		Announce("Attempting to generate latitude-longitude grid from data file");
-		const std::vector<std::string> & vecFiles = autocurator.GetFilenames();
-
-		if (vecFiles.size() < 1) {
-			_EXCEPTIONT("No data files specified; unable to generate grid");
-		}
-
 		NcFile ncFile(vecFiles[0].c_str());
 		if (!ncFile.is_valid()) {
 			_EXCEPTION1("Unable to open NetCDF file \"%s\"", vecFiles[0].c_str());
@@ -1584,8 +1579,7 @@ try {
 
 					// Open NetCDF files with data at this time
 					NcFileVector vecncDataFiles;
-					int iTime;
-					autocurator.FindFilesAtTime(time, vecncDataFiles, iTime);
+					autocurator.FindFilesAtTime(time, vecncDataFiles);
 					if (vecncDataFiles.size() == 0) {
 						_EXCEPTION1("Time (%s) does not exist in input data fileset",
 							time.ToString().c_str());
@@ -1605,7 +1599,6 @@ try {
 							vecncDataFiles,
 							grid,
 							cdhWorking,
-							iTime,
 							pathnode,
 							varixU,
 							varixV,
@@ -1642,8 +1635,7 @@ try {
 
 					// Open NetCDF files with data at this time
 					NcFileVector vecncDataFiles;
-					int iTime;
-					autocurator.FindFilesAtTime(time, vecncDataFiles, iTime);
+					autocurator.FindFilesAtTime(time, vecncDataFiles);
 					if (vecncDataFiles.size() == 0) {
 						_EXCEPTION1("Time (%s) does not exist in input data fileset",
 							time.ToString().c_str());
@@ -1662,7 +1654,6 @@ try {
 							vecncDataFiles,
 							grid,
 							cdhWorking,
-							iTime,
 							pathnode,
 							varix,
 							(*pargfunc)[1],
@@ -1702,8 +1693,7 @@ try {
 
 					// Open NetCDF files with data at this time
 					NcFileVector vecncDataFiles;
-					int iTime;
-					autocurator.FindFilesAtTime(time, vecncDataFiles, iTime);
+					autocurator.FindFilesAtTime(time, vecncDataFiles);
 					if (vecncDataFiles.size() == 0) {
 						_EXCEPTION1("Time (%s) does not exist in input data fileset",
 							time.ToString().c_str());
@@ -1722,7 +1712,6 @@ try {
 							vecncDataFiles,
 							grid,
 							cdhWorking,
-							iTime,
 							pathnode,
 							varixU,
 							varixV,
@@ -1976,8 +1965,7 @@ try {
 
 					// Open NetCDF files with data at this time
 					NcFileVector vecncDataFiles;
-					int iTime;
-					autocurator.FindFilesAtTime(time, vecncDataFiles, iTime);
+					autocurator.FindFilesAtTime(time, vecncDataFiles);
 					if (vecncDataFiles.size() == 0) {
 						_EXCEPTION1("Time (%s) does not exist in input data fileset",
 							time.ToString().c_str());
@@ -1996,7 +1984,6 @@ try {
 							vecncDataFiles,
 							grid,
 							cdhWorking,
-							iTime,
 							pathnode,
 							varix,
 							strRadius,
@@ -2083,8 +2070,7 @@ try {
 
 					// Open NetCDF files with data at this time
 					NcFileVector vecncDataFiles;
-					int iTime;
-					autocurator.Find(time, vecncDataFiles, iTime);
+					autocurator.Find(time, vecncDataFiles);
 					if (vecncDataFiles.size() == 0) {
 						_EXCEPTION1("Time (%s) does not exist in input data fileset",
 							time.ToString().c_str());
@@ -2103,7 +2089,6 @@ try {
 							vecncDataFiles,
 							grid,
 							cdhWorking,
-							iTime,
 							pathnode,
 							varix,
 							(*pargfunc)[1]);

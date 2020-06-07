@@ -131,12 +131,21 @@ public:
 
 public:
 	///	<summary>
-	///		Generate a NcFileVector and local time index for the given Time.
+	///		Generate a NcFileVector for the given Time.
 	///	</summary>
 	bool FindFilesAtTime(
 		const Time & time,
+		NcFileVector & vecncDataFiles
+	) const;
+
+	///	<summary>
+	///		Generate a NcFileVector for a Time near the given Time.
+	///	</summary>
+	bool FindFilesNearTime(
+		const Time & time,
 		NcFileVector & vecncDataFiles,
-		int & iTime
+		const Time & timeMaxDelta,
+		bool fVerbose = true
 	) const;
 
 protected:

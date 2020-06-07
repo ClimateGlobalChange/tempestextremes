@@ -578,7 +578,11 @@ try {
 			_EXCEPTIONT("Unable to create output dimension \"time\" in output file");
 		}
 
-		varOutTime->add_att("calendar", strTimeCalendar.c_str());
+		if (fIncludeLeapDays) {
+			_EXCEPTIONT("--include_leap_days not implemented");
+		} else {
+			varOutTime->add_att("calendar", "noleap");
+		}
 		varOutTime->add_att("units", strTimeUnits.c_str());
 
 		if (varOutTime->type() == ncInt) {
@@ -591,11 +595,17 @@ try {
 		} else if (varOutTime->type() == ncDouble) {
 			DataArray1D<double> dTimes(sOutputTimes);
 			for (size_t s = 0; s < sOutputTimes; s++) {
-				dTimes[s] = static_cast<int>(s);
+				dTimes[s] = static_cast<double>(s);
 			}
 			varOutTime->put(&(dTimes[0]), sOutputTimes);
 
-		// TODO: Add option for int64 time
+		} else if (varOutTime->type() == ncInt64) {
+			DataArray1D<ncint64> dTimes(sOutputTimes);
+			for (size_t s = 0; s < sOutputTimes; s++) {
+				dTimes[s] = static_cast<ncint64>(s);
+			}
+			varOutTime->put(&(dTimes[0]), sOutputTimes);
+
 		} else {
 			_EXCEPTIONT("Invalid type of \"time\" variable, expected \"int\" or \"double\"");
 		}

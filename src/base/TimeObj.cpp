@@ -175,6 +175,11 @@ void Time::VerifyTime() {
 
 void Time::NormalizeTime() {
 
+	// Normalization only for fixed time
+	if (m_eTimeType == TypeDelta) {
+		return;
+	}
+
 	// Normalization only for known CalendarTypes
 	if ((m_eCalendarType == CalendarNoLeap) || 
 		(m_eCalendarType == CalendarStandard) ||
@@ -384,6 +389,22 @@ bool Time::IsLeapYear() const {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+double Time::AsSeconds() const {
+	if (m_eTimeType != TypeDelta) {
+		_EXCEPTIONT("DeltaSeconds() only valid for operands of Time::TypeDelta");
+	}
+	if ((m_iYear != 0) || (m_iMonth != 0)) {
+		_EXCEPTIONT("AsSeconds() not supported for non-zero year / month as result is dependent on calendar");
+	}
+
+	return (
+		86400.0 * static_cast<double>(m_iDay)
+		+ static_cast<double>(m_iSecond)
+		+ 1.0e-6 * static_cast<double>(m_iMicroSecond));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 double Time::operator-(const Time & time) const {
 	return -DeltaSeconds(time);
 }
@@ -391,6 +412,13 @@ double Time::operator-(const Time & time) const {
 ///////////////////////////////////////////////////////////////////////////////
 
 double Time::DeltaSeconds(const Time & time) const {
+
+	if ((m_eTimeType != TypeFixed) || (time.m_eTimeType != TypeFixed)) {
+		_EXCEPTIONT("DeltaSeconds() only valid for operands of Time::TypeFixed");
+	}
+	if (m_eCalendarType != time.m_eCalendarType) {
+		_EXCEPTIONT("Incompatible calendar types");
+	}
 
 	int nDayNumber1 = DayNumber();
 	int nDayNumber2 = time.DayNumber();
@@ -404,6 +432,13 @@ double Time::DeltaSeconds(const Time & time) const {
 
 double Time::DeltaMinutes(const Time & time) const {
 
+	if ((m_eTimeType != TypeFixed) || (time.m_eTimeType != TypeFixed)) {
+		_EXCEPTIONT("DeltaMinutes() only valid for operands of Time::TypeFixed");
+	}
+	if (m_eCalendarType != time.m_eCalendarType) {
+		_EXCEPTIONT("Incompatible calendar types");
+	}
+
 	int nDayNumber1 = DayNumber();
 	int nDayNumber2 = time.DayNumber();
 
@@ -416,6 +451,13 @@ double Time::DeltaMinutes(const Time & time) const {
 
 double Time::DeltaHours(const Time & time) const {
 
+	if ((m_eTimeType != TypeFixed) || (time.m_eTimeType != TypeFixed)) {
+		_EXCEPTIONT("DeltaHours() only valid for operands of Time::TypeFixed");
+	}
+	if (m_eCalendarType != time.m_eCalendarType) {
+		_EXCEPTIONT("Incompatible calendar types");
+	}
+
 	int nDayNumber1 = DayNumber();
 	int nDayNumber2 = time.DayNumber();
 
@@ -427,6 +469,13 @@ double Time::DeltaHours(const Time & time) const {
 ///////////////////////////////////////////////////////////////////////////////
 
 double Time::DeltaDays(const Time & time) const {
+
+	if ((m_eTimeType != TypeFixed) || (time.m_eTimeType != TypeFixed)) {
+		_EXCEPTIONT("DeltaDays() only valid for operands of Time::TypeFixed");
+	}
+	if (m_eCalendarType != time.m_eCalendarType) {
+		_EXCEPTIONT("Incompatible calendar types");
+	}
 
 	int nDayNumber1 = DayNumber();
 	int nDayNumber2 = time.DayNumber();

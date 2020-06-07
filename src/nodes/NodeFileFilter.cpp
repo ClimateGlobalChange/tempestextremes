@@ -1272,7 +1272,8 @@ try {
 				}
 				if (strFilterByContour != "") {
 					Variable & varOp = varreg.Get(vecClosedContourOp[0].m_varix);
-					varOp.LoadGridData(varreg, vecInFiles, grid, t);
+					vecInFiles.SetConstantTimeIx(t);
+					varOp.LoadGridData(varreg, vecInFiles, grid);
 					const DataArray1D<float> & dataState = varOp.GetData();
 					_ASSERT(dataState.GetRows() == grid.GetSize());
 
@@ -1287,7 +1288,8 @@ try {
 				}
 				if (vecNearbyBlobsOp.size() != 0) {
 					Variable & varOp = varreg.Get(vecNearbyBlobsOp[0].m_varix);
-					varOp.LoadGridData(varreg, vecInFiles, grid, t);
+					vecInFiles.SetConstantTimeIx(t);
+					varOp.LoadGridData(varreg, vecInFiles, grid);
 					const DataArray1D<float> & dataState = varOp.GetData();
 					_ASSERT(dataState.GetRows() == grid.GetSize());
 

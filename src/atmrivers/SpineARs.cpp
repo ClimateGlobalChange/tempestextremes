@@ -920,7 +920,8 @@ void SpineARs(
 
 		// Get the search-by variable array
 		Variable & varSearchBy = varreg.Get(param.ixSearchByVar);
-		varSearchBy.LoadGridData(varreg, vecFiles, grid, t);
+		vecFiles.SetConstantTimeIx(t);
+		varSearchBy.LoadGridData(varreg, vecFiles, grid);
 		DataArray1D<float> & dataSearchBy = varSearchBy.GetData();
 
 		DataArray2D<float> dVarData(dimLat->size(), dimLon->size(), false);
