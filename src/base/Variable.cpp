@@ -479,10 +479,6 @@ DataOp * VariableRegistry::GetDataOp(
 // Variable
 ///////////////////////////////////////////////////////////////////////////////
 
-const long Variable::InvalidTimeIndex = (-2);
-
-const long Variable::NoTimeIndex = (-1);
-
 const long Variable::InvalidArgument = (-1);
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -547,36 +543,39 @@ std::string Variable::ToString(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-NcVar * Variable::GetFromNetCDF(
-	VariableRegistry & varreg,
-	const NcFileVector & vecFiles,
-	const SimpleGrid & grid,
-	long lTime
+NcVar * Variable::GetNcVarFromNcFileVector(
+	const NcFileVector & ncfilevec,
+	const SimpleGrid & grid
 ) {
 	if (m_fOp) {
-		_EXCEPTION1("Cannot call GetFromNetCDF() on operator \"%s\"",
+		_EXCEPTION1("Cannot call GetNcVarFromNetCDF() on operator \"%s\"",
 			m_strName.c_str());
 	}
 
-	// Find the NcVar in all open NcFiles
-	NcVar * var = NULL;
-	for (int i = 0; i < vecFiles.size(); i++) {
-		var = vecFiles[i]->get_var(m_strName.c_str());
-		if (var != NULL) {
-			break;
-		}
-	}
-	if (var == NULL) {
+	// Find the NcVar in all open NcFiles with this name
+	NcVar * var;
+	size_t sPos =
+		ncfilevec.FindContainingVariable(
+			m_strName,
+			&var);
+
+	if (sPos == NcFileVector::InvalidIndex) {
 		_EXCEPTION1("Variable \"%s\" not found in input files",
 			m_strName.c_str());
 	}
 
+	// Get the current time
+	m_timeStored = ncfilevec.GetTime();
+
+	// Get the time index
+	long lTime = ncfilevec.GetTimeIx(sPos);
+
 	// If the first dimension of the variable is not "time" then
 	// ignore any time index that has been specified.
 	int nVarDims = var->num_dims();
-	if ((nVarDims > 0) && (lTime != NoTimeIndex)) {
+	if ((nVarDims > 0) && (lTime != NcFileVector::NoTimeIndex)) {
 		if (strcmp(var->get_dim(0)->name(), "time") != 0) {
-			lTime = NoTimeIndex;
+			lTime = NcFileVector::NoTimeIndex;
 			m_fNoTimeInNcFile = true;
 		} else {
 			if (var->get_dim(0)->size() == 1) {
@@ -591,7 +590,7 @@ NcVar * Variable::GetFromNetCDF(
 
 	// Verify correct dimensionality
 	int nRequestedVarDims = m_lArg.size() + grid.DimCount();
-	if (lTime != NoTimeIndex) {
+	if (lTime != NcFileVector::NoTimeIndex) {
 		nRequestedVarDims++;
 	}
 	if (nVarDims != nRequestedVarDims) {
@@ -604,7 +603,7 @@ NcVar * Variable::GetFromNetCDF(
 	std::vector<long> lDim;
 	lDim.resize(nVarDims, 0);
 
-	if (lTime != NoTimeIndex) {
+	if (lTime != NcFileVector::NoTimeIndex) {
 		lDim[0] = lTime;
 		nSetDims++;
 	}
@@ -631,20 +630,21 @@ NcVar * Variable::GetFromNetCDF(
 void Variable::LoadGridData(
 	VariableRegistry & varreg,
 	const NcFileVector & vecFiles,
-	const SimpleGrid & grid,
-	long lTime
+	const SimpleGrid & grid
 ) {
+
 	// Check if data already loaded
-	if (lTime == InvalidTimeIndex) {
-		_EXCEPTIONT("Invalid time index");
+	const Time & time = vecFiles.GetTime();
+	if (time.GetCalendarType() == Time::CalendarUnknown) {
+		_EXCEPTIONT("Invalid time specified");
 	}
-	if (lTime == m_lTime) {
+	if (time == m_timeStored) {
 		if (m_data.GetRows() != grid.GetSize()) {
 			_EXCEPTIONT("Logic error");
 		}
 		return;
 	}
-	if ((m_fNoTimeInNcFile) && (m_lTime != InvalidTimeIndex)) {
+	if ((m_fNoTimeInNcFile) && (m_timeStored.GetCalendarType() != Time::CalendarUnknown)) {
 		if (m_data.GetRows() != grid.GetSize()) {
 			_EXCEPTIONT("Logic error");
 		}
@@ -655,13 +655,13 @@ void Variable::LoadGridData(
 
 	// Allocate data
 	m_data.Allocate(grid.GetSize());
-	m_lTime = lTime;
+	//m_lTime = lTime;
 
 	// Get the data directly from a variable
 	if (!m_fOp) {
 
 		// Get pointer to variable
-		NcVar * var = GetFromNetCDF(varreg, vecFiles, grid, lTime);
+		NcVar * var = GetNcVarFromNcFileVector(vecFiles, grid);
 		if (var == NULL) {
 			_EXCEPTION1("Variable \"%s\" not found in NetCDF file",
 				m_strName.c_str());
@@ -731,9 +731,9 @@ void Variable::LoadGridData(
 		}
 
 		return;
-	}
 
-	{
+	// Evaluate a data operator to get the contents of this variable
+	} else {
 		// Get the associated operator
 		DataOp * pop = varreg.GetDataOp(m_strName);
 		if (pop == NULL) {
@@ -745,7 +745,7 @@ void Variable::LoadGridData(
 		for (int i = 0; i < m_varArg.size(); i++) {
 			if (m_varArg[i] != InvalidVariableIndex) {
 				Variable & var = varreg.Get(m_varArg[i]);
-				var.LoadGridData(varreg, vecFiles, grid, lTime);
+				var.LoadGridData(varreg, vecFiles, grid);
 
 				vecArgData.push_back(&var.GetData());
 			} else {
@@ -755,6 +755,9 @@ void Variable::LoadGridData(
 
 		// Apply the DataOp
 		pop->Apply(grid, m_strArg, vecArgData, m_data);
+
+		// Store the time
+		m_timeStored = time;
 	}
 /*
 	// Evaluate the mean operator
@@ -860,7 +863,7 @@ void Variable::LoadGridData(
 void Variable::UnloadGridData() {
 
 	// Force data to be loaded within this structure
-	m_lTime = InvalidTimeIndex;
+	m_timeStored = Time(Time::CalendarUnknown);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

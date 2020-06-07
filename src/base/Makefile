@@ -13,6 +13,7 @@ include $(TEMPESTEXTREMESDIR)/mk/framework.make
 FILES= Announce.cpp \
        NetCDFUtilities.cpp \
        TimeObj.cpp \
+	   NcFileVector.cpp \
        Variable.cpp \
 	   DataOp.cpp \
        kdtree.cpp \
