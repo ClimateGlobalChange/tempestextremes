@@ -278,6 +278,11 @@ bool AutoCurator::FindFilesAtTime(
 		FilenameTimePairVector vec = m_acdDailyMean.Find(timeDailyMean);
 
 		for (int i = 0; i < vec.size(); i++) {
+			Announce("Using daily mean climatology from %s (index %i)",
+				time.ToDateString().c_str(),
+				vec[i].second);
+			//std::cout << vec[i].first << " : " << vec[i].second << std::endl;
+
 			vecncDataFiles.InsertFile(
 				vec[i].first.c_str(),
 				vec[i].second);
