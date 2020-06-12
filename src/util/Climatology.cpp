@@ -299,132 +299,101 @@ long long NcGetPutSpecifiedDataSize(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-int main(int argc, char** argv) {
+void SplitVariableStrings(
+	const std::vector<std::string> & vecVariableStrings,
+	std::vector<std::string> & vecVariableNames,
+	std::vector< std::vector<long> > & vecVariableSpecifiedDims
+) {
+	vecVariableNames.clear();
+	vecVariableSpecifiedDims.clear();
 
-#if defined(TEMPEST_MPIOMP)
-	// Initialize MPI
-	MPI_Init(&argc, &argv);
+	vecVariableNames.resize(vecVariableStrings.size());
+	vecVariableSpecifiedDims.resize(vecVariableStrings.size());
 
-	// Not yet implemented
-	int nMPISize;
-	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
-	if (nMPISize > 1) {
-		std::cout << "Sorry!  Parallel processing with MPI is not yet implemented" << std::endl;
-		return (-1);
-	}
-#endif
+	// Loop through all variables
+	for (int v = 0; v < vecVariableStrings.size(); v++) {
 
-	// Turn off fatal errors in NetCDF
-	NcError error(NcError::silent_nonfatal);
-
-try {
-
-	// Input data file
-	std::string strInputFile;
-
-	// List of input data files
-	std::string strInputFileList;
-
-	// Output data file
-	std::string strOutputFile;
-
-	// Variable to use
-	std::string strVariable;
-
-	// Maximum memory allocation per thread
-	std::string strMemoryMax;
-
-	// Type of mean climatology
-	std::string strMeanType;
-
-	// Include leap days
-	bool fIncludeLeapDays;
-
-	// Number of Fourier modes to retain
-	int nFourierModes;
-
-	// Dataset has missing data
-	bool fMissingData;
-
-	// Verbose
-	bool fVerbose;
-
-	// Parse the command line
-	BeginCommandLine()
-		CommandLineString(strInputFile, "in_data", "");
-		CommandLineString(strInputFileList, "in_data_list", "");
-		CommandLineString(strOutputFile, "out_data", "");
-		CommandLineString(strVariable, "var", "");
-		CommandLineStringD(strMemoryMax, "memmax", "2G", "[#K,#M,#G]");	
-		CommandLineStringD(strMeanType, "mean", "daily", "[daily|monthly|seasonal|annual]");
-		CommandLineBool(fIncludeLeapDays, "include_leap_days");
-		CommandLineInt(nFourierModes, "time_modes", 0);
-		CommandLineBool(fMissingData, "missingdata");
-		CommandLineBool(fVerbose, "verbose");
-
-		ParseCommandLine(argc, argv);
-	EndCommandLine(argv)
-
-	// Validate arguments
-	if ((strInputFile.length() == 0) && (strInputFileList.length() == 0)) {
-		_EXCEPTIONT("No input data file (--in_data) or (--in_data_list)"
-			" specified");
-	}
-	if ((strInputFile.length() != 0) && (strInputFileList.length() != 0)) {
-		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list)"
-			" may be specified");
-	}
-	if (strOutputFile.length() == 0) {
-		_EXCEPTIONT("No output file (--out) specified");
-	}
-	if (strVariable.length() == 0) {
-		_EXCEPTIONT("No variables (--var) specified");
-	}
-	if (fIncludeLeapDays) {
-		_EXCEPTIONT("--include_leap_days not implemented");
-	}
-
-	// Parse input file list
-	FilenameList vecInputFileList;
-	if (strInputFile.length() != 0) {
-		vecInputFileList.push_back(strInputFile);
-		if (strInputFile.find(';') != std::string::npos) {
-			_EXCEPTIONT("Only one filename allowed in --in_data");
+		// Split variable string into variable name and any specified dimensions
+		int iBeginParentheses = (-1);
+		int iEndParentheses = (-1);
+		for (int i = 0; i < vecVariableStrings[v].length(); i++) {
+			if (vecVariableStrings[v][i] == '(') {
+				if (iBeginParentheses != (-1)) {
+					_EXCEPTIONT("Multiple open parentheses in --var");
+				} else {
+					iBeginParentheses = i;
+				}
+			}
+			if (vecVariableStrings[v][i] == ')') {
+				if (iEndParentheses != (-1)) {
+					_EXCEPTIONT("Multiple closed parentheses in --var");
+				} else {
+					iEndParentheses = i;
+				}
+			}
 		}
-	} else {
-		vecInputFileList.FromFile(strInputFileList, false);
-	}
-	_ASSERT(vecInputFileList.size() != 0);
-
-	// Parse variable list
-	std::vector<std::string> vecVariableStrings;
-	STLStringHelper::ParseVariableList(strVariable, vecVariableStrings);
-
-	// Memory maximum
-	size_t sMemoryMax = (-1);
-	if (strMemoryMax != "") {
-		char cType = tolower(strMemoryMax[strMemoryMax.length()-1]);
-		std::string strMemoryMaxValue = strMemoryMax.substr(0,strMemoryMax.length()-1);
-		if (!STLStringHelper::IsInteger(strMemoryMaxValue)) {
-			_EXCEPTIONT("Invalid --memmax value, expected integer [#K,#M,#G]");
-		}
-		std::stringstream sstream(strMemoryMaxValue);
-		sstream >> sMemoryMax;
-		if (cType == 'k') {
-			sMemoryMax *= 1024;
-		} else if (cType == 'm') {
-			sMemoryMax *= 1024 * 1024;
-		} else if (cType == 'g') {
-			sMemoryMax *= 1024 * 1024 * 1024;
+	
+		// Extract variable name and specified dimensions
+		if (iBeginParentheses != (-1)) {
+			if ((iBeginParentheses != (-1)) && (iEndParentheses == (-1))) {
+				_EXCEPTIONT("Unbalanced open parentheses in --var");
+			}
+			if ((iBeginParentheses == (-1)) && (iEndParentheses != (-1))) {
+				_EXCEPTIONT("Unbalanced closed parentheses in --var");
+			}
+			if (iBeginParentheses >= iEndParentheses) {
+				_EXCEPTIONT("Unbalanced closed parentheses in --var");
+			}
+	
+			vecVariableNames[v] =
+				vecVariableStrings[v].substr(0, iBeginParentheses);
+	
+			int iLast = iBeginParentheses+1;
+			for (int i = iBeginParentheses+1; i <= iEndParentheses; i++) {
+				if ((i == iEndParentheses) ||
+				    (vecVariableStrings[v][i] == ',')
+				) {
+					std::string strDimValue =
+						vecVariableStrings[v].substr(iLast, i-iLast);
+					if (!STLStringHelper::IsInteger(strDimValue)) {
+						_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer.",
+							strDimValue.c_str());
+					}
+					long lDimValue = std::stol(strDimValue);
+					if (lDimValue < 0) {
+						_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer.",
+							strDimValue.c_str());
+					}
+					vecVariableSpecifiedDims[v].push_back(lDimValue);
+					iLast = i+1;
+				}
+			}
 		} else {
-			_EXCEPTIONT("Invalid --memmax unit, expected [#K,#M,#G]");
+			vecVariableNames[v] = vecVariableStrings[v];
 		}
 	}
-	if (sMemoryMax == 0) {
-		_EXCEPTIONT("--memmax must be non-zero");
-	}
+}
 
-	AnnounceBanner();
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Produce a climatology over the given input files.
+///	</summary>
+void Climatology(
+	const std::vector<std::string> & vecInputFileList,
+	const std::string & strOutputFile,
+	const std::vector<std::string> & vecVariableNames,
+	const std::vector< std::vector<long> > & vecVariableSpecifiedDims,
+	size_t sMemoryMax,
+	bool fIncludeLeapDays,
+	int nFourierModes,
+	bool fMissingData,
+	bool fOutputSliceCounts,
+	bool fVerbose
+) {
+	_ASSERT(vecInputFileList.size() > 0);
+	_ASSERT(vecVariableNames.size() > 0);
+	_ASSERT(vecVariableNames.size() == vecVariableSpecifiedDims.size());
 
 	// Time units
 	std::string strTimeUnits = "days since 0001-01-01";
@@ -438,27 +407,27 @@ try {
 
 	// Determine dimensionality of each variable
 	std::vector<DimInfoVector> vecVarDimInfo;
-	vecVarDimInfo.resize(vecVariableStrings.size());
+	vecVarDimInfo.resize(vecVariableNames.size());
 
 	std::vector<NcVar*> vecNcVarOut;
-	vecNcVarOut.resize(vecVariableStrings.size());
+	vecNcVarOut.resize(vecVariableNames.size());
+
+	std::vector<NcVar*> vecNcVarCount;
+	vecNcVarCount.resize(vecVariableNames.size());
 
 	std::string strTimeCalendar;
 	size_t sOutputTimes = 0;
 
 	std::vector<size_t> vecOutputAuxSize;
-	vecOutputAuxSize.resize(vecVariableStrings.size(), 0);
+	vecOutputAuxSize.resize(vecVariableNames.size(), 0);
 
 	std::vector<size_t> vecOutputAuxCount;
-	vecOutputAuxCount.resize(vecVariableStrings.size(), 0);
+	vecOutputAuxCount.resize(vecVariableNames.size(), 0);
 
-	std::vector<std::string> vecVariableNames;
-	vecVariableNames.resize(vecVariableStrings.size());
-
-	std::vector< std::vector<long> > vecVariableSpecifiedDims;
-	vecVariableSpecifiedDims.resize(vecVariableStrings.size());
-
+	/////////////////////////////////////////////
+	// Initialization
 	{
+		// Copy over details from the input file
 		NcFile ncinfile(vecInputFileList[0].c_str());
 		if (!ncinfile.is_valid()) {
 			_EXCEPTION1("Unable to open NetCDF file \"%s\"",
@@ -509,66 +478,7 @@ try {
 		AnnounceStartBlock("Loading variable information from input datafile");
 
 		std::set<DimInfo> setDimInfo;
-		for (int v = 0; v < vecVariableStrings.size(); v++) {
-
-			// Split variable string into variable name and any specified dimensions
-			int iBeginParentheses = (-1);
-			int iEndParentheses = (-1);
-			for (int i = 0; i < vecVariableStrings[v].length(); i++) {
-				if (vecVariableStrings[v][i] == '(') {
-					if (iBeginParentheses != (-1)) {
-						_EXCEPTIONT("Multiple open parentheses in --var");
-					} else {
-						iBeginParentheses = i;
-					}
-				}
-				if (vecVariableStrings[v][i] == ')') {
-					if (iEndParentheses != (-1)) {
-						_EXCEPTIONT("Multiple closed parentheses in --var");
-					} else {
-						iEndParentheses = i;
-					}
-				}
-			}
-
-			// Extract variable name and specified dimensions
-			if (iBeginParentheses != (-1)) {
-				if ((iBeginParentheses != (-1)) && (iEndParentheses == (-1))) {
-					_EXCEPTIONT("Unbalanced open parentheses in --var");
-				}
-				if ((iBeginParentheses == (-1)) && (iEndParentheses != (-1))) {
-					_EXCEPTIONT("Unbalanced closed parentheses in --var");
-				}
-				if (iBeginParentheses >= iEndParentheses) {
-					_EXCEPTIONT("Unbalanced closed parentheses in --var");
-				}
-
-				vecVariableNames[v] =
-					vecVariableStrings[v].substr(0, iBeginParentheses);
-
-				int iLast = iBeginParentheses+1;
-				for (int i = iBeginParentheses+1; i <= iEndParentheses; i++) {
-					if ((i == iEndParentheses) ||
-					    (vecVariableStrings[v][i] == ',')
-					) {
-						std::string strDimValue =
-							vecVariableStrings[v].substr(iLast, i-iLast);
-						if (!STLStringHelper::IsInteger(strDimValue)) {
-							_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer.",
-								strDimValue.c_str());
-						}
-						long lDimValue = std::stol(strDimValue);
-						if (lDimValue < 0) {
-							_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer.",
-								strDimValue.c_str());
-						}
-						vecVariableSpecifiedDims[v].push_back(lDimValue);
-						iLast = i+1;
-					}
-				}
-			} else {
-				vecVariableNames[v] = vecVariableStrings[v];
-			}
+		for (int v = 0; v < vecVariableNames.size(); v++) {
 
 			// Get the variable
 			NcVar * var = ncinfile.get_var(vecVariableNames[v].c_str());
@@ -581,7 +491,7 @@ try {
 			if (var->num_dims() - vecVariableSpecifiedDims[v].size() < 2) {
 				_EXCEPTION2("File \"%s\" variable \"%s\" must have at least 2 dimensions (in addition to specified dimensions)",
 					vecInputFileList[0].c_str(),
-					vecVariableStrings[v].c_str());
+					vecVariableNames[v].c_str());
 			}
 
 			NcDim * dim0 = var->get_dim(0);
@@ -591,14 +501,14 @@ try {
 			if (strDimTimeName != "time") {
 				_EXCEPTION2("File \"%s\" variable \"%s\" must have leftmost dimension \"time\"",
 					vecInputFileList[0].c_str(),
-					vecVariableStrings[v].c_str());
+					vecVariableNames[v].c_str());
 			}
 
 			for (int d = 0; d < vecVariableSpecifiedDims[v].size(); d++) {
 				if (vecVariableSpecifiedDims[v][d] >= var->get_dim(d+1)->size()) {
 					_EXCEPTION4("File \"%s\" variable \"%s\" specified dimension index out of range (%lu/%lu).",
 					vecInputFileList[0].c_str(),
-					vecVariableStrings[v].c_str(),
+					vecVariableNames[v].c_str(),
 					vecVariableSpecifiedDims[v][d],
 					var->get_dim(d+1)->size());
 				}
@@ -633,7 +543,7 @@ try {
 				MemoryBytesToString(sOutputTimes * sTotalAuxDims * sizeof(double));
 
 			AnnounceStartBlock("Variable \"%s\" has %lu distinct time series",
-				vecVariableStrings[v].c_str(),
+				vecVariableNames[v].c_str(),
 				sTotalAuxDims);
 			Announce("Memory requirement: per-timeslice %s / total %s",
 				strPerTimesliceStorage.c_str(),
@@ -711,8 +621,9 @@ try {
 
 		// Create output variables
 		Announce("Creating output variables");
-		_ASSERT(vecVariableStrings.size() == vecVariableNames.size());
-		for (int v = 0; v < vecVariableStrings.size(); v++) {
+		for (int v = 0; v < vecVariableNames.size(); v++) {
+
+			// Create the vector NcDims for the output variable
 			std::vector<NcDim *> vecVarNcDims;
 			vecVarNcDims.push_back(dimOutTime);
 			for (int d = vecVariableSpecifiedDims[v].size(); d < vecVarDimInfo[v].size(); d++) {
@@ -730,9 +641,30 @@ try {
 
 			if (varOut == NULL) {
 				_EXCEPTION1("Unable to create output variable \"%s\" in output file",
-					vecVariableStrings[v].c_str());
+					strOutVar.c_str());
 			}
 
+			// Create output variable for slice count
+			if (fOutputSliceCounts) {
+				if (fMissingData) {
+					_EXCEPTIONT("Output slice counts with missing data not implemented");
+				}
+				std::string strOutCountVar = strOutVar + "_count";
+				NcVar * varOutCount =
+					ncoutfile.add_var(
+						strOutCountVar.c_str(),
+						ncInt,
+						dimOutTime);
+
+				if (varOutCount == NULL) {
+					_EXCEPTION1("Unable to create output variable \"%s\" in output file",
+						strOutCountVar.c_str());
+				}
+
+				vecNcVarCount[v] = varOutCount;
+			}
+
+			// Add attributes to variable describing specified hyperslab indices
 			for (int d = 0; d < vecVariableSpecifiedDims[v].size(); d++) {
 				NcVar * varDimIn = ncinfile.get_var(vecVarDimInfo[v][d].name.c_str());
 				if (varDimIn == NULL) {
@@ -752,6 +684,7 @@ try {
 				}
 			}
 
+			// Get the input NcVar
 			NcVar * varIn = ncinfile.get_var(vecVariableNames[v].c_str());
 			_ASSERT(varIn != NULL);
 			CopyNcVarAttributes(varIn, varOut);
@@ -762,10 +695,13 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
+	/////////////////////////////////////////////
+	// Actual climatology calculation
+
 	// Loop through each variable
-	for (int v = 0; v < vecVariableStrings.size(); v++) {
+	for (int v = 0; v < vecVariableNames.size(); v++) {
 		AnnounceStartBlock("Calculating climatology of variable \"%s\"",
-			vecVariableStrings[v].c_str());
+			vecVariableNames[v].c_str());
 
 		DataArray1D<float> dDataIn(vecOutputAuxSize[v]);
 
@@ -859,7 +795,7 @@ try {
 					if (attFillValue == NULL) {
 						_EXCEPTION2("Variable \"%s\" missing _FillValue attribute, "
 							"needed for --missingdata in NetCDF file \"%s\"",
-							vecVariableStrings[v].c_str(),
+							vecVariableNames[v].c_str(),
 							vecInputFileList[f].c_str());
 					}
 
@@ -970,6 +906,7 @@ try {
 			// Write data
 			AnnounceStartBlock("Writing data to file");
 			for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
+
 				// Convert to float and write to disk
 				DataArray1D<float> dMeanData(dAccumulatedData.GetColumns());
 				for (size_t i = 0; i < dMeanData.GetRows(); i++) {
@@ -985,6 +922,23 @@ try {
 					dMeanData,
 					NetCDF_Put);
 			}
+
+			// Write slice counts
+			if (fOutputSliceCounts) {
+				AnnounceStartBlock("Writing slice counts");
+				if (fMissingData) {
+					_EXCEPTION();
+
+				// If no missing data only need to write this once
+				} else {
+					if (c == 0) {
+						vecNcVarCount[v]->set_cur((long)0);
+						vecNcVarCount[v]->put(&(nTimeSlices[0]), dAccumulatedData.GetRows());
+					}
+				}
+				AnnounceEndBlock("Done");
+			}
+
 			AnnounceEndBlock("Done");
 
 			if (vecOutputAuxCount[v] > 1) {
@@ -993,10 +947,233 @@ try {
 		}
 	}
 	AnnounceEndBlock("Done");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+int main(int argc, char** argv) {
+
+#if defined(TEMPEST_MPIOMP)
+	// Initialize MPI
+	MPI_Init(&argc, &argv);
+#endif
+
+	// Turn off fatal errors in NetCDF
+	NcError error(NcError::silent_nonfatal);
+
+	// Enable output only on rank zero
+	AnnounceOnlyOutputOnRankZero();
+
+try {
+
+	// Input data file
+	std::string strInputFile;
+
+	// List of input data files
+	std::string strInputFileList;
+
+	// Output data file
+	std::string strOutputFile;
+
+	// Variable to use
+	std::string strVariable;
+
+	// Maximum memory allocation per thread
+	std::string strMemoryMax;
+
+	// Type of mean climatology
+	std::string strMeanType;
+
+	// Include leap days
+	bool fIncludeLeapDays;
+
+	// Number of Fourier modes to retain
+	int nFourierModes;
+
+	// Dataset has missing data
+	bool fMissingData;
+
+	// Path to write temporary cliamtology files
+	std::string strTempFilePath;
+
+	// Do not delete temp files after completing climatology
+	bool fKeepTempFiles;
+
+	// Verbose
+	bool fVerbose;
+
+	// Parse the command line
+	BeginCommandLine()
+		CommandLineString(strInputFile, "in_data", "");
+		CommandLineString(strInputFileList, "in_data_list", "");
+		CommandLineString(strOutputFile, "out_data", "");
+		CommandLineString(strVariable, "var", "");
+		CommandLineStringD(strMemoryMax, "memmax", "2G", "[#K,#M,#G]");	
+		CommandLineStringD(strMeanType, "mean", "daily", "[daily|monthly|seasonal|annual]");
+		CommandLineBool(fIncludeLeapDays, "include_leap_days");
+		CommandLineInt(nFourierModes, "time_modes", 0);
+		CommandLineBool(fMissingData, "missingdata");
+		CommandLineString(strTempFilePath, "temp_file_path", ".");
+		CommandLineBool(fKeepTempFiles, "keep_temp_files");
+		CommandLineBool(fVerbose, "verbose");
+
+		ParseCommandLine(argc, argv);
+	EndCommandLine(argv)
+
+	// Validate arguments
+	if ((strInputFile.length() == 0) && (strInputFileList.length() == 0)) {
+		_EXCEPTIONT("No input data file (--in_data) or (--in_data_list)"
+			" specified");
+	}
+	if ((strInputFile.length() != 0) && (strInputFileList.length() != 0)) {
+		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list)"
+			" may be specified");
+	}
+	if (strOutputFile.length() == 0) {
+		_EXCEPTIONT("No output file (--out) specified");
+	}
+	if (strVariable.length() == 0) {
+		_EXCEPTIONT("No variables (--var) specified");
+	}
+	if (fIncludeLeapDays) {
+		_EXCEPTIONT("--include_leap_days not implemented");
+	}
+
+	// Parse input file list
+	FilenameList vecInputFileList;
+	if (strInputFile.length() != 0) {
+		vecInputFileList.push_back(strInputFile);
+		if (strInputFile.find(';') != std::string::npos) {
+			_EXCEPTIONT("Only one filename allowed in --in_data");
+		}
+	} else {
+		vecInputFileList.FromFile(strInputFileList, false);
+	}
+	_ASSERT(vecInputFileList.size() != 0);
+
+	// Parse variable list
+	std::vector<std::string> vecVariableStrings;
+	STLStringHelper::ParseVariableList(strVariable, vecVariableStrings);
+
+	std::vector<std::string> vecVariableNames;
+	std::vector< std::vector<long> > vecVariableSpecifiedDims;
+
+	SplitVariableStrings(
+		vecVariableStrings,
+		vecVariableNames,
+		vecVariableSpecifiedDims
+	);
+
+	// Memory maximum
+	size_t sMemoryMax = (-1);
+	if (strMemoryMax != "") {
+		char cType = tolower(strMemoryMax[strMemoryMax.length()-1]);
+		std::string strMemoryMaxValue = strMemoryMax.substr(0,strMemoryMax.length()-1);
+		if (!STLStringHelper::IsInteger(strMemoryMaxValue)) {
+			_EXCEPTIONT("Invalid --memmax value, expected integer [#K,#M,#G]");
+		}
+		std::stringstream sstream(strMemoryMaxValue);
+		sstream >> sMemoryMax;
+		if (cType == 'k') {
+			sMemoryMax *= 1024;
+		} else if (cType == 'm') {
+			sMemoryMax *= 1024 * 1024;
+		} else if (cType == 'g') {
+			sMemoryMax *= 1024 * 1024 * 1024;
+		} else {
+			_EXCEPTIONT("Invalid --memmax unit, expected [#K,#M,#G]");
+		}
+	}
+	if (sMemoryMax == 0) {
+		_EXCEPTIONT("--memmax must be non-zero");
+	}
+
+	AnnounceBanner();
+
+#if defined(TEMPEST_MPIOMP)
+	// Spread files across nodes
+	int nMPIRank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &nMPIRank);
+
+	int nMPISize;
+	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+#else
+	int nMPIRank = 0;
+	int nMPISize = 1;
+#endif
+
+	// Distribute workload over processors
+	std::vector< std::string > vecMyInputFileList;
+	std::string strMyOutputFile;
+
+	bool fOutputSliceCounts = false;
+
+	if (nMPISize != 1) {
+		fOutputSliceCounts = true;
+
+		size_t sFilesPerProc = vecInputFileList.size() / nMPISize;
+
+		// Split the file list among processors
+		for (size_t f = 0; f < sFilesPerProc; f++) {
+			vecMyInputFileList.push_back(
+				vecInputFileList[sFilesPerProc * nMPIRank + f]);
+		}
+		if (nMPIRank == nMPISize-1) {
+			for (size_t f = sFilesPerProc * nMPISize; f < vecInputFileList.size(); f++) {
+				vecMyInputFileList.push_back(vecInputFileList[f]);
+			}
+		}
+
+		char szBuffer[16];
+		sprintf(szBuffer, "%06i", nMPIRank);
+
+		strMyOutputFile =
+			strTempFilePath + "/tempClimatology" + szBuffer + ".nc";
+
+		std::string strLogFile =
+			strTempFilePath + "/tempLog" + szBuffer + ".txt";
+
+		FILE * fp = fopen(strLogFile.c_str(), "w");
+		if (fp == NULL) {
+			_EXCEPTION1("Unable to open log file \"%s\"", strLogFile.c_str());
+		}
+
+		Announce("Logs will be written to \"%s/tempLog######.txt\"", strTempFilePath.c_str());
+		Announce("Temporary climatologies will be written to \"%s/tempClimatology######.nc\"", strTempFilePath.c_str());
+		AnnounceSetOutputBuffer(fp);
+		AnnounceOutputOnAllRanks();
+
+	} else {
+		vecMyInputFileList = vecInputFileList;
+		strMyOutputFile = strOutputFile;
+	}
+
+	// Calculate the climatology
+	Climatology(
+		vecMyInputFileList,
+		strMyOutputFile,
+		vecVariableNames,
+		vecVariableSpecifiedDims,
+		sMemoryMax,
+		fIncludeLeapDays,
+		nFourierModes,
+		fMissingData,
+		fOutputSliceCounts,
+		fVerbose
+	);
+
+	if (nMPISize != 1) {
+		AnnounceSetOutputBuffer(stdout);
+		AnnounceOnlyOutputOnRankZero();
+	}
+
+	// TODO: Combine files across ranks
 
 	AnnounceBanner();
 
 } catch(Exception & e) {
+	AnnounceOutputOnAllRanks();
+	AnnounceSetOutputBuffer(stdout);
 	Announce(e.ToString().c_str());
 }
 
