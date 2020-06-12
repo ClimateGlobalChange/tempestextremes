@@ -41,7 +41,7 @@
 ///		Apply a Fourier filter to a given data sequence.
 ///	</summary>
 
-// TODO: Test this function
+// TODO: Test this function more thoroughly
 void fourier_filter(
 	double * const data,
 	size_t sCount,
@@ -208,6 +208,10 @@ enum NetCDF_GetPut {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Load in exactly lSizePerIteration contiguous elements from a NcVar,
+///		starting at the specified position.
+///	</summary>
 template <typename T>
 long long NcGetPutSpecifiedDataSize(
 	NcVar * ncvar,
@@ -433,7 +437,6 @@ try {
 	}
 
 	// Determine dimensionality of each variable
-
 	std::vector<DimInfoVector> vecVarDimInfo;
 	vecVarDimInfo.resize(vecVariableStrings.size());
 
@@ -448,6 +451,12 @@ try {
 
 	std::vector<size_t> vecOutputAuxCount;
 	vecOutputAuxCount.resize(vecVariableStrings.size(), 0);
+
+	std::vector<std::string> vecVariableNames;
+	vecVariableNames.resize(vecVariableStrings.size());
+
+	std::vector< std::vector<long> > vecVariableSpecifiedDims;
+	vecVariableSpecifiedDims.resize(vecVariableStrings.size());
 
 	{
 		NcFile ncinfile(vecInputFileList[0].c_str());
@@ -498,17 +507,79 @@ try {
 
 		// Get the auxiliary dimensions of each variable
 		AnnounceStartBlock("Loading variable information from input datafile");
+
 		std::set<DimInfo> setDimInfo;
 		for (int v = 0; v < vecVariableStrings.size(); v++) {
-			NcVar * var = ncinfile.get_var(vecVariableStrings[v].c_str());
+
+			// Split variable string into variable name and any specified dimensions
+			int iBeginParentheses = (-1);
+			int iEndParentheses = (-1);
+			for (int i = 0; i < vecVariableStrings[v].length(); i++) {
+				if (vecVariableStrings[v][i] == '(') {
+					if (iBeginParentheses != (-1)) {
+						_EXCEPTIONT("Multiple open parentheses in --var");
+					} else {
+						iBeginParentheses = i;
+					}
+				}
+				if (vecVariableStrings[v][i] == ')') {
+					if (iEndParentheses != (-1)) {
+						_EXCEPTIONT("Multiple closed parentheses in --var");
+					} else {
+						iEndParentheses = i;
+					}
+				}
+			}
+
+			// Extract variable name and specified dimensions
+			if (iBeginParentheses != (-1)) {
+				if ((iBeginParentheses != (-1)) && (iEndParentheses == (-1))) {
+					_EXCEPTIONT("Unbalanced open parentheses in --var");
+				}
+				if ((iBeginParentheses == (-1)) && (iEndParentheses != (-1))) {
+					_EXCEPTIONT("Unbalanced closed parentheses in --var");
+				}
+				if (iBeginParentheses >= iEndParentheses) {
+					_EXCEPTIONT("Unbalanced closed parentheses in --var");
+				}
+
+				vecVariableNames[v] =
+					vecVariableStrings[v].substr(0, iBeginParentheses);
+
+				int iLast = iBeginParentheses+1;
+				for (int i = iBeginParentheses+1; i <= iEndParentheses; i++) {
+					if ((i == iEndParentheses) ||
+					    (vecVariableStrings[v][i] == ',')
+					) {
+						std::string strDimValue =
+							vecVariableStrings[v].substr(iLast, i-iLast);
+						if (!STLStringHelper::IsInteger(strDimValue)) {
+							_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer.",
+								strDimValue.c_str());
+						}
+						long lDimValue = std::stol(strDimValue);
+						if (lDimValue < 0) {
+							_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer.",
+								strDimValue.c_str());
+						}
+						vecVariableSpecifiedDims[v].push_back(lDimValue);
+						iLast = i+1;
+					}
+				}
+			} else {
+				vecVariableNames[v] = vecVariableStrings[v];
+			}
+
+			// Get the variable
+			NcVar * var = ncinfile.get_var(vecVariableNames[v].c_str());
 			if (var == NULL) {
 				_EXCEPTION2("File \"%s\" does not contain variable \"%s\"",
 					vecInputFileList[0].c_str(),
-					vecVariableStrings[v].c_str());
+					vecVariableNames[v].c_str());
 			}
 
-			if (var->num_dims() < 2) {
-				_EXCEPTION2("File \"%s\" variable \"%s\" must have at least 2 dimensions",
+			if (var->num_dims() - vecVariableSpecifiedDims[v].size() < 2) {
+				_EXCEPTION2("File \"%s\" variable \"%s\" must have at least 2 dimensions (in addition to specified dimensions)",
 					vecInputFileList[0].c_str(),
 					vecVariableStrings[v].c_str());
 			}
@@ -523,6 +594,16 @@ try {
 					vecVariableStrings[v].c_str());
 			}
 
+			for (int d = 0; d < vecVariableSpecifiedDims[v].size(); d++) {
+				if (vecVariableSpecifiedDims[v][d] >= var->get_dim(d+1)->size()) {
+					_EXCEPTION4("File \"%s\" variable \"%s\" specified dimension index out of range (%lu/%lu).",
+					vecInputFileList[0].c_str(),
+					vecVariableStrings[v].c_str(),
+					vecVariableSpecifiedDims[v][d],
+					var->get_dim(d+1)->size());
+				}
+			}
+
 			for (int d = 1; d < var->num_dims(); d++) {
 				NcDim * dimVar = var->get_dim(d);
 				DimInfo diminfo(dimVar->name(), dimVar->size());
@@ -532,7 +613,7 @@ try {
 
 			// Output storage requirements
 			size_t sTotalAuxDims = 1;
-			for (int d = 0; d < vecVarDimInfo[v].size(); d++) {
+			for (int d = vecVariableSpecifiedDims[v].size(); d < vecVarDimInfo[v].size(); d++) {
 				sTotalAuxDims *= vecVarDimInfo[v][d].size;
 			}
 
@@ -630,15 +711,16 @@ try {
 
 		// Create output variables
 		Announce("Creating output variables");
+		_ASSERT(vecVariableStrings.size() == vecVariableNames.size());
 		for (int v = 0; v < vecVariableStrings.size(); v++) {
 			std::vector<NcDim *> vecVarNcDims;
 			vecVarNcDims.push_back(dimOutTime);
-			for (int d = 0; d < vecVarDimInfo[v].size(); d++) {
+			for (int d = vecVariableSpecifiedDims[v].size(); d < vecVarDimInfo[v].size(); d++) {
 				auto itNcDim = mapOutputNcDim.find(vecVarDimInfo[v][d].name);
 				_ASSERT(itNcDim != mapOutputNcDim.end());
 				vecVarNcDims.push_back(itNcDim->second);
 			}
-			std::string strOutVar = std::string("dailymean_") + vecVariableStrings[v];
+			std::string strOutVar = std::string("dailymean_") + vecVariableNames[v];
 			NcVar * varOut =
 				ncoutfile.add_var(
 					strOutVar.c_str(),
@@ -651,7 +733,26 @@ try {
 					vecVariableStrings[v].c_str());
 			}
 
-			NcVar * varIn = ncinfile.get_var(vecVariableStrings[v].c_str());
+			for (int d = 0; d < vecVariableSpecifiedDims[v].size(); d++) {
+				NcVar * varDimIn = ncinfile.get_var(vecVarDimInfo[v][d].name.c_str());
+				if (varDimIn == NULL) {
+					std::string strAttName = vecVarDimInfo[v][d].name + "_index";
+					varOut->add_att(
+						strAttName.c_str(),
+						vecVariableSpecifiedDims[v][d]);
+				} else {
+					_ASSERT(varDimIn->num_dims() == 1);
+					_ASSERT(varDimIn->get_dim(0)->size() > vecVariableSpecifiedDims[v][d]);
+					varDimIn->set_cur(vecVariableSpecifiedDims[v][d]);
+					double dValue;
+					varDimIn->get(&dValue, (long)1);
+					varOut->add_att(
+						vecVarDimInfo[v][d].name.c_str(),
+						dValue);
+				}
+			}
+
+			NcVar * varIn = ncinfile.get_var(vecVariableNames[v].c_str());
 			_ASSERT(varIn != NULL);
 			CopyNcVarAttributes(varIn, varOut);
 
@@ -661,15 +762,19 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
-	// Storage array for the time dimension
-	DataArray1D<long> lPos0(1);
-
 	// Loop through each variable
 	for (int v = 0; v < vecVariableStrings.size(); v++) {
 		AnnounceStartBlock("Calculating climatology of variable \"%s\"",
 			vecVariableStrings[v].c_str());
 
 		DataArray1D<float> dDataIn(vecOutputAuxSize[v]);
+
+		// Storage array for auxiliary dimensions
+		DataArray1D<long> lPos0get(1 + vecVariableSpecifiedDims[v].size());
+		for (int d = 0; d < vecVariableSpecifiedDims[v].size(); d++) {
+			lPos0get[d+1] = vecVariableSpecifiedDims[v][d];
+		}
+		DataArray1D<long> lPos0put(1);
 
 		// Loop through each iteration of this variable
 		for (int c = 0; c < vecOutputAuxCount[v]; c++) {
@@ -740,13 +845,13 @@ try {
 					false);
 
 				// Get the variable
-				NcVar * varIn = ncinfile.get_var(vecVariableStrings[v].c_str());
+				NcVar * varIn = ncinfile.get_var(vecVariableNames[v].c_str());
 				if (varIn == NULL) {
 					_EXCEPTION2("Cannot load variable \"%s\" from NetCDF file \"%s\"",
-						vecVariableStrings[v].c_str(),
+						vecVariableNames[v].c_str(),
 						vecInputFileList[f].c_str());
 				}
-				
+
 				// Get the fill value
 				float dFillValue;
 				if (fMissingData) {
@@ -778,11 +883,11 @@ try {
 						}
 					}
 
-					lPos0[0] = t;
+					lPos0get[0] = t;
 					size_t sGetRows =
 						NcGetPutSpecifiedDataSize<float>(
 							varIn,
-							lPos0,
+							lPos0get,
 							vecOutputAuxSize[v],
 							c,
 							dDataIn,
@@ -871,10 +976,10 @@ try {
 					dMeanData[i] = static_cast<float>(dAccumulatedData[t][i]);
 				}
 
-				lPos0[0] = t;
+				lPos0put[0] = t;
 				NcGetPutSpecifiedDataSize<float>(
 					vecNcVarOut[v],
-					lPos0,
+					lPos0put,
 					vecOutputAuxSize[v],
 					c,
 					dMeanData,

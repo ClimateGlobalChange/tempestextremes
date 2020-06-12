@@ -54,7 +54,16 @@ inline static void ToUpper(std::string &str) {
 ///////////////////////////////////////////////////////////////////////////////
 
 inline static bool IsInteger(const std::string &str) {
+	if (str.length() == 0) {
+		return false;
+	}
 	for(size_t i = 0; i < str.length(); i++) {
+		if ((i == 0) && ((str[i] == '-') || (str[i] == '+'))) {
+			if (str.length() == 1) {
+				return false;
+			}
+			continue;
+		}
 		if ((str[i] < '0') || (str[i] > '9')) {
 			return false;
 		}
@@ -120,26 +129,37 @@ static void ParseVariableList(
 	int iVarBegin = 0;
 	int iVarCurrent = 0;
 
-	// Parse variable name
+	int nParenthesesLevel = 0;
+
 	for (;;) {
 		if ((iVarCurrent >= strVariables.length()) ||
-			(strDelimiters.find(strVariables[iVarCurrent]) != std::string::npos)
+		    (strDelimiters.find(strVariables[iVarCurrent]) != std::string::npos)
 		) {
-			if (iVarCurrent == iVarBegin) {
-				if (iVarCurrent >= strVariables.length()) {
-					break;
-				}
+			if (nParenthesesLevel == 0) {
+				vecVariableStrings.push_back(
+					strVariables.substr(iVarBegin, iVarCurrent - iVarBegin));
 
-				continue;
+				iVarBegin = iVarCurrent + 1;
 			}
-
-			vecVariableStrings.push_back(
-				strVariables.substr(iVarBegin, iVarCurrent - iVarBegin));
-
-			iVarBegin = iVarCurrent + 1;
+			if (iVarCurrent >= strVariables.length()) {
+				break;
+			}
+		}
+		if (strVariables[iVarCurrent] == '(') {
+			nParenthesesLevel++;
+		}
+		if (strVariables[iVarCurrent] == ')') {
+			nParenthesesLevel--;
+			if (nParenthesesLevel < 0) {
+				_EXCEPTIONT("Unmatched closed parenthesis in variable list");
+			}
 		}
 
 		iVarCurrent++;
+	}
+
+	if (nParenthesesLevel != 0) {
+		_EXCEPTIONT("Unmatched open parenthesis in variable list");
 	}
 }
 
