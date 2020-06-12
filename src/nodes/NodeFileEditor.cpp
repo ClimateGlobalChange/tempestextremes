@@ -1027,6 +1027,7 @@ void CalculateCycloneMetrics(
 		}
 
 		// Accumulated Cyclone Energy from PSL (ACEPSL)
+		// Formula:  Holland (2008) Revised Hurricane Pressure-Wind Model
 		if (eCycloneMetric == CycloneMetric_ACEPSL) {
 			double dPSL_hPa = dataStateU[ix] / 100.0;
 
@@ -1034,7 +1035,8 @@ void CalculateCycloneMetrics(
 				continue;
 			}
 
-			double dTempValue = 3.92 * pow(1016.0 - dPSL_hPa, 0.644);
+			// Since Holland gives their formula in m/s we need to convert to kts
+			double dTempValue = KnotsPerMetersPerSecond * 3.92 * pow(1016.0 - dPSL_hPa, 0.644);
 
 			dTempValue *= 1.0e-4 * dTempValue;
 
