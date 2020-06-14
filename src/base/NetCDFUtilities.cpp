@@ -174,6 +174,13 @@ void CopyNcVar(
 				_EXCEPTION2("Failed to add dimension \"%s\" (%i) to file",
 					dimA->name(), dimA->size());
 			}
+
+			CopyNcVarIfExists(
+				ncIn,
+				ncOut,
+				dimA->name(),
+				true,
+				true);
 		}
 		if (dimOut[d]->size() != dimA->size()) {
 			if (dimA->is_unlimited() && !dimOut[d]->is_unlimited()) {
