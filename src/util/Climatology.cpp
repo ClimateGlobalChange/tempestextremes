@@ -23,10 +23,10 @@
 #include "Variable.h"
 #include "TimeObj.h"
 #include "DataArray2D.h"
+#include "FourierTransforms.h"
 
 #include "netcdfcpp.h"
 
-#include <complex>
 #include <vector>
 #include <set>
 #include <map>
@@ -34,76 +34,6 @@
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
 #endif
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		Apply a Fourier filter to a given data sequence.
-///	</summary>
-
-// TODO: Test this function more thoroughly
-void fourier_filter(
-	double * const data,
-	size_t sCount,
-	size_t sStride,
-	size_t sModes,
-	DataArray1D<double> & an,
-	DataArray1D<double> & bn
-) {
-	_ASSERT(an.GetRows() >= sModes);
-	_ASSERT(bn.GetRows() >= sModes);
-
-	an.Zero();
-	bn.Zero();
-
-	{
-		for (int n = 0; n < sCount; n++) {
-			an[0] += data[n*sStride];
-		}
-
-		double dProd0 = 2.0 * M_PI / static_cast<double>(sCount);
-		for (int k = 1; k < sModes; k++) {
-			double dProd1 = dProd0 * static_cast<double>(k);
-			for (int n = 0; n < sCount; n++) {
-				double dProd2 = dProd1 * static_cast<double>(n);
-				an[k] += data[n*sStride] * cos(dProd2);
-				bn[k] -= data[n*sStride] * sin(dProd2);
-			}
-
-			//an[sCount-k] = an[k];
-			//bn[sCount-k] = -bn[k];
-		}
-	}
-	{
-		for (int n = 0; n < sCount; n++) {
-			data[n*sStride] = 0.0;
-		}
-
-		double dProd0 = 2.0 * M_PI / static_cast<double>(sCount);
-		for (int n = 0; n < sCount; n++) {
-			data[n*sStride] += an[0];
-
-			double dProd1 = dProd0 * static_cast<double>(n);
-			for (int k = 1; k < sModes; k++) {
-				double dProd2 = dProd1 * static_cast<double>(k);
-				double dProd3 = dProd1 * static_cast<double>(sCount-k);
-				data[n*sStride] += an[k] * cos(dProd2) - bn[k] * sin(dProd2);
-				data[n*sStride] += an[k] * cos(dProd3) + bn[k] * sin(dProd3);
-
-				//printf("%1.15e %1.15e : ", cos(dProd2), cos(dProd3));
-				//printf("%1.15e %1.15e\n", sin(dProd2), sin(dProd3));
-			}
-			//for (int k = sCount-sModes+1; k < sCount; k++) {
-			//	double dProd2 = dProd1 * static_cast<double>(k);
-			//	data[n*sStride] += an[k] * cos(dProd2) - bn[k] * sin(dProd2);
-			//}
-		}
-
-		for (int n = 0; n < sCount; n++) {
-			data[n*sStride] /= static_cast<double>(sCount);
-		}
-	}
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -137,6 +67,24 @@ std::string MemoryBytesToString(
 
 
 	return (std::string(szBuffer) + strStorageUnit);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool CalculateIterationCountSize(
+	size_t sMemoryMax,
+	size_t sOutputTimes,
+	size_t sTotalAuxDims,
+	size_t & sAuxCount,
+	size_t & sAuxSize
+) {
+	size_t sClimatologyStorageSize = sOutputTimes * sTotalAuxDims * sizeof(double);
+	sAuxCount = ((sClimatologyStorageSize + 1) / sMemoryMax) + 1;
+	if (sAuxCount > sTotalAuxDims) {
+		return false;
+	}
+	sAuxSize = sTotalAuxDims / sAuxCount;
+	return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -528,12 +476,13 @@ void Climatology(
 			}
 
 			// Number of auxiliary values to store at each iteration
-			size_t sClimatologyStorageSize = sOutputTimes * sTotalAuxDims * sizeof(double);
-			vecOutputAuxCount[v] = ((sClimatologyStorageSize + 1) / sMemoryMax) + 1;
-			if (vecOutputAuxCount[v] > sTotalAuxDims) {
-				_EXCEPTIONT("Insufficient memory for operation, increase --memmax");
-			}
-			vecOutputAuxSize[v] = sTotalAuxDims / vecOutputAuxCount[v];
+			bool fSufficientMemory =
+				CalculateIterationCountSize(
+					sMemoryMax,
+					sOutputTimes,
+					sTotalAuxDims,
+					vecOutputAuxCount[v],
+					vecOutputAuxSize[v]);
 
 			// Output information to user
 			std::string strPerTimesliceStorage =
@@ -892,7 +841,7 @@ void Climatology(
 				DataArray1D<double> bn(dAccumulatedData.GetRows());
 
 				for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
-					fourier_filter(
+					fourier_filter<double>(
 						&(dAccumulatedData[0][i]),
 						dAccumulatedData.GetRows(),
 						dAccumulatedData.GetColumns(),
@@ -1163,11 +1112,19 @@ try {
 	);
 
 	if (nMPISize != 1) {
+		MPI_Barrier(MPI_COMM_WORLD);
 		AnnounceSetOutputBuffer(stdout);
 		AnnounceOnlyOutputOnRankZero();
 	}
 
-	// TODO: Combine files across ranks
+	if ((nMPISize != 1) && (nMPIRank == 0)) {
+		AnnounceBanner();
+
+		if (nMPIRank == 0) {
+			Announce("TODO: Combine files");
+			DataArray1D<float> dData;
+		}
+	}
 
 	AnnounceBanner();
 
