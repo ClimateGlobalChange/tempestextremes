@@ -175,12 +175,14 @@ void CopyNcVar(
 					dimA->name(), dimA->size());
 			}
 
-			CopyNcVarIfExists(
-				ncIn,
-				ncOut,
-				dimA->name(),
-				true,
-				true);
+			if (strVarName != dimA->name()) {
+				CopyNcVarIfExists(
+					ncIn,
+					ncOut,
+					dimA->name(),
+					true,
+					true);
+			}
 		}
 		if (dimOut[d]->size() != dimA->size()) {
 			if (dimA->is_unlimited() && !dimOut[d]->is_unlimited()) {
@@ -200,6 +202,11 @@ void CopyNcVar(
 
 		counts[d] = dimA->size();
 		nDataSize *= counts[d];
+	}
+
+	// Check for existence of variable
+	if (ncOut.get_var(var->name()) != NULL) {
+		_EXCEPTION1("Variable \"%s\" already exists in output file", var->name());
 	}
 
 	// ncByte / ncChar type
