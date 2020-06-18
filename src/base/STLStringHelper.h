@@ -131,11 +131,21 @@ static void ParseVariableList(
 
 	int nParenthesesLevel = 0;
 
+	if (strVariables.length() == 0) {
+		return;
+	}
+
 	for (;;) {
 		if ((iVarCurrent >= strVariables.length()) ||
 		    (strDelimiters.find(strVariables[iVarCurrent]) != std::string::npos)
 		) {
 			if (nParenthesesLevel == 0) {
+				_ASSERT(iVarCurrent > iVarBegin);
+				if (iVarCurrent == iVarBegin) {
+					_EXCEPTION1("Zero length variable string in \"%s\"",
+						strVariables.c_str());
+				}
+
 				vecVariableStrings.push_back(
 					strVariables.substr(iVarBegin, iVarCurrent - iVarBegin));
 
