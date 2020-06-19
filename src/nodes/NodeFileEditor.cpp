@@ -1357,6 +1357,10 @@ try {
 	} else {
 		AnnounceStartBlock("No connectivity file specified");
 		Announce("Attempting to generate latitude-longitude grid from data file");
+		if (vecFiles.size() < 1) {
+			_EXCEPTIONT("No data files specified -- unable to proceed without being able to determine grid dimensionality");
+		}
+
 		NcFile ncFile(vecFiles[0].c_str());
 		if (!ncFile.is_valid()) {
 			_EXCEPTION1("Unable to open NetCDF file \"%s\"", vecFiles[0].c_str());
