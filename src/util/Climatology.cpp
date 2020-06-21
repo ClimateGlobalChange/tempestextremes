@@ -900,6 +900,16 @@ void Climatology(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void MergeEnsembles(
+	const std::vector<std::string> & vecInputFiles,
+	const std::string & strVariable,
+	const std::string & strMemoryMax,
+	std::string & strOutputFile
+) {
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 #if defined(TEMPEST_MPIOMP)
@@ -1111,11 +1121,13 @@ try {
 		fVerbose
 	);
 
+#if defined(TEMPEST_MPIOMP)
 	if (nMPISize != 1) {
 		MPI_Barrier(MPI_COMM_WORLD);
 		AnnounceSetOutputBuffer(stdout);
 		AnnounceOnlyOutputOnRankZero();
 	}
+#endif
 
 	if ((nMPISize != 1) && (nMPIRank == 0)) {
 		AnnounceBanner();
