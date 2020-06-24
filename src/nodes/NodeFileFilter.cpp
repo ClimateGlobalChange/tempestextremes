@@ -779,9 +779,9 @@ try {
 	) {
 		_EXCEPTIONT("No command (--bydist, --bycontour, or --nearbyblobs) specified");
 	}
-	if ((strFilterByDist.length() != 0) && (strFilterByContour.length() != 0)) {
-		_EXCEPTIONT("Only one filter command (--bydist or --bycontour) may be specified");
-	}
+	//if ((strFilterByDist.length() != 0) && (strFilterByContour.length() != 0)) {
+	//	_EXCEPTIONT("Only one filter command (--bydist or --bycontour) may be specified");
+	//}
 	if ((strVariables.length() == 0) && (strMaskVariable.length() == 0)) {
 		_EXCEPTIONT("One of (--var) or (--maskvar) must be specified");
 	}
