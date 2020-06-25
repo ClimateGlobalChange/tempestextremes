@@ -1323,12 +1323,17 @@ try {
 			continue;
 		}
 #endif
+		// Output file for this file
+		std::string strOutputFileCurrent;
+
 		// Generate output file name
 		if (vecInputFiles.size() == 1) {
 			dbparam.fpLog = stdout;
 
 			if (strOutputFile == "") {
-				strOutputFile = "out.dat";
+				strOutputFileCurrent = "out.nc";
+			} else {
+				strOutputFileCurrent = strOutputFile;
 			}
 
 		} else {
@@ -1336,14 +1341,14 @@ try {
 			sprintf(szFileIndex, "%06i", f);
 
 			if (vecOutputFiles.size() != 0) {
-				strOutputFile = vecOutputFiles[f];
+				strOutputFileCurrent = vecOutputFiles[f];
 			} else {
 				if (strOutputFile == "") {
-					strOutputFile =
-						"out" + std::string(szFileIndex) + ".dat";
+					strOutputFileCurrent =
+						"out" + std::string(szFileIndex) + ".nc";
 				} else {
-					strOutputFile =
-						strOutputFile + std::string(szFileIndex) + ".dat";
+					strOutputFileCurrent =
+						strOutputFile + std::string(szFileIndex) + ".nc";
 				}
 			}
 
@@ -1355,7 +1360,7 @@ try {
 		DetectBlobs(
 			f,
 			vecInputFiles[f],
-			strOutputFile,
+			strOutputFileCurrent,
 			strConnectivity,
 			varreg,
 			dbparam);
