@@ -1313,7 +1313,9 @@ try {
 			Announce("Output will be written to %sXXXXXX.dat",
 				strOutputFile.c_str());
 		}
+#if defined(TEMPEST_MPIOMP)
 		Announce("Logs will be written to logXXXXXX.txt");
+#endif
 	}
 
 	// Loop over all files to be processed
@@ -1325,6 +1327,9 @@ try {
 #endif
 		// Output file for this file
 		std::string strOutputFileCurrent;
+
+		// Log file needs closing
+		bool fCloseLogFile = false;
 
 		// Generate output file name
 		if (vecInputFiles.size() == 1) {
@@ -1353,7 +1358,16 @@ try {
 			}
 
 			std::string strLogFile = "log" + std::string(szFileIndex) + ".txt";
+#if defined(TEMPEST_MPIOMP)
 			dbparam.fpLog = fopen(strLogFile.c_str(), "w");
+			if (dbparam.fpLog == NULL) {
+				_EXCEPTION1("Unable to open log file \"%s\" for writing",
+					strLogFile.c_str());
+			}
+			fCloseLogFile = true;
+#else
+			dbparam.fpLog = stdout;
+#endif
 		}
 
 		// Perform DetectBlobs
@@ -1365,10 +1379,12 @@ try {
 			varreg,
 			dbparam);
 
+#if defined(TEMPEST_MPIOMP)
 		// Close the log file
-		if (vecInputFiles.size() != 1) {
+		if (fCloseLogFile) {
 			fclose(dbparam.fpLog);
 		}
+#endif
 	}
 
 	AnnounceEndBlock("Done");
