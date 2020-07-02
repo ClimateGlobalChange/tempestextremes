@@ -19,6 +19,7 @@ EXEC_FILES= DetectNodes.cpp \
             StitchNodes.cpp \
 			NodeFileEditor.cpp \
 			NodeFileFilter.cpp \
+			NodeFileFilter2.cpp \
 			NodeFileCompose.cpp
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)

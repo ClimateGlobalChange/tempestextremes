@@ -19,6 +19,7 @@
 #include "FiniteElementTools.h"
 #include "GaussLobattoQuadrature.h"
 #include "Announce.h"
+#include "CoordTransforms.h"
 #include "kdtree.h"
 
 #include <cstdlib>
@@ -1121,9 +1122,8 @@ size_t SimpleGrid::NearestNode(
 	}
 
 	// Find the nearest node from a given point
-	double dX = cos(dLonRad) * cos(dLatRad);
-	double dY = sin(dLonRad) * cos(dLatRad);
-	double dZ = sin(dLatRad);
+	double dX, dY, dZ;
+	RLLtoXYZ_Rad(dLonRad, dLatRad, dX, dY, dZ);
 
 	kdres * kdresNearest = kd_nearest3(m_kdtree, dX, dY, dZ);
 	if (kdresNearest == NULL) {
@@ -1139,6 +1139,47 @@ size_t SimpleGrid::NearestNode(
 	kd_res_free(kdresNearest);
 
 	return i;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void SimpleGrid::NearestNodes(
+	double dLonRad,
+	double dLatRad,
+	double dDistDegGCD,
+	std::vector<size_t> & vecNodeIxs
+) const {
+	if (m_kdtree == NULL) {
+		_EXCEPTIONT("BuildKDTree() must be called before NearestNode()");
+	}
+
+	// Clear the index array
+	vecNodeIxs.clear();
+
+	// Find the nearest node from a given point
+	double dX, dY, dZ;
+	RLLtoXYZ_Rad(dLonRad, dLatRad, dX, dY, dZ);
+
+	double dDistXYZ = 2.0 * sin(DegToRad(dDistDegGCD) / 2.0) + ReferenceTolerance;
+
+	kdres * kdresNearestRange = kd_nearest_range3(m_kdtree, dX, dY, dZ, dDistXYZ);
+	if (kdresNearestRange == NULL) {
+		_EXCEPTIONT("kd_nearest_range3() failed");
+	}
+	int nResSize = kd_res_size(kdresNearestRange);
+	if (nResSize != 0) {
+		for (;;) {
+			size_t i = (size_t)(kd_res_item_data(kdresNearestRange));
+			vecNodeIxs.push_back(i);
+
+			if (kd_res_next(kdresNearestRange) == 0) {
+				break;
+			}
+		}
+	}
+
+	kd_res_free(kdresNearestRange);
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////

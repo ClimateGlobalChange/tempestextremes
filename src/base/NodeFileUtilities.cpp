@@ -15,6 +15,7 @@
 ///	</remarks>
 
 #include "NodeFileUtilities.h"
+#include "Defines.h"
 
 #include <iostream>
 
@@ -223,8 +224,8 @@ void NodeFile::Read(
 
 			// StitchNodes format input
 			if (ePathType == PathTypeSN) {
-				PathNode & pathnode =
-					m_pathvec[m_pathvec.size()-1][i];
+				Path & path = m_pathvec[m_pathvec.size()-1];
+				PathNode & pathnode = path[i];
 
 				if (nOutputSize < 4) {
 					_EXCEPTION2("Format error on line %i of \"%s\"",
@@ -246,6 +247,11 @@ void NodeFile::Read(
 					caltype);
 
 				pathnode.m_time = time;
+
+				// Add end time to Path
+				if (i == nCount-1) {
+					path.m_timeEnd = time;
+				}
 
 				// Store file position
 				pathnode.m_fileix = ixpathnode;
@@ -444,6 +450,107 @@ void NodeFile::GenerateTimeToPathNodeMap() {
 			}
 			iter->second.push_back(std::pair<int,int>(p,n));
 		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void NodeFile::InterpolateNodeCoordinates(
+	const Time & time,
+	const std::string & strLonName,
+	const std::string & strLatName,
+	std::vector<int> & vecPathId,
+	std::vector<double> & vecLonDeg,
+	std::vector<double> & vecLatDeg
+) const {
+
+	// Get lon and lat column indices
+	int iLonIx = m_cdh.GetIndexFromString(strLonName);
+	if (iLonIx == (-1)) {
+		_EXCEPTION1("Column header \"%s\" not found", strLonName.c_str());
+	}
+
+	int iLatIx = m_cdh.GetIndexFromString(strLatName);
+	if (iLatIx == (-1)) {
+		_EXCEPTION1("Column header \"%s\" not found", strLatName.c_str());
+	}
+
+	// Clear existing arrays
+	vecPathId.clear();
+	vecLonDeg.clear();
+	vecLatDeg.clear();
+
+	// Loop through all paths
+	for (int p = 0; p < m_pathvec.size(); p++) {
+		const Path & path = m_pathvec[p];
+
+		if ((path.m_timeStart <= time) && (path.m_timeEnd >= time)) {
+			vecPathId.push_back(p);
+
+			if (path.size() == 0) {
+				_EXCEPTION1("Zero length path (%i) found in nodefile", p);
+			}
+
+			if (path.size() == 1) {
+				const PathNode & pathnode = path[0];
+				vecLonDeg.push_back(pathnode.GetColumnDataAsDouble(iLonIx));
+				vecLatDeg.push_back(pathnode.GetColumnDataAsDouble(iLatIx));
+				continue;
+			}
+
+			if (time < path[0].m_time) {
+				const PathNode & pathnode = path[0];
+				vecLonDeg.push_back(pathnode.GetColumnDataAsDouble(iLonIx));
+				vecLatDeg.push_back(pathnode.GetColumnDataAsDouble(iLatIx));
+				continue;
+			}
+
+			if (time > path[path.size()-1].m_time) {
+				const PathNode & pathnode = path[path.size()-1];
+				vecLonDeg.push_back(pathnode.GetColumnDataAsDouble(iLonIx));
+				vecLatDeg.push_back(pathnode.GetColumnDataAsDouble(iLatIx));
+				continue;
+			}
+
+			for (int n = 0; n < path.size()-1; n++) {
+				const PathNode & pathnodePrev = path[n];
+				const PathNode & pathnodeNext = path[n+1];
+
+				if (pathnodeNext.m_time >= time) {
+					if (pathnodePrev.m_time > time) {
+						_EXCEPTIONT("Non-monotone time ordering in path");
+					}
+					if (pathnodePrev.m_time == time) {
+						vecLonDeg.push_back(pathnodePrev.GetColumnDataAsDouble(iLonIx));
+						vecLatDeg.push_back(pathnodePrev.GetColumnDataAsDouble(iLatIx));
+						break;
+					} else {
+						double dPrevLonDeg = pathnodePrev.GetColumnDataAsDouble(iLonIx);
+						double dPrevLatDeg = pathnodePrev.GetColumnDataAsDouble(iLatIx);
+						double dNextLonDeg = pathnodeNext.GetColumnDataAsDouble(iLonIx);
+						double dNextLatDeg = pathnodeNext.GetColumnDataAsDouble(iLatIx);
+
+						double dTimeDelta = pathnodeNext.m_time - pathnodePrev.m_time;
+						double dAlpha = (time - pathnodePrev.m_time) / dTimeDelta;
+
+						if ((dAlpha < -ReferenceTolerance) || (dAlpha > 1.0 + ReferenceTolerance)) {
+							_EXCEPTION1("Interpolation coefficient out of range (%1.5e)", dAlpha);
+						}
+
+						// TODO: Use great circle arc instead of line in lat-lon space
+						vecLonDeg.push_back(dNextLonDeg * dAlpha + dPrevLonDeg * (1.0 - dAlpha));
+						vecLatDeg.push_back(dNextLatDeg * dAlpha + dPrevLatDeg * (1.0 - dAlpha));
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	if ((vecPathId.size() != vecLonDeg.size()) ||
+	    (vecPathId.size() != vecLatDeg.size())
+	) {
+		_EXCEPTIONT("LOGIC ERROR: Mismatched path size arrays");
 	}
 }
 

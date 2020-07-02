@@ -625,6 +625,11 @@ public:
 	///		Start time of the path.
 	///	</summary>
 	Time m_timeStart;
+
+	///	<summary>
+	///		End time of the path.
+	///	</summary>
+	Time m_timeEnd;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -701,6 +706,18 @@ public:
 	///		Generate the TimeToPathNodeMap.
 	///	</summary>
 	void GenerateTimeToPathNodeMap();
+
+	///	<summary>
+	///		Get an array of longitudes and latitudes.
+	///	</summary>
+	void InterpolateNodeCoordinates(
+		const Time & time,
+		const std::string & strLonName,
+		const std::string & strLatName,
+		std::vector<int> & vecPathId,
+		std::vector<double> & vecLonDeg,
+		std::vector<double> & vecLatDeg
+	) const;
 
 public:
 	///	<summary>

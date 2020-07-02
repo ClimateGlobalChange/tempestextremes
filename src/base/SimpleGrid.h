@@ -228,6 +228,17 @@ public:
 		double dLatRad
 	) const;
 
+	///	<summary>
+	///		Find the set of nodes within the specified distance (degrees great circle distance)
+	///		of the given coordinate.
+	///	</summary>
+	void NearestNodes(
+		double dLonRad,
+		double dLatRad,
+		double dDistDegGCD,
+		std::vector<size_t> & vecNodeIxs
+	) const;
+
 public:
 	///	<summary>
 	///		Grid dimensions.
