@@ -124,6 +124,12 @@ try {
 	// Number of longitudes in output
 	int nLon;
 
+	// Only include genesis points
+	bool fGenesis;
+
+	// Online include termination points
+	bool fTermination;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -139,6 +145,8 @@ try {
 		CommandLineDouble(dLonEnd, "lon_end", 360.0);
 		CommandLineInt(nLat, "nlat", 180);
 		CommandLineInt(nLon, "nlon", 360);
+		CommandLineBool(fGenesis, "genesis_only");
+		CommandLineBool(fTermination, "termination_only");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -174,6 +182,11 @@ try {
 		_EXCEPTIONT("UNIMPLEMENTED: --nlon must be specified currently");
 	}
 
+	// Check genesis / termination flags
+	if (fGenesis && fTermination) {
+		_EXCEPTIONT("Only one of --genesis_only and --termination_only allowed");
+	}
+
 	// Input file list
 	std::vector<std::string> vecInputFiles;
 
@@ -204,7 +217,11 @@ try {
 				vecInputFiles[f].c_str());
 		}
 
+		int iLine = 0;
+		int nNodesTotal = 0;
+		int nNodesRemaining = 0;
 		for (;;) {
+			iLine++;
 
 			// Read in the next line
 			fgets(&(strBuffer[0]), 1024, fp);
@@ -223,7 +240,25 @@ try {
 
 			// Check for new storm
 			if (strncmp(&(strBuffer[0]), "start", 5) == 0) {
+
+				for (int i = 6; i <= nLength; i++) {
+					if ((strBuffer[i] < '0') || (strBuffer[i] > '9')) {
+						if (i == 6) {
+							_EXCEPTION1("Missing track length on line %i", iLine);
+						}
+						nNodesRemaining = atoi(&(strBuffer[6]));
+						nNodesTotal = nNodesRemaining;
+						break;
+					}
+				}
+
 				continue;
+			}
+
+			// Count down number of tracks
+			nNodesRemaining--;
+			if (nNodesRemaining < 0) {
+				_EXCEPTION1("Malformed nodefile on line %i: too many nodes in track", iLine);
 			}
 
 			// Parse line
@@ -291,7 +326,19 @@ try {
 				_EXCEPTION1("Longitude index (%i) out of range", iLon);
 			}
 
-			nCounts[iLat][iLon]++;
+			if (fGenesis) {
+				if (nNodesRemaining == nNodesTotal - 1) {
+					nCounts[iLat][iLon]++;
+				}
+
+			} else if (fTermination) {
+				if (nNodesRemaining == 0) {
+					nCounts[iLat][iLon]++;
+				}
+
+			} else {
+				nCounts[iLat][iLon]++;
+			}
 		}
 
 		fclose(fp);
