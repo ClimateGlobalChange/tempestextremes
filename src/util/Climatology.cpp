@@ -303,6 +303,10 @@ void SplitVariableStrings(
 				) {
 					std::string strDimValue =
 						vecVariableStrings[v].substr(iLast, i-iLast);
+					//if (strDimValue == "*") {
+					//	vecVariableSpecifiedDims[v].push_back(-1);
+					//	iLast = i+1;
+					//}
 					if (!STLStringHelper::IsInteger(strDimValue)) {
 						_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer.",
 							strDimValue.c_str());
@@ -325,6 +329,14 @@ void SplitVariableStrings(
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		Possible climatology types that can be calculated with Climatology().
+///	</summary>
+enum ClimatologyType {
+	ClimatologyType_Mean,
+	ClimatologyType_Sq
+};
+
+///	<summary>
 ///		Produce a climatology over the given input files.
 ///	</summary>
 void Climatology(
@@ -334,6 +346,7 @@ void Climatology(
 	const std::vector< std::vector<long> > & vecVariableSpecifiedDims,
 	size_t sMemoryMax,
 	bool fIncludeLeapDays,
+	ClimatologyType eClimoType,
 	int nFourierModes,
 	bool fMissingData,
 	bool fOutputSliceCounts,
@@ -342,6 +355,13 @@ void Climatology(
 	_ASSERT(vecInputFileList.size() > 0);
 	_ASSERT(vecVariableNames.size() > 0);
 	_ASSERT(vecVariableNames.size() == vecVariableSpecifiedDims.size());
+
+	// Climatology type
+	if ((eClimoType != ClimatologyType_Mean) &&
+	    (eClimoType != ClimatologyType_Sq)
+	) {
+		_EXCEPTIONT("Invalid eClimoType");
+	}
 
 	// Time units
 	std::string strTimeUnits = "days since 0001-01-01";
@@ -453,7 +473,9 @@ void Climatology(
 			}
 
 			for (int d = 0; d < vecVariableSpecifiedDims[v].size(); d++) {
-				if (vecVariableSpecifiedDims[v][d] >= var->get_dim(d+1)->size()) {
+				if ((vecVariableSpecifiedDims[v][d] < (-1)) ||
+				    (vecVariableSpecifiedDims[v][d] >= var->get_dim(d+1)->size())
+				) {
 					_EXCEPTION4("File \"%s\" variable \"%s\" specified dimension index out of range (%lu/%lu).",
 					vecInputFileList[0].c_str(),
 					vecVariableNames[v].c_str(),
@@ -792,16 +814,38 @@ void Climatology(
 					_ASSERT((iDay >= 0) && (iDay < 365));
 
 					if (fMissingData) {
-						for (size_t i = 0; i < sGetRows; i++) {
-							if (dDataIn[i] != dFillValue) {
-								nTimeSlicesGrid[iDay][i]++;
-								dAccumulatedData[iDay][i] += static_cast<double>(dDataIn[i]);
+						if (eClimoType == ClimatologyType_Mean) {
+							for (size_t i = 0; i < sGetRows; i++) {
+								if (dDataIn[i] != dFillValue) {
+									nTimeSlicesGrid[iDay][i]++;
+									dAccumulatedData[iDay][i] += static_cast<double>(dDataIn[i]);
+								}
+							}
+
+						} else if (eClimoType == ClimatologyType_Sq) {
+							for (size_t i = 0; i < sGetRows; i++) {
+								if (dDataIn[i] != dFillValue) {
+									nTimeSlicesGrid[iDay][i]++;
+									dAccumulatedData[iDay][i] +=
+										static_cast<double>(dDataIn[i])
+										* static_cast<double>(dDataIn[i]);
+								}
 							}
 						}
+
 					} else {
 						nTimeSlices[iDay]++;
-						for (size_t i = 0; i < sGetRows; i++) {
-							dAccumulatedData[iDay][i] += static_cast<double>(dDataIn[i]);
+						if (eClimoType == ClimatologyType_Mean) {
+							for (size_t i = 0; i < sGetRows; i++) {
+								dAccumulatedData[iDay][i] += static_cast<double>(dDataIn[i]);
+							}
+
+						} else if (eClimoType == ClimatologyType_Sq) {
+							for (size_t i = 0; i < sGetRows; i++) {
+								dAccumulatedData[iDay][i] +=
+									static_cast<double>(dDataIn[i])
+									* static_cast<double>(dDataIn[i]);
+							}
 						}
 					}
 				}
@@ -940,8 +984,11 @@ try {
 	// Maximum memory allocation per thread
 	std::string strMemoryMax;
 
-	// Type of mean climatology
-	std::string strMeanType;
+	// Period of the climatology
+	std::string strPeriod;
+
+	// Type of climatology
+	std::string strClimoType;
 
 	// Include leap days
 	bool fIncludeLeapDays;
@@ -967,8 +1014,9 @@ try {
 		CommandLineString(strInputFileList, "in_data_list", "");
 		CommandLineString(strOutputFile, "out_data", "");
 		CommandLineString(strVariable, "var", "");
-		CommandLineStringD(strMemoryMax, "memmax", "2G", "[#K,#M,#G]");	
-		CommandLineStringD(strMeanType, "mean", "daily", "[daily|monthly|seasonal|annual]");
+		CommandLineStringD(strMemoryMax, "memmax", "2G", "[#K,#M,#G]");
+		CommandLineStringD(strPeriod, "period", "daily", "[daily|monthly|seasonal|annual]");
+		CommandLineStringD(strClimoType, "type", "mean", "[mean|sq]");
 		CommandLineBool(fIncludeLeapDays, "include_leap_days");
 		CommandLineInt(nFourierModes, "time_modes", 0);
 		CommandLineBool(fMissingData, "missingdata");
@@ -996,6 +1044,17 @@ try {
 	}
 	if (fIncludeLeapDays) {
 		_EXCEPTIONT("--include_leap_days not implemented");
+	}
+
+	// Climatology type
+	ClimatologyType eClimoType;
+	STLStringHelper::ToLower(strClimoType);
+	if (strClimoType == "mean") {
+		eClimoType = ClimatologyType_Mean;
+	} else if (strClimoType == "sq") {
+		eClimoType = ClimatologyType_Sq;
+	} else {
+		_EXCEPTIONT("--type invalid; expected \"mean\" or \"sq\"");
 	}
 
 	// Parse input file list
@@ -1115,6 +1174,7 @@ try {
 		vecVariableSpecifiedDims,
 		sMemoryMax,
 		fIncludeLeapDays,
+		eClimoType,
 		nFourierModes,
 		fMissingData,
 		fOutputSliceCounts,
