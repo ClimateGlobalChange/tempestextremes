@@ -46,6 +46,16 @@ public:
 	///	</summary>
 	static const size_t InvalidIndex;
 
+	///	<summary>
+	///		File type.
+	///	</summary>
+	enum FileType {
+		FileType_Unknown = (-1),
+		FileType_Standard = 0,
+		FileType_NoTime = 1,
+		FileType_DailyMeanClimo = 2,
+	};
+
 private:
 	///	<summary>
 	///		Copy constructor.
@@ -119,6 +129,14 @@ public:
 		return m_vecFilenames[pos];
 	}
 
+	///	<summary>
+	///		Get the FileType at the specified position.
+	///	</summary>
+	const FileType & GetFileType(size_t pos) const {
+		_ASSERT(pos < m_vecFilenames.size());
+		return m_vecFileType[pos];
+	}
+
 public:
 	///	<summary>
 	///		Get the Time used to construct this NcFileVector.
@@ -137,10 +155,7 @@ public:
 	///	<summary>
 	///		Get the time index from the specified file corresponding to m_time.
 	///	</summary>
-	long GetTimeIx(size_t pos) const {
-		_ASSERT(pos < m_vecTimeIxs.size());
-		return m_vecTimeIxs[pos];
-	}
+	long GetTimeIx(size_t pos) const;
 
 	///	<summary>
 	///		Set the time index across all files.
@@ -171,6 +186,11 @@ protected:
 	///		Vector of file names.
 	///	</summary>
 	std::vector<std::string> m_vecFilenames;
+
+	///	<summary>
+	///		Type of file.
+	///	</summary>
+	std::vector<FileType> m_vecFileType;
 
 protected:
 	///	<summary>

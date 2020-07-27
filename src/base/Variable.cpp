@@ -614,7 +614,16 @@ NcVar * Variable::GetNcVarFromNcFileVector(
 			nSetDims++;
 		}
 	}
-
+/*
+	printf("Loading \"%s\" (%s) [", ncfilevec.GetFilename(sPos).c_str(), m_timeStored.ToString().c_str());
+	for (int d = 0; d < lDim.size(); d++) {
+		printf("%lu",lDim[d]);
+		if (d != lDim.size()-1) {
+			printf(",");
+		}
+	}
+	printf("]\n");
+*/
 	var->set_cur(&(lDim[0]));
 
 	NcError err;

@@ -16,6 +16,8 @@
 
 #include "NcFileVector.h"
 
+#include "NetCDFUtilities.h"
+
 ///////////////////////////////////////////////////////////////////////////////
 
 const long NcFileVector::InvalidTimeIndex = (-2);
@@ -33,6 +35,7 @@ void NcFileVector::clear() {
 	}
 	m_vecNcFile.resize(0);
 	m_vecFilenames.resize(0);
+	m_vecFileType.resize(0);
 	m_time = Time(Time::CalendarUnknown);
 	m_vecTimeIxs.resize(0);
 }
@@ -50,6 +53,30 @@ void NcFileVector::InsertFile(
 	if (!pNewFile->is_valid()) {
 		_EXCEPTION1("Cannot open input file \"%s\"", strFile.c_str());
 	}
+
+	// Identify the FileType
+	NcDim * dimTime = pNewFile->get_dim("time");
+	if (dimTime == NULL) {
+		m_vecFileType.push_back(FileType_NoTime);
+	} else {
+		NcVar * varTime = pNewFile->get_var("time");
+		if (varTime == NULL) {
+			m_vecFileType.push_back(FileType_Standard);
+		}
+		NcAtt * attType = varTime->get_att("type");
+		if (attType == NULL) {
+			m_vecFileType.push_back(FileType_Standard);
+		} else {
+			std::string strType = attType->as_string(0);
+			if (strType == "daily mean climatology") {
+				m_vecFileType.push_back(FileType_DailyMeanClimo);
+			} else {
+				_EXCEPTION2("Unrecognized time::type (%s) in file \"%s\"",
+					strType.c_str(), strFile.c_str());
+			}
+		}
+	}
+
 	m_vecNcFile.push_back(pNewFile);
 	m_vecFilenames.push_back(strFile);
 	m_vecTimeIxs.push_back(lTimeIndex);
@@ -107,6 +134,53 @@ size_t NcFileVector::FindContainingVariable(
 		*pvar = NULL;
 	}
 	return InvalidIndex;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+long NcFileVector::GetTimeIx(size_t pos) const {
+	_ASSERT(pos < m_vecTimeIxs.size());
+
+	if (m_vecTimeIxs[pos] != InvalidTimeIndex) {
+		return m_vecTimeIxs[pos];
+
+	} else {
+		_ASSERT(m_vecNcFile.size() == m_vecFilenames.size());
+		_ASSERT(m_vecNcFile.size() == m_vecFileType.size());
+
+		std::vector<Time> vecTimes;
+		ReadCFTimeDataFromNcFile(
+			m_vecNcFile[pos],
+			m_vecFilenames[pos],
+			vecTimes,
+			false);
+
+		_ASSERT(vecTimes.size() > 0);
+
+		if (m_vecFileType[pos] == NcFileVector::FileType_Standard) {
+			for (long t = 0; t < vecTimes.size(); t++) {
+				if (vecTimes[t] == m_time) {
+					return t;
+				}
+			}
+
+		} else if (m_vecFileType[pos] == NcFileVector::FileType_DailyMeanClimo) {
+			Time timeDailyMean(Time::CalendarNoLeap);
+			timeDailyMean.SetYear(1);
+			timeDailyMean.SetMonth(m_time.GetMonth());
+			timeDailyMean.SetDay(m_time.GetDay());
+			if (m_time.IsLeapDay()) {
+				timeDailyMean.SetDay(28);
+			}
+			for (long t = 0; t < vecTimes.size(); t++) {
+				if (vecTimes[t] == timeDailyMean) {
+					return t;
+				}
+			}
+		}
+	}
+	_EXCEPTION1("Unable to identify time axis in \"%s\"",
+		m_vecFilenames[pos].c_str());
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -692,13 +692,19 @@ void DetectBlobs(
 			true);
 	}
 */
+
 	// Get time dimension
 	NcDim * dimTime = vecFiles[0]->get_dim("time");
-	NcVar * varTime = NULL;
-	if (dimTime != NULL) {
-		varTime = vecFiles[0]->get_var("time");
+	if (dimTime == NULL) {
+		_EXCEPTION1("File \"%s\" missing \"time\" dimension",
+			vecFiles.GetFilename(0).c_str());
 	}
-
+	NcVar * varTime = vecFiles[0]->get_var("time");
+	if (varTime == NULL) {
+		_EXCEPTION1("File \"%s\" missing \"time\" variable",
+			vecFiles.GetFilename(0).c_str());
+	}
+/*
 	int nTime = 1;
 	if (dimTime != NULL) {
 		nTime = dimTime->size();
@@ -736,6 +742,14 @@ void DetectBlobs(
 			dTime[t] = static_cast<double>(t);
 		}
 	}
+*/
+	// Read the time data
+	std::vector<Time> vecTimes;
+	ReadCFTimeDataFromNcFile(
+		vecFiles[0],
+		vecFiles.GetFilename(0),
+		vecTimes,
+		false);
 
 	// Create reference to NetCDF input file
 	NcFile & ncInput = *(vecFiles[0]);
@@ -880,10 +894,10 @@ void DetectBlobs(
 	DataArray1D<int> bTag(grid.GetSize());
 
 	// Loop through all times
-	for (int t = 0; t < nTime; t ++) {
+	for (int t = 0; t < vecTimes.size(); t ++) {
 
 		// Announce
-		AnnounceStartBlock("Time %i", t);
+		AnnounceStartBlock("Time %s", vecTimes[t].ToString().c_str());
 
 		AnnounceStartBlock("Build tagged cell array");
 		bTag.Zero();
@@ -910,7 +924,7 @@ void DetectBlobs(
 
 			// Load the search variable data
 			Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
-			vecFiles.SetConstantTimeIx(t);
+			vecFiles.SetTime(vecTimes[t]);
 			var.LoadGridData(varreg, vecFiles, grid);
 			const DataArray1D<float> & dataState = var.GetData();
 
@@ -945,7 +959,7 @@ void DetectBlobs(
 
 				// Load the search variable data
 				Variable & var = varreg.Get(vecFilterOp[fc].m_varix);
-				vecFiles.SetConstantTimeIx(t);
+				vecFiles.SetTime(vecTimes[t]);
 				var.LoadGridData(varreg, vecFiles, grid);
 				const DataArray1D<float> & dataState = var.GetData();
 
@@ -986,7 +1000,7 @@ void DetectBlobs(
 							dim0);
 
 					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
-					vecFiles.SetConstantTimeIx(t);
+					vecFiles.SetTime(vecTimes[t]);
 					var.LoadGridData(varreg, vecFiles, grid);
 					const DataArray1D<float> & dataState = var.GetData();
 
@@ -1003,7 +1017,7 @@ void DetectBlobs(
 							dim1);
 
 					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
-					vecFiles.SetConstantTimeIx(t);
+					vecFiles.SetTime(vecTimes[t]);
 					var.LoadGridData(varreg, vecFiles, grid);
 					const DataArray1D<float> & dataState = var.GetData();
 
@@ -1036,7 +1050,7 @@ void DetectBlobs(
 							dim0);
 
 					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
-					vecFiles.SetConstantTimeIx(t);
+					vecFiles.SetTime(vecTimes[t]);
 					var.LoadGridData(varreg, vecFiles, grid);
 					const DataArray1D<float> & dataState = var.GetData();
 
@@ -1052,7 +1066,7 @@ void DetectBlobs(
 							dim1);
 
 					Variable & var = varreg.Get((*param.pvecOutputOp)[oc].m_varix);
-					vecFiles.SetConstantTimeIx(t);
+					vecFiles.SetTime(vecTimes[t]);
 					var.LoadGridData(varreg, vecFiles, grid);
 					const DataArray1D<float> & dataState = var.GetData();
 
@@ -1306,7 +1320,7 @@ try {
 	AnnounceStartBlock("Begin search operation");
 	if (vecInputFiles.size() != 1) {
 		if (vecOutputFiles.size() != 0) {
-			Announce("Output will be written following --out_file_list");
+			Announce("Output will be written following --out_list");
 		} else if (strOutputFile == "") {
 			Announce("Output will be written to outXXXXXX.dat");
 		} else {
