@@ -143,6 +143,18 @@ long NcFileVector::GetTimeIx(size_t pos) const {
 	_ASSERT(pos < m_vecTimeIxs.size());
 
 	if (m_vecTimeIxs[pos] != InvalidTimeIndex) {
+		if (m_vecTimeIxs[pos] == NoTimeIndex) {
+			return NoTimeIndex;
+		}
+
+		NcDim * dimTime = m_vecNcFile[pos]->get_dim("time");
+		if (dimTime == NULL) {
+			_EXCEPTIONT("Logic error: Dimension \"time\" missing in file");
+		}
+		if ((m_vecTimeIxs[pos] < 0) || (m_vecTimeIxs[pos] >= dimTime->size())) {
+			_EXCEPTIONT("Logic error: Time index out of range");
+		}
+
 		return m_vecTimeIxs[pos];
 
 	} else {

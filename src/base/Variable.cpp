@@ -564,28 +564,26 @@ NcVar * Variable::GetNcVarFromNcFileVector(
 			m_strName.c_str());
 	}
 
+	// Check number of variable dimensions
+	int nVarDims = var->num_dims();
+	if (nVarDims == 0) {
+		_EXCEPTION2("Variable \"%s\" in file \"%s\" has no dimensions; cannot read as a field",
+			m_strName.c_str(),
+			ncfilevec.GetFilename(sPos).c_str());
+	}
+
 	// Get the current time
 	m_timeStored = ncfilevec.GetTime();
 
 	// Get the time index
-	long lTime = ncfilevec.GetTimeIx(sPos);
-
-	// If the first dimension of the variable is not "time" then
-	// ignore any time index that has been specified.
-	int nVarDims = var->num_dims();
-	if ((nVarDims > 0) && (lTime != NcFileVector::NoTimeIndex)) {
-		if (strcmp(var->get_dim(0)->name(), "time") != 0) {
-			lTime = NcFileVector::NoTimeIndex;
-			m_fNoTimeInNcFile = true;
-		} else {
-			if (var->get_dim(0)->size() == 1) {
-				lTime = 0;
-				m_fNoTimeInNcFile = true;
-			} else if (lTime >= var->get_dim(0)->size()) {
-				_EXCEPTIONT("Requested time index larger than available in input files:\n"
-					"Likely mismatch in time dimension lengths among files");
-			}
-		}
+	long lTime;
+	std::string strDim0Name = var->get_dim(0)->name();
+	if (strDim0Name != "time") {
+		lTime = NcFileVector::NoTimeIndex;
+		m_fNoTimeInNcFile = true;
+	} else {
+		lTime = ncfilevec.GetTimeIx(sPos);
+		m_fNoTimeInNcFile = false;
 	}
 
 	// Verify correct dimensionality
