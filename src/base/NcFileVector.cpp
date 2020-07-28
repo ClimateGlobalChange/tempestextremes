@@ -62,17 +62,18 @@ void NcFileVector::InsertFile(
 		NcVar * varTime = pNewFile->get_var("time");
 		if (varTime == NULL) {
 			m_vecFileType.push_back(FileType_Standard);
-		}
-		NcAtt * attType = varTime->get_att("type");
-		if (attType == NULL) {
-			m_vecFileType.push_back(FileType_Standard);
 		} else {
-			std::string strType = attType->as_string(0);
-			if (strType == "daily mean climatology") {
-				m_vecFileType.push_back(FileType_DailyMeanClimo);
+			NcAtt * attType = varTime->get_att("type");
+			if (attType == NULL) {
+				m_vecFileType.push_back(FileType_Standard);
 			} else {
-				_EXCEPTION2("Unrecognized time::type (%s) in file \"%s\"",
-					strType.c_str(), strFile.c_str());
+				std::string strType = attType->as_string(0);
+				if (strType == "daily mean climatology") {
+					m_vecFileType.push_back(FileType_DailyMeanClimo);
+				} else {
+					_EXCEPTION2("Unrecognized time::type (%s) in file \"%s\"",
+						strType.c_str(), strFile.c_str());
+				}
 			}
 		}
 	}
