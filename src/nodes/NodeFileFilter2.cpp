@@ -326,14 +326,13 @@ void BuildMask_ByDist(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/*
+
 template <typename real>
 void BuildMask_ByContour(
 	const SimpleGrid & grid,
 	const DataArray1D<real> & dataState,
-	const ColumnDataHeader & cdh,
-	const PathVector & pathvec,
-	const PathNodeIndexVector & vecPathNodes,
+	std::vector<double> & vecLonDeg,
+	std::vector<double> & vecLatDeg,
 	const ClosedContourOp & op,
 	DataArray1D<double> & dataMask
 ) {
@@ -342,15 +341,19 @@ void BuildMask_ByContour(
 	double dDeltaDist = op.m_dDistance;
 	double dMinMaxDist = op.m_dMinMaxDist;
 
+	_ASSERT(vecLonDeg.size() == vecLatDeg.size());
 	_ASSERT(dDeltaAmt != 0.0);
 	_ASSERT(dDeltaDist > 0.0);
 
 	// Loop through all PathNodes
-	for (int j = 0; j < vecPathNodes.size(); j++) {
-		const Path & path = pathvec[vecPathNodes[j].first];
-		const PathNode & pathnode = path[vecPathNodes[j].second];
+	for (int j = 0; j < vecLonDeg.size(); j++) {
 
-		int ix0 = static_cast<int>(pathnode.m_gridix);
+		double dLon0 = DegToRad(vecLonDeg[j]);
+		double dLat0 = DegToRad(vecLatDeg[j]);
+
+		int ix0 = static_cast<int>(
+			grid.NearestNode(dLon0, dLat0));
+		_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
 
 		// Find min/max near point
 		int ixOrigin;
@@ -383,9 +386,6 @@ void BuildMask_ByContour(
 
 		// Reference value
 		real dRefValue = dataState[ixOrigin];
-
-		const double dLat0 = grid.m_dLat[ixOrigin];
-		const double dLon0 = grid.m_dLon[ixOrigin];
 
 		// Build up nodes
 		while (queueToVisit.size() != 0) {
@@ -452,9 +452,8 @@ template <typename real>
 void BuildMask_NearbyBlobs(
 	const SimpleGrid & grid,
 	const DataArray1D<real> & dataState,
-	const ColumnDataHeader & cdh,
-	const PathVector & pathvec,
-	const PathNodeIndexVector & vecPathNodes,
+	std::vector<double> & vecLonDeg,
+	std::vector<double> & vecLatDeg,
 	const NearbyBlobsOp & nearbyblobsop,
 	DataArray1D<double> & dataMask
 ) {
@@ -462,6 +461,7 @@ void BuildMask_NearbyBlobs(
 	const double dDist = nearbyblobsop.m_dDistance;
 	const double dMaxDist = nearbyblobsop.m_dMaxDist;
 
+	_ASSERT(vecLonDeg.size() == vecLatDeg.size());
 	_ASSERT(dataState.GetRows() == grid.GetSize());
 	_ASSERT(dDist >= 0.0);
 	_ASSERT(dDist <= 180.0);
@@ -469,23 +469,21 @@ void BuildMask_NearbyBlobs(
 	_ASSERT(dMaxDist <= 180.0);
 
 	// Loop through all PathNodes
-	for (int j = 0; j < vecPathNodes.size(); j++) {
-		const Path & path = pathvec[vecPathNodes[j].first];
-		const PathNode & pathnode = path[vecPathNodes[j].second];
+	for (int j = 0; j < vecLonDeg.size(); j++) {
 
-		int ix0 = static_cast<int>(pathnode.m_gridix);
+		double dLon0 = DegToRad(vecLonDeg[j]);
+		double dLat0 = DegToRad(vecLatDeg[j]);
+
+		int ix0 = static_cast<int>(
+			grid.NearestNode(dLon0, dLat0));
 		_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
 
 		// Queue of nodes that remain to be visited
 		std::queue<int> queueNodes;
 		queueNodes.push(ix0);
 
-		// Set of nodes that have already been visited
+		// Set of nodes that have already beenvisited
 		std::set<int> setNodesVisited;
-
-		// Latitude and longitude at the origin
-		const double dLat0 = grid.m_dLat[ix0];
-		const double dLon0 = grid.m_dLon[ix0];
 
 		// Loop through all elements
 		while (queueNodes.size() != 0) {
@@ -579,7 +577,7 @@ void BuildMask_NearbyBlobs(
 		}
 	}
 }
-*/
+
 ///////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char** argv) {
@@ -1222,40 +1220,38 @@ try {
 					strFilterByDist,
 					dataMask);
 			}
-/*
-				if (strFilterByContour != "") {
-					Variable & varOp = varreg.Get(vecClosedContourOp[0].m_varix);
-					vecInFiles.SetConstantTimeIx(t);
-					varOp.LoadGridData(varreg, vecInFiles, grid);
-					const DataArray1D<float> & dataState = varOp.GetData();
-					_ASSERT(dataState.GetRows() == grid.GetSize());
 
-					BuildMask_ByContour<float>(
-						grid,
-						dataState,
-						cdhInput,
-						pathvec,
-						iter->second,
-						vecClosedContourOp[0],
-						dataMask);
-				}
-				if (vecNearbyBlobsOp.size() != 0) {
-					Variable & varOp = varreg.Get(vecNearbyBlobsOp[0].m_varix);
-					vecInFiles.SetConstantTimeIx(t);
-					varOp.LoadGridData(varreg, vecInFiles, grid);
-					const DataArray1D<float> & dataState = varOp.GetData();
-					_ASSERT(dataState.GetRows() == grid.GetSize());
+			if (strFilterByContour != "") {
+				Variable & varOp = varreg.Get(vecClosedContourOp[0].m_varix);
+				vecInFiles.SetConstantTimeIx(t);
+				varOp.LoadGridData(varreg, vecInFiles, grid);
+				const DataArray1D<float> & dataState = varOp.GetData();
+				_ASSERT(dataState.GetRows() == grid.GetSize());
 
-					BuildMask_NearbyBlobs<float>(
-						grid,
-						dataState,
-						cdhInput,
-						pathvec,
-						iter->second,
-						vecNearbyBlobsOp[0],
-						dataMask);
-				}
-*/
+				BuildMask_ByContour<float>(
+					grid,
+					dataState,
+					vecLonDeg,
+					vecLatDeg,
+					vecClosedContourOp[0],
+					dataMask);
+			}
+			if (vecNearbyBlobsOp.size() != 0) {
+				Variable & varOp = varreg.Get(vecNearbyBlobsOp[0].m_varix);
+				vecInFiles.SetConstantTimeIx(t);
+				varOp.LoadGridData(varreg, vecInFiles, grid);
+				const DataArray1D<float> & dataState = varOp.GetData();
+				_ASSERT(dataState.GetRows() == grid.GetSize());
+
+				BuildMask_NearbyBlobs<float>(
+					grid,
+					dataState,
+					vecLonDeg,
+					vecLatDeg,
+					vecNearbyBlobsOp[0],
+					dataMask);
+			}
+
 			if (fInvert) {
 				for (int i = 0; i < dataMask.GetRows(); i++) {
 					dataMask[i] = 1.0 - dataMask[i];
@@ -1398,6 +1394,8 @@ try {
 
 		AnnounceEndBlock("Done");
 	}
+
+	AnnounceBanner();
 
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());
