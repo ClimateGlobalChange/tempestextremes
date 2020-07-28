@@ -1387,6 +1387,7 @@ try {
 		// Close the log file
 		if (fpLog != NULL) {
 			AnnounceSetOutputBuffer(stdout);
+			AnnounceOnlyOutputOnRankZero();
 			fclose(fpLog);
 		}
 #endif
