@@ -517,7 +517,6 @@ public:
 	///		Constructor.
 	///	</summary>
 	DetectBlobsParam() :
-		fpLog(NULL),
 		dMinAbsLat(0.0),
 		dMinLat(-90.0),
 		dMaxLat(90.0),
@@ -533,9 +532,6 @@ public:
 	{ }
 
 public:
-	// Log
-	FILE * fpLog;
-
 	// Minimum absolute latitude (in degrees)
 	double dMinAbsLat;
 
@@ -583,14 +579,6 @@ void DetectBlobs(
 	VariableRegistry & varreg,
 	const DetectBlobsParam & param
 ) {
-	// Set the Announce buffer
-	if (param.fpLog == NULL) {
-		_EXCEPTIONT("Invalid log buffer");
-	}
-
-	AnnounceSetOutputBuffer(param.fpLog);
-	AnnounceOutputOnAllRanks();
-
 	// Dereference pointers to operators
 	_ASSERT(param.pvecThresholdOp != NULL);
 	std::vector<ThresholdOp> & vecThresholdOp =
@@ -1328,7 +1316,9 @@ try {
 				strOutputFile.c_str());
 		}
 #if defined(TEMPEST_MPIOMP)
-		Announce("Logs will be written to logXXXXXX.txt");
+		if (vecInputFiles.size() != 1) {
+			Announce("Logs will be written to logXXXXXX.txt");
+		}
 #endif
 	}
 
@@ -1338,6 +1328,8 @@ try {
 		if (f % nMPISize != nMPIRank) {
 			continue;
 		}
+
+		FILE * fpLog = NULL;
 #endif
 		// Output file for this file
 		std::string strOutputFileCurrent;
@@ -1347,8 +1339,6 @@ try {
 
 		// Generate output file name
 		if (vecInputFiles.size() == 1) {
-			dbparam.fpLog = stdout;
-
 			if (strOutputFile == "") {
 				strOutputFileCurrent = "out.nc";
 			} else {
@@ -1373,14 +1363,14 @@ try {
 
 			std::string strLogFile = "log" + std::string(szFileIndex) + ".txt";
 #if defined(TEMPEST_MPIOMP)
-			dbparam.fpLog = fopen(strLogFile.c_str(), "w");
-			if (dbparam.fpLog == NULL) {
+			fpLog = fopen(strLogFile.c_str(), "w");
+			if (fpLog == NULL) {
 				_EXCEPTION1("Unable to open log file \"%s\" for writing",
 					strLogFile.c_str());
 			}
-			fCloseLogFile = true;
-#else
-			dbparam.fpLog = stdout;
+
+			AnnounceSetOutputBuffer(fpLog);
+			AnnounceOutputOnAllRanks();
 #endif
 		}
 
@@ -1395,8 +1385,9 @@ try {
 
 #if defined(TEMPEST_MPIOMP)
 		// Close the log file
-		if (fCloseLogFile) {
-			fclose(dbparam.fpLog);
+		if (fpLog != NULL) {
+			AnnounceSetOutputBuffer(stdout);
+			fclose(fpLog);
 		}
 #endif
 	}
