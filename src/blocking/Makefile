@@ -11,8 +11,10 @@ TEMPESTEXTREMESDIR= ../..
 include $(TEMPESTEXTREMESDIR)/mk/framework.make
 
 TEMPESTEXTREMESBASEDIR= $(TEMPESTEXTREMESDIR)/src/base
-
 TEMPESTEXTREMESBASELIB= $(TEMPESTEXTREMESBASEDIR)/libextremesbase.a
+
+TEMPESTEXTREMESNETCDFDIR= $(TEMPESTEXTREMESDIR)/src/netcdf-cxx-4.2
+TEMPESTEXTREMESNETCDFLIB= $(TEMPESTEXTREMESNETCDFDIR)/libnetcdf_c++.a
 
 UTIL_FILES= BlockingUtilities.cpp \
             Interp_z500.cpp \
@@ -21,16 +23,16 @@ UTIL_FILES= BlockingUtilities.cpp \
 
 EXEC_FILES= BlockingDevs.cpp \
             BlockingGHG.cpp \
-	    BlockingNormDevs.cpp\
+            BlockingNormDevs.cpp\
             BlockingPV.cpp \
             CombineBlobs.cpp \
-	    DensityCalculations.cpp \
+            DensityCalculations.cpp \
             Var4Dto3D.cpp\
             SplitFile.cpp\
             AvgVar.cpp\
             BlockingDFT.cpp\
             BlockingThresh.cpp\
-	    Smooth61Day.cpp\
+            Smooth61Day.cpp\
             DetrendHeights.cpp\
             ExtractTimeStep.cpp\
             DailyAverage.cpp
@@ -44,12 +46,15 @@ FILES= $(UTIL_FILES) $(EXEC_FILES)
 # Build rules. 
 all: $(EXEC_TARGETS)
 
-$(EXEC_TARGETS): %: $(UTIL_FILES:%.cpp=$(BUILDDIR)/%.o) $(BUILDDIR)/%.o $(TEMPESTEXTREMESBASELIB)
+$(EXEC_TARGETS): %: $(UTIL_FILES:%.cpp=$(BUILDDIR)/%.o) $(BUILDDIR)/%.o $(TEMPESTEXTREMESBASELIB) $(TEMPESTEXTREMESNETCDFLIB)
 	$(CXX) $(LDFLAGS) -o $@ $(UTIL_FILES:%.cpp=$(BUILDDIR)/%.o) $(BUILDDIR)/$*.o $(TEMPESTEXTREMESBASELIB) $(LIBRARIES)
 	mv $@ $(TEMPESTEXTREMESDIR)/bin
 
 $(TEMPESTEXTREMESBASELIB): %:
-	cd $(TEMPESTEXTREMESDIR)/src/base; $(MAKE)
+	cd $(TEMPESTEXTREMESBASEDIR); $(MAKE)
+
+$(TEMPESTEXTREMESNETCDFLIB): %:
+	cd $(TEMPESTEXTREMESNETCDFDIR); $(MAKE)
 
 # Clean rules.
 clean:
