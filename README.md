@@ -34,6 +34,11 @@ Parallel compilation with MPI is enabled by default.  To compile TempestExtremes
 
 Note:  If the build fails or is cancelled part way through the process, it may be necessary to remove extraneous dependency files.  To do so run "remove_depend.sh" prior to recompiling.
 
+Usage
+=====
+Details of the various executables that are part of TempestExtremes can be found in the user guide:
+https://climate.ucdavis.edu/tempestextremes.php
+
 Publications
 ============
 If you use the TempestExtremes software please cite our publications:
