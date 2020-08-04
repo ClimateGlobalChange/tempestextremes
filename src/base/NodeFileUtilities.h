@@ -659,7 +659,7 @@ public:
 	///		Different types of NodeFiles.
 	///	</summary>
 	enum PathType {
-		PathTypeDCU,
+		PathTypeDN,
 		PathTypeSN
 	};
 

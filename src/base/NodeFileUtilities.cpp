@@ -86,7 +86,7 @@ void NodeFile::Read(
 			std::istringstream iss(strBuffer);
 
 			// DetectCyclonesUnstructured output
-			if (ePathType == PathTypeDCU) {
+			if (ePathType == PathTypeDN) {
 				int iYear;
 				int iMonth;
 				int iDay;

@@ -258,7 +258,7 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputNodeFile, "in_nodefile", "");
 		//CommandLineString(strInputNodeFileList, "in_file_list", "");
-		CommandLineStringD(strInputNodeFileType, "in_nodefile_type", "SN", "[DCU|SN]");
+		CommandLineStringD(strInputNodeFileType, "in_nodefile_type", "SN", "[DN|SN]");
 		CommandLineString(strInputFormat, "in_fmt", "");
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
@@ -272,20 +272,20 @@ try {
 		CommandLineString(strVariables, "var", "");
 		CommandLineString(strOutputVariables, "varout", "");
 		//CommandLineBool(fMissingData, "missingdata");
+		CommandLineBool(fSnapshots, "snapshots");
 		CommandLineStringD(strOperators, "op", "mean", "[mean|min|max,...]");
 		CommandLineStringD(strHistogramOp, "histogram", "", "[var,offset,binsize;...]");
 
 		CommandLineDouble(dDeltaXDeg, "dx", 0.5);
 		CommandLineInt(nResolutionX, "resx", 11);
 		CommandLineInt(nResolutionA, "resa", 16);
-		CommandLineDouble(dFixedLatitudeDeg, "fixlat", -999.);
 		CommandLineDouble(dFixedLongitudeDeg, "fixlon", -999.);
+		CommandLineDouble(dFixedLatitudeDeg, "fixlat", -999.);
 
 		CommandLineString(strMaxTimeDelta, "max_time_delta", "");
-		CommandLineBool(fSnapshots, "snapshots");
 
-		CommandLineString(strLatitudeName, "latname", "lat");
 		CommandLineString(strLongitudeName, "lonname", "lon");
+		CommandLineString(strLatitudeName, "latname", "lat");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -365,12 +365,12 @@ try {
 
 	// Input file type
 	NodeFile::PathType iftype;
-	if (strInputNodeFileType == "DCU") {
-		iftype = NodeFile::PathTypeDCU;
+	if (strInputNodeFileType == "DN") {
+		iftype = NodeFile::PathTypeDN;
 	} else if (strInputNodeFileType == "SN") {
 		iftype = NodeFile::PathTypeSN;
 	} else {
-		_EXCEPTIONT("Invalid --in_nodefile_type, expected \"SN\" or \"DCU\"");
+		_EXCEPTIONT("Invalid --in_nodefile_type, expected \"SN\" or \"DN\"");
 	}
 
 	// Convert degrees to radians

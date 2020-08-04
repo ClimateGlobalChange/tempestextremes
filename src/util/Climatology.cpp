@@ -1018,7 +1018,7 @@ try {
 		CommandLineStringD(strPeriod, "period", "daily", "[daily|monthly|seasonal|annual]");
 		CommandLineStringD(strClimoType, "type", "mean", "[mean|sq]");
 		CommandLineBool(fIncludeLeapDays, "include_leap_days");
-		CommandLineInt(nFourierModes, "time_modes", 0);
+		//CommandLineInt(nFourierModes, "time_modes", 0);
 		CommandLineBool(fMissingData, "missingdata");
 		CommandLineString(strTempFilePath, "temp_file_path", ".");
 		CommandLineBool(fKeepTempFiles, "keep_temp_files");

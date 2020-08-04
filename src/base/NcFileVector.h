@@ -52,8 +52,9 @@ public:
 	enum FileType {
 		FileType_Unknown = (-1),
 		FileType_Standard = 0,
-		FileType_NoTime = 1,
-		FileType_DailyMeanClimo = 2,
+		FileType_NoTimeDim,
+		FileType_NoTimeVar,
+		FileType_DailyMeanClimo
 	};
 
 private:

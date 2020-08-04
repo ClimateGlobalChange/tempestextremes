@@ -1,11 +1,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
-///	\file    NodeFileFilter.cpp
+///	\file    NodeFileFilter2.cpp
 ///	\author  Paul Ullrich
-///	\version October 4, 2018
+///	\version July 2, 2020
 ///
 ///	<remarks>
-///		Copyright 2000-2018 Paul Ullrich
+///		Copyright 2020 Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -280,109 +280,47 @@ public:
 void BuildMask_ByDist(
 	const SimpleGrid & grid,
 	const ColumnDataHeader & cdh,
-	const PathVector & pathvec,
-	const PathNodeIndexVector & vecPathNodes,
+	std::vector<double> & vecLonDeg,
+	std::vector<double> & vecLatDeg,
 	const std::string & strDist,
 	DataArray1D<double> & dataMask
 ) {
+	_ASSERT(vecLonDeg.size() == vecLatDeg.size());
+	_ASSERT(grid.GetSize() == dataMask.GetRows());
+
 	// Get filter width (either fixed value or column data header)
 	bool fFixedFilterWidth = false;
-	double dFilterWidth = 0.0;
+	double dFilterWidthDeg = 0.0;
 	int iFilterWidthIx = 0;
 	if (STLStringHelper::IsFloat(strDist)) {
 		fFixedFilterWidth = true;
-		dFilterWidth = atof(strDist.c_str());
-		if (dFilterWidth == 0.0) {
+		dFilterWidthDeg = atof(strDist.c_str());
+		if (dFilterWidthDeg == 0.0) {
 			return;
 		}
 
 	} else {
+		_EXCEPTIONT("Not implemented");
 		iFilterWidthIx = cdh.GetIndexFromString(strDist);
 		if (iFilterWidthIx == (-1)) {
 			_EXCEPTION1("Unknown column header \"%s\"", strDist.c_str());
 		}
 	}
 
-	// Loop through all PathNodes
-	for (int j = 0; j < vecPathNodes.size(); j++) {
-		const Path & path = pathvec[vecPathNodes[j].first];
-		const PathNode & pathnode = path[vecPathNodes[j].second];
+	// Array of grid indices
+	std::vector<size_t> vecNodeIxs;
 
-		int ixOrigin = static_cast<int>(pathnode.m_gridix);
+	// Loop through all points
+	for (int i = 0; i < vecLonDeg.size(); i++) {
 
-		// Extract the filter width for this PathNode from ColumnData
-		if (!fFixedFilterWidth) {
-			if ((iFilterWidthIx < 0) ||
-			    (iFilterWidthIx > pathnode.m_vecColumnData.size())
-			) {
-				_EXCEPTIONT("Logic error");
-			}
+		// Get all nearest nodes to the given point
+		double dLonRad = DegToRad(vecLonDeg[i]);
+		double dLatRad = DegToRad(vecLatDeg[i]);
 
-			std::string str = pathnode.m_vecColumnData[iFilterWidthIx]->ToString();
-			if (!STLStringHelper::IsFloat(str)) {
-				_EXCEPTION1("Column header \"%s\" cannot be cast to type double",
-					strDist.c_str());
-			}
-			dFilterWidth = atof(str.c_str());
+		grid.NearestNodes(dLonRad, dLatRad, dFilterWidthDeg, vecNodeIxs);
 
-			if (dFilterWidth == 0.0) {
-				continue;
-			}
-		}
-
-		// Set of visited nodes
-		std::set<int> setNodesVisited;
-
-		// Set of nodes to visit
-		std::queue<int> queueToVisit;
-		queueToVisit.push(ixOrigin);
-
-		const double dLat0 = grid.m_dLat[ixOrigin];
-		const double dLon0 = grid.m_dLon[ixOrigin];
-
-		// Using the grid connectivity find nodes within a specified
-		// distance of each PathNode.
-		while (queueToVisit.size() != 0) {
-			int ix = queueToVisit.front();
-			queueToVisit.pop();
-
-			if (setNodesVisited.find(ix) != setNodesVisited.end()) {
-				continue;
-			}
-
-			setNodesVisited.insert(ix);
-
-			// Great circle distance to this element
-			double dLatThis = grid.m_dLat[ix];
-			double dLonThis = grid.m_dLon[ix];
-
-			double dR =
-				sin(dLat0) * sin(dLatThis)
-				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
-
-			if (dR >= 1.0) {
-				dR = 0.0;
-			} else if (dR <= -1.0) {
-				dR = 180.0;
-			} else {
-				dR = 180.0 / M_PI * acos(dR);
-			}
-			if (dR != dR) {
-				_EXCEPTIONT("NaN value detected");
-			}
-
-			// Check great circle distance
-			if (dR > dFilterWidth) {
-				continue;
-			}
-
-			// Add this point to the filter
-			dataMask[ix] = 1.0;
-
-			// Add all neighbors of this point
-			for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
-				queueToVisit.push(grid.m_vecConnectivity[ix][n]);
-			}
+		for (int n = 0; n < vecNodeIxs.size(); n++) {
+			dataMask[vecNodeIxs[n]] = 1.0;
 		}
 	}
 }
@@ -393,9 +331,8 @@ template <typename real>
 void BuildMask_ByContour(
 	const SimpleGrid & grid,
 	const DataArray1D<real> & dataState,
-	const ColumnDataHeader & cdh,
-	const PathVector & pathvec,
-	const PathNodeIndexVector & vecPathNodes,
+	std::vector<double> & vecLonDeg,
+	std::vector<double> & vecLatDeg,
 	const ClosedContourOp & op,
 	DataArray1D<double> & dataMask
 ) {
@@ -404,15 +341,19 @@ void BuildMask_ByContour(
 	double dDeltaDist = op.m_dDistance;
 	double dMinMaxDist = op.m_dMinMaxDist;
 
+	_ASSERT(vecLonDeg.size() == vecLatDeg.size());
 	_ASSERT(dDeltaAmt != 0.0);
 	_ASSERT(dDeltaDist > 0.0);
 
 	// Loop through all PathNodes
-	for (int j = 0; j < vecPathNodes.size(); j++) {
-		const Path & path = pathvec[vecPathNodes[j].first];
-		const PathNode & pathnode = path[vecPathNodes[j].second];
+	for (int j = 0; j < vecLonDeg.size(); j++) {
 
-		int ix0 = static_cast<int>(pathnode.m_gridix);
+		double dLon0 = DegToRad(vecLonDeg[j]);
+		double dLat0 = DegToRad(vecLatDeg[j]);
+
+		int ix0 = static_cast<int>(
+			grid.NearestNode(dLon0, dLat0));
+		_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
 
 		// Find min/max near point
 		int ixOrigin;
@@ -445,9 +386,6 @@ void BuildMask_ByContour(
 
 		// Reference value
 		real dRefValue = dataState[ixOrigin];
-
-		const double dLat0 = grid.m_dLat[ixOrigin];
-		const double dLon0 = grid.m_dLon[ixOrigin];
 
 		// Build up nodes
 		while (queueToVisit.size() != 0) {
@@ -514,9 +452,8 @@ template <typename real>
 void BuildMask_NearbyBlobs(
 	const SimpleGrid & grid,
 	const DataArray1D<real> & dataState,
-	const ColumnDataHeader & cdh,
-	const PathVector & pathvec,
-	const PathNodeIndexVector & vecPathNodes,
+	std::vector<double> & vecLonDeg,
+	std::vector<double> & vecLatDeg,
 	const NearbyBlobsOp & nearbyblobsop,
 	DataArray1D<double> & dataMask
 ) {
@@ -524,6 +461,7 @@ void BuildMask_NearbyBlobs(
 	const double dDist = nearbyblobsop.m_dDistance;
 	const double dMaxDist = nearbyblobsop.m_dMaxDist;
 
+	_ASSERT(vecLonDeg.size() == vecLatDeg.size());
 	_ASSERT(dataState.GetRows() == grid.GetSize());
 	_ASSERT(dDist >= 0.0);
 	_ASSERT(dDist <= 180.0);
@@ -531,23 +469,21 @@ void BuildMask_NearbyBlobs(
 	_ASSERT(dMaxDist <= 180.0);
 
 	// Loop through all PathNodes
-	for (int j = 0; j < vecPathNodes.size(); j++) {
-		const Path & path = pathvec[vecPathNodes[j].first];
-		const PathNode & pathnode = path[vecPathNodes[j].second];
+	for (int j = 0; j < vecLonDeg.size(); j++) {
 
-		int ix0 = static_cast<int>(pathnode.m_gridix);
+		double dLon0 = DegToRad(vecLonDeg[j]);
+		double dLat0 = DegToRad(vecLatDeg[j]);
+
+		int ix0 = static_cast<int>(
+			grid.NearestNode(dLon0, dLat0));
 		_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
 
 		// Queue of nodes that remain to be visited
 		std::queue<int> queueNodes;
 		queueNodes.push(ix0);
 
-		// Set of nodes that have already been visited
+		// Set of nodes that have already beenvisited
 		std::set<int> setNodesVisited;
-
-		// Latitude and longitude at the origin
-		const double dLat0 = grid.m_dLat[ix0];
-		const double dLon0 = grid.m_dLon[ix0];
 
 		// Loop through all elements
 		while (queueNodes.size() != 0) {
@@ -724,7 +660,7 @@ try {
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputNodeFile, "in_nodefile", "");
-		CommandLineStringD(strInputNodeFileType, "in_nodefile_type", "SN", "[DCU|SN]");
+		CommandLineStringD(strInputNodeFileType, "in_nodefile_type", "SN", "[DN|SN]");
 		CommandLineString(strInputFormat, "in_fmt", "");
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
@@ -803,12 +739,12 @@ try {
 
 	// Input file type
 	NodeFile::PathType iftype;
-	if (strInputNodeFileType == "DCU") {
-		iftype = NodeFile::PathTypeDCU;
+	if (strInputNodeFileType == "DN") {
+		iftype = NodeFile::PathTypeDN;
 	} else if (strInputNodeFileType == "SN") {
 		iftype = NodeFile::PathTypeSN;
 	} else {
-		_EXCEPTIONT("Invalid --in_nodefile_type, expected \"SN\" or \"DCU\"");
+		_EXCEPTIONT("Invalid --in_nodefile_type, expected \"SN\" or \"DN\"");
 	}
 
 	// NodeFile
@@ -881,9 +817,6 @@ try {
 	std::vector< std::string > vecPreserveVariables;
 	STLStringHelper::ParseVariableList(strPreserve, vecPreserveVariables);
 
-	// Define the SimpleGrid
-	SimpleGrid grid;
-
 	// Store input data
 	std::vector<std::string> vecInputFileList;
 
@@ -952,6 +885,9 @@ try {
 			vecInputFileList.size(), vecOutputFileList.size());
 	}
 
+	// Define the SimpleGrid
+	SimpleGrid grid;
+
 	// Check for connectivity file
 	if (strConnectivity != "") {
 		AnnounceStartBlock("Generating grid information from connectivity file");
@@ -982,6 +918,11 @@ try {
 		}
 		AnnounceEndBlock("Done");
 	}
+
+	// Build the KD tree for the grid
+	AnnounceStartBlock("Generating KD tree on grid");
+	grid.BuildKDTree();
+	AnnounceEndBlock("Done");
 
 	// Get the CalendarType
 	Time::CalendarType caltype;
@@ -1253,56 +1194,64 @@ try {
 
 			AnnounceStartBlock("Processing time \"%s\"",
 				vecTimes[t].ToString().c_str());
+
+			// Find all paths at this time
+			std::vector<int> vecPathId;
+			std::vector<double> vecLonDeg;
+			std::vector<double> vecLatDeg;
+
+			nodefile.InterpolateNodeCoordinates(
+				vecTimes[t],
+				"lon",
+				"lat",
+				vecPathId,
+				vecLonDeg,
+				vecLatDeg);
 	
 			// Build mask
-			TimeToPathNodeMap::const_iterator iter =
-				mapTimeToPathNode.find(vecTimes[t]);
-
 			dataMask.Zero();
 
-			if (iter != mapTimeToPathNode.end()) {
-				if (strFilterByDist != "") {
-					BuildMask_ByDist(
-						grid,
-						cdhInput,
-						pathvec,
-						iter->second,
-						strFilterByDist,
-						dataMask);
-				}
-				if (strFilterByContour != "") {
-					Variable & varOp = varreg.Get(vecClosedContourOp[0].m_varix);
-					vecInFiles.SetConstantTimeIx(t);
-					varOp.LoadGridData(varreg, vecInFiles, grid);
-					const DataArray1D<float> & dataState = varOp.GetData();
-					_ASSERT(dataState.GetRows() == grid.GetSize());
-
-					BuildMask_ByContour<float>(
-						grid,
-						dataState,
-						cdhInput,
-						pathvec,
-						iter->second,
-						vecClosedContourOp[0],
-						dataMask);
-				}
-				if (vecNearbyBlobsOp.size() != 0) {
-					Variable & varOp = varreg.Get(vecNearbyBlobsOp[0].m_varix);
-					vecInFiles.SetConstantTimeIx(t);
-					varOp.LoadGridData(varreg, vecInFiles, grid);
-					const DataArray1D<float> & dataState = varOp.GetData();
-					_ASSERT(dataState.GetRows() == grid.GetSize());
-
-					BuildMask_NearbyBlobs<float>(
-						grid,
-						dataState,
-						cdhInput,
-						pathvec,
-						iter->second,
-						vecNearbyBlobsOp[0],
-						dataMask);
-				}
+			if (strFilterByDist != "") {
+				BuildMask_ByDist(
+					grid,
+					cdhInput,
+					vecLonDeg,
+					vecLatDeg,
+					strFilterByDist,
+					dataMask);
 			}
+
+			if (strFilterByContour != "") {
+				Variable & varOp = varreg.Get(vecClosedContourOp[0].m_varix);
+				vecInFiles.SetConstantTimeIx(t);
+				varOp.LoadGridData(varreg, vecInFiles, grid);
+				const DataArray1D<float> & dataState = varOp.GetData();
+				_ASSERT(dataState.GetRows() == grid.GetSize());
+
+				BuildMask_ByContour<float>(
+					grid,
+					dataState,
+					vecLonDeg,
+					vecLatDeg,
+					vecClosedContourOp[0],
+					dataMask);
+			}
+			if (vecNearbyBlobsOp.size() != 0) {
+				Variable & varOp = varreg.Get(vecNearbyBlobsOp[0].m_varix);
+				vecInFiles.SetConstantTimeIx(t);
+				varOp.LoadGridData(varreg, vecInFiles, grid);
+				const DataArray1D<float> & dataState = varOp.GetData();
+				_ASSERT(dataState.GetRows() == grid.GetSize());
+
+				BuildMask_NearbyBlobs<float>(
+					grid,
+					dataState,
+					vecLonDeg,
+					vecLatDeg,
+					vecNearbyBlobsOp[0],
+					dataMask);
+			}
+
 			if (fInvert) {
 				for (int i = 0; i < dataMask.GetRows(); i++) {
 					dataMask[i] = 1.0 - dataMask[i];
@@ -1445,6 +1394,8 @@ try {
 
 		AnnounceEndBlock("Done");
 	}
+
+	AnnounceBanner();
 
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());

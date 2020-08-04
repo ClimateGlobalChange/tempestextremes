@@ -54,14 +54,14 @@ void NcFileVector::InsertFile(
 		_EXCEPTION1("Cannot open input file \"%s\"", strFile.c_str());
 	}
 
-	// Identify the FileType
+	// Identify the FileType by the properties of the "time" variable
 	NcDim * dimTime = pNewFile->get_dim("time");
 	if (dimTime == NULL) {
-		m_vecFileType.push_back(FileType_NoTime);
+		m_vecFileType.push_back(FileType_NoTimeDim);
 	} else {
 		NcVar * varTime = pNewFile->get_var("time");
 		if (varTime == NULL) {
-			m_vecFileType.push_back(FileType_Standard);
+			m_vecFileType.push_back(FileType_NoTimeVar);
 		} else {
 			NcAtt * attType = varTime->get_att("type");
 			if (attType == NULL) {

@@ -1174,7 +1174,7 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputNodeFile, "in_nodefile", "");
 		//CommandLineString(strInputNodeFileList, "in_file_list", "");
-		CommandLineStringD(strPathType, "in_nodefile_type", "SN", "[DCU|SN]");
+		CommandLineStringD(strPathType, "in_nodefile_type", "SN", "[DN|SN]");
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
@@ -1191,10 +1191,10 @@ try {
 		CommandLineString(strTimeFilter, "time_filter", "");
 		CommandLineStringD(strColumnFilter, "col_filter", "", "[col,op,value;...]");
 		CommandLineString(strCalculate, "calculate", "");
-		CommandLineString(strAppend, "append", "");
+		//CommandLineString(strAppend, "append", "");
 
-		CommandLineString(strLatitudeName, "latname", "lat");
 		CommandLineString(strLongitudeName, "lonname", "lon");
+		CommandLineString(strLatitudeName, "latname", "lat");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -1235,12 +1235,12 @@ try {
 
 	// Input file type
 	NodeFile::PathType iftype;
-	if (strPathType == "DCU") {
-		iftype = NodeFile::PathTypeDCU;
+	if (strPathType == "DN") {
+		iftype = NodeFile::PathTypeDN;
 	} else if (strPathType == "SN") {
 		iftype = NodeFile::PathTypeSN;
 	} else {
-		_EXCEPTIONT("Invalid --in_nodefile_type, expected \"SN\" or \"DCU\"");
+		_EXCEPTIONT("Invalid --in_nodefile_type, expected \"SN\" or \"DN\"");
 	}
 
 	// NodeFile
@@ -1545,7 +1545,7 @@ try {
 				if (eCycloneMetric == CycloneMetric_ACEPSL) {
 					if (nArguments != 2) {
 						_EXCEPTION2("Syntax error: Function \"%s\" "
-							"requires three arguments:\n"
+							"requires two arguments:\n"
 							"%s(<psl variable>, <radius>)",
 							(*pargtree)[2].c_str(),
 							(*pargtree)[2].c_str());
@@ -1738,7 +1738,7 @@ try {
 				if (nArguments != 3) {
 					_EXCEPTIONT("Syntax error: Function \"lastwhere\" "
 						"requires three arguments:\n"
-						"lastwhere(<column name>, <op>, <threshold>)");
+						"lastwhere(<column name>, <op>, <value>)");
 				}
 
 				// Get arguments
@@ -1860,7 +1860,7 @@ try {
 				if (nArguments != 2) {
 					_EXCEPTIONT("Syntax error: Function \"value\" "
 						"requires two arguments:\n"
-						"lastwhere(<column name>, <index>)");
+						"value(<column name>, <index>)");
 				}
 
 				// Get arguments
@@ -1891,7 +1891,7 @@ try {
 						const std::vector<double> & dUa = pdat->GetValues();
 
 						if (dR.size() == 0) {
-							_EXCEPTIONT("PathNode RadialVelocityProfile has zero size");
+							_EXCEPTIONT("PathNode radial profile has zero size");
 						}
 						if (dR.size() != dUa.size()) {
 							_EXCEPTIONT("PathNode R array size different from Ua size");
