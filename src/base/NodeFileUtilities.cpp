@@ -168,7 +168,8 @@ void NodeFile::Read(
 
 			getline(ifInput, strBuffer);
 			if (ifInput.eof()) {
-				break;
+				_EXCEPTION2("Unexpected end-of-file on line %i of \"%s\"",
+					iLine, strNodeFile.c_str());
 			}
 
 			std::istringstream iss(strBuffer);
