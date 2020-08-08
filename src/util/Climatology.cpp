@@ -687,22 +687,28 @@ void Climatology(
 
 			// Create output variable for slice count
 			if (fOutputSliceCounts) {
-				if (fMissingData) {
-					_EXCEPTIONT("Output slice counts with missing data not implemented");
-				}
 				std::string strOutCountVar = strOutVar + "_count";
-				NcVar * varOutCount =
-					ncoutfile.add_var(
-						strOutCountVar.c_str(),
-						ncInt,
-						dimOutTime);
 
-				if (varOutCount == NULL) {
+				if (fMissingData) {
+					vecNcVarCount[v] =
+						ncoutfile.add_var(
+							strOutCountVar.c_str(),
+							ncInt,
+							vecVarNcDims.size(),
+							const_cast<const NcDim**>(&(vecVarNcDims[0])));
+
+				} else {
+					vecNcVarCount[v] =
+						ncoutfile.add_var(
+							strOutCountVar.c_str(),
+							ncInt,
+							dimOutTime);
+				}
+
+				if (vecNcVarCount[v] == NULL) {
 					_EXCEPTION1("Unable to create output variable \"%s\" in output file",
 						strOutCountVar.c_str());
 				}
-
-				vecNcVarCount[v] = varOutCount;
 			}
 
 			// Add attributes to variable describing specified hyperslab indices
@@ -761,7 +767,10 @@ void Climatology(
 			}
 
 			// Number of time slices
-			DataArray1D<int> nTimeSlices(sOutputTimes);
+			DataArray1D<int> nTimeSlices;
+			if (!fMissingData) {
+				nTimeSlices.Allocate(sOutputTimes);
+			}
 
 			// Accumulated data array for mean
 			DataArray2D<double> dAccumulatedData(sOutputTimes, vecOutputAuxSize[v]);
@@ -965,7 +974,11 @@ void Climatology(
 			}
 */
 			// Write data
-			AnnounceStartBlock("Writing data to file");
+			if (fMissingData) {
+				AnnounceStartBlock("Writing data and slice counts to file");
+			} else {
+				AnnounceStartBlock("Writing data to file");
+			}
 			for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
 
 				// Convert to float and write to disk
@@ -982,21 +995,30 @@ void Climatology(
 					c,
 					dMeanData,
 					NetCDF_Put);
+
+				// If missing data is present write slice counts
+				if (fOutputSliceCounts && fMissingData) {
+
+					DataArray1D<int> nTimeSlicesGrid1D(nTimeSlicesGrid.GetColumns(), false);
+					nTimeSlicesGrid1D.AttachToData(&(nTimeSlicesGrid[t][0]));
+
+					NcGetPutSpecifiedDataSize<int>(
+						vecNcVarCount[v],
+						lPos0put,
+						vecOutputAuxSize[v],
+						c,
+						nTimeSlicesGrid1D,
+						NetCDF_Put);
+
+					AnnounceEndBlock("Done");
+				}
 			}
 
 			// Write slice counts
-			if (fOutputSliceCounts) {
+			if (fOutputSliceCounts && (!fMissingData) && (c == 0)) {
 				AnnounceStartBlock("Writing slice counts");
-				if (fMissingData) {
-					_EXCEPTION();
-
-				// If no missing data only need to write this once
-				} else {
-					if (c == 0) {
-						vecNcVarCount[v]->set_cur((long)0);
-						vecNcVarCount[v]->put(&(nTimeSlices[0]), dAccumulatedData.GetRows());
-					}
-				}
+				vecNcVarCount[v]->set_cur((long)0);
+				vecNcVarCount[v]->put(&(nTimeSlices[0]), dAccumulatedData.GetRows());
 				AnnounceEndBlock("Done");
 			}
 
