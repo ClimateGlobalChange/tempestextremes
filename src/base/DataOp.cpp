@@ -80,8 +80,8 @@ DataOp * DataOpManager::Add(
 	} else if (strName == "_DIFF") {
 		return Add(new DataOp_DIFF);
 		
-	} else if (strName == "_MULT") {
-		return Add(new DataOp_MULT);
+	} else if (strName == "_PROD") {
+		return Add(new DataOp_PROD);
 
 	} else if (strName == "_DIV") {
 		return Add(new DataOp_DIV);
@@ -463,14 +463,14 @@ bool DataOp_DIFF::Apply(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// DataOp_MULT
+// DataOp_PROD
 ///////////////////////////////////////////////////////////////////////////////
 
-const char * DataOp_MULT::name = "_MULT";
+const char * DataOp_PROD::name = "_PROD";
 
 ///////////////////////////////////////////////////////////////////////////////
 
-bool DataOp_MULT::Apply(
+bool DataOp_PROD::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
 	const std::vector<DataArray1D<float> const *> & vecArgData,

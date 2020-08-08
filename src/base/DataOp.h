@@ -324,7 +324,7 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class DataOp_MULT : public DataOp {
+class DataOp_PROD : public DataOp {
 
 public:
 	///	<summary>
@@ -336,7 +336,7 @@ public:
 	///	<summary>
 	///		Constructor.
 	///	</summary>
-	DataOp_MULT() :
+	DataOp_PROD() :
 		DataOp(name)
 	{ }
 
