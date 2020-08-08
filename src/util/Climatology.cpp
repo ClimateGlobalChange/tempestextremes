@@ -71,25 +71,56 @@ std::string MemoryBytesToString(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Calculate the number of iterations that need to be performed to
+///		stay within the memory limit and the read size per iteration.
+///	</summary>
+template<typename Type>
 bool CalculateIterationCountSize(
 	size_t sMemoryMax,
-	size_t sOutputTimes,
-	size_t sTotalAuxDims,
+	size_t sDataInstances,
+	size_t sTotalValuesPerInstance,
 	size_t & sAuxCount,
 	size_t & sAuxSize
 ) {
-	size_t sClimatologyStorageSize = sOutputTimes * sTotalAuxDims * sizeof(double);
-	sAuxCount = ((sClimatologyStorageSize + 1) / sMemoryMax) + 1;
-	if (sAuxCount > sTotalAuxDims) {
+	// Memory max too low; can't even store one value per data instance
+	if (sMemoryMax < sDataInstances * sizeof(Type)) {
 		return false;
 	}
-	sAuxSize = sTotalAuxDims / sAuxCount;
+
+	// Total amount of space needed for storage
+	size_t sClimatologyStorageSize = sDataInstances * sTotalValuesPerInstance * sizeof(Type);
+
+	// Adjust memory maximum to be a multiple of sDataInstances * sizeof(Type)
+	sMemoryMax -= sMemoryMax % (sDataInstances * sizeof(Type));
+
+	if (sClimatologyStorageSize <= sMemoryMax) {
+		sAuxCount = 1;
+		sAuxSize = sTotalValuesPerInstance;
+
+	} else if (sClimatologyStorageSize % sMemoryMax == 0) {
+		sAuxCount = sClimatologyStorageSize / sMemoryMax;
+		sAuxSize = sMemoryMax / (sDataInstances * sizeof(Type));
+
+	} else {
+		sAuxCount = sClimatologyStorageSize / sMemoryMax + 1;
+		sAuxSize = sMemoryMax / (sDataInstances * sizeof(Type));
+	}
+
+	//printf("%lu %lu\n", sDataInstances, sTotalValuesPerInstance);
+	//printf("%lu %lu\n", sClimatologyStorageSize, sMemoryMax);
+	//printf("%lu %lu (%lu)\n", sAuxCount, sAuxSize, sAuxSize);
+	//_EXCEPTION();
 	return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void CalculatePartialDataPosSize(
+///	<summary>
+///		Calculate the next nD NetCDF file position (lPos) and size (lSize)
+///		given a 1D position (llNcArrayPos) and size (llNcArraySize).
+///	</summary>
+bool CalculatePartialDataPosSize(
 	const DataArray1D<long> & lDimSize,
 	long lSkipDims,
 	long long llNcArrayPos,
@@ -110,6 +141,10 @@ void CalculatePartialDataPosSize(
 			* static_cast<long long>(lDimSize[d]);
 	}
 
+	if (llNcArrayPos == llAccumulatedSize[lSkipDims]) {
+		return false;
+	}
+
 	// Given a 1D llNcArrayPos find the multi-dimensional index corresponding
 	// to this offset in the larger array.
 	long long llNcArrayPosTemp = llNcArrayPos;
@@ -118,7 +153,7 @@ void CalculatePartialDataPosSize(
 		llNcArrayPosTemp /= lDimSize[d];
 	}
 	if (llNcArrayPosTemp > 0) {
-		_EXCEPTIONT("NcVar 1D index out of range");
+		_EXCEPTION2("NcVar 1D index (%lu) out of range (%lu)", llNcArrayPos, llNcArrayPosTemp);
 	}
 
 	for (long d = lSkipDims; d < lDimSize.GetRows(); d++) {
@@ -145,6 +180,8 @@ void CalculatePartialDataPosSize(
 			break;
 		}
 	}
+
+	return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -194,13 +231,18 @@ long long NcGetPutSpecifiedDataSize(
 
 	// Iterate until nothing left to be read/write
 	while(lSizePerIteration > 0) {
-		CalculatePartialDataPosSize(
-			lDimSize,
-			lPos0.GetRows(),
-			llNcArrayPos,
-			lSizePerIteration,
-			lPos,
-			lSize);
+		bool fDataRemaining =
+			CalculatePartialDataPosSize(
+				lDimSize,
+				lPos0.GetRows(),
+				llNcArrayPos,
+				lSizePerIteration,
+				lPos,
+				lSize);
+
+		if (!fDataRemaining) {
+			break;
+		}
 
 		// Number of elements to read
 		long lReadWriteSize = 1;
@@ -231,12 +273,21 @@ long long NcGetPutSpecifiedDataSize(
 		printf("\n");
 */
 		ncvar->set_cur(&(lPos[0]));
+
+		NcError err;
+		if (err.get_err() != NC_NOERR) {
+			_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
+		}
+
 		if (eGetPut == NetCDF_Get) {
 			ncvar->get(&(data[llTotalReadWriteSize]), &(lSize[0]));
 		} else if (eGetPut == NetCDF_Put) {
 			ncvar->put(&(data[llTotalReadWriteSize]), &(lSize[0]));
 		} else {
 			_EXCEPTIONT("Logic error");
+		}
+		if (err.get_err() != NC_NOERR) {
+			_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
 		}
 
 		llTotalReadWriteSize += lReadWriteSize;
@@ -498,14 +549,33 @@ void Climatology(
 			}
 
 			// Number of auxiliary values to store at each iteration
+			// We require storage for sOutputTimes persistent arrays and 1 temporary array
 			bool fSufficientMemory =
-				CalculateIterationCountSize(
+				CalculateIterationCountSize<double>(
 					sMemoryMax,
-					sOutputTimes,
+					sOutputTimes + 1,
 					sTotalAuxDims,
 					vecOutputAuxCount[v],
 					vecOutputAuxSize[v]);
+/*
+			// Only allow one read per iteration
+			size_t sAuxCount = 1;
+			size_t sAuxSize = 1;
+			for (int d = var->num_dims()-1; d >= 1; d--) {
+				size_t sDimSize = var->get_dim(d)->size();
+				if (sAuxSize * sDimSize * sOutputTimes * sizeof(double) > sMemoryMax) {
+					for (int di = d-1; d >= 1; d--) {
+						sAuxCount *= sDimSize;
+					}
+					break;
+				}
+				sAuxSize *= sDimSize;
+			}
 
+			Announce("Multi-read: %lu (%lu) / Single-read: %lu (%lu)", vecOutputAuxSize[v], vecOutputAuxCount[v], sAuxSize, sAuxCount);
+			vecOutputAuxSize[v] = sAuxSize;
+			vecOutputAuxCount[v] = sAuxCount;
+*/
 			// Output information to user
 			std::string strPerTimesliceStorage =
 				MemoryBytesToString(sTotalAuxDims * sizeof(double));
@@ -687,7 +757,7 @@ void Climatology(
 		for (int c = 0; c < vecOutputAuxCount[v]; c++) {
 
 			if (vecOutputAuxCount[v] > 1) {
-				AnnounceStartBlock("Iteration %i/%i", c, vecOutputAuxCount[v]);
+				AnnounceStartBlock("Iteration %i/%i", c+1, vecOutputAuxCount[v]);
 			}
 
 			// Number of time slices
@@ -800,8 +870,6 @@ void Climatology(
 							dDataIn,
 							NetCDF_Get);
 
-					//std::cout << sGetRows << " read" << std::endl;
-
 					Time timeJan01 = vecTimes[t];
 					timeJan01.SetMonth(1);
 					timeJan01.SetDay(1);
@@ -875,7 +943,7 @@ void Climatology(
 					}
 				}
 			}
-
+/*
 			// Apply Fourier smoothing in time
 			if ((nFourierModes != 0) &&
 			    (nFourierModes < dAccumulatedData.GetColumns() / 2)
@@ -895,7 +963,7 @@ void Climatology(
 				}
 				AnnounceEndBlock("Done");
 			}
-
+*/
 			// Write data
 			AnnounceStartBlock("Writing data to file");
 			for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
@@ -940,16 +1008,6 @@ void Climatology(
 		}
 	}
 	AnnounceEndBlock("Done");
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void MergeEnsembles(
-	const std::vector<std::string> & vecInputFiles,
-	const std::string & strVariable,
-	const std::string & strMemoryMax,
-	std::string & strOutputFile
-) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
