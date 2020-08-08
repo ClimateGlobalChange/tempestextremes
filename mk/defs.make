@@ -42,6 +42,7 @@ ifeq ($(DEBUG),TRUE)
 endif
 
 ifeq ($(PARALLEL),MPIOMP)
+  CXXFLAGS+= -DTEMPEST_MPIOMP
   CXX= $(MPICXX)
   F90= $(MPIF90)
 else ifeq ($(PARALLEL),NONE)
