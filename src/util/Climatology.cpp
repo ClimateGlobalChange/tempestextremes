@@ -75,6 +75,10 @@ std::string MemoryBytesToString(
 ///		Calculate the number of iterations that need to be performed to
 ///		stay within the memory limit and the read size per iteration.
 ///	</summary>
+///	<returns>
+///		true if sufficient memory is available after splitting, false
+///		otherwise.
+///	</returns>
 template<typename Type>
 bool CalculateIterationCountSize(
 	size_t sMemoryMax,
@@ -109,7 +113,7 @@ bool CalculateIterationCountSize(
 
 	//printf("%lu %lu\n", sDataInstances, sTotalValuesPerInstance);
 	//printf("%lu %lu\n", sClimatologyStorageSize, sMemoryMax);
-	//printf("%lu %lu (%lu)\n", sAuxCount, sAuxSize, sAuxSize);
+	//printf("%lu %lu\n", sAuxCount, sAuxSize);
 	//_EXCEPTION();
 	return true;
 }
@@ -1029,6 +1033,493 @@ void Climatology(
 			}
 		}
 	}
+	ncoutfile.close();
+
+	AnnounceEndBlock("Done");
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Average over NetCDF files.
+///	</summary>
+void AverageOverNcFiles(
+	const std::vector<std::string> & vecInputFilenames,
+	const std::string & strOutputFile,
+	const std::vector<std::string> & vecVariableNames,
+	size_t sMemoryMax
+) {
+	_ASSERT(vecInputFilenames.size() > 0);
+	_ASSERT(vecVariableNames.size() > 0);
+
+	AnnounceStartBlock("Averaging over files");
+
+	// Open output file
+	NcFile ncoutfile(strOutputFile.c_str(), NcFile::Replace);
+	if (!ncoutfile.is_valid()) {
+		_EXCEPTION1("Unable to open output datafile \"%s\"",
+			strOutputFile.c_str());
+	}
+
+	// Open input files
+	std::vector<NcFile *> vecInputNcFiles;
+	for (int f = 0; f < vecInputFilenames.size(); f++) {
+		NcFile * pncinfile = new NcFile(vecInputFilenames[f].c_str(), NcFile::ReadOnly);
+		if (!pncinfile->is_valid()) {
+			_EXCEPTION1("Unable to open input datafile \"%s\"",
+				vecInputFilenames[f].c_str());
+		}
+
+		vecInputNcFiles.push_back(pncinfile);
+	}
+	_ASSERT(vecInputNcFiles.size() == vecInputFilenames.size());
+
+	// Loop through all variables
+	for (int v = 0; v < vecVariableNames.size(); v++) {
+
+		AnnounceStartBlock("Variable \"%s\"", vecVariableNames[v].c_str());
+
+		// Variable dimension information
+		std::vector<std::string> vecVariableDimNames;
+		std::vector<long> vecVariableDimSizes;
+
+		float dFillValueFloat = 0.0;
+		double dFillValueDouble = 0.0;
+
+		DataArray1D<float> dDataFloat;
+		DataArray1D<double> dDataDouble;
+
+		DataArray1D<float> dAccumDataFloat;
+		DataArray1D<double> dAccumDataDouble;
+
+		long lCountDims = (-1);
+		size_t sAuxDimSize;
+		DataArray1D<int> nDataCount;
+		DataArray1D<int> nAccumDataCount;
+
+		NcType nctype;
+
+		// Number of iterations needed to average all data
+		size_t sAuxCount = (-1);
+		size_t sAuxSize = (-1);
+
+		NcVar * varOut = NULL;
+
+		// Loop through input files, initialize allocation size from file 0
+		for (int f = 0; f < vecInputNcFiles.size(); f++) {
+
+			NcVar * var = vecInputNcFiles[f]->get_var(vecVariableNames[v].c_str());
+			if (var == NULL) {
+				_EXCEPTION2("Input datafile \"%s\" does not contain variable \"%s\"",
+					vecInputFilenames[f].c_str(),
+					vecVariableNames[v].c_str());
+			}
+
+			if (var->num_dims() < 1) {
+				_EXCEPTION2("Variable \"%s\" in file \"%s\" must have at least one dimension",
+					vecVariableNames[v].c_str(),
+					vecInputFilenames[f].c_str());
+			}
+
+			// Check for counts
+			std::string strVariableCount = vecVariableNames[v] + "_count";
+			NcVar * varCount = vecInputNcFiles[f]->get_var(strVariableCount.c_str());
+
+			// Store variable dimension names and size, initialize variable in output file
+			if (f == 0) {
+				nctype = var->type();
+
+				NcAtt * attFill = var->get_att("_FillValue");
+				if (attFill != NULL) {
+					if (attFill->type() != nctype) {
+						_EXCEPTION1("Variable \"%s\" attribute \"_FillValue\" has incompatible type",
+							vecVariableNames[v].c_str());
+					}
+					if (nctype == ncFloat) {
+						dFillValueFloat = attFill->as_float(0);
+					}
+					if (nctype == ncDouble) {
+						dFillValueDouble = attFill->as_double(0);
+					}
+				}
+
+				CopyNcVar(*(vecInputNcFiles[f]), ncoutfile, vecVariableNames[v], true, false);
+
+				varOut = ncoutfile.get_var(vecVariableNames[v].c_str());
+				if (varOut == NULL) {
+					_EXCEPTION3("Error copying variable \"%s\" from datafile \"%s\" to datafile \"%s\"",
+						vecVariableNames[v].c_str(),
+						vecInputFilenames[f].c_str(),
+						strOutputFile.c_str());
+				}
+
+				size_t sTotalValues = 1;
+				vecVariableDimNames.resize(var->num_dims());
+				vecVariableDimSizes.resize(var->num_dims());
+				for (int d = 0; d < var->num_dims(); d++) {
+					vecVariableDimNames[d] = var->get_dim(d)->name();
+					vecVariableDimSizes[d] = var->get_dim(d)->size();
+
+					sTotalValues *= static_cast<size_t>(vecVariableDimSizes[d]);
+				}
+				sAuxDimSize = 1;
+				for (int d = 1; d < var->num_dims(); d++) {
+					sAuxDimSize *= static_cast<size_t>(vecVariableDimSizes[d]);
+				}
+
+				// Calculate number of iterations needed to stay within memory limit
+				bool fSufficientMemory = false;
+				if (nctype == ncFloat) {
+					fSufficientMemory =
+						CalculateIterationCountSize<float>(
+							sMemoryMax,
+							2,
+							sTotalValues,
+							sAuxCount,
+							sAuxSize);
+
+					dDataFloat.Allocate(sAuxSize);
+					dAccumDataFloat.Allocate(sAuxSize);
+
+				} else if (nctype == ncDouble) {
+					fSufficientMemory =
+						CalculateIterationCountSize<double>(
+							sMemoryMax,
+							2,
+							sTotalValues,
+							sAuxCount,
+							sAuxSize);
+
+					dDataDouble.Allocate(sAuxSize);
+					dAccumDataDouble.Allocate(sAuxSize);
+
+				} else {
+					_EXCEPTION2("Variable \"%s\" has unsupported nctype (%i)",
+						var->name(),
+						var->type());
+				}
+
+				if (!fSufficientMemory) {
+					_EXCEPTIONT("Insufficient memory to perform averaging");
+				}
+
+				// Allocate count array
+				if (varCount == NULL) {
+					nAccumDataCount.Allocate(1);
+
+				} else {
+					lCountDims = varCount->num_dims();
+
+					if (varCount->get_dim(0)->size() != var->get_dim(0)->size()) {
+						_EXCEPTION4("Variable \"%s\" not compatible with variable \"%s\": "
+							"Lead dimension must have same size (%i found vs. %i expected)",
+							vecVariableNames[v].c_str(),
+							strVariableCount.c_str(),
+							var->get_dim(0)->size(),
+							varCount->get_dim(0)->size());
+					}
+
+					if (varCount->num_dims() == 1) {
+						nDataCount.Allocate(varCount->get_dim(0)->size());
+						nAccumDataCount.Allocate(varCount->get_dim(0)->size());
+
+					} else if (varCount->num_dims() == var->num_dims()) {
+						nDataCount.Allocate(sAuxSize);
+						nAccumDataCount.Allocate(sAuxSize);
+
+					} else {
+						_EXCEPTION3("Variable \"%s\" not compatible with variable \"%s\": "
+							"Either 1 dimension or %i dimensions expected",
+							vecVariableNames[v].c_str(),
+							strVariableCount.c_str(),
+							var->num_dims());
+					}
+				}
+
+				Announce("%lu values will be loaded per iteration over %lu iteration(s)",
+					sAuxSize, sAuxCount);
+
+			// Verify variable dimension names and size
+			} else {
+				if (var->num_dims() != vecVariableDimSizes.size()) {
+					_EXCEPTION3("Input datafile \"%s\" dimension count mismatch. Found (%i) expected (%i)",
+						vecInputFilenames[f].c_str(),
+						var->num_dims(),
+						vecVariableDimSizes.size());
+				}
+				for (int d = 0; d < var->num_dims(); d++) {
+					if (var->get_dim(d)->name() != vecVariableDimNames[d]) {
+						_EXCEPTION4("Input datafile \"%s\" dimension name mismatch in dimension %i. Found (%s) expected (%s)",
+							vecInputFilenames[f].c_str(),
+							d,
+							var->get_dim(d)->name(),
+							vecVariableDimNames[d].c_str());
+					}
+					if (var->get_dim(d)->size() != vecVariableDimSizes[d]) {
+						_EXCEPTION4("Input datafile \"%s\" dimension size mismatch in dimension \"%s\". Found (%i) expected (%i)",
+							vecInputFilenames[f].c_str(),
+							var->get_dim(d)->name(),
+							var->get_dim(d)->size(),
+							vecVariableDimSizes[d]);
+					}
+				}
+
+				// Verify count array
+				if ((varCount == NULL) && (lCountDims >= 0)) {
+					_EXCEPTION2("Variable \"%s\" missing from file \"%s\"",
+						strVariableCount.c_str(),
+						vecInputFilenames[f].c_str());
+				}
+				if ((varCount != NULL) && (lCountDims == (-1))) {
+					_EXCEPTION2("Variable \"%s\" present in file \"%s\" but missing from earlier files",
+						strVariableCount.c_str(),
+						vecInputFilenames[f].c_str());
+				}
+
+				if (varCount != NULL) {
+					if (varCount->get_dim(0)->size() != var->get_dim(0)->size()) {
+						_EXCEPTION4("Variable \"%s\" not compatible with variable \"%s\": "
+							"Lead dimension must have same size (%i found vs. %i expected)",
+							vecVariableNames[v].c_str(),
+							strVariableCount.c_str(),
+							var->get_dim(0)->size(),
+							varCount->get_dim(0)->size());
+					}
+
+					if (varCount->num_dims() != lCountDims) {
+						_EXCEPTION2("Variable \"%s\" inconsistent across files: "
+							"%i dimensions expected",
+							strVariableCount.c_str(),
+							var->num_dims());
+					}
+				}
+			}
+		}
+
+		_ASSERT(sAuxCount != (-1));
+		_ASSERT(sAuxSize != (-1));
+
+		// Perform averaging
+		AnnounceStartBlock("Performing averaging");
+
+		size_t sCurrentArrayPos = 0;
+
+		DataArray1D<long> lPos0;
+		for (size_t c = 0; c < sAuxCount; c++) {
+			if (sAuxCount > 1) {
+				Announce("Iteration %lu/%lu", c+1, sAuxCount);
+			}
+
+			long long llCountReadSize = 0;
+			long long llCurrentReadSize = 0;
+			long long llCurrentWriteSize = 0;
+
+			// Accumulate data
+			for (int f = 0; f < vecInputFilenames.size(); f++) {
+
+				NcVar * var = vecInputNcFiles[f]->get_var(vecVariableNames[v].c_str());
+				if (var == NULL) {
+					_EXCEPTION2("Input datafile \"%s\" does not contain variable \"%s\"",
+						vecInputFilenames[f].c_str(),
+						vecVariableNames[v].c_str());
+				}
+
+				// Check and read counts
+				std::string strVariableCount = vecVariableNames[v] + "_count";
+				NcVar * varCount = vecInputNcFiles[f]->get_var(strVariableCount.c_str());
+
+				if (varCount != NULL) {
+					if (varCount->num_dims() == 1) {
+						varCount->set_cur((long)0);
+						varCount->get(&(nDataCount[0]), nDataCount.GetRows());
+
+						for (size_t s = 0; s < nDataCount.GetRows(); s++) {
+							nAccumDataCount[s] += nDataCount[s];
+						}
+
+					} else {
+						llCountReadSize =
+							NcGetPutSpecifiedDataSize<int>(
+								varCount,
+								lPos0,
+								sAuxSize,
+								c,
+								nDataCount,
+								NetCDF_Get);
+
+						for (size_t s = 0; s < llCountReadSize; s++) {
+							nAccumDataCount[s] += nDataCount[s];
+						}
+					}
+				}
+
+				// Read data
+				if (nctype == ncFloat) {
+					llCurrentReadSize =
+						NcGetPutSpecifiedDataSize<float>(
+							var,
+							lPos0,
+							sAuxSize,
+							c,
+							dDataFloat,
+							NetCDF_Get);
+
+					if (lCountDims == (-1)) {
+						nAccumDataCount[0]++;
+						for (size_t s = 0; s < llCurrentReadSize; s++) {
+							dAccumDataFloat[s] += dDataFloat[s];
+						}
+
+					} else if (lCountDims == 1) {
+						for (size_t s = 0; s < llCurrentReadSize; s++) {
+							size_t sDim0Index = (sCurrentArrayPos + s) / sAuxDimSize;
+							dAccumDataFloat[s] += dDataFloat[s] * static_cast<float>(nDataCount[sDim0Index]);
+						}
+
+					} else {
+						_ASSERT(llCountReadSize == llCurrentReadSize);
+						_ASSERT(dDataFloat.GetRows() == nAccumDataCount.GetRows());
+						for (size_t s = 0; s < llCurrentReadSize; s++) {
+							dAccumDataFloat[s] += dDataFloat[s] * static_cast<float>(nDataCount[s]);
+						}
+					}
+
+				} else if (nctype == ncDouble) {
+					llCurrentReadSize =
+						NcGetPutSpecifiedDataSize<double>(
+							var,
+							lPos0,
+							sAuxSize,
+							c,
+							dDataDouble,
+							NetCDF_Get);
+
+					if (lCountDims == (-1)) {
+						nAccumDataCount[0]++;
+						for (size_t s = 0; s < llCurrentReadSize; s++) {
+							dAccumDataDouble[s] += dDataDouble[s];
+						}
+
+					} else if (lCountDims == 1) {
+						for (size_t s = 0; s < llCurrentReadSize; s++) {
+							size_t sDim0Index = (sCurrentArrayPos + s) / sAuxDimSize;
+							dAccumDataDouble[s] += dDataDouble[s] * static_cast<float>(nAccumDataCount[sDim0Index]);
+						}
+
+					} else {
+						_ASSERT(llCountReadSize == llCurrentReadSize);
+						_ASSERT(dDataDouble.GetRows() == nAccumDataCount.GetRows());
+						for (size_t s = 0; s < llCurrentReadSize; s++) {
+							dAccumDataDouble[s] += dDataDouble[s] * static_cast<float>(nAccumDataCount[s]);
+						}
+					}
+				}
+			}
+
+			// Write averaged data (float)
+			if (nctype == ncFloat) {
+				if (lCountDims == (-1)) {
+					if (nAccumDataCount[0] == 0) {
+						for (size_t s = 0; s < dAccumDataFloat.GetRows(); s++) {
+							dAccumDataFloat[s] = dFillValueFloat;
+						}
+					} else {
+						for (size_t s = 0; s < dAccumDataFloat.GetRows(); s++) {
+							dAccumDataFloat[s] /= static_cast<float>(nAccumDataCount[0]);
+						}
+					}
+
+				} else if (lCountDims == 1) {
+					for (size_t s = 0; s < llCurrentReadSize; s++) {
+						size_t sDim0Index = (sCurrentArrayPos + s) / sAuxDimSize;
+						if (nAccumDataCount[sDim0Index] == 0) {
+							dAccumDataFloat[s] = dFillValueFloat;
+						} else {
+							dAccumDataFloat[s] /= static_cast<float>(nAccumDataCount[sDim0Index]);
+						}
+					}
+
+				} else {
+					for (size_t s = 0; s < dAccumDataFloat.GetRows(); s++) {
+						if (nAccumDataCount[s] == 0) {
+							dAccumDataFloat[s] = dFillValueFloat;
+						} else {
+							dAccumDataFloat[s] /= static_cast<float>(nAccumDataCount[s]);
+						}
+					}
+				}
+
+				llCurrentWriteSize =
+					NcGetPutSpecifiedDataSize<float>(
+						varOut,
+						lPos0,
+						sAuxSize,
+						c,
+						dAccumDataFloat,
+						NetCDF_Put);
+
+			// Write averaged data (double)
+			} else if (nctype == ncDouble) {
+				if (lCountDims == (-1)) {
+					if (nAccumDataCount[0] == 0) {
+						for (size_t s = 0; s < dAccumDataDouble.GetRows(); s++) {
+							dAccumDataDouble[s] = dFillValueDouble;
+						}
+					} else {
+						for (size_t s = 0; s < dAccumDataDouble.GetRows(); s++) {
+							dAccumDataDouble[s] /= static_cast<float>(nAccumDataCount[0]);
+						}
+					}
+
+				} else if (lCountDims == 1) {
+					for (size_t s = 0; s < llCurrentReadSize; s++) {
+						size_t sDim0Index = (sCurrentArrayPos + s) / sAuxDimSize;
+						if (nAccumDataCount[sDim0Index] == 0) {
+							dAccumDataDouble[s] = dFillValueDouble;
+						} else {
+							dAccumDataDouble[s] /= static_cast<float>(nAccumDataCount[sDim0Index]);
+						}
+					}
+
+				} else {
+					for (size_t s = 0; s < dAccumDataDouble.GetRows(); s++) {
+						if (nAccumDataCount[s] == 0) {
+							dAccumDataDouble[s] = dFillValueDouble;
+						} else {
+							dAccumDataDouble[s] /= static_cast<float>(nAccumDataCount[s]);
+						}
+					}
+				}
+
+				llCurrentWriteSize =
+					NcGetPutSpecifiedDataSize<double>(
+						varOut,
+						lPos0,
+						sAuxSize,
+						c,
+						dAccumDataDouble,
+						NetCDF_Put);
+			}
+
+			if (llCurrentReadSize != llCurrentWriteSize) {
+				_EXCEPTION2("Read/write size mismatch: %ld / %ld",
+					llCurrentReadSize,
+					llCurrentWriteSize);
+			}
+
+			// Update 1D array position
+			sCurrentArrayPos += static_cast<size_t>(llCurrentReadSize);
+		}
+
+		AnnounceEndBlock("Done");
+		AnnounceEndBlock(NULL);
+	}
+
+	for (int f = 0; f < vecInputNcFiles.size(); f++) {
+		vecInputNcFiles[f]->close();
+		delete vecInputNcFiles[f];
+	}
+
 	AnnounceEndBlock("Done");
 }
 
@@ -1100,7 +1591,7 @@ try {
 		CommandLineBool(fIncludeLeapDays, "include_leap_days");
 		//CommandLineInt(nFourierModes, "time_modes", 0);
 		CommandLineBool(fMissingData, "missingdata");
-		CommandLineString(strTempFilePath, "temp_file_path", ".");
+		CommandLineString(strTempFilePath, "temp_file_path", "/tmp");
 		CommandLineBool(fKeepTempFiles, "keep_temp_files");
 		CommandLineBool(fVerbose, "verbose");
 
@@ -1124,6 +1615,11 @@ try {
 	}
 	if (fIncludeLeapDays) {
 		_EXCEPTIONT("--include_leap_days not implemented");
+	}
+
+	// Period
+	if (strPeriod != "daily") {
+		_EXCEPTIONT("Only --period \"daily\" is currently implemented");
 	}
 
 	// Climatology type
@@ -1263,20 +1759,44 @@ try {
 
 #if defined(TEMPEST_MPIOMP)
 	if (nMPISize != 1) {
+
+		// Barrier
 		MPI_Barrier(MPI_COMM_WORLD);
 		AnnounceSetOutputBuffer(stdout);
 		AnnounceOnlyOutputOnRankZero();
-	}
-#endif
 
-	if ((nMPISize != 1) && (nMPIRank == 0)) {
-		AnnounceBanner();
-
+		// Perform averaging
 		if (nMPIRank == 0) {
-			Announce("TODO: Combine files");
-			DataArray1D<float> dData;
+			AnnounceBanner();
+
+			if (nMPIRank == 0) {
+				std::vector< std::string > vecAllOutputFileList;
+				for (int f = 0; f < nMPISize; f++) {
+					char szBuffer[16];
+					sprintf(szBuffer, "%06i", f);
+
+					std::string strTempOutputFile =
+						strTempFilePath + "/tempClimatology" + szBuffer + ".nc";
+
+					vecAllOutputFileList.push_back(strTempOutputFile);
+				}
+
+				std::vector<std::string> vecTempVariableNames;
+				if (strPeriod == "daily") {
+					for (int v = 0; v < vecVariableNames.size(); v++) {
+						vecTempVariableNames.push_back(std::string("dailymean_") + vecVariableNames[v]);
+					}
+				}
+
+				AverageOverNcFiles(
+					vecAllOutputFileList,
+					strOutputFile,
+					vecTempVariableNames,
+					sMemoryMax);
+			}
 		}
 	}
+#endif
 
 	AnnounceBanner();
 
@@ -1284,6 +1804,10 @@ try {
 	AnnounceOutputOnAllRanks();
 	AnnounceSetOutputBuffer(stdout);
 	Announce(e.ToString().c_str());
+
+#if defined(TEMPEST_MPIOMP)
+	MPI_Abort(MPI_COMM_WORLD, -1);
+#endif
 }
 
 #if defined(TEMPEST_MPIOMP)
