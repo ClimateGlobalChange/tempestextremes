@@ -763,6 +763,8 @@ void Climatology(
 		}
 		DataArray1D<long> lPos0put(1);
 
+		float dFillValue = 0.0;
+
 		// Loop through each iteration of this variable
 		for (int c = 0; c < vecOutputAuxCount[v]; c++) {
 
@@ -843,7 +845,6 @@ void Climatology(
 				}
 
 				// Get the fill value
-				float dFillValue;
 				if (fMissingData) {
 					NcAtt * attFillValue = varIn->get_att("_FillValue");
 					if (attFillValue == NULL) {
@@ -942,7 +943,7 @@ void Climatology(
 							dAccumulatedData[t][i] /=
 								static_cast<double>(nTimeSlicesGrid[t][i]);
 						} else {
-							dAccumulatedData[t][i] = 0.0;
+							dAccumulatedData[t][i] = dFillValue;
 						}
 					}
 
@@ -1315,6 +1316,16 @@ void AverageOverNcFiles(
 			long long llCurrentWriteSize = 0;
 
 			// Accumulate data
+			if (nAccumDataCount.IsAttached()) {
+				nAccumDataCount.Zero();
+			}
+			if (dAccumDataFloat.IsAttached()) {
+				dAccumDataFloat.Zero();
+			}
+			if (dAccumDataDouble.IsAttached()) {
+				dAccumDataDouble.Zero();
+			}
+
 			for (int f = 0; f < vecInputFilenames.size(); f++) {
 
 				NcVar * var = vecInputNcFiles[f]->get_var(vecVariableNames[v].c_str());
@@ -1329,7 +1340,7 @@ void AverageOverNcFiles(
 				NcVar * varCount = vecInputNcFiles[f]->get_var(strVariableCount.c_str());
 
 				if (varCount != NULL) {
-					if (varCount->num_dims() == 1) {
+					if (lCountDims == 1) {
 						varCount->set_cur((long)0);
 						varCount->get(&(nDataCount[0]), nDataCount.GetRows());
 
@@ -1379,6 +1390,7 @@ void AverageOverNcFiles(
 					} else {
 						_ASSERT(llCountReadSize == llCurrentReadSize);
 						_ASSERT(dDataFloat.GetRows() == nAccumDataCount.GetRows());
+
 						for (size_t s = 0; s < llCurrentReadSize; s++) {
 							dAccumDataFloat[s] += dDataFloat[s] * static_cast<float>(nDataCount[s]);
 						}
