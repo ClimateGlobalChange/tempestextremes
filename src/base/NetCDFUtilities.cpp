@@ -228,8 +228,6 @@ void CopyNcVar(
 
 	// ncShort type
 	if (var->type() == ncShort) {
-		DataArray1D<short> data(nDataSize);
-
 		varOut =
 			ncOut.add_var(
 				var->name(), var->type(),
@@ -240,6 +238,7 @@ void CopyNcVar(
 		}
 
 		if (fCopyData) {
+			DataArray1D<short> data(nDataSize);
 			var->get(&(data[0]), &(counts[0]));
 			varOut->put(&(data[0]), &(counts[0]));
 		}
@@ -247,8 +246,6 @@ void CopyNcVar(
 
 	// ncInt type
 	if (var->type() == ncInt) {
-		DataArray1D<int> data(nDataSize);
-
 		varOut =
 			ncOut.add_var(
 				var->name(), var->type(),
@@ -259,6 +256,7 @@ void CopyNcVar(
 		}
 
 		if (fCopyData) {
+			DataArray1D<int> data(nDataSize);
 			var->get(&(data[0]), &(counts[0]));
 			varOut->put(&(data[0]), &(counts[0]));
 		}
@@ -266,8 +264,6 @@ void CopyNcVar(
 
 	// ncFloat type
 	if (var->type() == ncFloat) {
-		DataArray1D<float> data(nDataSize);
-
 		varOut =
 			ncOut.add_var(
 				var->name(), var->type(),
@@ -278,6 +274,7 @@ void CopyNcVar(
 		}
 
 		if (fCopyData) {
+			DataArray1D<float> data(nDataSize);
 			var->get(&(data[0]), &(counts[0]));
 			varOut->put(&(data[0]), &(counts[0]));
 		}
@@ -285,8 +282,6 @@ void CopyNcVar(
 
 	// ncDouble type
 	if (var->type() == ncDouble) {
-		DataArray1D<double> data(nDataSize);
-
 		varOut =
 			ncOut.add_var(
 				var->name(), var->type(),
@@ -297,6 +292,7 @@ void CopyNcVar(
 		}
 
 		if (fCopyData) {
+			DataArray1D<double> data(nDataSize);
 			var->get(&(data[0]), &(counts[0]));
 			varOut->put(&(data[0]), &(counts[0]));
 		}
@@ -304,8 +300,6 @@ void CopyNcVar(
 
 	// ncInt64 type
 	if (var->type() == ncInt64) {
-		DataArray1D<ncint64> data(nDataSize);
-
 		varOut =
 			ncOut.add_var(
 				var->name(), var->type(),
@@ -316,6 +310,7 @@ void CopyNcVar(
 		}
 
 		if (fCopyData) {
+			DataArray1D<ncint64> data(nDataSize);
 			var->get(&(data[0]), &(counts[0]));
 			varOut->put(&(data[0]), &(counts[0]));
 		}
