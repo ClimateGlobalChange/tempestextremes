@@ -16,6 +16,7 @@
 
 #include "Variable.h"
 #include "STLStringHelper.h"
+#include "Units.h"
 
 #include <set>
 #include <cctype>
@@ -153,25 +154,19 @@ int VariableRegistry::FindOrRegisterSubStr(
 				_EXCEPTION1("Variable dimension list must be terminated"
 					" with ): %s", strIn.c_str());
 			}
-			if (strIn[n] == ',') {
+			if ((strIn[n] == ',') || (strIn[n] == ')')) {
 				if (strDim.length() == 0) {
 					_EXCEPTIONT("Invalid dimension index in variable");
 				}
 				pvar->m_strArg.push_back(strDim);
-				pvar->m_lArg.push_back(std::stol(strDim));
+				//pvar->m_lArg.push_back(std::stol(strDim));
 				pvar->m_varArg.push_back(InvalidVariableIndex);
 				strDim = "";
 
-			} else if (strIn[n] == ')') {
-				if (strDim.length() == 0) {
-					_EXCEPTIONT("Invalid dimension index in variable");
+				if (strIn[n] == ')') {
+					InsertUniqueOrDelete(pvar, pvarix);
+					return (n+1);
 				}
-				pvar->m_strArg.push_back(strDim);
-				pvar->m_lArg.push_back(std::stol(strDim));
-				pvar->m_varArg.push_back(InvalidVariableIndex);
-
-				InsertUniqueOrDelete(pvar, pvarix);
-				return (n+1);
 
 			} else {
 				strDim += strIn[n];
@@ -214,7 +209,7 @@ int VariableRegistry::FindOrRegisterSubStr(
 				}
 				pvar->m_strArg.push_back(strFloat);
 				pvar->m_varArg.push_back(InvalidVariableIndex);
-				pvar->m_lArg.push_back(Variable::InvalidArgument);
+				//pvar->m_lArg.push_back(Variable::InvalidArgument);
 
 			// Check for string argument
 			} else if (strIn[n] == '\"') {
@@ -240,7 +235,7 @@ int VariableRegistry::FindOrRegisterSubStr(
 
 				pvar->m_strArg.push_back(strIn.substr(nStart+1,n-nStart-1));
 				pvar->m_varArg.push_back(InvalidVariableIndex);
-				pvar->m_lArg.push_back(Variable::InvalidArgument);
+				//pvar->m_lArg.push_back(Variable::InvalidArgument);
 
 			// Check for variable
 			} else {
@@ -249,7 +244,7 @@ int VariableRegistry::FindOrRegisterSubStr(
 
 				pvar->m_strArg.push_back("");
 				pvar->m_varArg.push_back(varix);
-				pvar->m_lArg.push_back(Variable::InvalidArgument);
+				//pvar->m_lArg.push_back(Variable::InvalidArgument);
 			}
 
 			if (strIn[n] == ')') {
@@ -495,17 +490,17 @@ bool Variable::operator==(
 	if (m_strArg.size() != var.m_strArg.size()) {
 		return false;
 	}
-	_ASSERT(m_strArg.size() == m_lArg.size());
+	//_ASSERT(m_strArg.size() == m_lArg.size());
 	_ASSERT(m_strArg.size() == m_varArg.size());
-	_ASSERT(m_strArg.size() == var.m_lArg.size());
+	//_ASSERT(m_strArg.size() == var.m_lArg.size());
 	_ASSERT(m_strArg.size() == var.m_varArg.size());
 	for (int i = 0; i < m_strArg.size(); i++) {
 		if (m_strArg[i] != var.m_strArg[i]) {
 			return false;
 		}
-		if (m_lArg[i] != var.m_lArg[i]) {
-			return false;
-		}
+		//if (m_lArg[i] != var.m_lArg[i]) {
+		//	return false;
+		//}
 		if (m_varArg[i] != var.m_varArg[i]) {
 			return false;
 		}
@@ -525,7 +520,7 @@ std::string Variable::ToString(
 	}
 	strOut += "(";
 	_ASSERT(m_varArg.size() == m_strArg.size());
-	_ASSERT(m_varArg.size() == m_lArg.size());
+	//_ASSERT(m_varArg.size() == m_lArg.size());
 	for (size_t d = 0; d < m_varArg.size(); d++) {
 		if (m_varArg[d] != InvalidVariableIndex) {
 			strOut += varreg.GetVariableString(m_varArg[d]);
@@ -587,13 +582,16 @@ NcVar * Variable::GetNcVarFromNcFileVector(
 	}
 
 	// Verify correct dimensionality
-	int nRequestedVarDims = m_lArg.size() + grid.DimCount();
+	int nRequestedVarDims = m_strArg.size() + grid.DimCount();
 	if (lTime != NcFileVector::NoTimeIndex) {
 		nRequestedVarDims++;
 	}
 	if (nVarDims != nRequestedVarDims) {
-		_EXCEPTION3("Inconsistent number of dimensions in \"%s\" (%i found / %i requested)",
-			m_strName.c_str(), nVarDims, nRequestedVarDims);
+		_EXCEPTION4("Variable \"%s\" in file \"%s\" has fewer auxiliary dimensions (%i) than specified on command line (%i)",
+			m_strName.c_str(),
+			ncfilevec.GetFilename(sPos).c_str(),
+			nVarDims,
+			nRequestedVarDims);
 	}
 
 	// Set the current index position for this variable
@@ -606,12 +604,184 @@ NcVar * Variable::GetNcVarFromNcFileVector(
 		nSetDims++;
 	}
 
+	for (int a = 0; a < m_strArg.size(); a++) {
+
+		if (m_strArg[a].length() == 0) {
+			_EXCEPTION2("Empty string argument found in position %i of variable %s",
+				a, m_strName.c_str());
+		}
+
+		// Index notation
+		if (STLStringHelper::IsIntegerIndex(m_strArg[a])) {
+			lDim[nSetDims] = std::stol(m_strArg[a]);
+
+		// Value notation (value + units)
+		} else {
+			_ASSERT(nSetDims < var->num_dims());
+
+			// Get the units from the NetCDF file
+			NcDim * dimArg = var->get_dim(nSetDims);
+			if (dimArg == NULL) {
+				_EXCEPTION3("Failure to read dimension %i of variable \"%s\" in file \"%s\"",
+					nSetDims,
+					m_strName.c_str(),
+					ncfilevec.GetFilename(sPos).c_str());
+			}
+
+			std::string strDimName = dimArg->name();
+
+			NcVar * varDim = ncfilevec[sPos]->get_var(strDimName.c_str());
+			if (varDim == NULL) {
+				_EXCEPTION3("Dimension \"%s\" in file \"%s\" has no corresponding variable (unable to use value notation for variable \"%s\")",
+					dimArg->name(),
+					ncfilevec.GetFilename(sPos).c_str(),
+					m_strName.c_str());
+			}
+			if (varDim->num_dims() != 1) {
+				_EXCEPTION2("Dimension variable \"%s\" in file \"%s\" has more than one dimension",
+					dimArg->name(),
+					ncfilevec.GetFilename(sPos).c_str());
+			}
+			if (strDimName != varDim->get_dim(0)->name()) {
+				_EXCEPTION3("Dimension variable \"%s\" in file \"%s\" instead refers to dimension \"%s\"",
+					dimArg->name(),
+					ncfilevec.GetFilename(sPos).c_str(),
+					varDim->get_dim(0)->name());
+			}
+
+			NcAtt * attUnits = varDim->get_att("units");
+			if (attUnits == NULL) {
+				_EXCEPTION3("Dimension variable \"%s\" in file \"%s\" has no units attribute (unable to use value notation for variable \"%s\")",
+					dimArg->name(),
+					ncfilevec.GetFilename(sPos).c_str(),
+					m_strName.c_str());
+			}
+
+			std::string strNcDimUnits = attUnits->as_string(0);
+
+			// Get the value and units from the argument string
+			std::string strValue;
+			std::string strUnits;
+			SplitIntoValueAndUnits(m_strArg[a], strValue, strUnits);
+
+			// Find the corresponding index in the dimension variable
+
+			// int type dimension
+			if (varDim->type() == ncInt) {
+				if (!STLStringHelper::IsInteger(strValue)) {
+					_EXCEPTION3("Specified dimension \"%s\" for variable \"%s\" is not of type integer, as expected for dimension \"%s\"",
+						m_strArg[a].c_str(),
+						m_strName.c_str(),
+						dimArg->name());
+				}
+				long lValue = std::stol(strValue);
+
+				bool fConvert =
+					ConvertUnits<long>(
+						lValue,
+						strUnits,
+						strNcDimUnits);
+
+				if (!fConvert) {
+					_EXCEPTION3("Specified dimension \"%s\" for variable \"%s\" is incompatible with dimension units \"%s\"",
+						m_strArg[a].c_str(),
+						m_strName.c_str(),
+						strNcDimUnits.c_str());
+				}
+
+				DataArray1D<int> nDimValues(dimArg->size());
+				varDim->get(&(nDimValues[0]), dimArg->size());
+
+				NcError err;
+				if (err.get_err() != NC_NOERR) {
+					_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
+				}
+
+				long vd = 0;
+				for (; vd < dimArg->size(); vd++) {
+					if (nDimValues[vd] == lValue) {
+						lDim[nSetDims] = vd;
+						break;
+					}
+				}
+				if (vd == dimArg->size()) {
+					_EXCEPTION2("Dimension \"%s\" does not contain coordinate value \"%s\"",
+						dimArg->name(),
+						m_strArg[a].c_str());
+				}
+
+			// double type dimension
+			} else if ((varDim->type() == ncFloat) || (varDim->type() == ncDouble)) {
+				if (!STLStringHelper::IsFloat(strValue)) {
+					_EXCEPTION3("Specified dimension \"%s\" for variable \"%s\" is not of type float/double, as expected for dimension \"%s\"",
+						m_strArg[a].c_str(),
+						m_strName.c_str(),
+						dimArg->name());
+				}
+				double dValue = std::stof(strValue);
+
+				bool fConvert =
+					ConvertUnits<double>(
+						dValue,
+						strUnits,
+						strNcDimUnits);
+
+				if (!fConvert) {
+					_EXCEPTION3("Specified dimension \"%s\" for variable \"%s\" is incompatible with dimension units \"%s\"",
+						m_strArg[a].c_str(),
+						m_strName.c_str(),
+						strNcDimUnits.c_str());
+				}
+
+				DataArray1D<double> dDimValues(dimArg->size());
+				if (varDim->type() == ncFloat) {
+					DataArray1D<float> flDimValues(dimArg->size());
+					varDim->get(&(flDimValues[0]), dimArg->size());
+					for (long vd = 0; vd < dimArg->size(); vd++) {
+						dDimValues[vd] = static_cast<double>(flDimValues[vd]);
+					}
+				} else {
+					varDim->get(&(dDimValues[0]), dimArg->size());
+				}
+
+				NcError err;
+				if (err.get_err() != NC_NOERR) {
+					_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
+				}
+
+				long vd = 0;
+				for (; vd < dimArg->size(); vd++) {
+					if (fabs(dDimValues[vd] - dValue) < 1.0e-12 * fabs(dValue)) {
+						lDim[nSetDims] = vd;
+						break;
+					}
+				}
+				if (vd == dimArg->size()) {
+					_EXCEPTION2("Dimension \"%s\" does not contain coordinate value \"%s\"",
+						dimArg->name(),
+						m_strArg[a].c_str());
+				}
+
+				printf("\"%s\" corresponds to dimension index %li", m_strArg[a].c_str(), vd);
+
+			// Unknown dimension type
+			} else {
+				_EXCEPTION2("Dimension variable \"%s\" in file \"%s\" must be of type int, float, or double to use value indexing",
+					varDim->name(),
+					ncfilevec.GetFilename(sPos).c_str());
+			}
+
+			nSetDims++;
+		}
+	}
+/*
 	if (m_lArg.size() != 0) {
 		for (int i = 0; i < m_lArg.size(); i++) {
 			lDim[nSetDims] = m_lArg[i];
 			nSetDims++;
 		}
 	}
+*/
 /*
 	printf("Loading \"%s\" (%s) [", ncfilevec.GetFilename(sPos).c_str(), m_timeStored.ToString().c_str());
 	for (int d = 0; d < lDim.size(); d++) {

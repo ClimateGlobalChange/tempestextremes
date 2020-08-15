@@ -53,6 +53,20 @@ inline static void ToUpper(std::string &str) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+inline static bool IsIntegerIndex(const std::string &str) {
+	if (str.length() == 0) {
+		return false;
+	}
+	for(size_t i = 0; i < str.length(); i++) {
+		if ((str[i] < '0') || (str[i] > '9')) {
+			return false;
+		}
+	}
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 inline static bool IsInteger(const std::string &str) {
 	if (str.length() == 0) {
 		return false;

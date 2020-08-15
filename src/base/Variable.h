@@ -479,7 +479,7 @@ public:
 	///	</summary>
 	size_t GetArgumentCount() const {
 		_ASSERT(m_strArg.size() == m_varArg.size());
-		_ASSERT(m_strArg.size() == m_lArg.size());
+		//_ASSERT(m_strArg.size() == m_lArg.size());
 		return m_strArg.size();
 	}
 
@@ -489,14 +489,14 @@ public:
 	const std::vector<std::string> & GetArgumentStrings() const {
 		return m_strArg;
 	}
-
+/*
 	///	<summary>
 	///		Get the array of specified operator arguments (as long).
 	///	</summary>
 	const std::vector<long> & GetArgumentLongs() const {
 		return m_lArg;
 	}
-
+*/
 	///	<summary>
 	///		Get the array of specified operator Variables.
 	///	</summary>
@@ -569,7 +569,7 @@ protected:
 	///	<summary>
 	///		Specified operator arguments (as long, for NetCDF file indexing).
 	///	</summary>
-	std::vector<long> m_lArg;
+	//std::vector<long> m_lArg;
 
 	///	<summary>
 	///		Specified operator arguments (as VariableIndex).
