@@ -580,8 +580,8 @@ try {
 	// Minimum blob size (in grid points)
 	int nMinBlobSize;
 
-	// Minimum number of timesteps for blob
-	int nMinTime;
+	// Minimum duration of blob
+	std::string strMinTime;
 
 	// Minimum percentage of the earlier blob that needs to be covered by the later blob
 	double dMinPercentOverlapPrev;
@@ -642,7 +642,7 @@ try {
 		CommandLineString(strVariable, "var", "");
 		CommandLineString(strOutputVariable, "outvar", "");
 		CommandLineInt(nMinBlobSize, "minsize", 1);
-		CommandLineInt(nMinTime, "mintime", 1);
+		CommandLineString(strMinTime, "mintime", "1");
 		CommandLineDoubleD(dMinPercentOverlapPrev, "min_overlap_prev", 0.0, "(%)")
 		CommandLineDoubleD(dMaxPercentOverlapPrev, "max_overlap_prev", 100.0, "(%)")
 		CommandLineDoubleD(dMinPercentOverlapNext, "min_overlap_next", 0.0, "(%)")
@@ -721,6 +721,24 @@ try {
 		if (vecOutputFiles.size() != vecInputFiles.size()) {
 			_EXCEPTION2("Mismatch in number of rows of --in_list (%lu) and --out_list (%lu)",
 				vecInputFiles.size(), vecOutputFiles.size());
+		}
+	}
+
+	// Parse --mintime
+	int nMinTime = 1;
+	double dMinTimeSeconds = 0.0;
+	if (STLStringHelper::IsIntegerIndex(strMinTime)) {
+		nMinTime = std::stoi(strMinTime);
+		if (nMinTime < 1) {
+			_EXCEPTIONT("Invalid value of --mintime; expected positive integer or time delta");
+		}
+
+	} else {
+		Time timeMinTime;
+		timeMinTime.FromFormattedString(strMinTime);
+		dMinTimeSeconds = timeMinTime.AsSeconds();
+		if (dMinTimeSeconds <= 0.0) {
+			_EXCEPTIONT("Invalid value for --mintime; expected positive integer or positive time delta");
 		}
 	}
 
@@ -841,6 +859,8 @@ try {
 	// Get time dimension over all files
 	// strOutTimeUnits is either predetermined or set at the command line
 	NcType nctypeTime;
+	std::vector< std::pair<int, int> > vecGlobalTimeIxToFileTimeIx;
+
 	std::vector< std::vector<Time> > vecGlobalTimes;
 	vecGlobalTimes.resize(vecOutputFiles.size());
 
@@ -879,12 +899,19 @@ try {
 			vecTimes,
 			true);
 
+		std::cout << vecTimes[0].ToString() << " " << vecTimes[0].GetCalendarType() << std::endl;
+
 		if (vecOutputFiles.size() == 1) {
 			for (int t = 0; t < vecTimes.size(); t++) {
+				int iGlobalTime = vecGlobalTimes[0].size();
 				vecGlobalTimes[0].push_back(vecTimes[t]);
+				vecGlobalTimeIxToFileTimeIx.push_back( std::pair<int,int>(0,iGlobalTime) );
 			}
 		} else {
-			vecGlobalTimes[f] = vecTimes;
+			for (int t = 0; t < vecTimes.size(); t++) {
+				vecGlobalTimes[f].push_back(vecTimes[t]);
+				vecGlobalTimeIxToFileTimeIx.push_back( std::pair<int,int>(f,t) );
+			}
 		}
 	}
 
@@ -893,6 +920,7 @@ try {
 		nGlobalTimes += vecGlobalTimes[f].size();
 	}
 	_ASSERT(nGlobalTimes > 0);
+	_ASSERT(nGlobalTimes == vecGlobalTimeIxToFileTimeIx.size());
 
 	///////////////////////////////////////////////////////////////////////////
 	// Build the set of nodes at each time contained in each blob
@@ -914,6 +942,9 @@ try {
 
 	// Loop through all files
 	for (int f = 0; f < nFiles; f++) {
+
+		// Clear existing data in the register
+		varreg.UnloadAllGridData();
 
 		// Load in the benchmark file
 		NcFileVector vecNcFiles;
@@ -1323,12 +1354,12 @@ try {
 
 	AnnounceEndBlock("Done");
 
-	AnnounceStartBlock("Identify cliques in connectivity graph");
+	AnnounceStartBlock("Identify components in connectivity graph");
 
 	// Total number of blobs
 	int nTotalBlobCount = 0;
 
-	// Find all cliques using a bidirectional graph search
+	// Find all components using a bidirectional graph search
 	std::map<Tag, Tag> mapEquivalentTags;
 
 	std::set<Tag>::const_iterator iterTag = setAllTags.begin();
@@ -1342,7 +1373,7 @@ try {
 
 		Tag tagMinimum = *iterTag;
 
-		// Check if this tag is already part of an explored clique
+		// Check if this tag is already part of an explored component
 		if (mapEquivalentTags.find(*iterTag) != mapEquivalentTags.end()) {
 			continue;
 		}
@@ -1350,13 +1381,13 @@ try {
 		// New blob
 		nTotalBlobCount++;
 
-		// All time values associated with this blob
+		// All time indices associated with this blob
 		std::set<int> setBlobTimes;
 
-		// All time values where this blob is in the restrict region
+		// All time indices where this blob is in the restrict region
 		std::set<int> setBlobTimesInRestrictRegion;
 
-		// Find clique containing this node
+		// Find component containing this node
 		for (;;) {
 
 			// Out of tags to visit; done
@@ -1409,6 +1440,24 @@ try {
 		if (setBlobTimes.size() < nMinTime) {
 			fAcceptBlob = false;
 		}
+		if (dMinTimeSeconds > 0.0) {
+			int iFirstTime = *(setBlobTimes.begin());
+			int iLastTime = *(setBlobTimes.rbegin());
+
+			_ASSERT(iFirstTime >= 0);
+			_ASSERT(iLastTime < vecGlobalTimeIxToFileTimeIx.size());
+
+			std::pair<int,int> iFileTimeIxFirst = vecGlobalTimeIxToFileTimeIx[iFirstTime];
+			std::pair<int,int> iFileTimeIxLast = vecGlobalTimeIxToFileTimeIx[iLastTime];
+
+			const Time & timeFirst = vecGlobalTimes[iFileTimeIxFirst.first][iFileTimeIxFirst.second];
+			const Time & timeLast = vecGlobalTimes[iFileTimeIxLast.first][iFileTimeIxLast.second];
+
+			double dBlockDurationSeconds = timeFirst.DeltaSeconds(timeLast);
+			if (dBlockDurationSeconds < dMinTimeSeconds) {
+				fAcceptBlob = false;
+			}
+		}
 
 		// Set global id
 		if (fAcceptBlob) {
@@ -1418,7 +1467,7 @@ try {
 			nTotalBlobCount--;
 		}
 
-		// Refer all tags in clique to minimum tag
+		// Refer all tags in component to minimum tag
 		std::set<Tag>::const_iterator iterTagsVisited = setTagsVisited.begin();
 		for (; iterTagsVisited != setTagsVisited.end(); iterTagsVisited++) {
 			mapEquivalentTags.insert(

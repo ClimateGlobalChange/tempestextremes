@@ -391,7 +391,7 @@ bool Time::IsLeapYear() const {
 
 double Time::AsSeconds() const {
 	if (m_eTimeType != TypeDelta) {
-		_EXCEPTIONT("DeltaSeconds() only valid for operands of Time::TypeDelta");
+		_EXCEPTIONT("AsSeconds() only valid for operands of Time::TypeDelta");
 	}
 	if ((m_iYear != 0) || (m_iMonth != 0)) {
 		_EXCEPTIONT("AsSeconds() not supported for non-zero year / month as result is dependent on calendar");
