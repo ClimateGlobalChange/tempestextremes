@@ -1685,10 +1685,10 @@ try {
 	STLStringHelper::ToLower(strClimoType);
 	if (strClimoType == "mean") {
 		eClimoType = ClimatologyType_Mean;
-	} else if (strClimoType == "sq") {
+	} else if (strClimoType == "meansq") {
 		eClimoType = ClimatologyType_MeanSq;
 	} else {
-		_EXCEPTIONT("--type invalid; expected \"mean\" or \"sq\"");
+		_EXCEPTIONT("--type invalid; expected \"mean\" or \"meansq\"");
 	}
 
 	// Parse input file list
