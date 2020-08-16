@@ -639,8 +639,8 @@ try {
 		CommandLineBool(fDiagonalConnectivity, "diag_connect");
 		CommandLineString(strOutputFile, "out", "");
 		CommandLineString(strOutputFileList, "out_list", "");
-		CommandLineString(strVariable, "var", "");
-		CommandLineString(strOutputVariable, "outvar", "");
+		CommandLineString(strVariable, "var", "binary_tag");
+		CommandLineString(strOutputVariable, "outvar", "object_id");
 		CommandLineInt(nMinBlobSize, "minsize", 1);
 		CommandLineString(strMinTime, "mintime", "1");
 		CommandLineDoubleD(dMinPercentOverlapPrev, "min_overlap_prev", 0.0, "(%)")
