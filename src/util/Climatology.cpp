@@ -24,6 +24,7 @@
 #include "TimeObj.h"
 #include "DataArray2D.h"
 #include "FourierTransforms.h"
+#include "Units.h"
 
 #include "netcdfcpp.h"
 
@@ -305,7 +306,7 @@ long long NcGetPutSpecifiedDataSize(
 void SplitVariableStrings(
 	const std::vector<std::string> & vecVariableStrings,
 	std::vector<std::string> & vecVariableNames,
-	std::vector< std::vector<long> > & vecVariableSpecifiedDims
+	std::vector< std::vector<std::string> > & vecVariableSpecifiedDims
 ) {
 	vecVariableNames.clear();
 	vecVariableSpecifiedDims.clear();
@@ -358,23 +359,30 @@ void SplitVariableStrings(
 				) {
 					std::string strDimValue =
 						vecVariableStrings[v].substr(iLast, i-iLast);
+
+					std::string strValue;
+					std::string strUnits;
+					SplitIntoValueAndUnits(strDimValue, strValue, strUnits);
+
+					if (!STLStringHelper::IsFloat(strValue)) {
+						_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer or value index.",
+							strDimValue.c_str());
+					}
+
 					//if (strDimValue == "*") {
 					//	vecVariableSpecifiedDims[v].push_back(-1);
 					//	iLast = i+1;
 					//}
-					if (!STLStringHelper::IsInteger(strDimValue)) {
-						_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer.",
-							strDimValue.c_str());
-					}
-					long lDimValue = std::stol(strDimValue);
-					if (lDimValue < 0) {
-						_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer.",
-							strDimValue.c_str());
-					}
-					vecVariableSpecifiedDims[v].push_back(lDimValue);
+					//long lDimValue = std::stol(strDimValue);
+					//if (lDimValue < 0) {
+					//	_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer.",
+					//		strDimValue.c_str());
+					//}
+					vecVariableSpecifiedDims[v].push_back(strDimValue);
 					iLast = i+1;
 				}
 			}
+
 		} else {
 			vecVariableNames[v] = vecVariableStrings[v];
 		}
@@ -388,7 +396,7 @@ void SplitVariableStrings(
 ///	</summary>
 enum ClimatologyType {
 	ClimatologyType_Mean,
-	ClimatologyType_Sq
+	ClimatologyType_MeanSq
 };
 
 ///	<summary>
@@ -398,7 +406,7 @@ void Climatology(
 	const std::vector<std::string> & vecInputFileList,
 	const std::string & strOutputFile,
 	const std::vector<std::string> & vecVariableNames,
-	const std::vector< std::vector<long> > & vecVariableSpecifiedDims,
+	const std::vector< std::vector<std::string> > & vecVariableSpecifiedDims,
 	size_t sMemoryMax,
 	bool fIncludeLeapDays,
 	ClimatologyType eClimoType,
@@ -413,7 +421,7 @@ void Climatology(
 
 	// Climatology type
 	if ((eClimoType != ClimatologyType_Mean) &&
-	    (eClimoType != ClimatologyType_Sq)
+	    (eClimoType != ClimatologyType_MeanSq)
 	) {
 		_EXCEPTIONT("Invalid eClimoType");
 	}
@@ -429,6 +437,9 @@ void Climatology(
 	}
 
 	// Determine dimensionality of each variable
+	std::vector< std::vector<long> > vecVariableSpecifiedDimIxs;
+	vecVariableSpecifiedDimIxs.resize(vecVariableSpecifiedDims.size());
+
 	std::vector<DimInfoVector> vecVarDimInfo;
 	vecVarDimInfo.resize(vecVariableNames.size());
 
@@ -527,15 +538,27 @@ void Climatology(
 					vecVariableNames[v].c_str());
 			}
 
+			// Get the dimension indices
+			vecVariableSpecifiedDimIxs[v].resize(vecVariableSpecifiedDims[v].size());
 			for (int d = 0; d < vecVariableSpecifiedDims[v].size(); d++) {
-				if ((vecVariableSpecifiedDims[v][d] < (-1)) ||
-				    (vecVariableSpecifiedDims[v][d] >= var->get_dim(d+1)->size())
+
+				vecVariableSpecifiedDimIxs[v][d] =
+					GetIntegerIndexFromValueBasedIndex(
+						&ncinfile,
+						vecInputFileList[0],
+						vecVariableNames[v],
+						d+1,
+						vecVariableSpecifiedDims[v][d]
+					);
+
+				if ((vecVariableSpecifiedDimIxs[v][d] < (-1)) ||
+				    (vecVariableSpecifiedDimIxs[v][d] >= var->get_dim(d+1)->size())
 				) {
 					_EXCEPTION4("File \"%s\" variable \"%s\" specified dimension index out of range (%lu/%lu).",
-					vecInputFileList[0].c_str(),
-					vecVariableNames[v].c_str(),
-					vecVariableSpecifiedDims[v][d],
-					var->get_dim(d+1)->size());
+						vecInputFileList[0].c_str(),
+						vecVariableNames[v].c_str(),
+						vecVariableSpecifiedDimIxs[v][d],
+						var->get_dim(d+1)->size());
 				}
 			}
 
@@ -676,7 +699,14 @@ void Climatology(
 				_ASSERT(itNcDim != mapOutputNcDim.end());
 				vecVarNcDims.push_back(itNcDim->second);
 			}
-			std::string strOutVar = std::string("dailymean_") + vecVariableNames[v];
+			std::string strOutVar;
+			if (eClimoType == ClimatologyType_Mean) {
+				strOutVar = std::string("dailymean_") + vecVariableNames[v];
+			} else if (eClimoType == ClimatologyType_MeanSq) {
+				strOutVar = std::string("dailymeansq_") + vecVariableNames[v];
+			} else {
+				_EXCEPTIONT("Invalid eClimoType");
+			}
 			NcVar * varOut =
 				ncoutfile.add_var(
 					strOutVar.c_str(),
@@ -722,11 +752,11 @@ void Climatology(
 					std::string strAttName = vecVarDimInfo[v][d].name + "_index";
 					varOut->add_att(
 						strAttName.c_str(),
-						vecVariableSpecifiedDims[v][d]);
+						vecVariableSpecifiedDims[v][d].c_str());
 				} else {
 					_ASSERT(varDimIn->num_dims() == 1);
-					_ASSERT(varDimIn->get_dim(0)->size() > vecVariableSpecifiedDims[v][d]);
-					varDimIn->set_cur(vecVariableSpecifiedDims[v][d]);
+					_ASSERT(varDimIn->get_dim(0)->size() > vecVariableSpecifiedDimIxs[v][d]);
+					varDimIn->set_cur(vecVariableSpecifiedDimIxs[v][d]);
 					double dValue;
 					varDimIn->get(&dValue, (long)1);
 					varOut->add_att(
@@ -757,9 +787,9 @@ void Climatology(
 		DataArray1D<float> dDataIn(vecOutputAuxSize[v]);
 
 		// Storage array for auxiliary dimensions
-		DataArray1D<long> lPos0get(1 + vecVariableSpecifiedDims[v].size());
-		for (int d = 0; d < vecVariableSpecifiedDims[v].size(); d++) {
-			lPos0get[d+1] = vecVariableSpecifiedDims[v][d];
+		DataArray1D<long> lPos0get(1 + vecVariableSpecifiedDimIxs[v].size());
+		for (int d = 0; d < vecVariableSpecifiedDimIxs[v].size(); d++) {
+			lPos0get[d+1] = vecVariableSpecifiedDimIxs[v][d];
 		}
 		DataArray1D<long> lPos0put(1);
 
@@ -904,7 +934,7 @@ void Climatology(
 								}
 							}
 
-						} else if (eClimoType == ClimatologyType_Sq) {
+						} else if (eClimoType == ClimatologyType_MeanSq) {
 							for (size_t i = 0; i < sGetRows; i++) {
 								if (dDataIn[i] != dFillValue) {
 									nTimeSlicesGrid[iDay][i]++;
@@ -922,7 +952,7 @@ void Climatology(
 								dAccumulatedData[iDay][i] += static_cast<double>(dDataIn[i]);
 							}
 
-						} else if (eClimoType == ClimatologyType_Sq) {
+						} else if (eClimoType == ClimatologyType_MeanSq) {
 							for (size_t i = 0; i < sGetRows; i++) {
 								dAccumulatedData[iDay][i] +=
 									static_cast<double>(dDataIn[i])
@@ -1599,7 +1629,7 @@ try {
 		CommandLineString(strVariable, "var", "");
 		CommandLineStringD(strMemoryMax, "memmax", "2G", "[#K,#M,#G]");
 		CommandLineStringD(strPeriod, "period", "daily", "[daily|monthly|seasonal|annual]");
-		CommandLineStringD(strClimoType, "type", "mean", "[mean|sq]");
+		CommandLineStringD(strClimoType, "type", "mean", "[mean|meansq]");
 		CommandLineBool(fIncludeLeapDays, "include_leap_days");
 		//CommandLineInt(nFourierModes, "time_modes", 0);
 		CommandLineBool(fMissingData, "missingdata");
@@ -1640,7 +1670,7 @@ try {
 	if (strClimoType == "mean") {
 		eClimoType = ClimatologyType_Mean;
 	} else if (strClimoType == "sq") {
-		eClimoType = ClimatologyType_Sq;
+		eClimoType = ClimatologyType_MeanSq;
 	} else {
 		_EXCEPTIONT("--type invalid; expected \"mean\" or \"sq\"");
 	}
@@ -1662,7 +1692,7 @@ try {
 	STLStringHelper::ParseVariableList(strVariable, vecVariableStrings);
 
 	std::vector<std::string> vecVariableNames;
-	std::vector< std::vector<long> > vecVariableSpecifiedDims;
+	std::vector< std::vector<std::string> > vecVariableSpecifiedDims;
 
 	SplitVariableStrings(
 		vecVariableStrings,
@@ -1795,8 +1825,14 @@ try {
 
 				std::vector<std::string> vecTempVariableNames;
 				if (strPeriod == "daily") {
-					for (int v = 0; v < vecVariableNames.size(); v++) {
-						vecTempVariableNames.push_back(std::string("dailymean_") + vecVariableNames[v]);
+					if (eClimoType == ClimatologyType_Mean) {
+						for (int v = 0; v < vecVariableNames.size(); v++) {
+							vecTempVariableNames.push_back(std::string("dailymean_") + vecVariableNames[v]);
+						}
+					} else if (eClimoType == ClimatologyType_MeanSq) {
+						for (int v = 0; v < vecVariableNames.size(); v++) {
+							vecTempVariableNames.push_back(std::string("dailymeansq_") + vecVariableNames[v]);
+						}
 					}
 				}
 

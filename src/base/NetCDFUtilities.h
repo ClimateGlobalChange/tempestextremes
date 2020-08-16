@@ -85,5 +85,18 @@ void ReadCFTimeDataFromNcFile(
 
 ////////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Convert a value-based index into an integer index.
+///	</summary>
+long GetIntegerIndexFromValueBasedIndex(
+	NcFile * ncfile,
+	const std::string & strFilename,
+	const std::string & strVariableName,
+	long lDim,
+	const std::string & strValueIndex
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
 #endif
 
