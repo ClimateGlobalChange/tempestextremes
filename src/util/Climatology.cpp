@@ -610,8 +610,20 @@ void Climatology(
 			std::string strTotalOutputStorage =
 				MemoryBytesToString(sOutputTimes * sTotalAuxDims * sizeof(double));
 
+			std::string strFullVariableName = vecVariableNames[v];
+			if (vecVariableSpecifiedDims.size() > 0) {
+				strFullVariableName += "(";
+				for (int d = 0; d < vecVariableSpecifiedDims.size(); d++) {
+					strFullVariableName += vecVariableSpecifiedDims[v][d];
+					if (d != vecVariableSpecifiedDims.size()-1) {
+						strFullVariableName += ",";
+					}
+				}
+				strFullVariableName += ")";
+			}
+
 			AnnounceStartBlock("Variable \"%s\" has %lu distinct time series",
-				vecVariableNames[v].c_str(),
+				strFullVariableName.c_str(),
 				sTotalAuxDims);
 			Announce("Memory requirement: per-timeslice %s / total %s",
 				strPerTimesliceStorage.c_str(),
