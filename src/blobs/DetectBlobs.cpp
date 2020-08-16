@@ -24,6 +24,8 @@
 #include "Announce.h"
 #include "SimpleGrid.h"
 #include "BlobUtilities.h"
+#include "CoordTransforms.h"
+#include "Units.h"
 
 #include "DataArray1D.h"
 #include "DataArray2D.h"
@@ -198,6 +200,395 @@ bool SatisfiesThreshold(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// Set of indicator locations stored as grid indices
+typedef std::set<int> IndicatorSet;
+typedef IndicatorSet::iterator IndicatorSetIterator;
+typedef IndicatorSet::const_iterator IndicatorSetConstIterator;
+
+///////////////////////////////////////////////////////////////////////////////
+
+class GeoFilterOp {
+
+public:
+	///	<summary>
+	///		Possible operations.
+	///	</summary>
+	enum GeoFilterProperty {
+		Area,
+		ArealFraction
+	};
+
+public:
+	///	<summary>
+	///		Parse a threshold operator string.
+	///	</summary>
+	void Parse(
+		const std::string & strOp
+	) {
+		m_strThis = strOp;
+
+		// Read mode
+		enum {
+			ReadMode_Property,
+			ReadMode_Op,
+			ReadMode_Value,
+			ReadMode_Invalid
+		} eReadMode = ReadMode_Property;
+
+		std::string strAreaString;
+
+		// Loop through string
+		int iLast = 0;
+		for (int i = 0; i <= strOp.length(); i++) {
+
+			// Comma-delineated
+			if ((i == strOp.length()) || (strOp[i] == ',')) {
+
+				std::string strSubStr =
+					strOp.substr(iLast, i - iLast);
+
+				// Read in property
+				if (eReadMode == ReadMode_Property) {
+					if (strSubStr == "area") {
+						m_eProperty = Area;
+						eReadMode = ReadMode_Op;
+
+					} else if (strSubStr == "areafrac") {
+						m_eProperty = ArealFraction;
+						eReadMode = ReadMode_Op;
+
+					} else {
+						_EXCEPTION1("--geofiltercmd invalid property \"%s\", expected \"area\" or \"areafrac\".",
+							strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+
+				// Read in operation
+				} else if (eReadMode == ReadMode_Op) {
+					if (strSubStr == ">") {
+						m_eOp = ThresholdOp::GreaterThan;
+					} else if (strSubStr == "<") {
+						m_eOp = ThresholdOp::LessThan;
+					} else if (strSubStr == ">=") {
+						m_eOp = ThresholdOp::GreaterThanEqualTo;
+					} else if (strSubStr == "<=") {
+						m_eOp = ThresholdOp::LessThanEqualTo;
+					} else if (strSubStr == "=") {
+						m_eOp = ThresholdOp::EqualTo;
+					} else if (strSubStr == "!=") {
+						m_eOp = ThresholdOp::NotEqualTo;
+					} else {
+						_EXCEPTION1("--geofiltercmd invalid operation \"%s\"",
+							strSubStr.c_str());
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Value;
+
+				// Read in value
+				} else if (eReadMode == ReadMode_Value) {
+					strAreaString = strSubStr;
+
+					std::string strValue;
+					std::string strUnits;
+
+					SplitIntoValueAndUnits(strAreaString, strValue, strUnits);
+					if (!STLStringHelper::IsFloat(strValue)) {
+						_EXCEPTIONT("Value entry in --geofiltercmd must be of floating point type");
+					}
+
+					m_dValue = std::atof(strValue.c_str());
+
+					if (m_eProperty == Area) {
+						if (strUnits == "") {
+							strUnits = "sr";
+						}
+
+						bool fIsArea = ConvertUnits<double>(m_dValue, strUnits, std::string("sr"), false);
+						if (!fIsArea) {
+							_EXCEPTION1("Value entry in --geofiltercmd \"%s\" unknown units; expected \"sr\", \"m2\", \"km2\"",
+								strUnits.c_str());
+						}
+
+					} else if (m_eProperty == ArealFraction) {
+						if (strUnits == "") {
+							strUnits = "%";
+						}
+						if (strUnits != "%") {
+							_EXCEPTION1("Value entry in --geofiltercmd \"%s\" unknown units; expected \"%\"",
+								strUnits.c_str());
+						}
+						strAreaString = strValue + "%";
+					}
+
+					iLast = i + 1;
+					eReadMode = ReadMode_Invalid;
+
+				// Invalid
+				} else if (eReadMode == ReadMode_Invalid) {
+					_EXCEPTION1("Too many entries in --geofiltercmd string \"%s\"",
+						strOp.c_str());
+				}
+			}
+		}
+
+		if (eReadMode != ReadMode_Invalid) {
+			_EXCEPTION1("Insufficient entries in --geofiltercmd string \"%s\"",
+					strOp.c_str());
+		}
+
+		// Check values
+		if (m_eProperty == Area) {
+			if (m_dValue < 0.0) {
+				_EXCEPTIONT("Area threshold must be nonnegative in --geofiltercmd");
+			}
+		}
+		if (m_eProperty == ArealFraction) {
+			if ((m_dValue < 0.0) || (m_dValue > 100.0)) {
+				_EXCEPTIONT("Areal fraction threshold (\%) must be between 0 and 100 in --geofiltercmd");
+			}
+		}
+
+		// Output announcement
+		std::string strDescription;
+		if (m_eProperty == Area) {
+			strDescription = "Area";
+		} else {
+			strDescription = "Areal fraction";
+		}
+
+		if (m_eOp == ThresholdOp::GreaterThan) {
+			strDescription += " is greater than ";
+		} else if (m_eOp == ThresholdOp::LessThan) {
+			strDescription += " is less than ";
+		} else if (m_eOp == ThresholdOp::GreaterThanEqualTo) {
+			strDescription += " is greater than or equal to ";
+		} else if (m_eOp == ThresholdOp::LessThanEqualTo) {
+			strDescription += " is less than or equal to ";
+		} else if (m_eOp == ThresholdOp::EqualTo) {
+			strDescription += " is equal to ";
+		} else if (m_eOp == ThresholdOp::NotEqualTo) {
+			strDescription += " is not equal to ";
+		}
+
+		strDescription += strAreaString;
+
+		Announce("%s", strDescription.c_str());
+	}
+
+	///	<summary>
+	///		Verify that the specified blob satisfies the geofilter op.
+	///	</summary>
+	bool Apply(
+		const SimpleGrid & grid,
+		const IndicatorSet & setBlobPoints,
+		const LatLonBox<double> & boxBlobRad
+	) const {
+		_ASSERT(
+			(m_eOp == ThresholdOp::GreaterThan) ||
+			(m_eOp == ThresholdOp::LessThan) ||
+			(m_eOp == ThresholdOp::GreaterThanEqualTo) ||
+			(m_eOp == ThresholdOp::LessThanEqualTo) ||
+			(m_eOp == ThresholdOp::EqualTo) ||
+			(m_eOp == ThresholdOp::NotEqualTo));
+
+		// Thresholds related to area
+		if ((m_eProperty == Area) ||
+		    (m_eProperty == ArealFraction)
+		) {
+			// Calculate the area of each blob
+			double dBlobArea = 0.0;
+			auto iterBlob = setBlobPoints.begin();
+			for (; iterBlob != setBlobPoints.end(); iterBlob++) {
+				dBlobArea += grid.m_dArea[*iterBlob];
+			}
+
+			// Minimum area
+			if (m_eProperty == Area) {
+				if ((m_eOp == ThresholdOp::GreaterThan) && (dBlobArea > m_dValue)) {
+					return true;
+
+				} else if ((m_eOp == ThresholdOp::LessThan) && (dBlobArea < m_dValue)) {
+					return true;
+
+				} else if ((m_eOp == ThresholdOp::GreaterThanEqualTo) && (dBlobArea >= m_dValue)) {
+					return true;
+
+				} else if ((m_eOp == ThresholdOp::LessThanEqualTo) && (dBlobArea <= m_dValue)) {
+					return true;
+
+				} else if ((m_eOp == ThresholdOp::EqualTo) && (dBlobArea == m_dValue)) {
+					return true;
+
+				} else if ((m_eOp == ThresholdOp::NotEqualTo) && (dBlobArea != m_dValue)) {
+					return true;
+				}
+
+			} else if (m_eProperty == ArealFraction) {
+
+				// Calculate the area of the blob box
+				double dBoxArea = fabs(sin(boxBlobRad.lat[1]) - sin(boxBlobRad.lat[0]));
+				if (boxBlobRad.lon[1] > boxBlobRad.lon[0]) {
+					dBoxArea *= (boxBlobRad.lon[1] - boxBlobRad.lon[0]);
+				} else {
+					dBoxArea *= (2.0 * M_PI - boxBlobRad.lon[1] + boxBlobRad.lon[0]);
+				}
+
+				double dBoxAreaThresh = dBoxArea * m_dValue / 100.0;
+
+				if ((m_eOp == ThresholdOp::GreaterThan) && (dBlobArea > dBoxAreaThresh)) {
+					return true;
+
+				} else if ((m_eOp == ThresholdOp::LessThan) && (dBlobArea < dBoxAreaThresh)) {
+					return true;
+
+				} else if ((m_eOp == ThresholdOp::GreaterThanEqualTo) && (dBlobArea >= dBoxAreaThresh)) {
+					return true;
+
+				} else if ((m_eOp == ThresholdOp::LessThanEqualTo) && (dBlobArea <= dBoxAreaThresh)) {
+					return true;
+
+				} else if ((m_eOp == ThresholdOp::EqualTo) && (dBlobArea == dBoxAreaThresh)) {
+					return true;
+
+				} else if ((m_eOp == ThresholdOp::NotEqualTo) && (dBlobArea != dBoxAreaThresh)) {
+					return true;
+				}
+			}
+/*
+		// Thresholds related to orientation
+		} else if ((m_eQuantity == EastwardOrientation) ||
+		           (m_eQuantity == WestwardOrientation)
+		) {
+			double dNorthHemiMeanLat = 0.0;
+			double dNorthHemiMeanLon = 0.0;
+			double dNorthHemiMeanLon2 = 0.0;
+			double dNorthHemiCoLatLon = 0.0;
+
+			double dSouthHemiMeanLat = 0.0;
+			double dSouthHemiMeanLon = 0.0;
+			double dSouthHemiMeanLon2 = 0.0;
+			double dSouthHemiCoLatLon = 0.0;
+
+			// Calculate regression coefficients for this blob
+			IndicatorSetIterator iterBlob = setBlobPoints.begin();
+			for (; iterBlob != setBlobPoints.end(); iterBlob++) {
+
+				double dAltLon = 0.0;
+				if (dLatDeg[iterBlob->lat] > 0.0) {
+					if (iterBlob->lon < boxBlob.lon[0]) {
+						dAltLon = dLonDeg[iterBlob->lon] + 360.0;
+					} else {
+						dAltLon = dLonDeg[iterBlob->lon];
+					}
+
+					dNorthHemiMeanLat += dLatDeg[iterBlob->lat];
+					dNorthHemiMeanLon += dAltLon;
+					dNorthHemiMeanLon2 += dAltLon * dAltLon;
+					dNorthHemiCoLatLon += dLatDeg[iterBlob->lat] * dAltLon;
+
+				} else if (dLatDeg[iterBlob->lat] < 0.0) {
+					if (iterBlob->lon < boxBlob.lon[0]) {
+						dAltLon = dLonDeg[iterBlob->lon] + 360.0;
+					} else {
+						dAltLon = dLonDeg[iterBlob->lon];
+					}
+
+					dSouthHemiMeanLat += dLatDeg[iterBlob->lat];
+					dSouthHemiMeanLon += dAltLon;
+					dSouthHemiMeanLon2 += dAltLon * dAltLon;
+					dSouthHemiCoLatLon += dLatDeg[iterBlob->lat] * dAltLon;
+				}
+			}
+
+			double dBlobCount = static_cast<double>(setBlobPoints.size());
+
+			dNorthHemiMeanLat /= dBlobCount;
+			dNorthHemiMeanLon /= dBlobCount;
+			dNorthHemiMeanLon2 /= dBlobCount;
+			dNorthHemiCoLatLon /= dBlobCount;
+
+			dSouthHemiMeanLat /= dBlobCount;
+			dSouthHemiMeanLon /= dBlobCount;
+			dSouthHemiMeanLon2 /= dBlobCount;
+			dSouthHemiCoLatLon /= dBlobCount;
+
+			// Calculate the slope of the regression line
+			double dNorthSlopeNum =
+				dNorthHemiCoLatLon
+					- dNorthHemiMeanLat * dNorthHemiMeanLon;
+
+			double dNorthSlopeDen =
+				dNorthHemiMeanLon2
+					- dNorthHemiMeanLon * dNorthHemiMeanLon;
+
+			double dSouthSlopeNum =
+				dSouthHemiCoLatLon
+					- dSouthHemiMeanLat * dSouthHemiMeanLon;
+
+			double dSouthSlopeDen =
+				dSouthHemiMeanLon2
+					- dSouthHemiMeanLon * dSouthHemiMeanLon;
+
+			// Check orientation
+			if (m_eQuantity == EastwardOrientation) {
+
+				if (dNorthSlopeNum * dNorthSlopeDen < 0.0) {
+					return false;
+				}
+				if (dSouthSlopeNum * dSouthSlopeDen > 0.0) {
+					return false;
+				}
+
+			} else if (m_eQuantity == WestwardOrientation) {
+				if (dNorthSlopeNum * dNorthSlopeDen > 0.0) {
+					return false;
+				}
+				if (dSouthSlopeNum * dSouthSlopeDen < 0.0) {
+					return false;
+				}
+			}
+*/
+		// Invalid property
+		} else {
+			_EXCEPTIONT("Invalid property");
+		}
+
+		return false;
+	}
+
+	///	<summary>
+	///		Get a string representation of this operator.
+	///	</summary>
+	const std::string & ToOperatorString() const {
+		return m_strThis;
+	}
+
+protected:
+	///	<summary>
+	///		A string representation of this operator.
+	///	</summary>
+	std::string m_strThis;
+
+	///	<summary>
+	///		Threshold quantity.
+	///	</summary>
+	GeoFilterProperty m_eProperty;
+
+	///	<summary>
+	///		Operation that must be satisfied.
+	///	</summary>
+	ThresholdOp::Operation m_eOp;
+
+	///	<summary>
+	///		Threshold value.
+	///	</summary>
+	double m_dValue;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 ///	<summary>
 ///		A class storing a filtering operator.
 ///	</summary>
@@ -345,6 +736,173 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+template <typename real>
+void ApplyFilters(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & dataState,
+	const ThresholdOp::Operation op,
+	const double dTargetValue,
+	const int nCount,
+	DataArray1D<int> & bTag
+) {
+	_ASSERT(bTag.GetRows() == grid.GetSize());
+	_ASSERT(bTag.GetRows() == dataState.GetRows());
+
+	// Number of blobs
+	int nBlobs = 0;
+	int nBlobsFiltered = 0;
+
+	// Visit all tagged points
+	std::set<int> setNodesVisited;
+	for (int i = 0; i < grid.GetSize(); i++) {
+
+		// Verify point it tagged and we haven't visited before
+		if (bTag[i] == 0) {
+			continue;
+		}
+		if (setNodesVisited.find(i) != setNodesVisited.end()) {
+			continue;
+		}
+
+		// Number of blobs
+		nBlobs++;
+
+		// New blob
+		IndicatorSet setCurrentBlob;
+
+		// Number of points within blob that satisfy threshold
+		int nThresholdPoints = 0;
+
+		// Build connectivity
+		std::queue<int> queueToVisit;
+		queueToVisit.push(i);
+
+		while (queueToVisit.size() != 0) {
+			int iNext = queueToVisit.front();
+			queueToVisit.pop();
+
+			// Verify point is tagged and we haven't visited before
+			if (bTag[iNext] == 0) {
+				continue;
+			}
+			if (setNodesVisited.find(iNext) != setNodesVisited.end()) {
+				continue;
+			}
+			setNodesVisited.insert(iNext);
+			setCurrentBlob.insert(iNext);
+
+			// Check if this point satisfies threshold
+			bool fSatisfiesThreshold =
+				SatisfiesThreshold<real>(
+					grid,
+					dataState,
+					iNext,
+					op,
+					dTargetValue,
+					0.0);
+
+			if (fSatisfiesThreshold) {
+				nThresholdPoints++;
+			}
+
+			// Insert all connected neighbors into "to visit" queue
+			for (int n = 0; n < grid.m_vecConnectivity[iNext].size(); n++) {
+				queueToVisit.push(grid.m_vecConnectivity[iNext][n]);
+			}
+		}
+
+		// If not enough points satisfy the filter then eliminate this blob
+		if (nThresholdPoints < nCount) {
+			nBlobsFiltered++;
+			for (auto it = setCurrentBlob.begin(); it != setCurrentBlob.end(); it++) {
+				bTag[*it] = 0;
+			}
+		}
+	}
+
+	// Announce results
+	Announce("Filter removed %i of %i blobs", nBlobsFiltered, nBlobs);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ApplyGeoFilter(
+	const SimpleGrid & grid,
+	bool fRegional,
+	const GeoFilterOp & op,
+	DataArray1D<int> & bTag
+) {
+	_ASSERT(bTag.GetRows() == grid.GetSize());
+
+	// Number of blobs
+	int nBlobs = 0;
+	int nBlobsFiltered = 0;
+
+	// Visit all tagged points
+	std::set<int> setNodesVisited;
+	for (int i = 0; i < grid.GetSize(); i++) {
+
+		// Verify point it tagged and we haven't visited before
+		if (bTag[i] == 0) {
+			continue;
+		}
+		if (setNodesVisited.find(i) != setNodesVisited.end()) {
+			continue;
+		}
+
+		// Number of blobs
+		nBlobs++;
+
+		// New blob
+		IndicatorSet setCurrentBlob;
+		LatLonBox<double> boxCurrentBlob(!fRegional, 2.0 * M_PI);
+
+		// Build connectivity
+		std::queue<int> queueToVisit;
+		queueToVisit.push(i);
+
+		while (queueToVisit.size() != 0) {
+			int iNext = queueToVisit.front();
+			queueToVisit.pop();
+
+			// Verify point is tagged and we haven't visited before
+			if (bTag[iNext] == 0) {
+				continue;
+			}
+			if (setNodesVisited.find(iNext) != setNodesVisited.end()) {
+				continue;
+			}
+			setNodesVisited.insert(iNext);
+			setCurrentBlob.insert(iNext);
+
+			//std::cout << LonRadToStandardRange(grid.m_dLon[iNext]) << std::endl;
+			boxCurrentBlob.insert(
+				grid.m_dLat[iNext],
+				LonRadToStandardRange(grid.m_dLon[iNext]));
+
+			// Insert all connected neighbors into "to visit" queue
+			for (int n = 0; n < grid.m_vecConnectivity[iNext].size(); n++) {
+				queueToVisit.push(grid.m_vecConnectivity[iNext][n]);
+			}
+		}
+
+		bool fSuccess = op.Apply(grid, setCurrentBlob, boxCurrentBlob);
+
+		// If not enough points satisfy the filter then eliminate this blob
+		if (!fSuccess) {
+			nBlobsFiltered++;
+			for (auto it = setCurrentBlob.begin(); it != setCurrentBlob.end(); it++) {
+				bTag[*it] = 0;
+			}
+		}
+	}
+
+	// Announce results
+	Announce("Geofilter \"%s\" removed %i of %i blobs", op.ToOperatorString().c_str(), nBlobsFiltered, nBlobs);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 ///	<summary>
 ///		A class storing a output operator.
 ///	</summary>
@@ -420,96 +978,6 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-template <typename real>
-void ApplyFilters(
-	const SimpleGrid & grid,
-	const DataArray1D<real> & dataState,
-	const ThresholdOp::Operation op,
-	const double dTargetValue,
-	const int nCount,
-	DataArray1D<int> & bTag
-) {
-	_ASSERT(bTag.GetRows() == grid.GetSize());
-	_ASSERT(bTag.GetRows() == dataState.GetRows());
-
-	// Number of blobs
-	int nBlobs = 0;
-	int nBlobsFiltered = 0;
-
-	// Visit all tagged points
-	std::set<int> setNodesVisited;
-	for (int i = 0; i < grid.GetSize(); i++) {
-
-		// Verify point it tagged and we haven't visited before
-		if (bTag[i] == 0) {
-			continue;
-		}
-		if (setNodesVisited.find(i) != setNodesVisited.end()) {
-			continue;
-		}
-
-		// Number of blobs
-		nBlobs++;
-
-		// New blob
-		std::set<int> setCurrentBlob;
-
-		// Number of points within blob that satisfy threshold
-		int nThresholdPoints = 0;
-
-		// Build connectivity
-		std::queue<int> queueToVisit;
-		queueToVisit.push(i);
-
-		while (queueToVisit.size() != 0) {
-			int iNext = queueToVisit.front();
-			queueToVisit.pop();
-
-			// Verify point is tagged and we haven't visited before
-			if (bTag[iNext] == 0) {
-				continue;
-			}
-			if (setNodesVisited.find(iNext) != setNodesVisited.end()) {
-				continue;
-			}
-			setNodesVisited.insert(iNext);
-			setCurrentBlob.insert(iNext);
-
-			// Check if this point satisfies threshold
-			bool fSatisfiesThreshold =
-				SatisfiesThreshold<real>(
-					grid,
-					dataState,
-					iNext,
-					op,
-					dTargetValue,
-					0.0);
-
-			if (fSatisfiesThreshold) {
-				nThresholdPoints++;
-			}
-
-			// Insert all connected neighbors into "to visit" queue
-			for (int n = 0; n < grid.m_vecConnectivity[iNext].size(); n++) {
-				queueToVisit.push(grid.m_vecConnectivity[iNext][n]);
-			}
-		}
-
-		// If not enough points satisfy the filter then eliminate this blob
-		if (nThresholdPoints < nCount) {
-			nBlobsFiltered++;
-			for (auto it = setCurrentBlob.begin(); it != setCurrentBlob.end(); it++) {
-				bTag[*it] = 0;
-			}
-		}
-	}
-
-	// Announce results
-	Announce("Filter removed %i of %i blobs", nBlobsFiltered, nBlobs);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 class DetectBlobsParam {
 
 public:
@@ -528,6 +996,7 @@ public:
 		strLatitudeName("lat"),
 		pvecThresholdOp(NULL),
 		pvecFilterOp(NULL),
+		pvecGeoFilterOp(NULL),
 		pvecOutputOp(NULL)
 	{ }
 
@@ -565,6 +1034,9 @@ public:
 	// Vector of filter operators
 	std::vector<FilterOp> * pvecFilterOp;
 
+	// Vector of geometric filter operators
+	std::vector<GeoFilterOp> * pvecGeoFilterOp;
+
 	// Vector of output operators
 	std::vector<BlobOutputOp> * pvecOutputOp;
 };
@@ -588,6 +1060,11 @@ void DetectBlobs(
 	_ASSERT(param.pvecFilterOp != NULL);
 	std::vector<FilterOp> & vecFilterOp =
 		*(param.pvecFilterOp);
+
+	// Dereference pointers to operators
+	_ASSERT(param.pvecGeoFilterOp != NULL);
+	std::vector<GeoFilterOp> & vecGeoFilterOp =
+		*(param.pvecGeoFilterOp);
 
 	// Unload data from the VariableRegistry
 	varreg.UnloadAllGridData();
@@ -963,6 +1440,19 @@ void DetectBlobs(
 			AnnounceEndBlock("Done");
 		}
 
+		// Eliminate based on geofilter commands
+		if (vecGeoFilterOp.size() != 0) {
+			AnnounceStartBlock("Apply geometric filters");
+			for (int gc = 0; gc < vecGeoFilterOp.size(); gc++) {
+				ApplyGeoFilter(
+					grid,
+					param.fRegional,
+					vecGeoFilterOp[gc],
+					bTag);
+			}
+			AnnounceEndBlock("Done");
+		}
+
 		// Output tagged cell array
 		AnnounceStartBlock("Writing results");
 		if (dimTimeOut != NULL) {
@@ -1112,6 +1602,9 @@ try {
 	// Filter commands
 	std::string strFilterCmd;
 
+	// Filter commands
+	std::string strGeoFilterCmd;
+
 	// Output commands
 	std::string strOutputCmd;
 
@@ -1125,6 +1618,7 @@ try {
 		CommandLineString(strOutputFileList, "out_list", "");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
 		CommandLineStringD(strFilterCmd, "filtercmd", "", "[var,op,value,count]");
+		CommandLineStringD(strGeoFilterCmd, "geofiltercmd", "", "[prop,op,value]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,name;...]");
 		CommandLineDouble(dbparam.dMinAbsLat, "minabslat", 0.0);
 		CommandLineDouble(dbparam.dMinLat, "minlat", -90.0);
@@ -1268,7 +1762,35 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
-	// Parse the threshold operator command string
+	// Parse the geofilter operator command string
+	std::vector<GeoFilterOp> vecGeoFilterOp;
+	dbparam.pvecGeoFilterOp = &vecGeoFilterOp;
+
+	if (strGeoFilterCmd != "") {
+		AnnounceStartBlock("Parsing geofilter operations");
+
+		int iLast = 0;
+		for (int i = 0; i <= strGeoFilterCmd.length(); i++) {
+
+			if ((i == strGeoFilterCmd.length()) ||
+				(strGeoFilterCmd[i] == ';') ||
+				(strGeoFilterCmd[i] == ':')
+			) {
+				std::string strSubStr =
+					strGeoFilterCmd.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecGeoFilterOp.size());
+				vecGeoFilterOp.resize(iNextOp + 1);
+				vecGeoFilterOp[iNextOp].Parse(strSubStr);
+
+				iLast = i + 1;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	// Parse the output operator command string
 	std::vector<BlobOutputOp> vecOutputOp;
 	dbparam.pvecOutputOp = &vecOutputOp;
 

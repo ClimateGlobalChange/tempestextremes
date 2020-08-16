@@ -109,7 +109,7 @@ struct Tag {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Set of indicator locations stored as latitude-longitude pairs
+// Set of indicator locations stored as grid indices
 typedef std::set<int> IndicatorSet;
 typedef IndicatorSet::iterator IndicatorSetIterator;
 typedef IndicatorSet::const_iterator IndicatorSetConstIterator;

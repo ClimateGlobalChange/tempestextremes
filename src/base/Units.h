@@ -197,6 +197,42 @@ bool ConvertUnits(
 			return false;
 		}
 
+	// Perform unit conversion from steradians (sr)
+	} else if (strUnit == "sr") {
+		if (strTargetUnit == "m2") {
+			dValue *= EarthRadius * EarthRadius;
+
+		} else if (strTargetUnit == "km2") {
+			dValue *= EarthRadius * EarthRadius / (1000.0 * 1000.0);
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from square meters (m2)
+	} else if (strUnit == "m2") {
+		if (strTargetUnit == "sr") {
+			dValue /= (EarthRadius * EarthRadius);
+
+		} else if (strTargetUnit == "km2") {
+			dValue /= (1000.0 * 1000.0);
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from square kilometers (km2)
+	} else if (strUnit == "km2") {
+		if (strTargetUnit == "sr") {
+			dValue *= 1000.0 * 1000.0 / (EarthRadius * EarthRadius);
+
+		} else if (strTargetUnit == "m2") {
+			dValue *= 1000.0 * 1000.0;
+
+		} else {
+			return false;
+		}
+
 	} else {
 		return false;
 	}
@@ -211,7 +247,7 @@ inline static void SplitIntoValueAndUnits(
 	std::string & strValue,
 	std::string & strUnits
 ) {
-	int iFirstNonValue = 0;
+	size_t iFirstNonValue = std::string::npos;
 
 	bool fIsFloat = false;
 	bool fHasExponent = false;
@@ -258,7 +294,11 @@ inline static void SplitIntoValueAndUnits(
 	}
 
 	strValue = str.substr(0, iFirstNonValue);
-	strUnits = str.substr(iFirstNonValue, std::string::npos);
+	if (iFirstNonValue == std::string::npos) {
+		strUnits = "";
+	} else {
+		strUnits = str.substr(iFirstNonValue, std::string::npos);
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
