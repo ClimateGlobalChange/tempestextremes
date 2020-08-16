@@ -833,6 +833,10 @@ void Climatology(
 			// Loop through each input file
 			for (int f = 0; f < vecInputFileList.size(); f++) {
 
+				if (fVerbose) {
+					Announce("%s", vecInputFileList[f].c_str());
+				}
+
 				// Open input file
 				NcFile ncinfile(vecInputFileList[f].c_str());
 				if (!ncinfile.is_valid()) {
