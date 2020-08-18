@@ -38,6 +38,10 @@
 #include <set>
 #include <queue>
 
+#ifndef TEMPEST_NOREGEX
+#include <regex>
+#endif
+
 ///////////////////////////////////////////////////////////////////////////////
 
 typedef std::pair<int, int> Point;
@@ -997,7 +1001,8 @@ public:
 		pvecThresholdOp(NULL),
 		pvecFilterOp(NULL),
 		pvecGeoFilterOp(NULL),
-		pvecOutputOp(NULL)
+		pvecOutputOp(NULL),
+		strTimeFilter("")
 	{ }
 
 public:
@@ -1039,6 +1044,9 @@ public:
 
 	// Vector of output operators
 	std::vector<BlobOutputOp> * pvecOutputOp;
+
+	// Time filter
+	std::string strTimeFilter;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1065,6 +1073,35 @@ void DetectBlobs(
 	_ASSERT(param.pvecGeoFilterOp != NULL);
 	std::vector<GeoFilterOp> & vecGeoFilterOp =
 		*(param.pvecGeoFilterOp);
+
+#ifdef TEMPEST_NOREGEX
+		if (param.strTimeFilter != "") {
+			_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
+		}
+#endif
+#ifndef TEMPEST_NOREGEX
+	// Parse --timefilter
+	std::regex reTimeSubset;
+	{
+		std::string strTimeFilter = param.strTimeFilter;
+		if (strTimeFilter == "3hr") {
+			strTimeFilter = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
+		}
+		if (strTimeFilter == "6hr") {
+			strTimeFilter = "....-..-.. (00|06|12|18):00:00";
+		}
+		if (strTimeFilter == "daily") {
+			strTimeFilter = "....-..-.. 00:00:00";
+		}
+
+		try {
+			reTimeSubset.assign(strTimeFilter);
+		} catch(std::regex_error & reerr) {
+			_EXCEPTION2("Parse error in --timefilter regular expression \"%s\" (code %i)",
+				strTimeFilter.c_str(), reerr.code());
+		}
+	}
+#endif
 
 	// Unload data from the VariableRegistry
 	varreg.UnloadAllGridData();
@@ -1216,6 +1253,23 @@ void DetectBlobs(
 		vecTimes,
 		false);
 
+	std::vector<bool> vecTimeRetained;
+	std::vector<Time> vecOutputTimes;
+#ifndef TEMPEST_NOREGEX
+	vecTimeRetained.resize(vecTimes.size(), false);
+	for (int t = 0; t < vecTimes.size(); t++) {
+		std::string strTime = vecTimes[t].ToString();
+		std::smatch match;
+		if (std::regex_search(strTime, match, reTimeSubset)) {
+			vecOutputTimes.push_back(vecTimes[t]);
+			vecTimeRetained[t] = true;
+		}
+	}
+#else
+	vecOutputTimes = vecTimes;
+	vecTimeRetained.resize(vecTimes.size(), true);
+#endif
+
 	// Create reference to NetCDF input file
 	NcFile & ncInput = *(vecFiles[0]);
 
@@ -1229,7 +1283,13 @@ void DetectBlobs(
 	// Copy over latitude, longitude and time variables to output file
 	NcDim * dimTimeOut = NULL;
 	if ((dimTime != NULL) && (varTime != NULL)) {
-		CopyNcVar(ncInput, ncOutput, "time", true);
+		if (param.strTimeFilter != "") {
+			CopyNcVarTimeSubset(ncInput, ncOutput, "time", vecOutputTimes);
+
+		} else {
+			CopyNcVar(ncInput, ncOutput, "time", true);
+		}
+
 		dimTimeOut = ncOutput.get_dim("time");
 		if (dimTimeOut == NULL) {
 			_EXCEPTIONT("Error copying variable \"time\" to output file");
@@ -1359,10 +1419,18 @@ void DetectBlobs(
 	DataArray1D<int> bTag(grid.GetSize());
 
 	// Loop through all times
-	for (int t = 0; t < vecTimes.size(); t ++) {
+	int to = (-1);
+	for (int t = 0; t < vecTimes.size(); t++) {
 
 		// Announce
-		AnnounceStartBlock("Time %s", vecTimes[t].ToString().c_str());
+		std::string strTime = vecTimes[t].ToString();
+		AnnounceStartBlock("Time %s", strTime.c_str());
+
+		if (!vecTimeRetained[t]) {
+			AnnounceEndBlock("Skipping (timefilter)");
+			continue;
+		}
+		to++;
 
 		AnnounceStartBlock("Build tagged cell array");
 		bTag.Zero();
@@ -1457,11 +1525,11 @@ void DetectBlobs(
 		AnnounceStartBlock("Writing results");
 		if (dimTimeOut != NULL) {
 			if (grid.m_nGridDim.size() == 1) {
-				varTag->set_cur(t, 0);
+				varTag->set_cur(to, 0);
 				varTag->put(&(bTag[0]), 1, grid.m_nGridDim[0]);
 
 			} else if (grid.m_nGridDim.size() == 2) {
-				varTag->set_cur(t, 0, 0);
+				varTag->set_cur(to, 0, 0);
 				varTag->put(&(bTag[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
 
 			} else {
@@ -1482,7 +1550,7 @@ void DetectBlobs(
 					var.LoadGridData(varreg, vecFiles, grid);
 					const DataArray1D<float> & dataState = var.GetData();
 
-					ncvar->set_cur(t, 0);
+					ncvar->set_cur(to, 0);
 					ncvar->put(&(dataState[0]), 1, grid.m_nGridDim[0]);
 
 				} else if (grid.m_nGridDim.size() == 2) {
@@ -1499,7 +1567,7 @@ void DetectBlobs(
 					var.LoadGridData(varreg, vecFiles, grid);
 					const DataArray1D<float> & dataState = var.GetData();
 
-					ncvar->set_cur(t, 0, 0);
+					ncvar->set_cur(to, 0, 0);
 					ncvar->put(&(dataState[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
 
 				} else {
@@ -1620,6 +1688,7 @@ try {
 		CommandLineStringD(strFilterCmd, "filtercmd", "", "[var,op,value,count]");
 		CommandLineStringD(strGeoFilterCmd, "geofiltercmd", "", "[prop,op,value]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,name;...]");
+		CommandLineString(dbparam.strTimeFilter, "timefilter", "");
 		CommandLineDouble(dbparam.dMinAbsLat, "minabslat", 0.0);
 		CommandLineDouble(dbparam.dMinLat, "minlat", -90.0);
 		CommandLineDouble(dbparam.dMaxLat, "maxlat", 90.0);

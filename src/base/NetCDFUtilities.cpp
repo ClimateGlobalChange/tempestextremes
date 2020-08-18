@@ -349,6 +349,109 @@ void CopyNcVarIfExists(
 
 ////////////////////////////////////////////////////////////////////////////////
 
+void CopyNcVarTimeSubset(
+	NcFile & ncIn,
+	NcFile & ncOut,
+	const std::string & strVarName,
+	const std::vector<Time> & vecOutputTimes
+) {
+	if (!ncIn.is_valid()) {
+		_EXCEPTIONT("Invalid input file specified");
+	}
+	if (!ncOut.is_valid()) {
+		_EXCEPTIONT("Invalid output file specified");
+	}
+
+	NcDim * dimIn = ncIn.get_dim(strVarName.c_str());
+	if (dimIn == NULL) {
+		_EXCEPTION1("NetCDF file does not contain dimension \"%s\"",
+			strVarName.c_str());
+	}
+
+	// Check if this variable is the record dimension
+	bool fRecDim = false;
+	NcDim * dimRec = ncIn.rec_dim();
+	if ((dimRec != NULL) && (strVarName == std::string(dimRec->name())))  {
+		fRecDim = true;
+	}
+
+	NcVar * varIn = ncIn.get_var(strVarName.c_str());
+	if (varIn == NULL) {
+		_EXCEPTION1("NetCDF file does not contain variable \"%s\"",
+			strVarName.c_str());
+	}
+
+	NcDim * dimOut;
+	if (fRecDim) {
+		dimOut = ncOut.add_dim(strVarName.c_str(), 0);
+		if (dimOut == NULL) {
+			_EXCEPTION1("Error creating dimension \"%s\" (0) in output file",
+				strVarName.c_str());
+		}
+
+	} else {
+		dimOut = ncOut.add_dim(strVarName.c_str(), vecOutputTimes.size());
+		if (dimOut == NULL) {
+			_EXCEPTION2("Error creating dimension \"%s\" (%lu) in output file",
+				strVarName.c_str(), vecOutputTimes.size());
+		}
+	}
+
+	NcVar * varOut = ncOut.add_var(strVarName.c_str(), varIn->type(), dimOut);
+	if (varOut == NULL) {
+		_EXCEPTION1("Error creating variable \"%s\" in output file",
+			strVarName.c_str());
+	}
+
+	CopyNcVarAttributes(varIn, varOut);
+
+	NcAtt * attTimeUnits = varOut->get_att("units");
+	if (attTimeUnits == NULL) {
+		_EXCEPTIONT("Variable \"time\" is missing \"units\" attribute");
+	}
+	std::string strFormattedTime = attTimeUnits->as_string(0);
+
+	// ncInt type
+	if (varOut->type() == ncInt) {
+		DataArray1D<int> data(vecOutputTimes.size());
+		for (int t = 0; t < vecOutputTimes.size(); t++) {
+			data[t] = static_cast<int>(vecOutputTimes[t].GetCFCompliantUnitsOffsetDouble(strFormattedTime));
+		}
+		varOut->put(&(data[0]), data.GetRows());
+
+	// ncFloat type
+	} else if (varOut->type() == ncFloat) {
+		DataArray1D<float> data(vecOutputTimes.size());
+		for (int t = 0; t < vecOutputTimes.size(); t++) {
+			data[t] = static_cast<float>(vecOutputTimes[t].GetCFCompliantUnitsOffsetDouble(strFormattedTime));
+		}
+		varOut->put(&(data[0]), data.GetRows());
+
+	// ncDouble type
+	} else if (varOut->type() == ncDouble) {
+		DataArray1D<double> data(vecOutputTimes.size());
+		for (int t = 0; t < vecOutputTimes.size(); t++) {
+			data[t] = vecOutputTimes[t].GetCFCompliantUnitsOffsetDouble(strFormattedTime);
+		}
+		varOut->put(&(data[0]), data.GetRows());
+
+	// ncInt64 type
+	} else if (varOut->type() == ncInt64) {
+		DataArray1D<ncint64> data(vecOutputTimes.size());
+		for (int t = 0; t < vecOutputTimes.size(); t++) {
+			data[t] = static_cast<ncint64>(vecOutputTimes[t].GetCFCompliantUnitsOffsetDouble(strFormattedTime));
+		}
+		varOut->put(&(data[0]), data.GetRows());
+
+	// Invalid time type
+	} else {
+		_EXCEPTION1("Invalid time type (%i)", varOut->type());
+	}
+
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void ReadCFTimeDataFromNcFile(
 	NcFile * ncfile,
 	const std::string & strFilename,
