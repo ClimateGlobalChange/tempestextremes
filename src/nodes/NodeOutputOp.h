@@ -177,7 +177,7 @@ void ApplyNodeOutputOp(
 	const SimpleGrid & grid,
 	VariableRegistry & varreg,
 	NcFileVector & vecFiles,
-	int ixTime,
+	const Time & time,
 	int ixCandidate,
 	std::string & strResult
 ) {
@@ -186,7 +186,7 @@ void ApplyNodeOutputOp(
 
 	// Load the search variable data
 	Variable & var = varreg.Get(op.m_varix);
-	vecFiles.SetConstantTimeIx(ixTime);
+	vecFiles.SetTime(time);
 	var.LoadGridData(varreg, vecFiles, grid);
 	const DataArray1D<float> & dataState = var.GetData();
 

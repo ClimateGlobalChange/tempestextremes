@@ -28,6 +28,7 @@
 #include "NodeOutputOp.h"
 #include "ClosedContourOp.h"
 #include "ThresholdOp.h"
+#include "NetCDFUtilities.h"
 #include "SimpleGridUtilities.h"
 
 #include "kdtree.h"
@@ -41,6 +42,10 @@
 #include <string>
 #include <set>
 #include <queue>
+
+#ifndef TEMPEST_NOREGEX
+#include <regex>
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -309,7 +314,7 @@ public:
 		pvecNoClosedContourOp(NULL),
 		pvecThresholdOp(NULL),
 		pvecOutputOp(NULL),
-		nTimeStride(1),
+		//nTimeStride(1),
 		strLatitudeName("lat"),
 		strLongitudeName("lon"),
 		fRegional(false),
@@ -358,7 +363,10 @@ public:
 	std::vector<NodeOutputOp> * pvecOutputOp;
 
 	// Time stride
-	int nTimeStride;
+	//int nTimeStride;
+
+	// Time filter
+	std::string strTimeFilter;
 
 	// Name of the latitude dimension
 	std::string strLatitudeName;
@@ -417,17 +425,50 @@ void DetectCyclonesUnstructured(
 	}
 
 	// Dereference pointers to operators
+	_ASSERT(param.pvecClosedContourOp != NULL);
 	std::vector<ClosedContourOp> & vecClosedContourOp =
 		*(param.pvecClosedContourOp);
 
+	_ASSERT(param.pvecNoClosedContourOp != NULL);
 	std::vector<ClosedContourOp> & vecNoClosedContourOp =
 		*(param.pvecNoClosedContourOp);
 
+	_ASSERT(param.pvecThresholdOp != NULL);
 	std::vector<ThresholdOp> & vecThresholdOp =
 		*(param.pvecThresholdOp);
 
+	_ASSERT(param.pvecOutputOp != NULL);
 	std::vector<NodeOutputOp> & vecOutputOp =
 		*(param.pvecOutputOp);
+
+#ifdef TEMPEST_NOREGEX
+	if (param.strTimeFilter != "") {
+		_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
+	}
+#endif
+#ifndef TEMPEST_NOREGEX
+	// Parse --timefilter
+	std::regex reTimeSubset;
+	{
+		std::string strTimeFilter = param.strTimeFilter;
+		if (strTimeFilter == "3hr") {
+			strTimeFilter = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
+		}
+		if (strTimeFilter == "6hr") {
+			strTimeFilter = "....-..-.. (00|06|12|18):00:00";
+		}
+		if (strTimeFilter == "daily") {
+			strTimeFilter = "....-..-.. 00:00:00";
+		}
+
+		try {
+			reTimeSubset.assign(strTimeFilter);
+		} catch(std::regex_error & reerr) {
+			_EXCEPTION2("Parse error in --timefilter regular expression \"%s\" (code %i)",
+				strTimeFilter.c_str(), reerr.code());
+		}
+	}
+#endif
 
 	// Unload data from the VariableRegistry
 	varreg.UnloadAllGridData();
@@ -459,6 +500,29 @@ void DetectCyclonesUnstructured(
 		AnnounceEndBlock("Done");
 	}
 
+	// Get time information
+	std::vector<Time> vecTimes;
+	ReadCFTimeDataFromNcFile(
+		vecFiles[0],
+		vecFiles.GetFilename(0),
+		vecTimes,
+		false);
+
+#ifndef TEMPEST_NOREGEX
+	{
+		std::vector<Time> vecOutputTimes;
+		for (int t = 0; t < vecTimes.size(); t++) {
+			std::string strTime = vecTimes[t].ToString();
+			std::smatch match;
+			if (std::regex_search(strTime, match, reTimeSubset)) {
+				vecOutputTimes.push_back(vecTimes[t]);
+			}
+		}
+		vecTimes = vecOutputTimes;
+	}
+#endif
+
+/*
 	// Get time dimension
 	NcDim * dimTime = vecFiles[0]->get_dim("time");
 	if (dimTime == NULL) {
@@ -505,7 +569,7 @@ void DetectCyclonesUnstructured(
 		_EXCEPTIONT("Variable \"time\" has an invalid type:\n"
 			"Expected \"float\", \"double\", \"int\", or \"int64\"");
 	}
-
+*/
 	// Open output file
 	FILE * fpOutput = fopen(strOutputFile.c_str(), "w");
 	if (fpOutput == NULL) {
@@ -530,19 +594,18 @@ void DetectCyclonesUnstructured(
 	}
 
 	// Loop through all times
-	for (int t = 0; t < nTime; t += param.nTimeStride) {
+	for (int t = 0; t < vecTimes.size(); t++) {
 
-		char szStartBlock[128];
-		sprintf(szStartBlock, "Time %i", t);
-		AnnounceStartBlock(szStartBlock);
+		// Announce
+		AnnounceStartBlock("Time %s", vecTimes[t].ToString().c_str());
 
 		// Load the data for the search variable
 		Variable & varSearchBy = varreg.Get(param.ixSearchBy);
-		vecFiles.SetConstantTimeIx(t);
+		vecFiles.SetTime(vecTimes[t]);
 		varSearchBy.LoadGridData(varreg, vecFiles, grid);
 
 		const DataArray1D<float> & dataSearch = varSearchBy.GetData();
-
+/*
 		// Parse time information
 		NcAtt * attTimeUnits = varTime->get_att("units");
 		if (attTimeUnits == NULL) {
@@ -562,7 +625,7 @@ void DetectCyclonesUnstructured(
 
 		Time time(eCalendarType);
 		time.FromCFCompliantUnitsOffsetDouble(strTimeUnits, dTime[t]);
-
+*/
 		// Tag all minima
 		std::set<int> setCandidates;
 
@@ -743,7 +806,7 @@ void DetectCyclonesUnstructured(
 
 			// Load the search variable data
 			Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
-			vecFiles.SetConstantTimeIx(t);
+			vecFiles.SetTime(vecTimes[t]);
 			var.LoadGridData(varreg, vecFiles, grid);
 			const DataArray1D<float> & dataState = var.GetData();
 
@@ -781,7 +844,7 @@ void DetectCyclonesUnstructured(
 
 			// Load the search variable data
 			Variable & var = varreg.Get(vecClosedContourOp[ccc].m_varix);
-			vecFiles.SetConstantTimeIx(t);
+			vecFiles.SetTime(vecTimes[t]);
 			var.LoadGridData(varreg, vecFiles, grid);
 			const DataArray1D<float> & dataState = var.GetData();
 
@@ -819,7 +882,7 @@ void DetectCyclonesUnstructured(
 
 			// Load the search variable data
 			Variable & var = varreg.Get(vecNoClosedContourOp[ccc].m_varix);
-			vecFiles.SetConstantTimeIx(t);
+			vecFiles.SetTime(vecTimes[t]);
 			var.LoadGridData(varreg, vecFiles, grid);
 			const DataArray1D<float> & dataState = var.GetData();
 
@@ -878,11 +941,11 @@ void DetectCyclonesUnstructured(
 		{
 			// Write time information
 			fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
-				time.GetYear(),
-				time.GetMonth(),
-				time.GetDay(),
+				vecTimes[t].GetYear(),
+				vecTimes[t].GetMonth(),
+				vecTimes[t].GetDay(),
 				static_cast<int>(setCandidates.size()),
-				time.GetSecond() / 3600);
+				vecTimes[t].GetSecond() / 3600);
 /*
 			if (param.fOutputInfileInfo) {
 				fprintf(fpOutput, "\t\"%s\"\t%i\n", strInputFiles.c_str(), t);
@@ -914,7 +977,7 @@ void DetectCyclonesUnstructured(
 						grid,
 						varreg,
 						vecFiles,
-						t,
+						vecTimes[t],
 						*iterCandidate,
 						vecOutputValue[iCandidateIx][outc]);
 
@@ -1033,7 +1096,7 @@ try {
 		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,op,dist;...]");
-		CommandLineInt(dcuparam.nTimeStride, "timestride", 1);
+		//CommandLineInt(dcuparam.nTimeStride, "timestride", 1);
 		CommandLineString(dcuparam.strLatitudeName, "latname", "lat");
 		CommandLineString(dcuparam.strLongitudeName, "lonname", "lon");
 		CommandLineBool(dcuparam.fRegional, "regional");
