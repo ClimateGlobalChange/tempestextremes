@@ -314,7 +314,7 @@ public:
 		pvecNoClosedContourOp(NULL),
 		pvecThresholdOp(NULL),
 		pvecOutputOp(NULL),
-		//nTimeStride(1),
+		nTimeStride(1),
 		strLatitudeName("lat"),
 		strLongitudeName("lon"),
 		fRegional(false),
@@ -363,7 +363,7 @@ public:
 	std::vector<NodeOutputOp> * pvecOutputOp;
 
 	// Time stride
-	//int nTimeStride;
+	int nTimeStride;
 
 	// Time filter
 	std::string strTimeFilter;
@@ -594,7 +594,7 @@ void DetectCyclonesUnstructured(
 	}
 
 	// Loop through all times
-	for (int t = 0; t < vecTimes.size(); t++) {
+	for (int t = 0; t < vecTimes.size(); t += param.nTimeStride) {
 
 		// Announce
 		AnnounceStartBlock("Time %s", vecTimes[t].ToString().c_str());
@@ -1096,7 +1096,8 @@ try {
 		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,op,dist;...]");
-		//CommandLineInt(dcuparam.nTimeStride, "timestride", 1);
+		CommandLineInt(dcuparam.nTimeStride, "timestride", 1);
+		CommandLineString(dcuparam.strTimeFilter, "timefilter", "");
 		CommandLineString(dcuparam.strLatitudeName, "latname", "lat");
 		CommandLineString(dcuparam.strLongitudeName, "lonname", "lon");
 		CommandLineBool(dcuparam.fRegional, "regional");
@@ -1107,6 +1108,14 @@ try {
 	EndCommandLine(argv)
 
 	AnnounceBanner();
+
+	// Note timestride is deprecated
+	if (dcuparam.nTimeStride != 1) {
+		Announce("WARNING: --timestride is deprecated.  Consider using --timefilter instead.");
+		if (dcuparam.strTimeFilter != "") {
+			_EXCEPTIONT("Only one of --timestride and --timefilter can be used.");
+		}
+	}
 
 	// Create Variable registry
 	VariableRegistry varreg;
