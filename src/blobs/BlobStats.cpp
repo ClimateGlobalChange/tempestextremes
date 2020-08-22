@@ -20,7 +20,7 @@
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
-
+#include "FilenameList.h"
 #include "DataArray1D.h"
 #include "DataArray2D.h"
 #include "TimeObj.h"
@@ -163,13 +163,13 @@ try {
 
 	// Parse the command line
 	BeginCommandLine()
-		CommandLineString(strInputFile, "infile", "");
-		CommandLineString(strInputFileList, "inlist", "");
+		CommandLineString(strInputFile, "in_file", "");
+		CommandLineString(strInputFileList, "in_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineBool(fDiagonalConnectivity, "diag_connect");
 		CommandLineBool(fRegional, "regional");
-		CommandLineString(strOutputFile, "outfile", "");
-		CommandLineString(strInputVariable, "invar", "");
+		CommandLineString(strOutputFile, "out_file", "");
+		CommandLineString(strInputVariable, "var", "");
 		CommandLineString(strOutputQuantities, "out", "");
 		CommandLineBool(fOutputHeaders, "out_headers");
 		CommandLineBool(fOutputFullTimes, "out_fulltime");
@@ -208,13 +208,12 @@ try {
 	}
 
 	// Input file list
-	std::vector<std::string> vecInputFiles;
+	FilenameList vecInputFiles;
 
 	if (strInputFile != "") {
 		vecInputFiles.push_back(strInputFile);
-	}
-	if (strInputFileList != "") {
-		GetInputFileList(strInputFileList, vecInputFiles);
+	} else {
+		vecInputFiles.FromFile(strInputFileList, false);
 	}
 
 	int nFiles = vecInputFiles.size();

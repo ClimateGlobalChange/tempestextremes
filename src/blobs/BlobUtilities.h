@@ -450,49 +450,6 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		Load in the contents of a text file containing one filename per
-///		line and store in a vector of strings.
-///	</summary>
-void GetInputFileList(
-	const std::string & strInputFileList,
-	std::vector<std::string> & vecInputFiles
-) {
-	FILE * fp = fopen(strInputFileList.c_str(), "r");
-
-	char szBuffer[1024];
-	for (;;) {
-		fgets(szBuffer, 1024, fp);
-
-		if (feof(fp)) {
-			break;
-		}
-
-		// Remove end-of-line characters
-		for (;;) {
-			int nLen = strlen(szBuffer);
-			if ((szBuffer[nLen-1] == '\n') ||
-				(szBuffer[nLen-1] == '\r') ||
-				(szBuffer[nLen-1] == ' ')
-			) {
-				szBuffer[nLen-1] = '\0';
-				continue;
-			}
-			break;
-		}
-
-		vecInputFiles.push_back(szBuffer);
-	}
-
-	if (vecInputFiles.size() == 0) {
-		_EXCEPTION1("No files found in file \"%s\"", strInputFileList.c_str());
-	}
-
-	fclose(fp);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
 ///		Get a DataArray1D containing the time variable across a list of
 ///		input files.
 ///	</summary>

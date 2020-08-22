@@ -17,7 +17,9 @@
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
+#include "FilenameList.h"
 #include "NodeFileUtilities.h"
+#include "CoordTransforms.h"
 
 #include "kdtree.h"
 
@@ -69,12 +71,21 @@ void ParseVariableList(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void ParseInput(
+typedef std::vector< std::vector<std::string> > TimesliceCandidateInformation;
+
+typedef std::pair<Time, TimesliceCandidateInformation> TimeToCandidateInfoPair;
+
+typedef std::map<Time, TimesliceCandidateInformation> TimeToCandidateInfoMap;
+
+typedef TimeToCandidateInfoMap::iterator TimeToCandidateInfoMapIterator;
+
+///////////////////////////////////////////////////////////////////////////////
+
+void ParseDetectNodesFile(
 	const std::string & strInputFile,
 	const std::vector< std::string > & vecFormatStrings,
-	std::vector< std::vector<std::string> > & vecTimes,
-	std::vector< std::vector< std::vector<std::string> > > & vecCandidates,
-	int nTimeStride = 1
+	TimeToCandidateInfoMap & mapCandidateInfo,
+	Time::CalendarType caltype
 ) {
 	// Open file for reading
 	FILE * fp = fopen(strInputFile.c_str(), "r");
@@ -99,10 +110,13 @@ void ParseInput(
 	// Number of entries per candidate
 	int nFormatEntries = vecFormatStrings.size();
 
-	int iAllTime = 0;
-	int iTime = 0;
-
+	// Current candidate at this time
 	int iCandidate = 0;
+
+	// Current candidate information
+	TimeToCandidateInfoMapIterator iterCurrentTime = mapCandidateInfo.end();
+
+	// Total candidates at this time
 	int nCandidates = 0;
 
 	for (;;) {
@@ -143,66 +157,65 @@ void ParseInput(
 		if (eReadState == ReadState_Time) {
 
 			// Parse the time data
-			vecTimes.resize(iTime + 1);
+			std::vector<std::string> vecTimeString;
+			ParseVariableList(strLine, vecTimeString);
 
-			ParseVariableList(strLine, vecTimes[iTime]);
-
-			if (vecTimes[iTime].size() != 5) {
+			if (vecTimeString.size() != 5) {
 				_EXCEPTION1("Malformed time string:\n%s", strLine.c_str());
 			}
 
 			iCandidate = 0;
-			nCandidates = atoi(vecTimes[iTime][3].c_str());
+			nCandidates = std::stoi(vecTimeString[3]);
 
-			// Verify that this time is on stride
-			if (iAllTime % nTimeStride != 0) {
-				if (nCandidates != 0) {
-					eReadState = ReadState_Candidate;
-				} else {
-					iAllTime++;
-				}
-				vecTimes.resize(iTime);
-				continue;
+			Time time(caltype);
+			time.SetYear(std::stoi(vecTimeString[0]));
+			time.SetMonth(std::stoi(vecTimeString[1]));
+			time.SetDay(std::stoi(vecTimeString[2]));
+			time.SetSecond(std::stoi(vecTimeString[4]) * 3600);
+
+			auto it = mapCandidateInfo.find(time);
+			if (it != mapCandidateInfo.end()) {
+				_EXCEPTION1("Repated time \"%s\" found in candidate files",
+					time.ToString().c_str());
+			}
+			auto ins =
+				mapCandidateInfo.insert(
+					TimeToCandidateInfoPair(
+						time, TimesliceCandidateInformation(nCandidates)));
+
+			if (!ins.second) {
+				_EXCEPTION1("Insertion of time \"%s\" into candidate info map failed",
+					time.ToString().c_str());
 			}
 
-			// Prepare to parse candidate data
-			vecCandidates.resize(iTime + 1);
-			vecCandidates[iTime].resize(nCandidates);
+			iterCurrentTime = ins.first;
 
+			// Prepare to parse candidate data
 			if (nCandidates != 0) {
 				eReadState = ReadState_Candidate;
-			} else {
-				iTime++;
-				iAllTime++;
 			}
 
 		// Parse candidate information
 		} else if (eReadState == ReadState_Candidate) {
 
-			// Ignore candidates that are not on stride
-			if (iAllTime % nTimeStride != 0) {
-				iCandidate++;
-				if (iCandidate == nCandidates) {
-					eReadState = ReadState_Time;
-					iAllTime++;
-					iCandidate = 0;
-				}
-				continue;
-			}
-
 			// Parse candidates
-			ParseVariableList(strLine, vecCandidates[iTime][iCandidate]);
+			_ASSERT(iterCurrentTime != mapCandidateInfo.end());
 
-			if (vecCandidates[iTime][iCandidate].size() != nFormatEntries) {
+			TimesliceCandidateInformation & tscinfo = iterCurrentTime->second;
+
+			_ASSERT(iCandidate < tscinfo.size());
+
+			ParseVariableList(strLine, tscinfo[iCandidate]);
+
+			if (tscinfo[iCandidate].size() != nFormatEntries) {
 				fWarnInsufficientCandidateInfo = true;
 			}
 
 			iCandidate++;
 			if (iCandidate == nCandidates) {
 				eReadState = ReadState_Time;
-				iTime++;
-				iAllTime++;
 				iCandidate = 0;
+				iterCurrentTime = mapCandidateInfo.end();
 			}
 		}
 	}
@@ -212,7 +225,7 @@ void ParseInput(
 	// Insufficient candidate information
 	if (fWarnInsufficientCandidateInfo) {
 		Announce("WARNING: One or more candidates do not have matching"
-				" --format entries");
+				" --in_fmt entries");
 	}
 }
 
@@ -223,15 +236,9 @@ struct Node {
 	double y;
 	double z;
 
-	double lat;
 	double lon;
+	double lat;
 };
-
-///////////////////////////////////////////////////////////////////////////////
-
-typedef std::vector< std::vector<std::string> > TimesVector;
-
-typedef std::vector< std::vector< std::vector<std::string> > > CandidateVector;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -463,15 +470,17 @@ public:
 	///	</summary>
 	bool Apply(
 		const SimplePath & path,
-		const CandidateVector & vecCandidates
+		const std::vector<TimeToCandidateInfoMapIterator> & vecCandidates
 	) {
 		int nCount = 0;
 		for (int s = 0; s < path.m_iTimes.size(); s++) {
 			int t = path.m_iTimes[s];
 			int i = path.m_iCandidates[s];
 
+			_ASSERT((t >= 0) && (t < vecCandidates.size()));
+
 			double dCandidateValue =
-				atof(vecCandidates[t][i][m_iColumn].c_str());
+				std::stod(vecCandidates[t]->second[i][m_iColumn]);
 
 			if ((m_eOp == GreaterThan) &&
 				(dCandidateValue > m_dValue)
@@ -570,14 +579,26 @@ try {
 	// Input file
 	std::string strInputFile;
 
+	// List of input files
+	std::string strInputFileList;
+
+	// Connectivity file
+	std::string strConnectivityFile;
+
 	// Output file
 	std::string strOutputFile;
+
+	// Format string
+	std::string strFormatOld;
 
 	// Format string
 	std::string strFormat;
 
 	// Range (in degrees)
 	double dRange;
+
+	// Minimum duration of path
+	std::string strMinTime;
 
 	// Minimum path length
 	int nMinPathLength;
@@ -588,11 +609,14 @@ try {
 	// Minimum path length
 	double dMinPathDistance;
 
-	// Maximum time gap (in time steps)
-	int nMaxGapSize;
+	// Maximum time gap (in time steps or duration)
+	std::string strMaxGapSize;
 
 	// Time step stride
 	int nTimeStride;
+
+	// Calendar type
+	std::string strCalendar;
 
 	// Output format
 	std::string strOutputFileFormat;
@@ -603,16 +627,21 @@ try {
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
+		CommandLineString(strInputFileList, "in_list", "");
+		CommandLineString(strConnectivityFile, "in_connect", "");
 		CommandLineString(strOutputFile, "out", "");
-		CommandLineString(strFormat, "format", "i,j,lon,lat");
+		CommandLineString(strFormatOld, "*format", "");
+		CommandLineString(strFormat, "in_fmt", "lon,lat");
 		CommandLineDoubleD(dRange, "range", 5.0, "(degrees)");
-		CommandLineInt(nMinPathLength, "minlength", 3);
+		CommandLineString(strMinTime, "mintime", "3");
+		CommandLineInt(nMinPathLength, "*minlength", 1);
 		CommandLineDoubleD(dMinEndpointDistance, "min_endpoint_dist", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinPathDistance, "min_path_dist", 0.0, "(degrees)");
-		CommandLineInt(nMaxGapSize, "maxgap", 0);
+		CommandLineString(strMaxGapSize, "maxgap", "0");
 		CommandLineStringD(strThreshold, "threshold", "",
 			"[col,op,value,count;...]");
-		CommandLineInt(nTimeStride, "timestride", 1);
+		CommandLineStringD(strCalendar, "caltype", "standard", "(none|standard|noleap|360_day)");
+		//CommandLineInt(nTimeStride, "timestride", 1);
 		CommandLineStringD(strOutputFileFormat, "out_file_format", "gfdl", "(gfdl|csv|csvnohead)");
 
 		ParseCommandLine(argc, argv);
@@ -621,8 +650,110 @@ try {
 	AnnounceBanner();
 
 	// Check input
-	if (strInputFile.size() == 0) {
-		_EXCEPTIONT("No input file specified");
+	if ((strInputFile == "") && (strInputFileList == "")) {
+		_EXCEPTIONT("At least one of --in or --in_list must be specified");
+	}
+	if ((strInputFile != "") && (strInputFileList != "")) {
+		_EXCEPTIONT("At most one of --in or --in_list must be specified");
+	}
+
+	// Check format
+/*
+	std::vector<size_t> nGridDim;
+	if (strFormatOld != "") {
+		Announce("WARNING: --format is deprecated.  Consider using --in_fmt and --in_connect instead");
+
+		if (strFormatOld.substr(0,4) == "i,j,") {
+			strFormat = strFormatOld.substr(4);
+
+			nGridDim.resize(2);
+			nGridDim[0] = static_cast<size_t>(-1);
+			nGridDim[1] = static_cast<size_t>(-1);
+
+		} else if (strFormatOld.substr(0,2) == "i,") {
+			strFormat = strFormatOld.substr(2);
+
+			nGridDim.resize(1);
+			nGridDim[0] = static_cast<size_t>(-1);
+
+		} else {
+			_EXCEPTIONT("Invalid --format string; expected first entries to be \"i,\" or \"i,j,\"");
+		}
+
+	} else {
+		if (strConnectivityFile != "") {
+			nGridDim.resize(1);
+			nGridDim[0] = static_cast<size_t>(-1);
+		} else {
+			nGridDim.resize(2);
+			nGridDim[0] = static_cast<size_t>(-1);
+			nGridDim[1] = static_cast<size_t>(-1);
+		}
+	}
+*/
+	if (strFormatOld != "") {
+		Announce("WARNING: --format is deprecated.  Consider using --in_fmt and --in_connect instead");
+		strFormat = strFormatOld;
+
+	} else {
+		if (strConnectivityFile != "") {
+			strFormat = std::string("i,") + strFormat;
+		} else {
+			strFormat = std::string("i,j,") + strFormat;
+		}
+	}
+
+	// Notify that --minlength is deprecated
+	if (nMinPathLength != 1) {
+		Announce("WARNING: --minlength is deprecated.  Consider using --mintime instead");
+	}
+
+	// Parse --mintime
+	int nMinTimeSteps = nMinPathLength;
+	double dMinTimeSeconds = 0.0;
+	if (STLStringHelper::IsIntegerIndex(strMinTime)) {
+		nMinTimeSteps = std::stoi(strMinTime);
+		if (nMinTimeSteps < 1) {
+			_EXCEPTIONT("Invalid value of --mintime; expected positive integer or time delta");
+		}
+
+	} else {
+		Time timeMinTime;
+		timeMinTime.FromFormattedString(strMinTime);
+		dMinTimeSeconds = timeMinTime.AsSeconds();
+		if (dMinTimeSeconds <= 0.0) {
+			_EXCEPTIONT("Invalid value for --mintime; expected positive integer or positive time delta");
+		}
+	}
+
+	// Parse --maxgap
+	int nMaxGapSteps = (-1);
+	double dMaxGapSeconds = -1.0;
+	if (STLStringHelper::IsIntegerIndex(strMaxGapSize)) {
+		nMaxGapSteps = std::stoi(strMaxGapSize);
+		if (nMaxGapSteps < 0) {
+			_EXCEPTIONT("Invalid value of --maxgap; expected nonnegative integer or time delta");
+		}
+
+	} else {
+		Time timeMaxGap;
+		timeMaxGap.FromFormattedString(strMaxGapSize);
+		dMaxGapSeconds = timeMaxGap.AsSeconds();
+		if (dMaxGapSeconds < 0.0) {
+			_EXCEPTIONT("Invalid value for --maxgap; expected nonnegative integer or positive time delta");
+		}
+	}
+
+	// Parse calendar type
+	Time::CalendarType caltype = Time::CalendarTypeFromString(strCalendar);
+
+	if (caltype == Time::CalendarNone) {
+		if (dMinTimeSeconds > 0.0) {
+			_EXCEPTIONT("A calendar type (--caltype) must be specified if using time deltas for --mintime");
+		}
+		if (dMaxGapSeconds >= 0.0) {
+			_EXCEPTIONT("A calendar type (--caltype) must be specified if using time deltas for --maxgap");
+		}
 	}
 
 	// Output format
@@ -631,6 +762,16 @@ try {
 		(strOutputFileFormat != "csvnohead")
 	) {
 		_EXCEPTIONT("Output format must be either \"gfdl\", \"csv\", or \"csvnohead\"");
+	}
+
+	// Input file list
+	FilenameList vecInputFiles;
+
+	if (strInputFile != "") {
+		vecInputFiles.push_back(strInputFile);
+	}
+	if (strInputFileList != "") {
+		vecInputFiles.FromFile(strInputFileList, false);
 	}
 
 	// Parse format string
@@ -685,25 +826,78 @@ try {
 	}
 
 	// Parse the input
-	TimesVector vecTimes;
-	CandidateVector vecCandidates;
-
+	std::vector<TimeToCandidateInfoMapIterator> vecIterCandidates;
+	TimeToCandidateInfoMap mapCandidateInfo;
 	{
 		AnnounceStartBlock("Loading candidate data");
 
-		ParseInput(
-			strInputFile,
-			vecFormatStrings,
-			vecTimes,
-			vecCandidates,
-			nTimeStride);
+		// Parse all input files
+		for (size_t f = 0; f < vecInputFiles.size(); f++) {
+			if (vecInputFiles.size() > 1) {
+				Announce("File (%lu/%lu) \"%s\"", f+1, vecInputFiles.size(), vecInputFiles[f].c_str());
+			}
+			ParseDetectNodesFile(
+				vecInputFiles[f],
+				vecFormatStrings,
+				mapCandidateInfo,
+				caltype);
+		}
 
-		Announce("Discrete times: %i", vecTimes.size());
+		if (mapCandidateInfo.size() == 0) {
+			_EXCEPTIONT("Zero candidate nodes found within input files; nothing to stitch");
+		}
+
+		vecIterCandidates.reserve(mapCandidateInfo.size());
+		for (auto it = mapCandidateInfo.begin(); it != mapCandidateInfo.end(); it++) {
+			vecIterCandidates.push_back(it);
+		}
+
+		_ASSERT(vecIterCandidates.size() == mapCandidateInfo.size());
+
+		const Time & timeFirst = vecIterCandidates[0]->first;
+		const Time & timeLast = vecIterCandidates[vecIterCandidates.size()-1]->first;
+
+		Announce("Discrete times: %i (%s to %s)",
+			vecIterCandidates.size(),
+			timeFirst.ToString().c_str(),
+			timeLast.ToString().c_str());
+
+		// Verify total time is larger than mintime
+		if (dMinTimeSeconds > 0.0) {
+			double dDeltaSeconds = timeFirst.DeltaSeconds(timeLast);
+
+			if (dMinTimeSeconds > dDeltaSeconds) {
+				_EXCEPTION3("Duration of record (%id%ih%i) is shorter than --mintime; no paths possible",
+					static_cast<int>(dDeltaSeconds) / 86400,
+					(static_cast<int>(dDeltaSeconds) % 86400) / 3600,
+					static_cast<int>(dDeltaSeconds) % 3600);
+			}
+		}
+
+		// Verify adjacent times are smaller than maxgap
+		if (dMaxGapSeconds >= 0.0) {
+			for (size_t t = 0; t < vecIterCandidates.size()-1; t++) {
+				const Time & timeCurrent = vecIterCandidates[t]->first;
+				const Time & timeNext = vecIterCandidates[t+1]->first;
+
+				double dDeltaSeconds = timeCurrent.DeltaSeconds(timeNext);
+				if (dDeltaSeconds > dMaxGapSeconds) {
+					Announce("WARNING: Discrete times %i (%s) and %i (%s) differ by more than --maxgap (%s)",
+						t,
+						timeCurrent.ToString().c_str(),
+						t+1,
+						timeNext.ToString().c_str(),
+						strMaxGapSize.c_str());
+				}
+			}
+		}
 
 		AnnounceEndBlock("Done");
 	}
 
-	// Create kdtree at each time
+	/////////////////////////////////////////////
+	// 	Build KD trees at each time slice
+
 	AnnounceStartBlock("Creating KD trees at each time level");
 
 	// Null pointer
@@ -711,78 +905,89 @@ try {
 
 	// Vector of lat/lon values
 	std::vector< std::vector<Node> > vecNodes;
-	vecNodes.resize(vecTimes.size());
+	vecNodes.resize(mapCandidateInfo.size());
 
 	// Vector of KD trees
 	std::vector<kdtree *> vecKDTrees;
-	vecKDTrees.resize(vecTimes.size());
+	vecKDTrees.resize(mapCandidateInfo.size());
 
-	for (int t = 0; t < vecTimes.size(); t++) {
+	for (size_t t = 0; t < vecIterCandidates.size(); t++) {
+
+		const TimesliceCandidateInformation & tscinfo = vecIterCandidates[t]->second;
 
 		// Create a new kdtree
-		if (vecCandidates[t].size() == 0) {
+		if (tscinfo.size() == 0) {
 			vecKDTrees[t] = NULL;
 			continue;
 		}
 
 		vecKDTrees[t] = kd_create(3);
 
-		vecNodes[t].resize(vecCandidates[t].size());
+		vecNodes[t].resize(tscinfo.size());
 
 		// Insert all points at this time level
-		for (int i = 0; i < vecCandidates[t].size(); i++) {
-			double dLat = atof(vecCandidates[t][i][iLatIndex].c_str());
-			double dLon = atof(vecCandidates[t][i][iLonIndex].c_str());
+		for (int i = 0; i < tscinfo.size(); i++) {
+			vecNodes[t][i].lon = DegToRad(std::stod(tscinfo[i][iLonIndex].c_str()));
+			vecNodes[t][i].lat = DegToRad(std::stod(tscinfo[i][iLatIndex].c_str()));
 
-			dLat *= M_PI / 180.0;
-			dLon *= M_PI / 180.0;
+			RLLtoXYZ_Rad(
+				vecNodes[t][i].lon,
+				vecNodes[t][i].lat,
+				vecNodes[t][i].x,
+				vecNodes[t][i].y,
+				vecNodes[t][i].z);
 
-			double dX = sin(dLon) * cos(dLat);
-			double dY = cos(dLon) * cos(dLat);
-			double dZ = sin(dLat);
-
-			vecNodes[t][i].lat = dLat;
-			vecNodes[t][i].lon = dLon;
-
-			vecNodes[t][i].x = dX;
-			vecNodes[t][i].y = dY;
-			vecNodes[t][i].z = dZ;
-
-			kd_insert3(vecKDTrees[t], dX, dY, dZ, reinterpret_cast<void*>(noptr+i));
+			kd_insert3(
+				vecKDTrees[t],
+				vecNodes[t][i].x,
+				vecNodes[t][i].y,
+				vecNodes[t][i].z,
+				reinterpret_cast<void*>(noptr+i));
 		}
 	}
 
 	AnnounceEndBlock("Done");
 
-	// Create set of path segments
+	/////////////////////////////////////////////
+	// 	Populate the set of path segments
+
 	AnnounceStartBlock("Populating set of path segments");
 
 	std::vector<SimplePathSegmentSet> vecPathSegmentsSet;
-	vecPathSegmentsSet.resize(vecTimes.size()-1);
+	vecPathSegmentsSet.resize(mapCandidateInfo.size()-1);
 
-	// Insert nodes from this time level
-	for (int t = 0; t < vecTimes.size()-1; t++) {
+	// Search nodes at current time level
+	for (size_t t = 0; t < vecIterCandidates.size()-1; t++) {
 
-		// Loop through all points at the current time level
-		for (int i = 0; i < vecCandidates[t].size(); i++) {
+		const Time & timeCurrent = vecIterCandidates[t]->first;
+		const TimesliceCandidateInformation & tscinfo = vecIterCandidates[t]->second;
 
-			double dX = vecNodes[t][i].x;
-			double dY = vecNodes[t][i].y;
-			double dZ = vecNodes[t][i].z;
+		// Loop through all candidates at current time level
+		for (int i = 0; i < tscinfo.size(); i++) {
 
-			double dLat = vecNodes[t][i].lat;
-			double dLon = vecNodes[t][i].lon;
+			// Check future timesteps for next candidate in path
+			for (int g = 1; ; g++) {
 
-			for (int g = 1; g <= nMaxGapSize+1; g++) {
-				if (t+g >= vecTimes.size()) {
+				if ((nMaxGapSteps != (-1)) && (g > nMaxGapSteps+1)) {
 					break;
+				}
+				if (t+g >= vecIterCandidates.size()) {
+					break;
+				}
+		
+				if (dMaxGapSeconds >= 0.0) {
+					const Time & timeNext = vecIterCandidates[t+g]->first;
+					double dDeltaSeconds = timeCurrent.DeltaSeconds(timeNext);
+					if (dDeltaSeconds > dMaxGapSeconds) {
+						break;
+					}
 				}
 
 				if (vecKDTrees[t+g] == NULL) {
 					continue;
 				}
 
-				kdres * set = kd_nearest3(vecKDTrees[t+g], dX, dY, dZ);
+				kdres * set = kd_nearest3(vecKDTrees[t+g], vecNodes[t][i].x, vecNodes[t][i].y, vecNodes[t][i].z);
 
 				if (kd_res_size(set) == 0) {
 					kd_res_free(set);
@@ -796,23 +1001,12 @@ try {
 				kd_res_free(set);
 
 				// Great circle distance between points
-				double dLonC = vecNodes[t+g][iRes].lon;
-				double dLatC = vecNodes[t+g][iRes].lat;
-
 				double dR =
-					sin(dLatC) * sin(dLat)
-					+ cos(dLatC) * cos(dLat) * cos(dLon - dLonC);
-
-				if (dR >= 1.0) {
-					dR = 0.0;
-				} else if (dR <= -1.0) {
-					dR = 180.0;
-				} else {
-					dR = 180.0 / M_PI * acos(dR);
-				}
-				if (dR != dR) {
-					_EXCEPTIONT("NaN value detected");
-				}
+					GreatCircleDistance_Deg(
+						vecNodes[t][i].lon,
+						vecNodes[t][i].lat,
+						vecNodes[t+g][iRes].lon,
+						vecNodes[t+g][iRes].lat);
 
 				// Verify great circle distance satisfies range requirement
 				if (dR <= dRange) {
@@ -829,18 +1023,20 @@ try {
 
 	AnnounceEndBlock("Done");
 
-	// Work forwards to find all paths
+	/////////////////////////////////////////////
+	// 	Find all paths
+
 	AnnounceStartBlock("Constructing paths");
 
 	std::vector<SimplePath> vecPaths;
 
-	int nRejectedMinLengthPaths = 0;
+	int nRejectedMinTimePaths = 0;
 	int nRejectedMinEndpointDistPaths = 0;
 	int nRejectedMinPathDistPaths = 0;
 	int nRejectedThresholdPaths = 0;
 
-	// Loop through all times
-	for (int t = 0; t < vecTimes.size()-1; t++) {
+	// Remove path
+	for (size_t t = 0; t < vecIterCandidates.size()-1; t++) {
 
 		// Loop through all remaining segments
 		while (vecPathSegmentsSet[t].size() > 0) {
@@ -862,7 +1058,7 @@ try {
 
 				int txnext = iterSeg->m_iTime[1];
 
-				if (txnext >= vecTimes.size()-1) {
+				if (txnext >= vecIterCandidates.size()-1) {
 					vecPathSegmentsSet[tx].erase(iterSeg);
 					break;
 				}
@@ -881,10 +1077,27 @@ try {
 				tx = txnext;
 			}
 
-			// Reject path due to minimum length
-			if (path.m_iTimes.size() < nMinPathLength) {
-				nRejectedMinLengthPaths++;
+			// Reject path due to minimum time
+			if (path.m_iTimes.size() < nMinTimeSteps) {
+				nRejectedMinTimePaths++;
 				continue;
+			}
+			if (dMinTimeSeconds > 0.0) {
+				int nT = path.m_iTimes.size();
+				int iTime0 = path.m_iTimes[0];
+				int iTime1 = path.m_iTimes[nT-1];
+
+				_ASSERT((iTime0 >= 0) && (iTime0 < vecIterCandidates.size()));
+				_ASSERT((iTime1 >= 0) && (iTime1 < vecIterCandidates.size()));
+
+				const Time & timeFirst = vecIterCandidates[iTime0]->first;
+				const Time & timeLast = vecIterCandidates[iTime1]->first;
+
+				double dDeltaSeconds = timeFirst.DeltaSeconds(timeLast);
+				if (dDeltaSeconds < dMinTimeSeconds) {
+					nRejectedMinTimePaths++;
+					continue;
+				}
 			}
 
 			// Reject path due to minimum endpoint distance
@@ -903,20 +1116,7 @@ try {
 				double dLon1 = vecNodes[iTime1][iRes1].lon;
 				double dLat1 = vecNodes[iTime1][iRes1].lat;
 
-				double dR =
-					sin(dLat0) * sin(dLat1)
-					+ cos(dLat0) * cos(dLat1) * cos(dLon0 - dLon1);
-
-				if (dR >= 1.0) {
-					dR = 0.0;
-				} else if (dR <= -1.0) {
-					dR = 180.0;
-				} else {
-					dR = 180.0 / M_PI * acos(dR);
-				}
-				if (dR != dR) {
-					_EXCEPTIONT("NaN value detected");
-				}
+				double dR = GreatCircleDistance_Rad(dLon0, dLat0, dLon1, dLat1);
 
 				if (dR < dMinEndpointDistance) {
 					nRejectedMinEndpointDistPaths++;
@@ -940,20 +1140,7 @@ try {
 					double dLon1 = vecNodes[iTime1][iRes1].lon;
 					double dLat1 = vecNodes[iTime1][iRes1].lat;
 
-					double dR =
-						sin(dLat0) * sin(dLat1)
-						+ cos(dLat0) * cos(dLat1) * cos(dLon0 - dLon1);
-
-					if (dR >= 1.0) {
-						dR = 0.0;
-					} else if (dR <= -1.0) {
-						dR = 180.0;
-					} else {
-						dR = 180.0 / M_PI * acos(dR);
-					}
-					if (dR != dR) {
-						_EXCEPTIONT("NaN value detected");
-					}
+					double dR = GreatCircleDistance_Rad(dLon0, dLat0, dLon1, dLat1);
 
 					dTotalPathDistance += dR;
 				}
@@ -970,7 +1157,7 @@ try {
 				fOpResult =
 					vecThresholdOp[x].Apply(
 						path,
-						vecCandidates);
+						vecIterCandidates);
 
 				if (!fOpResult) {
 					break;
@@ -986,14 +1173,16 @@ try {
 		}
 	}
 
-	Announce("Paths rejected (minlength): %i", nRejectedMinLengthPaths);
+	Announce("Paths rejected (mintime): %i", nRejectedMinTimePaths);
 	Announce("Paths rejected (minendpointdist): %i", nRejectedMinEndpointDistPaths);
 	Announce("Paths rejected (minpathdist): %i", nRejectedMinPathDistPaths);
 	Announce("Paths rejected (threshold): %i", nRejectedThresholdPaths);
 	Announce("Total paths found: %i", vecPaths.size());
 	AnnounceEndBlock("Done");
 
-	// Write results out
+	/////////////////////////////////////////////
+	// 	Write results
+
 	AnnounceStartBlock("Writing results");
 
 	// Convert the result into a NodeFile
@@ -1018,27 +1207,21 @@ try {
 				PathNode & pathnode = path[t];
 
 				int iTime = vecPaths[i].m_iTimes[t];
-				_ASSERT(vecTimes[iTime].size() == 5);
 
 				int iCandidate = vecPaths[i].m_iCandidates[t];
 
-				int iYear = atoi(vecTimes[iTime][0].c_str());
-				int iMonth = atoi(vecTimes[iTime][1].c_str());
-				int iDay = atoi(vecTimes[iTime][2].c_str());
-				int iSecond = atoi(vecTimes[iTime][4].c_str()) * 3600;
+				path[t].m_time = vecIterCandidates[iTime]->first;
 
-				path[t].m_time =
-					Time(iYear, iMonth, iDay, iSecond, 0, Time::CalendarNone);
-
-				for (int j = 0; j < vecCandidates[iTime][iCandidate].size(); j++) {
+				for (int j = 0; j < vecIterCandidates[iTime]->second[iCandidate].size(); j++) {
 					pathnode.m_vecColumnData.push_back(
 						new ColumnDataString(
-							vecCandidates[iTime][iCandidate][j]));
+							vecIterCandidates[iTime]->second[iCandidate][j]));
 				}
 			}
 
 			path.m_timeStart = path[0].m_time;
 		}
+
 		if (strOutputFileFormat == "gfdl") {
 			nodefile.Write(strOutputFile);
 		} else if (strOutputFileFormat == "csv") {

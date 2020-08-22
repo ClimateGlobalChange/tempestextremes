@@ -22,6 +22,7 @@
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
+#include "FilenameList.h"
 #include "DataArray1D.h"
 #include "DataArray2D.h"
 #include "TimeObj.h"
@@ -1140,49 +1141,23 @@ try {
 	}
 
 	// Load input file list
-	std::vector<std::string> vecInputFiles;
+	FilenameList vecInputFiles;
 
 	if (strInputFile.length() != 0) {
 		vecInputFiles.push_back(strInputFile);
 
 	} else {
-		std::ifstream ifInputFileList(strInputFileList.c_str());
-		if (!ifInputFileList.is_open()) {
-			_EXCEPTION1("Unable to open file \"%s\"",
-				strInputFileList.c_str());
-		}
-		std::string strFileLine;
-		while (std::getline(ifInputFileList, strFileLine)) {
-			if (strFileLine.length() == 0) {
-				continue;
-			}
-			if (strFileLine[0] == '#') {
-				continue;
-			}
-			vecInputFiles.push_back(strFileLine);
-		}
+		vecInputFiles.FromFile(strInputFileList, true);
 	}
 
 	// Load output file list
-	std::vector<std::string> vecOutputFiles;
+	FilenameList vecOutputFiles;
 
-	if (strOutputFileList.length() != 0) {
+	if (strOutput != "") {
+		vecOutputFiles.push_back(strOutput);
 
-		std::ifstream ifOutputFileList(strOutputFileList.c_str());
-		if (!ifOutputFileList.is_open()) {
-			_EXCEPTION1("Unable to open file \"%s\"",
-				strOutputFileList.c_str());
-		}
-		std::string strFileLine;
-		while (std::getline(ifOutputFileList, strFileLine)) {
-			if (strFileLine.length() == 0) {
-				continue;
-			}
-			if (strFileLine[0] == '#') {
-				continue;
-			}
-			vecOutputFiles.push_back(strFileLine);
-		}
+	} else {
+		vecOutputFiles.FromFile(strOutputFileList);
 
 		if (vecOutputFiles.size() != vecInputFiles.size()) {
 			_EXCEPTIONT("File --in_file_list must match --out_file_list");
@@ -1376,18 +1351,21 @@ try {
 
 	AnnounceStartBlock("Begin search operation");
 	if (vecInputFiles.size() != 1) {
-		if (vecOutputFiles.size() != 0) {
-			Announce("Output will be written following --out_file_list");
-		} else if (strOutput == "") {
+
+		if (vecOutputFiles.size() == 0) {
 			Announce("Output will be written to outXXXXXX.dat");
-		} else {
+		} else if (vecOutputFiles.size() == 1) {
 			Announce("Output will be written to %sXXXXXX.dat",
-				strOutput.c_str());
+				vecOutputFiles[0].c_str());
+		} else {
+			Announce("Output will be written following --out_file_list");
 		}
 		Announce("Logs will be written to logXXXXXX.txt");
 	}
 
 	// Loop over all files to be processed
+	_ASSERT(vecInputFiles.size() == vecOutputFiles.size());
+
 	for (int f = 0; f < vecInputFiles.size(); f++) {
 #if defined(TEMPEST_MPIOMP)
 		if (f % nMPISize != nMPIRank) {
@@ -1399,7 +1377,7 @@ try {
 		if (vecInputFiles.size() == 1) {
 			dcuparam.fpLog = stdout;
 
-			if (strOutput == "") {
+			if (vecOutputFiles.size() == 0) {
 				strOutputFile = "out.dat";
 			} else {
 				strOutputFile = strOutput;
@@ -1409,16 +1387,15 @@ try {
 			char szFileIndex[32];
 			sprintf(szFileIndex, "%06i", f);
 
-			if (vecOutputFiles.size() != 0) {
-				strOutputFile = vecOutputFiles[f];
+			if (vecOutputFiles.size() == 0) {
+				strOutputFile =
+					"out" + std::string(szFileIndex) + ".dat";
+			} else if (vecOutputFiles.size() == 1) {
+				strOutputFile =
+					vecOutputFiles[0] + std::string(szFileIndex) + ".dat";
 			} else {
-				if (strOutput == "") {
-					strOutputFile =
-						"out" + std::string(szFileIndex) + ".dat";
-				} else {
-					strOutputFile =
-						strOutput + std::string(szFileIndex) + ".dat";
-				}
+				strOutputFile =
+					vecOutputFiles[f];
 			}
 
 			std::string strLogFile = "log" + std::string(szFileIndex) + ".txt";

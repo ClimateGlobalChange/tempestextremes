@@ -731,7 +731,7 @@ try {
 		} else if (strFillValue == "nan") {
 			dFillValue = nanf(NULL);
 		} else if (STLStringHelper::IsFloat(strFillValue)) {
-			dFillValue = std::stof(strFillValue);
+			dFillValue = std::stod(strFillValue);
 		} else {
 			_EXCEPTIONT("Invalid value specified for --fillvalue");
 		}

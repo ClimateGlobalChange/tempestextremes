@@ -61,8 +61,14 @@ public:
 		std::string strDescription
 	) :
 		m_strName(std::string("--") + strName),
-		m_strDescription(strDescription)
-	{ }
+		m_strDescription(strDescription),
+		m_fHidden(false)
+	{
+		if ((strName.length() > 0) && (strName[0] == '*')) {
+			m_strName = std::string("--") + strName.substr(1);
+			m_fHidden = true;
+		}
+	}
 
 	///	<summary>
 	///		Virtual destructor.
@@ -113,6 +119,11 @@ public:
 	///		Description of this parameter.
 	///	</summary>
 	std::string m_strDescription;
+
+	///	<summary>
+	///		Flag indicating this argument is hidden.
+	///	</summary>
+	bool m_fHidden;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -154,10 +165,12 @@ public:
 	///		Print the usage information of this parameter.
 	///	</summary>
 	virtual void PrintUsage() const {
-		Announce("  %s <bool> [%s] %s",
-			m_strName.c_str(),
-			(m_fValue)?("true"):("false"),
-			m_strDescription.c_str());
+		if (!m_fHidden) {
+			Announce("  %s <bool> [%s] %s",
+				m_strName.c_str(),
+				(m_fValue)?("true"):("false"),
+				m_strDescription.c_str());
+		}
 	}
 
 	///	<summary>
@@ -214,10 +227,12 @@ public:
 	///		Print the usage information of this parameter.
 	///	</summary>
 	virtual void PrintUsage() const {
-		Announce("  %s <string> [\"%s\"] %s",
-			m_strName.c_str(),
-			m_strValue.c_str(),
-			m_strDescription.c_str());
+		if (!m_fHidden) {
+			Announce("  %s <string> [\"%s\"] %s",
+				m_strName.c_str(),
+				m_strValue.c_str(),
+				m_strDescription.c_str());
+		}
 	}
 
 	///	<summary>
@@ -280,10 +295,12 @@ public:
 	///		Print the usage information of this parameter.
 	///	</summary>
 	virtual void PrintUsage() const {
-		Announce("  %s <integer> [%i] %s",
-			m_strName.c_str(),
-			m_dValue,
-			m_strDescription.c_str());
+		if (!m_fHidden) {
+			Announce("  %s <integer> [%i] %s",
+				m_strName.c_str(),
+				m_dValue,
+				m_strDescription.c_str());
+		}
 	}
 
 	///	<summary>
@@ -346,16 +363,18 @@ public:
 	///		Print the usage information of this parameter.
 	///	</summary>
 	virtual void PrintUsage() const {
-		if (fabs(m_dValue) < 1.0e6) {
-			Announce("  %s <double> [%f] %s",
-				m_strName.c_str(),
-				m_dValue,
-				m_strDescription.c_str());
-		} else {
-			Announce("  %s <double> [%e] %s",
-				m_strName.c_str(),
-				m_dValue,
-				m_strDescription.c_str());
+		if (!m_fHidden) {
+			if (fabs(m_dValue) < 1.0e6) {
+				Announce("  %s <double> [%f] %s",
+					m_strName.c_str(),
+					m_dValue,
+					m_strDescription.c_str());
+			} else {
+				Announce("  %s <double> [%e] %s",
+					m_strName.c_str(),
+					m_dValue,
+					m_strDescription.c_str());
+			}
 		}
 	}
 
@@ -422,20 +441,22 @@ public:
 	///		Print the usage information of this parameter.
 	///	</summary>
 	virtual void PrintUsage() const {
-		if (m_eTimeType == Time::TypeFixed) {
-			Announce("  %s <time> [%s] %s",
-				m_strName.c_str(),
-				m_timeValue.ToFreeString().c_str(),
-				m_strDescription.c_str());
+		if (!m_fHidden) {
+			if (m_eTimeType == Time::TypeFixed) {
+				Announce("  %s <time> [%s] %s",
+					m_strName.c_str(),
+					m_timeValue.ToFreeString().c_str(),
+					m_strDescription.c_str());
 
-		} else if (m_eTimeType == Time::TypeDelta) {
-			Announce("  %s <dtime> [%s] %s",
-				m_strName.c_str(),
-				m_timeValue.ToFreeString().c_str(),
-				m_strDescription.c_str());
+			} else if (m_eTimeType == Time::TypeDelta) {
+				Announce("  %s <dtime> [%s] %s",
+					m_strName.c_str(),
+					m_timeValue.ToFreeString().c_str(),
+					m_strDescription.c_str());
 
-		} else {
-			_EXCEPTIONT("Invalid TimeType");
+			} else {
+				_EXCEPTIONT("Invalid TimeType");
+			}
 		}
 	}
 

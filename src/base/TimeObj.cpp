@@ -524,8 +524,16 @@ std::string Time::ToLongString() const {
 		_EXCEPTIONT("ToLongString() only valid for Time::TypeFixed");
 	}
 
+	int iReindexedMonth = m_iMonth;
+	int iReindexedDay = m_iDay;
+
+	if ((m_eCalendarType != CalendarNone) && (m_eCalendarType != CalendarUnknown)) {
+		iReindexedMonth++;
+		iReindexedDay++;
+	}
+
 	sprintf(szBuffer, "%04i-%02i-%02i-%05i-%06i",
-		m_iYear, m_iMonth+1, m_iDay+1, m_iSecond, m_iMicroSecond);
+		m_iYear, iReindexedMonth, iReindexedDay, m_iSecond, m_iMicroSecond);
 
 	return std::string(szBuffer);
 }
@@ -539,11 +547,19 @@ std::string Time::ToString() const {
 		_EXCEPTIONT("ToString() only valid for Time::TypeFixed");
 	}
 
+	int iReindexedMonth = m_iMonth;
+	int iReindexedDay = m_iDay;
+
+	if ((m_eCalendarType != CalendarNone) && (m_eCalendarType != CalendarUnknown)) {
+		iReindexedMonth++;
+		iReindexedDay++;
+	}
+
 	if (m_iMicroSecond == 0) {
 		sprintf(szBuffer, "%04i-%02i-%02i %02i:%02i:%02i",
 			m_iYear,
-			m_iMonth+1,
-			m_iDay+1,
+			iReindexedMonth,
+			iReindexedDay,
 			m_iSecond / 3600,
 			(m_iSecond % 3600) / 60,
 			(m_iSecond % 60));
@@ -551,8 +567,8 @@ std::string Time::ToString() const {
 	} else {
 		sprintf(szBuffer, "%04i-%02i-%02i %02i:%02i:%02i.%06i",
 			m_iYear,
-			m_iMonth+1,
-			m_iDay+1,
+			iReindexedMonth,
+			iReindexedDay,
 			m_iSecond / 3600,
 			(m_iSecond % 3600) / 60,
 			(m_iSecond % 60),
@@ -596,6 +612,9 @@ std::string Time::ToFreeString() const {
 ///////////////////////////////////////////////////////////////////////////////
 
 void Time::FromLongString(const std::string & strLongTime) {
+	if ((m_eCalendarType == CalendarNone) && (m_eCalendarType == CalendarUnknown)) {
+		_EXCEPTIONT("Not implemented");
+	}
 	if (strLongTime.length() != 23) {
 		_EXCEPTIONT("Invalid Time LongString");
 	}

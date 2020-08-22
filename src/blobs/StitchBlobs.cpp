@@ -2,10 +2,10 @@
 ///
 ///	\file    StitchBlobs.cpp
 ///	\author  Paul Ullrich
-///	\version October 1st, 2014
+///	\version August 20, 2020
 ///
 ///	<remarks>
-///		Copyright 2000-2014 Paul Ullrich
+///		Copyright 2020 Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -25,7 +25,7 @@
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
-
+#include "FilenameList.h"
 #include "DataArray1D.h"
 #include "DataArray2D.h"
 
@@ -698,25 +698,25 @@ try {
 	}
 
 	// Input file list
-	std::vector<std::string> vecInputFiles;
+	FilenameList vecInputFiles;
 
 	if (strInputFile != "") {
 		vecInputFiles.push_back(strInputFile);
 	}
 	if (strInputFileList != "") {
-		GetInputFileList(strInputFileList, vecInputFiles);
+		vecInputFiles.FromFile(strInputFileList, false);
 	}
 
 	int nFiles = vecInputFiles.size();
 
 	// Output file list
-	std::vector<std::string> vecOutputFiles;
+	FilenameList vecOutputFiles;
 
 	if (strOutputFile != "") {
 		vecOutputFiles.push_back(strOutputFile);
 	}
 	if (strOutputFileList != "") {
-		GetInputFileList(strOutputFileList, vecOutputFiles);
+		vecOutputFiles.FromFile(strOutputFileList, false);
 
 		if (vecOutputFiles.size() != vecInputFiles.size()) {
 			_EXCEPTION2("Mismatch in number of rows of --in_list (%lu) and --out_list (%lu)",

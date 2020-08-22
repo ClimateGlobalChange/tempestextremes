@@ -192,7 +192,8 @@ long NcFileVector::GetTimeIx(size_t pos) const {
 			}
 		}
 	}
-	_EXCEPTION1("Unable to identify time axis in \"%s\"",
+	_EXCEPTION2("Unable to identify time \"%s\" in \"%s\"",
+		m_time.ToString().c_str(),
 		m_vecFilenames[pos].c_str());
 }
 

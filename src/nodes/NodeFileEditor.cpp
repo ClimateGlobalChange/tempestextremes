@@ -1188,8 +1188,8 @@ try {
 		CommandLineStringD(strOutputFileFormat, "out_nodefile_format", "gfdl", "[gfdl|csv|csvnohead]");
 		//CommandLineBool(fOutputAppend, "out_append");
 
-		CommandLineString(strTimeFilter, "time_filter", "");
-		CommandLineStringD(strColumnFilter, "col_filter", "", "[col,op,value;...]");
+		CommandLineString(strTimeFilter, "timefilter", "");
+		CommandLineStringD(strColumnFilter, "colfilter", "", "[col,op,value;...]");
 		CommandLineString(strCalculate, "calculate", "");
 		//CommandLineString(strAppend, "append", "");
 
@@ -1254,7 +1254,7 @@ try {
 	ColumnDataHeader cdhOutput;
 	cdhOutput.Parse(strOutputFormat);
 
-	// Parse --time_filter
+	// Parse --timefilter
 	if (strTimeFilter == "3hr") {
 		strTimeFilter = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
 	}
@@ -1267,7 +1267,7 @@ try {
 
 #ifdef TEMPEST_NOREGEX
 	if (strTimeFilter != "") {
-		_EXCEPTIONT("Cannot use --time_filter with -DTEMPEST_NOREGEX compiler flag");
+		_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
 	}
 #endif
 #ifndef TEMPEST_NOREGEX
@@ -1275,7 +1275,7 @@ try {
 	try {
 		reTimeSubset.assign(strTimeFilter);
 	} catch(std::regex_error & reerr) {
-		_EXCEPTION2("Parse error in --time_filter regular expression \"%s\" (code %i)",
+		_EXCEPTION2("Parse error in --timefilter regular expression \"%s\" (code %i)",
 			strTimeFilter.c_str(), reerr.code());
 	}
 #endif

@@ -26,11 +26,17 @@
 
 void NodeFile::Read(
 	const std::string & strNodeFile,
-	NodeFile::PathType ePathType,
+	PathType ePathType,
 	const ColumnDataHeader & cdh,
-	const SimpleGrid & grid,
+	const std::vector<size_t> & nGridDim,
+	size_t sGridSize,
 	Time::CalendarType caltype
 ) {
+	// Not implemented
+	if (ePathType == PathTypeDN) {
+		_EXCEPTIONT("Not implemented");
+	}
+
 	// Check that this NodeFile
 	if ((m_cdh.size() != 0) || (m_pathvec.size() != 0)) {
 		_EXCEPTIONT("Attempting to Read() on an initialized NodeFile");
@@ -46,16 +52,21 @@ void NodeFile::Read(
 	std::string strBuffer;
 
 	// Only support grids of dimension 1 or 2
-	if ((grid.m_nGridDim.size() < 1) || (grid.m_nGridDim.size() > 2)) {
+	if ((nGridDim.size() < 1) || (nGridDim.size() > 2)) {
 		_EXCEPTIONT("Grid dimension out of range:  Only grids of dimension 1 or 2 supported");
 	}
 
 	// Coordinate buffer
 	std::vector<int> coord;
-	coord.resize(grid.m_nGridDim.size());
+	coord.resize(nGridDim.size());
 
 	// Clear the PathVector
 	m_pathvec.clear();
+
+	// DetectNodes has a single Path
+	if (ePathType == PathTypeDN) {
+		m_pathvec.resize(1);
+	}
 
 	// Clear the TimeToPathNodeMap
 	m_mapTimeToPathNode.clear();
@@ -85,7 +96,7 @@ void NodeFile::Read(
 
 			std::istringstream iss(strBuffer);
 
-			// DetectCyclonesUnstructured output
+			// DetectNodes type
 			if (ePathType == PathTypeDN) {
 				int iYear;
 				int iMonth;
@@ -117,7 +128,7 @@ void NodeFile::Read(
 					0,
 					caltype);
 
-			// StitchNodes output
+			// StitchNodes type
 			} else if (ePathType == PathTypeSN) {
 				std::string strStart;
 				int iYear;
@@ -174,27 +185,27 @@ void NodeFile::Read(
 
 			std::istringstream iss(strBuffer);
 
-			for (int n = 0; n < grid.m_nGridDim.size(); n++) {
+			for (int n = 0; n < nGridDim.size(); n++) {
 				iss >> coord[n];
 			}
 
 			// Note that for 2D grids the coordinate indices are swapped
 			if (coord.size() == 1) {
-				if ((coord[0] < 0) || (coord[0] >= grid.m_nGridDim[0])) {
+				if ((coord[0] < 0) || (coord[0] >= nGridDim[0])) {
 					_EXCEPTION4("Coordinate index out of range on line %i of \"%s\""
 						" (%i/%i) (%i/%i)",
 						iLine, strNodeFile.c_str(),
-						coord[0], grid.m_nGridDim[0]);
+						coord[0], nGridDim[0]);
 				}
 			} else if (coord.size() == 2) {
-				if ((coord[0] < 0) || (coord[0] >= grid.m_nGridDim[1]) ||
-				    (coord[1] < 0) || (coord[1] >= grid.m_nGridDim[0])
+				if ((coord[0] < 0) || (coord[0] >= nGridDim[1]) ||
+				    (coord[1] < 0) || (coord[1] >= nGridDim[0])
 				) {
 					_EXCEPTION6("Coordinate index out of range on line %i of \"%s\""
 						" (%i/%i) (%i/%i)",
 						iLine, strNodeFile.c_str(),
-						coord[0], grid.m_nGridDim[1],
-						coord[1], grid.m_nGridDim[0]);
+						coord[0], nGridDim[1],
+						coord[1], nGridDim[0]);
 				}
 			} else {
 				_EXCEPTION();
@@ -223,8 +234,12 @@ void NodeFile::Read(
 					static_cast<int>(cdh.size()), iLine, strNodeFile.c_str());
 			}
 
+			// DetectNodes format output
+			if (ePathType == PathTypeDN) {
+				_EXCEPTIONT("Not implemented");
+
 			// StitchNodes format input
-			if (ePathType == PathTypeSN) {
+			} else if (ePathType == PathTypeSN) {
 				Path & path = m_pathvec[m_pathvec.size()-1];
 				PathNode & pathnode = path[i];
 
@@ -262,12 +277,12 @@ void NodeFile::Read(
 				if (coord.size() == 1) {
 					pathnode.m_gridix = coord[0];
 				} else if (coord.size() == 2) {
-					pathnode.m_gridix = coord[0] + grid.m_nGridDim[1] * coord[1];
+					pathnode.m_gridix = coord[0] + nGridDim[1] * coord[1];
 				} else {
 					_EXCEPTIONT("Undefined behavior for SimpleGrid dimensionality > 2");
 				}
 
-				if ((pathnode.m_gridix < 0) || (pathnode.m_gridix > grid.GetSize())) {
+				if ((pathnode.m_gridix < 0) || (pathnode.m_gridix > sGridSize)) {
 					_EXCEPTION2("Coordinate index out of range on line %i of \"%s\"",
 						iLine, strNodeFile.c_str());
 				}
@@ -282,6 +297,24 @@ void NodeFile::Read(
 			iLine++;
 		}
 	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void NodeFile::Read(
+	const std::string & strNodeFile,
+	NodeFile::PathType ePathType,
+	const ColumnDataHeader & cdh,
+	const SimpleGrid & grid,
+	Time::CalendarType caltype
+) {
+	Read(
+		strNodeFile,
+		ePathType,
+		cdh,
+		grid.m_nGridDim,
+		grid.GetSize(),
+		caltype);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

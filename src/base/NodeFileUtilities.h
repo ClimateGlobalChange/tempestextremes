@@ -687,6 +687,18 @@ public:
 		const std::string & strNodeFile,
 		PathType ePathType,
 		const ColumnDataHeader & cdh,
+		const std::vector<size_t> & nGridDim,
+		size_t sGridSize,
+		Time::CalendarType caltype
+	);
+
+	///	<summary>
+	///		Read in a node file and parse it into a PathVector.
+	///	</summary>
+	void Read(
+		const std::string & strNodeFile,
+		PathType ePathType,
+		const ColumnDataHeader & cdh,
 		const SimpleGrid & grid,
 		Time::CalendarType caltype
 	);

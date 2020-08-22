@@ -350,7 +350,7 @@ public:
 		}
 		if (m_eProperty == ArealFraction) {
 			if ((m_dValue < 0.0) || (m_dValue > 100.0)) {
-				_EXCEPTIONT("Areal fraction threshold (\%) must be between 0 and 100 in --geofiltercmd");
+				_EXCEPTIONT("Areal fraction threshold (%%) must be between 0 and 100 in --geofiltercmd");
 			}
 		}
 
@@ -1075,9 +1075,9 @@ void DetectBlobs(
 		*(param.pvecGeoFilterOp);
 
 #ifdef TEMPEST_NOREGEX
-		if (param.strTimeFilter != "") {
-			_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
-		}
+	if (param.strTimeFilter != "") {
+		_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
+	}
 #endif
 #ifndef TEMPEST_NOREGEX
 	// Parse --timefilter
