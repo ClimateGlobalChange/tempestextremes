@@ -640,7 +640,6 @@ void DetectCyclonesUnstructured(
 		int nTotalCandidates = setCandidates.size();
 
 		int nRejectedLocation = 0;
-		int nRejectedTopography = 0;
 		int nRejectedMerge = 0;
 
 		DataArray1D<int> vecRejectedClosedContour(vecClosedContourOp.size());
@@ -917,7 +916,6 @@ void DetectCyclonesUnstructured(
 
 		Announce("Total candidates: %i", setCandidates.size());
 		Announce("Rejected (  location): %i", nRejectedLocation);
-		Announce("Rejected (topography): %i", nRejectedTopography);
 		Announce("Rejected (    merged): %i", nRejectedMerge);
 
 		for (int tc = 0; tc < vecRejectedThreshold.GetRows(); tc++) {
@@ -1380,7 +1378,7 @@ try {
 			if (vecOutputFiles.size() == 0) {
 				strOutputFile = "out.dat";
 			} else {
-				strOutputFile = strOutput;
+				strOutputFile = vecOutputFiles[0];
 			}
 
 		} else {
