@@ -657,6 +657,12 @@ try {
 	// Apply the inverted filter
 	bool fInvert;
 
+	// Name of latitude dimension
+	std::string strLatitudeName;
+
+	// Name of longitude dimension
+	std::string strLongitudeName;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputNodeFile, "in_nodefile", "");
@@ -680,6 +686,9 @@ try {
 		CommandLineStringD(strFilterByContour, "bycontour", "", "[var,delta,dist,minmaxdist]");
 		CommandLineStringD(strNearbyBlobs, "nearbyblobs", "", "[var,dist,op,value[,maxdist]]");
 		CommandLineBool(fInvert, "invert");
+
+		CommandLineString(strLongitudeName, "lonname", "lon");
+		CommandLineString(strLatitudeName, "latname", "lat");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -910,6 +919,8 @@ try {
 
 		grid.GenerateLatitudeLongitude(
 			&ncFile,
+			strLatitudeName,
+			strLongitudeName,
 			fRegional,
 			fDiagonalConnectivity);
 
