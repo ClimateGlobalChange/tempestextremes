@@ -41,6 +41,9 @@ int main(int argc, char** argv) {
 	// Turn off fatal errors in NetCDF
 	NcError error(NcError::silent_nonfatal);
 
+	// Enable output only on rank zero
+	AnnounceOnlyOutputOnRankZero();
+
 try {
 
 	// Input data file
@@ -259,6 +262,11 @@ try {
 
 	int nMPISize;
 	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+
+	// Set up logging
+	if ((vecInputFileList.size() > 1) && (nMPISize > 1)) {
+		Announce("Logs will be written to logXXXXXX.txt");
+	}
 #endif
 
 	// Loop over all files to be processed
@@ -266,6 +274,21 @@ try {
 #if defined(TEMPEST_MPIOMP)
 		if (f % nMPISize != nMPIRank) {
 			continue;
+		}
+
+		FILE * fpLog = NULL;
+		if ((vecInputFileList.size() > 1) && (nMPISize > 1)) {
+			char szFileIndex[32];
+			sprintf(szFileIndex, "%06lu", f);
+
+			std::string strLogFile = std::string("log") + szFileIndex + ".txt";
+
+			fpLog = fopen(strLogFile.c_str(), "w");
+			if (fpLog == NULL) {
+				_EXCEPTION1("Unable to open log file \"%s\"", strLogFile.c_str());
+			}
+			AnnounceSetOutputBuffer(fpLog);
+			AnnounceOutputOnAllRanks();
 		}
 #endif
 		AnnounceStartBlock("Line %lu/%lu", f+1, vecInputFileList.size());
@@ -411,6 +434,14 @@ try {
 			AnnounceEndBlock(NULL);
 		}
 		AnnounceEndBlock("Done");
+
+#if defined(TEMPEST_MPIOMP)
+		AnnounceSetOutputBuffer(stdout);
+		if (fpLog != NULL) {
+			fclose(fpLog);
+		}
+		AnnounceOnlyOutputOnRankZero();
+#endif
 	}
 
 	AnnounceEndBlock(NULL);
