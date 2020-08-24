@@ -1294,8 +1294,6 @@ try {
 	}
 
 	// Loop over all files to be processed
-	_ASSERT(vecInputFiles.size() == vecOutputFiles.size());
-
 	for (int f = 0; f < vecInputFiles.size(); f++) {
 #if defined(TEMPEST_MPIOMP)
 		if (f % nMPISize != nMPIRank) {
