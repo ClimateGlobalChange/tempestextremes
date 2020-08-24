@@ -575,7 +575,8 @@ void ReadCFTimeDataFromNcFile(
 void WriteCFTimeDataToNcFile(
 	NcFile * ncfile,
 	const std::string & strFilename,
-	NcTimeDimension & vecTimes
+	NcTimeDimension & vecTimes,
+	bool fRecordDim
 ) {
 	_ASSERT(ncfile != NULL);
 
@@ -585,7 +586,11 @@ void WriteCFTimeDataToNcFile(
 
 	NcDim * dimTime = ncfile->get_dim("time");
 	if (dimTime == NULL) {
-		dimTime = ncfile->add_dim("time", vecTimes.size());
+		if (fRecordDim) {
+			dimTime = ncfile->add_dim("time", 0);
+		} else {
+			dimTime = ncfile->add_dim("time", vecTimes.size());
+		}
 		if (dimTime == NULL) {
 			_EXCEPTION1("Unable to create dimension \"time\" in file \"%s\"",
 				strFilename.c_str());
