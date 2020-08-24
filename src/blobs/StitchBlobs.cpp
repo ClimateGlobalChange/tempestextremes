@@ -892,7 +892,7 @@ try {
 		}
 
 		// Load in CF-compliant time data
-		std::vector<Time> vecTimes;
+		NcTimeDimension vecTimes;
 		ReadCFTimeDataFromNcFile(
 			vecNcFiles[0],
 			vecInputFiles[f].c_str(),

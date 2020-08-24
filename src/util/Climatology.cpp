@@ -875,7 +875,7 @@ void Climatology(
 				}
 
 				// Load Times from file
-				std::vector<Time> vecTimes;
+				NcTimeDimension vecTimes;
 				ReadCFTimeDataFromNcFile(
 					&ncinfile, 
 					vecInputFileList[f],

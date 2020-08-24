@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
-///	\file    NodeFileFilter2.cpp
+///	\file    NodeFileFilter.cpp
 ///	\author  Paul Ullrich
 ///	\version July 2, 2020
 ///
@@ -33,6 +33,7 @@
 #include "ClosedContourOp.h"
 #include "SimpleGridUtilities.h"
 #include "GridElements.h"
+#include "FilenameList.h"
 
 #include "netcdfcpp.h"
 
@@ -827,64 +828,26 @@ try {
 	STLStringHelper::ParseVariableList(strPreserve, vecPreserveVariables);
 
 	// Store input data
-	std::vector<std::string> vecInputFileList;
+	FilenameList vecInputFileList;
 
 	if (strInputData.length() != 0) {
 		vecInputFileList.push_back(strInputData);
 
 	} else {
 		AnnounceStartBlock("Building input data list");
-		std::ifstream ifInputDataList(strInputDataList.c_str());
-		if (!ifInputDataList.is_open()) {
-			_EXCEPTION1("Unable to open file \"%s\"",
-				strInputDataList.c_str());
-		}
-		std::string strFileLine;
-		while (std::getline(ifInputDataList, strFileLine)) {
-			if (strFileLine.length() == 0) {
-				continue;
-			}
-			if (strFileLine[0] == '#') {
-				continue;
-			}
-			for (int i = 0; i < strFileLine.length(); i++) {
-				if (strFileLine[i] == ';') {
-					_EXCEPTIONT("Only one filename allowed per line in --in_data_list");
-				}
-			}
-			vecInputFileList.push_back(strFileLine);
-		}
+		vecInputFileList.FromFile(strInputDataList, false);
 		AnnounceEndBlock("Done");
 	}
 
 	// Store output data
-	std::vector<std::string> vecOutputFileList;
+	FilenameList vecOutputFileList;
 
 	if (strOutputData.length() != 0) {
 		vecOutputFileList.push_back(strOutputData);
 
 	} else {
 		AnnounceStartBlock("Building output data list");
-		std::ifstream ifOutputDataList(strOutputDataList.c_str());
-		if (!ifOutputDataList.is_open()) {
-			_EXCEPTION1("Unable to open file \"%s\"",
-				strOutputDataList.c_str());
-		}
-		std::string strFileLine;
-		while (std::getline(ifOutputDataList, strFileLine)) {
-			if (strFileLine.length() == 0) {
-				continue;
-			}
-			if (strFileLine[0] == '#') {
-				continue;
-			}
-			for (int i = 0; i < strFileLine.length(); i++) {
-				if (strFileLine[i] == ';') {
-					_EXCEPTIONT("Only one filename allowed per line in --out_data_list");
-				}
-			}
-			vecOutputFileList.push_back(strFileLine);
-		}
+		vecOutputFileList.FromFile(strOutputDataList, false);
 		AnnounceEndBlock("Done");
 	}
 
@@ -1025,7 +988,7 @@ try {
 		}
 
 		// Load in vector of Times
-		std::vector<Time> vecTimes;
+		NcTimeDimension vecTimes;
 		ReadCFTimeDataFromNcFile(&ncinfile, vecInputFileList[f], vecTimes, true);
 
 		// Open output file

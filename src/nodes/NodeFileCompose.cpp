@@ -212,7 +212,7 @@ try {
 	// End of time range to use
 	std::string strTimeEnd;
 
-	// List of variables to output
+	// List of variables to process
 	std::string strVariables;
 
 	// List of variables to output

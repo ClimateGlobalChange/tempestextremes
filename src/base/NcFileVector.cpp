@@ -161,7 +161,7 @@ long NcFileVector::GetTimeIx(size_t pos) const {
 		_ASSERT(m_vecNcFile.size() == m_vecFilenames.size());
 		_ASSERT(m_vecNcFile.size() == m_vecFileType.size());
 
-		std::vector<Time> vecTimes;
+		NcTimeDimension vecTimes;
 		ReadCFTimeDataFromNcFile(
 			m_vecNcFile[pos],
 			m_vecFilenames[pos],

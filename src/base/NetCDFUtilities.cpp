@@ -455,9 +455,11 @@ void CopyNcVarTimeSubset(
 void ReadCFTimeDataFromNcFile(
 	NcFile * ncfile,
 	const std::string & strFilename,
-	std::vector<Time> & vecTimes,
+	NcTimeDimension & vecTimes,
 	bool fWarnOnMissingCalendar
 ) {
+	_ASSERT(ncfile != NULL);
+
 	// Empty existing Time vector
 	vecTimes.clear();
 
@@ -503,7 +505,10 @@ void ReadCFTimeDataFromNcFile(
 		_EXCEPTION1("Variable \"time\" is missing \"units\" attribute in file \"%s\"",
 			strFilename.c_str());
 	}
-	std::string strTimeUnits = attTimeUnits->as_string(0);
+
+	// Store details of time dimension
+	vecTimes.m_nctype = varTime->type();
+	vecTimes.m_units = attTimeUnits->as_string(0);
 
 	// Load in time data
 	DataArray1D<int> vecTimeInt;
@@ -541,28 +546,105 @@ void ReadCFTimeDataFromNcFile(
 		Time time(eCalendarType);
 		if (varTime->type() == ncInt) {
 			time.FromCFCompliantUnitsOffsetInt(
-				strTimeUnits,
+				vecTimes.m_units,
 				vecTimeInt[t]);
 
 		} else if (varTime->type() == ncFloat) {
 			time.FromCFCompliantUnitsOffsetDouble(
-				strTimeUnits,
+				vecTimes.m_units,
 				static_cast<double>(vecTimeFloat[t]));
 
 		} else if (varTime->type() == ncDouble) {
 			time.FromCFCompliantUnitsOffsetDouble(
-				strTimeUnits,
+				vecTimes.m_units,
 				vecTimeDouble[t]);
 
 		} else if (varTime->type() == ncInt64) {
 			time.FromCFCompliantUnitsOffsetInt(
-				strTimeUnits,
+				vecTimes.m_units,
 				(int)(vecTimeInt64[t]));
 
 		}
 
 		vecTimes.push_back(time);
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void WriteCFTimeDataToNcFile(
+	NcFile * ncfile,
+	const std::string & strFilename,
+	NcTimeDimension & vecTimes
+) {
+	_ASSERT(ncfile != NULL);
+
+	if (vecTimes.size() == 0) {
+		_EXCEPTIONT("NcTimeDimension has zero size");
+	}
+
+	NcDim * dimTime = ncfile->get_dim("time");
+	if (dimTime == NULL) {
+		dimTime = ncfile->add_dim("time", vecTimes.size());
+		if (dimTime == NULL) {
+			_EXCEPTION1("Unable to create dimension \"time\" in file \"%s\"",
+				strFilename.c_str());
+		}
+	} else {
+		if (dimTime->size() != vecTimes.size()) {
+			_EXCEPTION1("File \"%s\" already contains dimension \"time\" with unexpected size",
+				strFilename.c_str());
+		}
+	}
+
+	NcVar * varTime = ncfile->add_var("time", vecTimes.type(), dimTime);
+	if (varTime == NULL) {
+		_EXCEPTION1("Unable to create variable \"time\" in file \"%s\"",
+			strFilename.c_str());
+	}
+
+	if (vecTimes.type() == ncInt) {
+		DataArray1D<int> nTimes(vecTimes.size());
+		for (int t = 0; t < nTimes.GetRows(); t++) {
+			nTimes[t] =
+				static_cast<int>(
+					vecTimes[t].GetCFCompliantUnitsOffsetDouble(vecTimes.units()));
+		}
+		varTime->put(&(nTimes[0]), nTimes.GetRows());
+
+	} else if (vecTimes.type() == ncFloat) {
+		DataArray1D<float> dTimes(vecTimes.size());
+		for (int t = 0; t < dTimes.GetRows(); t++) {
+			dTimes[t] =
+				static_cast<float>(
+					vecTimes[t].GetCFCompliantUnitsOffsetDouble(vecTimes.units()));
+		}
+		varTime->put(&(dTimes[0]), dTimes.GetRows());
+
+	} else if (vecTimes.type() == ncDouble) {
+		DataArray1D<double> dTimes(vecTimes.size());
+		for (int t = 0; t < dTimes.GetRows(); t++) {
+			dTimes[t] =
+				vecTimes[t].GetCFCompliantUnitsOffsetDouble(vecTimes.units());
+		}
+		varTime->put(&(dTimes[0]), dTimes.GetRows());
+
+	} else if (vecTimes.type() == ncInt64) {
+		DataArray1D<ncint64> nTimes(vecTimes.size());
+		for (int t = 0; t < nTimes.GetRows(); t++) {
+			nTimes[t] =
+				static_cast<ncint64>(
+					vecTimes[t].GetCFCompliantUnitsOffsetDouble(vecTimes.units()));
+		}
+		varTime->put(&(nTimes[0]), nTimes.GetRows());
+
+	} else {
+		_EXCEPTION1("Invalid \"time\" type (%i)", varTime->type());
+	}
+
+	varTime->add_att("long_name", "time");
+	varTime->add_att("calendar", vecTimes[0].GetCalendarName().c_str());
+	varTime->add_att("units", vecTimes.units().c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -17,13 +17,42 @@
 #ifndef _NETCDFUTILITIES_H_
 #define _NETCDFUTILITIES_H_
 
-class NcFile;
-class NcVar;
-
+#include "netcdfcpp.h"
 #include "TimeObj.h"
 
 #include <string>
 #include <vector>
+
+////////////////////////////////////////////////////////////////////////////////
+
+class NcTimeDimension : public std::vector<Time> {
+
+public:
+	///	<summary>
+	///		Get the type.
+	///	</summary>
+	NcType type() const {
+		return m_nctype;
+	}
+
+	///	<summary>
+	///		Get the units.
+	///	</summary>
+	const std::string & units() const {
+		return m_units;
+	}
+
+public:
+	///	<summary>
+	///		Associated type.
+	///	</summary>
+	NcType m_nctype;
+
+	///	<summary>
+	///		Associated units.
+	///	</summary>
+	std::string m_units;
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -91,8 +120,19 @@ void CopyNcVarTimeSubset(
 void ReadCFTimeDataFromNcFile(
 	NcFile * ncfile,
 	const std::string & strFilename,
-	std::vector<Time> & vecTimes,
+	NcTimeDimension & vecTimes,
 	bool fWarnOnMissingCalendar
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Write the time data to a NetCDF file.
+///	</summary>
+void WriteCFTimeDataToNcFile(
+	NcFile * ncfile,
+	const std::string & strFilename,
+	NcTimeDimension & vecTimes
 );
 
 ////////////////////////////////////////////////////////////////////////////////

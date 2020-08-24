@@ -442,13 +442,13 @@ void DetectCyclonesUnstructured(
 	std::vector<NodeOutputOp> & vecOutputOp =
 		*(param.pvecOutputOp);
 
+	// Parse --timefilter
 #ifdef TEMPEST_NOREGEX
 	if (param.strTimeFilter != "") {
 		_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
 	}
 #endif
 #ifndef TEMPEST_NOREGEX
-	// Parse --timefilter
 	std::regex reTimeSubset;
 	{
 		std::string strTimeFilter = param.strTimeFilter;
@@ -502,7 +502,7 @@ void DetectCyclonesUnstructured(
 	}
 
 	// Get time information
-	std::vector<Time> vecTimes;
+	NcTimeDimension vecTimes;
 	ReadCFTimeDataFromNcFile(
 		vecFiles[0],
 		vecFiles.GetFilename(0),
@@ -511,7 +511,7 @@ void DetectCyclonesUnstructured(
 
 #ifndef TEMPEST_NOREGEX
 	{
-		std::vector<Time> vecOutputTimes;
+		NcTimeDimension vecOutputTimes;
 		for (int t = 0; t < vecTimes.size(); t++) {
 			std::string strTime = vecTimes[t].ToString();
 			std::smatch match;
@@ -523,54 +523,6 @@ void DetectCyclonesUnstructured(
 	}
 #endif
 
-/*
-	// Get time dimension
-	NcDim * dimTime = vecFiles[0]->get_dim("time");
-	if (dimTime == NULL) {
-		_EXCEPTIONT("No dimension \"time\" found in first input file");
-	}
-
-	NcVar * varTime = vecFiles[0]->get_var("time");
-	if (varTime == NULL) {
-		_EXCEPTIONT("No variable \"time\" found in input file");
-	}
-
-	int nTime = dimTime->size();
-
-	DataArray1D<double> dTime(nTime);
-
-	if (varTime->type() == ncDouble) {
-		varTime->get(dTime, nTime);
-
-	} else if (varTime->type() == ncFloat) {
-		DataArray1D<float> dTimeFloat(nTime);
-
-		varTime->get(dTimeFloat, nTime);
-		for (int t = 0; t < nTime; t++) {
-			dTime[t] = static_cast<double>(dTimeFloat[t]);
-		}
-
-	} else if (varTime->type() == ncInt) {
-		DataArray1D<int> dTimeInt(nTime);
-
-		varTime->get(dTimeInt, nTime);
-		for (int t = 0; t < nTime; t++) {
-			dTime[t] = static_cast<double>(dTimeInt[t]);
-		}
-
-	} else if (varTime->type() == ncInt64) {
-		DataArray1D<ncint64> dTimeInt(nTime);
-
-		varTime->get(dTimeInt, nTime);
-		for (int t = 0; t < nTime; t++) {
-			dTime[t] = static_cast<double>(dTimeInt[t]);
-		}
-
-	} else {
-		_EXCEPTIONT("Variable \"time\" has an invalid type:\n"
-			"Expected \"float\", \"double\", \"int\", or \"int64\"");
-	}
-*/
 	// Open output file
 	FILE * fpOutput = fopen(strOutputFile.c_str(), "w");
 	if (fpOutput == NULL) {
@@ -606,27 +558,7 @@ void DetectCyclonesUnstructured(
 		varSearchBy.LoadGridData(varreg, vecFiles, grid);
 
 		const DataArray1D<float> & dataSearch = varSearchBy.GetData();
-/*
-		// Parse time information
-		NcAtt * attTimeUnits = varTime->get_att("units");
-		if (attTimeUnits == NULL) {
-			_EXCEPTIONT("Variable \"time\" has no \"units\" attribute");
-		}
 
-		std::string strTimeUnits = attTimeUnits->as_string(0);
-
-		Time::CalendarType eCalendarType = Time::CalendarStandard;
-		NcAtt * attTimeCalendar = varTime->get_att("calendar");
-		if (attTimeCalendar != NULL) {
-			eCalendarType = Time::CalendarTypeFromString(attTimeCalendar->as_string(0));
-			if (eCalendarType == Time::CalendarUnknown) {
-				_EXCEPTIONT("Unknown calendar type associated with variable \"time\"");
-			}
-		}
-
-		Time time(eCalendarType);
-		time.FromCFCompliantUnitsOffsetDouble(strTimeUnits, dTime[t]);
-*/
 		// Tag all minima
 		std::set<int> setCandidates;
 

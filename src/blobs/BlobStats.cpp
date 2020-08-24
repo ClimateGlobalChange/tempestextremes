@@ -333,7 +333,7 @@ try {
 	for (int f = 0; f < nFiles; f++) {
 
 		// Time objects for each time in this file
-		std::vector<Time> vecFileTimes;
+		NcTimeDimension vecFileTimes;
 
 		// Load in each file
 		NcFile ncInput(vecInputFiles[f].c_str());
