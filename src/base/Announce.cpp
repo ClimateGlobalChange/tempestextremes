@@ -208,6 +208,12 @@ void AnnounceEndBlock(
 		} else {
 			Announce(szBuffer);
 		}
+
+	} else {
+		if (s_fBlockFlag) {
+			s_fBlockFlag = false;
+			fprintf(g_fpAnnounceOutput, "\n");
+		}
 	}
 
 	s_nIndentationLevel--;
