@@ -21,6 +21,7 @@
 
 #include "SimpleGrid.h"
 #include "AutoCurator.h"
+#include "CoordTransforms.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -489,14 +490,93 @@ void NodeFile::GenerateTimeToPathNodeMap() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void NodeFile::InterpolateNodeCoordinates(
-	const Time & time,
+void NodeFile::Interpolate(
+	const Time & time
+) {
+	// Clear existing arrays
+	m_vecInterpPathId.clear();
+	m_vecInterpTimeId.clear();
+	m_vecInterpAlpha.clear();
+
+	// Loop through all paths
+	for (size_t p = 0; p < m_pathvec.size(); p++) {
+		const Path & path = m_pathvec[p];
+
+		if ((path.m_timeStart <= time) && (path.m_timeEnd >= time)) {
+			m_vecInterpPathId.push_back(p);
+
+			if (path.size() == 0) {
+				_EXCEPTION1("Zero length path (%i) found in nodefile", p);
+			}
+
+			if (path.size() == 1) {
+				m_vecInterpTimeId.push_back(0);
+				m_vecInterpAlpha.push_back(0.0);
+				continue;
+			}
+
+			if (time < path[0].m_time) {
+				m_vecInterpTimeId.push_back(0);
+				m_vecInterpAlpha.push_back(0.0);
+				continue;
+			}
+
+			if (time >= path[path.size()-1].m_time) {
+				m_vecInterpTimeId.push_back(path.size()-2);
+				m_vecInterpAlpha.push_back(1.0);
+				continue;
+			}
+
+			for (size_t n = 0; n < path.size()-1; n++) {
+				const PathNode & pathnodePrev = path[n];
+				const PathNode & pathnodeNext = path[n+1];
+
+				if (pathnodeNext.m_time > time) {
+					if (pathnodePrev.m_time > time) {
+						_EXCEPTIONT("Non-monotone time ordering in path");
+					}
+					if (pathnodePrev.m_time == time) {
+						m_vecInterpTimeId.push_back(n);
+						m_vecInterpAlpha.push_back(0.0);
+						break;
+
+					} else {
+						double dTimeDelta = pathnodeNext.m_time - pathnodePrev.m_time;
+						double dAlpha = (time - pathnodePrev.m_time) / dTimeDelta;
+
+						if ((dAlpha < -ReferenceTolerance) || (dAlpha > 1.0 + ReferenceTolerance)) {
+							_EXCEPTION1("Interpolation coefficient out of range (%1.5e)", dAlpha);
+						}
+
+						m_vecInterpTimeId.push_back(n);
+						m_vecInterpAlpha.push_back(dAlpha);
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	if ((m_vecInterpPathId.size() != m_vecInterpTimeId.size()) ||
+	    (m_vecInterpPathId.size() != m_vecInterpAlpha.size())
+	) {
+		_EXCEPTIONT("LOGIC ERROR: Mismatched path size arrays");
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void NodeFile::InterpolatedNodeCoordinatesRad(
 	const std::string & strLonName,
 	const std::string & strLatName,
-	std::vector<int> & vecPathId,
-	std::vector<double> & vecLonDeg,
-	std::vector<double> & vecLatDeg
+	std::vector<double> & vecInterpLonRad,
+	std::vector<double> & vecInterpLatRad
 ) const {
+	_ASSERT(m_vecInterpPathId.size() == m_vecInterpTimeId.size());
+	_ASSERT(m_vecInterpPathId.size() == m_vecInterpAlpha.size());
+
+	vecInterpLonRad.clear();
+	vecInterpLatRad.clear();
 
 	// Get lon and lat column indices
 	int iLonIx = m_cdh.GetIndexFromString(strLonName);
@@ -509,83 +589,93 @@ void NodeFile::InterpolateNodeCoordinates(
 		_EXCEPTION1("Column header \"%s\" not found", strLatName.c_str());
 	}
 
-	// Clear existing arrays
-	vecPathId.clear();
-	vecLonDeg.clear();
-	vecLatDeg.clear();
-
 	// Loop through all paths
-	for (int p = 0; p < m_pathvec.size(); p++) {
-		const Path & path = m_pathvec[p];
+	for (size_t p = 0; p < m_vecInterpPathId.size(); p++) {
+		_ASSERT(m_vecInterpPathId[p] < m_pathvec.size());
 
-		if ((path.m_timeStart <= time) && (path.m_timeEnd >= time)) {
-			vecPathId.push_back(p);
+		const Path & path = m_pathvec[m_vecInterpPathId[p]];
+		_ASSERT(path.size() > 0);
 
-			if (path.size() == 0) {
-				_EXCEPTION1("Zero length path (%i) found in nodefile", p);
-			}
+		if (path.size() == 1) {
+			const PathNode & pathnode = path[0];
 
-			if (path.size() == 1) {
-				const PathNode & pathnode = path[0];
-				vecLonDeg.push_back(pathnode.GetColumnDataAsDouble(iLonIx));
-				vecLatDeg.push_back(pathnode.GetColumnDataAsDouble(iLatIx));
-				continue;
-			}
+			double dNodeLonDeg = pathnode.GetColumnDataAsDouble(iLonIx);
+			double dNodeLatDeg = pathnode.GetColumnDataAsDouble(iLatIx);
 
-			if (time < path[0].m_time) {
-				const PathNode & pathnode = path[0];
-				vecLonDeg.push_back(pathnode.GetColumnDataAsDouble(iLonIx));
-				vecLatDeg.push_back(pathnode.GetColumnDataAsDouble(iLatIx));
-				continue;
-			}
+			vecInterpLonRad.push_back(DegToRad(dNodeLonDeg));
+			vecInterpLatRad.push_back(DegToRad(dNodeLatDeg));
 
-			if (time > path[path.size()-1].m_time) {
-				const PathNode & pathnode = path[path.size()-1];
-				vecLonDeg.push_back(pathnode.GetColumnDataAsDouble(iLonIx));
-				vecLatDeg.push_back(pathnode.GetColumnDataAsDouble(iLatIx));
-				continue;
-			}
+		} else {
+			_ASSERT(m_vecInterpTimeId[p] < path.size()-1);
+			const PathNode & pathnodePrev = path[ m_vecInterpTimeId[p] ];
+			const PathNode & pathnodeNext = path[ m_vecInterpTimeId[p]+1 ];
 
-			for (int n = 0; n < path.size()-1; n++) {
-				const PathNode & pathnodePrev = path[n];
-				const PathNode & pathnodeNext = path[n+1];
+			double dPrevLonDeg = pathnodePrev.GetColumnDataAsDouble(iLonIx);
+			double dPrevLatDeg = pathnodePrev.GetColumnDataAsDouble(iLatIx);
+			double dNextLonDeg = pathnodeNext.GetColumnDataAsDouble(iLonIx);
+			double dNextLatDeg = pathnodeNext.GetColumnDataAsDouble(iLatIx);
 
-				if (pathnodeNext.m_time >= time) {
-					if (pathnodePrev.m_time > time) {
-						_EXCEPTIONT("Non-monotone time ordering in path");
-					}
-					if (pathnodePrev.m_time == time) {
-						vecLonDeg.push_back(pathnodePrev.GetColumnDataAsDouble(iLonIx));
-						vecLatDeg.push_back(pathnodePrev.GetColumnDataAsDouble(iLatIx));
-						break;
-					} else {
-						double dPrevLonDeg = pathnodePrev.GetColumnDataAsDouble(iLonIx);
-						double dPrevLatDeg = pathnodePrev.GetColumnDataAsDouble(iLatIx);
-						double dNextLonDeg = pathnodeNext.GetColumnDataAsDouble(iLonIx);
-						double dNextLatDeg = pathnodeNext.GetColumnDataAsDouble(iLatIx);
+			// TODO: Use great circle arc instead of line in lat-lon space
+			double dNodeLonDeg =
+				dPrevLonDeg * (1.0 - m_vecInterpAlpha[p])
+				+ dNextLonDeg * m_vecInterpAlpha[p];
+			double dNodeLatDeg =
+				dPrevLatDeg * (1.0 - m_vecInterpAlpha[p])
+				+ dNextLatDeg * m_vecInterpAlpha[p];
 
-						double dTimeDelta = pathnodeNext.m_time - pathnodePrev.m_time;
-						double dAlpha = (time - pathnodePrev.m_time) / dTimeDelta;
-
-						if ((dAlpha < -ReferenceTolerance) || (dAlpha > 1.0 + ReferenceTolerance)) {
-							_EXCEPTION1("Interpolation coefficient out of range (%1.5e)", dAlpha);
-						}
-
-						// TODO: Use great circle arc instead of line in lat-lon space
-						vecLonDeg.push_back(dNextLonDeg * dAlpha + dPrevLonDeg * (1.0 - dAlpha));
-						vecLatDeg.push_back(dNextLatDeg * dAlpha + dPrevLatDeg * (1.0 - dAlpha));
-						break;
-					}
-				}
-			}
+			vecInterpLonRad.push_back(DegToRad(dNodeLonDeg));
+			vecInterpLatRad.push_back(DegToRad(dNodeLatDeg));
 		}
 	}
 
-	if ((vecPathId.size() != vecLonDeg.size()) ||
-	    (vecPathId.size() != vecLatDeg.size())
-	) {
-		_EXCEPTIONT("LOGIC ERROR: Mismatched path size arrays");
+	_ASSERT(m_vecInterpPathId.size() == vecInterpLonRad.size());
+	_ASSERT(m_vecInterpPathId.size() == vecInterpLatRad.size());
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void NodeFile::InterpolatedColumnDouble(
+	const std::string & strHeaderName,
+	std::vector<double> & vecInterpDouble
+) const {
+	_ASSERT(m_vecInterpPathId.size() == m_vecInterpTimeId.size());
+	_ASSERT(m_vecInterpPathId.size() == m_vecInterpAlpha.size());
+
+	vecInterpDouble.clear();
+
+	// Get column index
+	int iColIx = m_cdh.GetIndexFromString(strHeaderName);
+	if (iColIx == (-1)) {
+		_EXCEPTION1("Column header \"%s\" not found", strHeaderName.c_str());
 	}
+
+	// Loop through all paths
+	for (size_t p = 0; p < m_vecInterpPathId.size(); p++) {
+		_ASSERT(m_vecInterpPathId[p] < m_pathvec.size());
+
+		const Path & path = m_pathvec[m_vecInterpPathId[p]];
+		_ASSERT(path.size() > 0);
+
+		if (path.size() == 1) {
+			const PathNode & pathnode = path[0];
+			double dValue = pathnode.GetColumnDataAsDouble(iColIx);
+			vecInterpDouble.push_back(dValue);
+
+		} else {
+			_ASSERT(m_vecInterpTimeId[p] < path.size()-1);
+			const PathNode & pathnodePrev = path[ m_vecInterpTimeId[p] ];
+			const PathNode & pathnodeNext = path[ m_vecInterpTimeId[p]+1 ];
+
+			double dPrevValue = pathnodePrev.GetColumnDataAsDouble(iColIx);
+			double dNextValue = pathnodeNext.GetColumnDataAsDouble(iColIx);
+
+			vecInterpDouble.push_back(
+				dPrevValue * (1.0 - m_vecInterpAlpha[p])
+				+ dNextValue * m_vecInterpAlpha[p]);
+		}
+	}
+
+	_ASSERT(m_vecInterpPathId.size() == vecInterpDouble.size());
 }
 
 ///////////////////////////////////////////////////////////////////////////////

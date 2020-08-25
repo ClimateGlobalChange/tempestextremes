@@ -719,16 +719,37 @@ public:
 	///	</summary>
 	void GenerateTimeToPathNodeMap();
 
+public:
 	///	<summary>
-	///		Get an array of longitudes and latitudes.
+	///		Initialize the interpolation indices at the given time.
 	///	</summary>
-	void InterpolateNodeCoordinates(
-		const Time & time,
+	void Interpolate(
+		const Time & time
+	);
+
+	///	<summary>
+	///		Get the array of path ids from interpolation.
+	///	</summary>
+	const std::vector<size_t> & GetInterpolatedPathIds() const {
+		return m_vecInterpPathId;
+	}
+
+	///	<summary>
+	///		Get the interpolated coordinates from nodefile.
+	///	</summary>
+	void InterpolatedNodeCoordinatesRad(
 		const std::string & strLonName,
 		const std::string & strLatName,
-		std::vector<int> & vecPathId,
-		std::vector<double> & vecLonDeg,
-		std::vector<double> & vecLatDeg
+		std::vector<double> & vecInterpLonRad,
+		std::vector<double> & vecInterpLatRad
+	) const;
+
+	///	<summary>
+	///		Get the interpolated column value.
+	///	</summary>
+	void InterpolatedColumnDouble(
+		const std::string & strHeaderName,
+		std::vector<double> & vecInterpDouble
 	) const;
 
 public:
@@ -785,6 +806,22 @@ public:
 	///		lines by time.
 	///	</remarks>
 	TimeToPathNodeMap m_mapTimeToPathNode;
+
+protected:
+	///	<summary>
+	///		Vector of paths from interpolation.
+	///	</summary>
+	std::vector<size_t> m_vecInterpPathId;
+
+	///	<summary>
+	///		Vector of time indices from interpolation.
+	///	</summary>
+	std::vector<size_t> m_vecInterpTimeId;
+
+	///	<summary>
+	///		Vector of alpha indices from interpolation.
+	///	</summary>
+	std::vector<double> m_vecInterpAlpha;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

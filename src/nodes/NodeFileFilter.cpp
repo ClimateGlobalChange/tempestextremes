@@ -280,48 +280,46 @@ public:
 
 void BuildMask_ByDist(
 	const SimpleGrid & grid,
-	const ColumnDataHeader & cdh,
-	std::vector<double> & vecLonDeg,
-	std::vector<double> & vecLatDeg,
+	const NodeFile & nodefile,
+	const std::vector<double> & vecLonRad,
+	const std::vector<double> & vecLatRad,
 	const std::string & strDist,
 	DataArray1D<double> & dataMask
 ) {
-	_ASSERT(vecLonDeg.size() == vecLatDeg.size());
 	_ASSERT(grid.GetSize() == dataMask.GetRows());
 
+	// Get path ids from interpolation
+	const std::vector<size_t> & vecPathId = nodefile.GetInterpolatedPathIds();
+
+	_ASSERT(vecPathId.size() == vecLonRad.size());
+	_ASSERT(vecPathId.size() == vecLatRad.size());
+
 	// Get filter width (either fixed value or column data header)
-	bool fFixedFilterWidth = false;
-	double dFilterWidthDeg = 0.0;
-	int iFilterWidthIx = 0;
 	if (STLStringHelper::IsFloat(strDist)) {
-		fFixedFilterWidth = true;
-		dFilterWidthDeg = atof(strDist.c_str());
+		double dFilterWidthDeg = std::stod(strDist);
 		if (dFilterWidthDeg == 0.0) {
 			return;
 		}
 
-	} else {
-		_EXCEPTIONT("Not implemented");
-		iFilterWidthIx = cdh.GetIndexFromString(strDist);
-		if (iFilterWidthIx == (-1)) {
-			_EXCEPTION1("Unknown column header \"%s\"", strDist.c_str());
+		std::vector<size_t> vecNodeIxs;
+		for (int i = 0; i < vecPathId.size(); i++) {
+			grid.NearestNodes(vecLonRad[i], vecLatRad[i], dFilterWidthDeg, vecNodeIxs);
+			for (int n = 0; n < vecNodeIxs.size(); n++) {
+				dataMask[vecNodeIxs[n]] = 1.0;
+			}
 		}
-	}
 
-	// Array of grid indices
-	std::vector<size_t> vecNodeIxs;
+	} else {
+		std::vector<double> vecFilterWidthDeg;
+		nodefile.InterpolatedColumnDouble(
+			strDist, vecFilterWidthDeg);
 
-	// Loop through all points
-	for (int i = 0; i < vecLonDeg.size(); i++) {
-
-		// Get all nearest nodes to the given point
-		double dLonRad = DegToRad(vecLonDeg[i]);
-		double dLatRad = DegToRad(vecLatDeg[i]);
-
-		grid.NearestNodes(dLonRad, dLatRad, dFilterWidthDeg, vecNodeIxs);
-
-		for (int n = 0; n < vecNodeIxs.size(); n++) {
-			dataMask[vecNodeIxs[n]] = 1.0;
+		std::vector<size_t> vecNodeIxs;
+		for (int i = 0; i < vecPathId.size(); i++) {
+			grid.NearestNodes(vecLonRad[i], vecLatRad[i], vecFilterWidthDeg[i], vecNodeIxs);
+			for (int n = 0; n < vecNodeIxs.size(); n++) {
+				dataMask[vecNodeIxs[n]] = 1.0;
+			}
 		}
 	}
 }
@@ -332,8 +330,8 @@ template <typename real>
 void BuildMask_ByContour(
 	const SimpleGrid & grid,
 	const DataArray1D<real> & dataState,
-	std::vector<double> & vecLonDeg,
-	std::vector<double> & vecLatDeg,
+	std::vector<double> & vecLonRad,
+	std::vector<double> & vecLatRad,
 	const ClosedContourOp & op,
 	DataArray1D<double> & dataMask
 ) {
@@ -342,15 +340,15 @@ void BuildMask_ByContour(
 	double dDeltaDist = op.m_dDistance;
 	double dMinMaxDist = op.m_dMinMaxDist;
 
-	_ASSERT(vecLonDeg.size() == vecLatDeg.size());
+	_ASSERT(vecLonRad.size() == vecLatRad.size());
 	_ASSERT(dDeltaAmt != 0.0);
 	_ASSERT(dDeltaDist > 0.0);
 
 	// Loop through all PathNodes
-	for (int j = 0; j < vecLonDeg.size(); j++) {
+	for (int j = 0; j < vecLonRad.size(); j++) {
 
-		double dLon0 = DegToRad(vecLonDeg[j]);
-		double dLat0 = DegToRad(vecLatDeg[j]);
+		double dLon0 = vecLonRad[j];
+		double dLat0 = vecLatRad[j];
 
 		int ix0 = static_cast<int>(
 			grid.NearestNode(dLon0, dLat0));
@@ -404,19 +402,9 @@ void BuildMask_ByContour(
 			double dLonThis = grid.m_dLon[ix];
 
 			double dR =
-				sin(dLat0) * sin(dLatThis)
-				+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
-
-			if (dR >= 1.0) {
-				dR = 0.0;
-			} else if (dR <= -1.0) {
-				dR = 180.0;
-			} else {
-				dR = 180.0 / M_PI * acos(dR);
-			}
-			if (dR != dR) {
-				_EXCEPTIONT("NaN value detected");
-			}
+				GreatCircleDistance_Rad(
+					dLon0, dLat0,
+					dLonThis, dLatThis);
 
 			// Check great circle distance
 			if (dR > dDeltaDist) {
@@ -453,8 +441,8 @@ template <typename real>
 void BuildMask_NearbyBlobs(
 	const SimpleGrid & grid,
 	const DataArray1D<real> & dataState,
-	std::vector<double> & vecLonDeg,
-	std::vector<double> & vecLatDeg,
+	std::vector<double> & vecLonRad,
+	std::vector<double> & vecLatRad,
 	const NearbyBlobsOp & nearbyblobsop,
 	DataArray1D<double> & dataMask
 ) {
@@ -462,7 +450,7 @@ void BuildMask_NearbyBlobs(
 	const double dDist = nearbyblobsop.m_dDistance;
 	const double dMaxDist = nearbyblobsop.m_dMaxDist;
 
-	_ASSERT(vecLonDeg.size() == vecLatDeg.size());
+	_ASSERT(vecLonRad.size() == vecLatRad.size());
 	_ASSERT(dataState.GetRows() == grid.GetSize());
 	_ASSERT(dDist >= 0.0);
 	_ASSERT(dDist <= 180.0);
@@ -470,10 +458,10 @@ void BuildMask_NearbyBlobs(
 	_ASSERT(dMaxDist <= 180.0);
 
 	// Loop through all PathNodes
-	for (int j = 0; j < vecLonDeg.size(); j++) {
+	for (int j = 0; j < vecLonRad.size(); j++) {
 
-		double dLon0 = DegToRad(vecLonDeg[j]);
-		double dLat0 = DegToRad(vecLatDeg[j]);
+		double dLon0 = vecLonRad[j];
+		double dLat0 = vecLatRad[j];
 
 		int ix0 = static_cast<int>(
 			grid.NearestNode(dLon0, dLat0));
@@ -501,7 +489,7 @@ void BuildMask_NearbyBlobs(
 			_ASSERT((ix >= 0) && (ix < grid.GetSize()));
 
 			double dR =
-				GreatCircleDistance_Deg(
+				GreatCircleDistance_Rad(
 					dLon0, dLat0,
 					grid.m_dLon[ix], grid.m_dLat[ix]);
 
@@ -805,7 +793,7 @@ try {
 	std::vector<ClosedContourOp> vecClosedContourOp;
 
 	if (strFilterByContour != "") {
-		AnnounceStartBlock("Parsing --byclosedcontour");
+		AnnounceStartBlock("Parsing --bycontour");
 		ClosedContourOp op;
 		op.Parse(varreg, strFilterByContour);
 		vecClosedContourOp.push_back(op);
@@ -1170,31 +1158,25 @@ try {
 				vecTimes[t].ToString().c_str());
 
 			// Find all paths at this time
-			std::vector<int> vecPathId;
-			std::vector<double> vecLonDeg;
-			std::vector<double> vecLatDeg;
+			nodefile.Interpolate(vecTimes[t]);
 
-			nodefile.InterpolateNodeCoordinates(
-				vecTimes[t],
-				"lon",
-				"lat",
-				vecPathId,
-				vecLonDeg,
-				vecLatDeg);
-	
+			// Get coordinates of nodes at this time
+			std::vector<double> vecLonRad;
+			std::vector<double> vecLatRad;
+			nodefile.InterpolatedNodeCoordinatesRad("lon", "lat", vecLonRad, vecLatRad);
+
 			// Build mask
 			dataMask.Zero();
 
 			if (strFilterByDist != "") {
 				BuildMask_ByDist(
 					grid,
-					cdhInput,
-					vecLonDeg,
-					vecLatDeg,
+					nodefile,
+					vecLonRad,
+					vecLatRad,
 					strFilterByDist,
 					dataMask);
 			}
-
 			if (strFilterByContour != "") {
 				Variable & varOp = varreg.Get(vecClosedContourOp[0].m_varix);
 				vecInFiles.SetConstantTimeIx(t);
@@ -1205,8 +1187,8 @@ try {
 				BuildMask_ByContour<float>(
 					grid,
 					dataState,
-					vecLonDeg,
-					vecLatDeg,
+					vecLonRad,
+					vecLatRad,
 					vecClosedContourOp[0],
 					dataMask);
 			}
@@ -1220,8 +1202,8 @@ try {
 				BuildMask_NearbyBlobs<float>(
 					grid,
 					dataState,
-					vecLonDeg,
-					vecLatDeg,
+					vecLonRad,
+					vecLatRad,
 					vecNearbyBlobsOp[0],
 					dataMask);
 			}
