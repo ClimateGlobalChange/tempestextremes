@@ -32,16 +32,13 @@
 #include "NodeFileUtilities.h"
 #include "GridElements.h"
 #include "RLLPolygonArray.h"
+#include "TimeMatch.h"
 
 #include "netcdfcpp.h"
 
 #include <fstream>
 #include <queue>
 #include <set>
-
-#ifndef TEMPEST_NOREGEX
-#include <regex>
-#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1272,11 +1269,16 @@ try {
 #endif
 #ifndef TEMPEST_NOREGEX
 	std::regex reTimeSubset;
-	try {
-		reTimeSubset.assign(strTimeFilter);
-	} catch(std::regex_error & reerr) {
-		_EXCEPTION2("Parse error in --timefilter regular expression \"%s\" (code %i)",
-			strTimeFilter.c_str(), reerr.code());
+	if (strTimeFilter != "") {
+		// Test regex support
+		TestRegex();
+
+		try {
+			reTimeSubset.assign(strTimeFilter);
+		} catch(std::regex_error & reerr) {
+			_EXCEPTION2("Parse error in --timefilter regular expression \"%s\" (code %i)",
+				strTimeFilter.c_str(), reerr.code());
+		}
 	}
 #endif
 

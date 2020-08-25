@@ -26,6 +26,7 @@
 #include "DataArray1D.h"
 #include "DataArray2D.h"
 #include "TimeObj.h"
+#include "TimeMatch.h"
 #include "NodeOutputOp.h"
 #include "ClosedContourOp.h"
 #include "ThresholdOp.h"
@@ -43,10 +44,6 @@
 #include <string>
 #include <set>
 #include <queue>
-
-#ifndef TEMPEST_NOREGEX
-#include <regex>
-#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -451,6 +448,10 @@ void DetectCyclonesUnstructured(
 #ifndef TEMPEST_NOREGEX
 	std::regex reTimeSubset;
 	if (param.strTimeFilter != "") {
+
+		// Test regex support
+		TestRegex();
+
 		std::string strTimeFilter = param.strTimeFilter;
 		if (strTimeFilter == "3hr") {
 			strTimeFilter = "....-..-.. (00|03|06|09|12|15|18|21):00:00";

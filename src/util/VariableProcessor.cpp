@@ -24,10 +24,7 @@
 #include "Variable.h"
 #include "FilenameList.h"
 #include "NetCDFUtilities.h"
-
-#ifndef TEMPEST_NOREGEX
-#include <regex>
-#endif
+#include "TimeMatch.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -230,7 +227,11 @@ try {
 #endif
 #ifndef TEMPEST_NOREGEX
 	std::regex reTimeSubset;
-	{
+	if (strTimeFilter != "") {
+
+		// Test Regex
+		TestRegex();
+
 		if (strTimeFilter == "3hr") {
 			strTimeFilter = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
 		}

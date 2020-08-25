@@ -26,6 +26,7 @@
 #include "BlobUtilities.h"
 #include "CoordTransforms.h"
 #include "Units.h"
+#include "TimeMatch.h"
 
 #include "DataArray1D.h"
 #include "DataArray2D.h"
@@ -37,10 +38,6 @@
 
 #include <set>
 #include <queue>
-
-#ifndef TEMPEST_NOREGEX
-#include <regex>
-#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1082,7 +1079,11 @@ void DetectBlobs(
 #ifndef TEMPEST_NOREGEX
 	// Parse --timefilter
 	std::regex reTimeSubset;
-	{
+	if (param.strTimeFilter != "") {
+		
+		// Test regex support
+		TestRegex();
+
 		std::string strTimeFilter = param.strTimeFilter;
 		if (strTimeFilter == "3hr") {
 			strTimeFilter = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
@@ -1257,13 +1258,19 @@ void DetectBlobs(
 	std::vector<Time> vecOutputTimes;
 #ifndef TEMPEST_NOREGEX
 	vecTimeRetained.resize(vecTimes.size(), false);
-	for (int t = 0; t < vecTimes.size(); t++) {
-		std::string strTime = vecTimes[t].ToString();
-		std::smatch match;
-		if (std::regex_search(strTime, match, reTimeSubset)) {
-			vecOutputTimes.push_back(vecTimes[t]);
-			vecTimeRetained[t] = true;
+	if (param.strTimeFilter != "") {
+		for (int t = 0; t < vecTimes.size(); t++) {
+			std::string strTime = vecTimes[t].ToString();
+			std::smatch match;
+			if (std::regex_search(strTime, match, reTimeSubset)) {
+				vecOutputTimes.push_back(vecTimes[t]);
+				vecTimeRetained[t] = true;
+			}
 		}
+
+	} else {
+		vecOutputTimes = vecTimes;
+		vecTimeRetained.resize(vecTimes.size(), true);
 	}
 #else
 	vecOutputTimes = vecTimes;
