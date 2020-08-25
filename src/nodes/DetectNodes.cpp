@@ -450,7 +450,7 @@ void DetectCyclonesUnstructured(
 #endif
 #ifndef TEMPEST_NOREGEX
 	std::regex reTimeSubset;
-	{
+	if (param.strTimeFilter != "") {
 		std::string strTimeFilter = param.strTimeFilter;
 		if (strTimeFilter == "3hr") {
 			strTimeFilter = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
@@ -509,20 +509,6 @@ void DetectCyclonesUnstructured(
 		vecTimes,
 		false);
 
-#ifndef TEMPEST_NOREGEX
-	{
-		NcTimeDimension vecOutputTimes;
-		for (int t = 0; t < vecTimes.size(); t++) {
-			std::string strTime = vecTimes[t].ToString();
-			std::smatch match;
-			if (std::regex_search(strTime, match, reTimeSubset)) {
-				vecOutputTimes.push_back(vecTimes[t]);
-			}
-		}
-		vecTimes = vecOutputTimes;
-	}
-#endif
-
 	// Open output file
 	FILE * fpOutput = fopen(strOutputFile.c_str(), "w");
 	if (fpOutput == NULL) {
@@ -551,6 +537,17 @@ void DetectCyclonesUnstructured(
 
 		// Announce
 		AnnounceStartBlock("Time %s", vecTimes[t].ToString().c_str());
+
+#ifndef TEMPEST_NOREGEX
+		if (param.strTimeFilter != "") {
+			std::string strTime = vecTimes[t].ToString();
+			std::smatch match;
+			if (!std::regex_search(strTime, match, reTimeSubset)) {
+				AnnounceEndBlock("(skipping)");
+				continue;
+			}
+		}
+#endif
 
 		// Load the data for the search variable
 		Variable & varSearchBy = varreg.Get(param.ixSearchBy);
