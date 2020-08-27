@@ -85,7 +85,13 @@ DataOp * DataOpManager::Add(
 
 	} else if (strName == "_DIV") {
 		return Add(new DataOp_DIV);
+		
+	} else if (strName == "_MIN") {
+		return Add(new DataOp_MIN);
 	
+	} else if (strName == "_MAX") {
+		return Add(new DataOp_MAX);
+
 	} else if (strName == "_LAT") {
 		return Add(new DataOp_LAT);
 
