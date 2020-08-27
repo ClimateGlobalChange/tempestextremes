@@ -1084,7 +1084,7 @@ try {
 	if (strOutput != "") {
 		vecOutputFiles.push_back(strOutput);
 
-	} else {
+	} else if (strOutputFileList != "") {
 		vecOutputFiles.FromFile(strOutputFileList);
 
 		if (vecOutputFiles.size() != vecInputFiles.size()) {
