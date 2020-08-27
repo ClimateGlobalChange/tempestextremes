@@ -36,6 +36,8 @@ VariableRegistry::VariableRegistry() {
 	m_domDataOp.Add("_DIFF");
 	m_domDataOp.Add("_MULT");
 	m_domDataOp.Add("_DIV");
+	m_domDataOp.Add("_MIN");
+	m_domDataOp.Add("_MAX");
 	m_domDataOp.Add("_LAT");
 	m_domDataOp.Add("_F");
 }

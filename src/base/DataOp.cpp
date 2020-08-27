@@ -576,6 +576,134 @@ bool DataOp_DIV::Apply(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// DataOp_MIN
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_MIN::name = "_MIN";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_MIN::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() <= 1) {
+		_EXCEPTION2("%s expects at least two arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	for (int v = 0; v < vecArgData.size(); v++) {
+		if (vecArgData[v] == NULL) {
+			if (!STLStringHelper::IsFloat(strArg[v])) {
+				_EXCEPTION1("Arguments to %s must be data variables or floats",
+					m_strName.c_str());
+			}
+		}
+	}
+
+	if (vecArgData[0] == NULL) {
+		float dValue = atof(strArg[0].c_str());
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = dValue;
+		}
+
+	} else {
+		const DataArray1D<float> & data  = *(vecArgData[0]);
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = data[i];
+		}
+	}
+
+	dataout.Zero();
+	for (int v = 1; v < vecArgData.size(); v++) {
+
+		if (vecArgData[v] == NULL) {
+			float dValue = atof(strArg[v].c_str());
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				if (dValue < dataout[i]) {
+					dataout[i] = dValue;
+				}
+			}
+
+		} else {
+			const DataArray1D<float> & data  = *(vecArgData[v]);
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				if (data[i] < dataout[i]) {
+					dataout[i] = data[i];
+				}
+			}
+		}
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_MAX
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_MAX::name = "_MAX";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_MAX::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() <= 1) {
+		_EXCEPTION2("%s expects at least two arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	for (int v = 0; v < vecArgData.size(); v++) {
+		if (vecArgData[v] == NULL) {
+			if (!STLStringHelper::IsFloat(strArg[v])) {
+				_EXCEPTION1("Arguments to %s must be data variables or floats",
+					m_strName.c_str());
+			}
+		}
+	}
+
+	if (vecArgData[0] == NULL) {
+		float dValue = atof(strArg[0].c_str());
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = dValue;
+		}
+
+	} else {
+		const DataArray1D<float> & data  = *(vecArgData[0]);
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = data[i];
+		}
+	}
+
+	dataout.Zero();
+	for (int v = 1; v < vecArgData.size(); v++) {
+
+		if (vecArgData[v] == NULL) {
+			float dValue = atof(strArg[v].c_str());
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				if (dValue > dataout[i]) {
+					dataout[i] = dValue;
+				}
+			}
+
+		} else {
+			const DataArray1D<float> & data  = *(vecArgData[v]);
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				if (data[i] > dataout[i]) {
+					dataout[i] = data[i];
+				}
+			}
+		}
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // DataOp_LAT
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -749,6 +877,7 @@ void BuildLaplacianOperator(
 	// Scaling factor used in Laplacian calculation
 	const double dScale = 4.0 / static_cast<double>(nLaplacianPoints);
 
+	// TODO: Use SimpleGrid's built-in functionality
 	// Create a kdtree with all nodes in grid
 	kdtree * kdGrid = kd_create(3);
 	if (kdGrid == NULL) {
