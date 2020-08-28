@@ -503,12 +503,11 @@ void DetectCyclonesUnstructured(
 	}
 
 	// Get time information
-	NcTimeDimension vecTimes;
-	ReadCFTimeDataFromNcFile(
-		vecFiles[0],
-		vecFiles.GetFilename(0),
-		vecTimes,
-		false);
+	const NcTimeDimension & vecTimes = vecFiles.GetNcTimeDimension(0);
+	if (vecTimes.size() == 0) {
+		_EXCEPTION1("Input files contain no time information (%s)",
+			 strInputFiles.c_str());
+	}
 
 	// Open output file
 	FILE * fpOutput = fopen(strOutputFile.c_str(), "w");
