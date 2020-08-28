@@ -236,8 +236,8 @@ struct Node {
 	double y;
 	double z;
 
-	double lon;
-	double lat;
+	double lonRad;
+	double latRad;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -927,12 +927,12 @@ try {
 
 		// Insert all points at this time level
 		for (int i = 0; i < tscinfo.size(); i++) {
-			vecNodes[t][i].lon = DegToRad(std::stod(tscinfo[i][iLonIndex].c_str()));
-			vecNodes[t][i].lat = DegToRad(std::stod(tscinfo[i][iLatIndex].c_str()));
+			vecNodes[t][i].lonRad = DegToRad(std::stod(tscinfo[i][iLonIndex].c_str()));
+			vecNodes[t][i].latRad = DegToRad(std::stod(tscinfo[i][iLatIndex].c_str()));
 
 			RLLtoXYZ_Rad(
-				vecNodes[t][i].lon,
-				vecNodes[t][i].lat,
+				vecNodes[t][i].lonRad,
+				vecNodes[t][i].latRad,
 				vecNodes[t][i].x,
 				vecNodes[t][i].y,
 				vecNodes[t][i].z);
@@ -1003,10 +1003,10 @@ try {
 				// Great circle distance between points
 				double dR =
 					GreatCircleDistance_Deg(
-						vecNodes[t][i].lon,
-						vecNodes[t][i].lat,
-						vecNodes[t+g][iRes].lon,
-						vecNodes[t+g][iRes].lat);
+						vecNodes[t][i].lonRad,
+						vecNodes[t][i].latRad,
+						vecNodes[t+g][iRes].lonRad,
+						vecNodes[t+g][iRes].latRad);
 
 				// Verify great circle distance satisfies range requirement
 				if (dR <= dRange) {
@@ -1110,13 +1110,13 @@ try {
 				int iTime1 = path.m_iTimes[nT-1];
 				int iRes1  = path.m_iCandidates[nT-1];
 
-				double dLon0 = vecNodes[iTime0][iRes0].lon;
-				double dLat0 = vecNodes[iTime0][iRes0].lat;
+				double dLonRad0 = vecNodes[iTime0][iRes0].lonRad;
+				double dLatRad0 = vecNodes[iTime0][iRes0].latRad;
 
-				double dLon1 = vecNodes[iTime1][iRes1].lon;
-				double dLat1 = vecNodes[iTime1][iRes1].lat;
+				double dLonRad1 = vecNodes[iTime1][iRes1].lonRad;
+				double dLatRad1 = vecNodes[iTime1][iRes1].latRad;
 
-				double dR = GreatCircleDistance_Rad(dLon0, dLat0, dLon1, dLat1);
+				double dR = GreatCircleDistance_Deg(dLonRad0, dLatRad0, dLonRad1, dLatRad1);
 
 				if (dR < dMinEndpointDistance) {
 					nRejectedMinEndpointDistPaths++;
@@ -1134,13 +1134,13 @@ try {
 					int iTime1 = path.m_iTimes[i+1];
 					int iRes1 = path.m_iCandidates[i+1];
 
-					double dLon0 = vecNodes[iTime0][iRes0].lon;
-					double dLat0 = vecNodes[iTime0][iRes0].lat;
+					double dLonRad0 = vecNodes[iTime0][iRes0].lonRad;
+					double dLatRad0 = vecNodes[iTime0][iRes0].latRad;
 
-					double dLon1 = vecNodes[iTime1][iRes1].lon;
-					double dLat1 = vecNodes[iTime1][iRes1].lat;
+					double dLonRad1 = vecNodes[iTime1][iRes1].lonRad;
+					double dLatRad1 = vecNodes[iTime1][iRes1].latRad;
 
-					double dR = GreatCircleDistance_Rad(dLon0, dLat0, dLon1, dLat1);
+					double dR = GreatCircleDistance_Deg(dLonRad0, dLatRad0, dLonRad1, dLatRad1);
 
 					dTotalPathDistance += dR;
 				}
