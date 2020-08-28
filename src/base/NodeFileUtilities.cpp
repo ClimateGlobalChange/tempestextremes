@@ -192,17 +192,15 @@ void NodeFile::Read(
 
 			// Note that for 2D grids the coordinate indices are swapped
 			if (coord.size() == 1) {
-				if ((coord[0] < 0) || (coord[0] >= nGridDim[0])) {
-					_EXCEPTION4("Coordinate index out of range on line %i of \"%s\""
+				if (coord[0] < 0) {
+					_EXCEPTION4("Negative coordinate index on line %i of \"%s\""
 						" (%i/%i) (%i/%i)",
 						iLine, strNodeFile.c_str(),
 						coord[0], nGridDim[0]);
 				}
 			} else if (coord.size() == 2) {
-				if ((coord[0] < 0) || (coord[0] >= nGridDim[1]) ||
-				    (coord[1] < 0) || (coord[1] >= nGridDim[0])
-				) {
-					_EXCEPTION6("Coordinate index out of range on line %i of \"%s\""
+				if ((coord[0] < 0) || (coord[1] < 0)) {
+					_EXCEPTION6("Negative coordinate index on line %i of \"%s\""
 						" (%i/%i) (%i/%i)",
 						iLine, strNodeFile.c_str(),
 						coord[0], nGridDim[1],
@@ -283,8 +281,8 @@ void NodeFile::Read(
 					_EXCEPTIONT("Undefined behavior for SimpleGrid dimensionality > 2");
 				}
 
-				if ((pathnode.m_gridix < 0) || (pathnode.m_gridix > sGridSize)) {
-					_EXCEPTION2("Coordinate index out of range on line %i of \"%s\"",
+				if (pathnode.m_gridix < 0) {
+					_EXCEPTION2("Negative coordinate index on line %i of \"%s\"",
 						iLine, strNodeFile.c_str());
 				}
 

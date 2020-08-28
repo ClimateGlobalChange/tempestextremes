@@ -1040,7 +1040,7 @@ try {
 
 	// Note timestride is deprecated
 	if (dcuparam.nTimeStride != 1) {
-		Announce("WARNING: --timestride is deprecated.  Consider using --timefilter instead.");
+		//Announce("WARNING: --timestride is deprecated.  Consider using --timefilter instead.");
 		if (dcuparam.strTimeFilter != "") {
 			_EXCEPTIONT("Only one of --timestride and --timefilter can be used.");
 		}

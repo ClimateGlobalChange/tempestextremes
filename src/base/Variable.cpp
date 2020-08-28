@@ -743,7 +743,7 @@ void Variable::LoadGridData(
 
 			if (nVarDimX0 != nSize) {
 				_EXCEPTION1("Dimension mismatch with variable"
-					" \"%s\" on \"ncol\"",
+					" \"%s\" on \"ncol\" -- possible mismatch between connectivity file and data",
 					m_strName.c_str());
 			}
 
