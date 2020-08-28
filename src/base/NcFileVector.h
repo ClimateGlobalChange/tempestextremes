@@ -20,6 +20,7 @@
 #include "Exception.h"
 #include "netcdfcpp.h"
 #include "TimeObj.h"
+#include "NetCDFUtilities.h"
 
 #include <vector>
 
@@ -169,6 +170,14 @@ public:
 		}
 	}
 
+	///	<summary>
+	///		Get the NcTimeDimension from the specified file.
+	///	</summary>
+	const NcTimeDimension & GetNcTimeDimension(size_t pos) const {
+		_ASSERT(pos < m_vecFileTime.size());
+		return m_vecFileTime[pos];
+	}
+
 public:
 	///	<summary>
 	///		Square bracket accessor.
@@ -192,6 +201,11 @@ protected:
 	///		Type of file.
 	///	</summary>
 	std::vector<FileType> m_vecFileType;
+
+	///	<summary>
+	///		Times from each file.
+	///	</summary>
+	std::vector<NcTimeDimension> m_vecFileTime;
 
 protected:
 	///	<summary>

@@ -54,6 +54,11 @@ void NcFileVector::InsertFile(
 		_EXCEPTION1("Cannot open input file \"%s\"", strFile.c_str());
 	}
 
+	m_vecNcFile.push_back(pNewFile);
+	m_vecFilenames.push_back(strFile);
+	m_vecTimeIxs.push_back(lTimeIndex);
+	m_vecFileTime.resize(m_vecFileTime.size()+1);
+
 	// Identify the FileType by the properties of the "time" variable
 	NcDim * dimTime = pNewFile->get_dim("time");
 	if (dimTime == NULL) {
@@ -63,6 +68,14 @@ void NcFileVector::InsertFile(
 		if (varTime == NULL) {
 			m_vecFileType.push_back(FileType_NoTimeVar);
 		} else {
+			// If the time variable exists read it in
+			ReadCFTimeDataFromNcFile(
+				pNewFile,
+				strFile,
+				m_vecFileTime[m_vecFileTime.size()-1],
+				false);
+
+			// Check time type
 			NcAtt * attType = varTime->get_att("type");
 			if (attType == NULL) {
 				m_vecFileType.push_back(FileType_Standard);
@@ -77,10 +90,6 @@ void NcFileVector::InsertFile(
 			}
 		}
 	}
-
-	m_vecNcFile.push_back(pNewFile);
-	m_vecFilenames.push_back(strFile);
-	m_vecTimeIxs.push_back(lTimeIndex);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -161,13 +170,7 @@ long NcFileVector::GetTimeIx(size_t pos) const {
 		_ASSERT(m_vecNcFile.size() == m_vecFilenames.size());
 		_ASSERT(m_vecNcFile.size() == m_vecFileType.size());
 
-		NcTimeDimension vecTimes;
-		ReadCFTimeDataFromNcFile(
-			m_vecNcFile[pos],
-			m_vecFilenames[pos],
-			vecTimes,
-			false);
-
+		const NcTimeDimension & vecTimes = m_vecFileTime[pos];
 		_ASSERT(vecTimes.size() > 0);
 
 		if (m_vecFileType[pos] == NcFileVector::FileType_Standard) {
