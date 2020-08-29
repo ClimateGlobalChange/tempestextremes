@@ -899,7 +899,7 @@ try {
 			vecTimes,
 			true);
 
-		std::cout << vecTimes[0].ToString() << " " << vecTimes[0].GetCalendarType() << std::endl;
+		//std::cout << vecTimes[0].ToString() << " " << vecTimes[0].GetCalendarType() << std::endl;
 
 		if (vecOutputFiles.size() == 1) {
 			for (int t = 0; t < vecTimes.size(); t++) {
