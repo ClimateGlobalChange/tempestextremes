@@ -1247,12 +1247,7 @@ void DetectBlobs(
 	}
 */
 	// Read the time data
-	NcTimeDimension vecTimes;
-	ReadCFTimeDataFromNcFile(
-		vecFiles[0],
-		vecFiles.GetFilename(0),
-		vecTimes,
-		false);
+	const NcTimeDimension & vecTimes = vecFiles.GetNcTimeDimension(0);
 
 	std::vector<bool> vecTimeRetained;
 	std::vector<Time> vecOutputTimes;

@@ -610,6 +610,9 @@ try {
 	// Maximum longitude for detections
 	double dMaxLonDeg;
 
+	// Flatten data
+	bool fFlatten;
+
 	// Operate on a regional area (no periodic boundaries)
 	bool fRegional;
 
@@ -653,6 +656,7 @@ try {
 		CommandLineDouble(dMaxLatDeg, "maxlat", 90.0);
 		CommandLineDouble(dMinLonDeg, "minlon", 0.0);
 		CommandLineDouble(dMaxLonDeg, "maxlon", 360.0);
+		CommandLineBool(fFlatten, "flatten");
 		CommandLineString(strLatitudeName, "latname","lat");
 		CommandLineString(strLongitudeName, "lonname","lon");
 		//CommandLineString(strTimeName, "timename", "time");
@@ -858,6 +862,7 @@ try {
 
 	// Get time dimension over all files
 	// strOutTimeUnits is either predetermined or set at the command line
+	AnnounceStartBlock("Concatenating times");
 	NcType nctypeTime;
 	std::vector< std::pair<int, int> > vecGlobalTimeIxToFileTimeIx;
 
@@ -892,12 +897,16 @@ try {
 		}
 
 		// Load in CF-compliant time data
-		NcTimeDimension vecTimes;
-		ReadCFTimeDataFromNcFile(
-			vecNcFiles[0],
-			vecInputFiles[f].c_str(),
-			vecTimes,
-			true);
+		const NcTimeDimension & vecTimes = vecNcFiles.GetNcTimeDimension(0);
+		if (vecTimes.size() == 0) {
+			_EXCEPTION1("WARNING: File group does not contain any time data (%s)",
+				vecInputFiles[f].c_str());
+		}
+		//ReadCFTimeDataFromNcFile(
+		//	vecNcFiles[0],
+		//	vecInputFiles[f].c_str(),
+		//	vecTimes,
+		//	true);
 
 		//std::cout << vecTimes[0].ToString() << " " << vecTimes[0].GetCalendarType() << std::endl;
 
@@ -921,6 +930,8 @@ try {
 	}
 	_ASSERT(nGlobalTimes > 0);
 	_ASSERT(nGlobalTimes == vecGlobalTimeIxToFileTimeIx.size());
+
+	AnnounceEndBlock("Done");
 
 	///////////////////////////////////////////////////////////////////////////
 	// Build the set of nodes at each time contained in each blob
@@ -1701,9 +1712,15 @@ try {
 					}
 		
 					IndicatorSetConstIterator iter = vecBlobs[p].begin();
-					for (; iter != vecBlobs[p].end(); iter++) {
-						dataBlobTag[*iter] =
-							vecBlobTags[p].global_id;
+					if (!fFlatten) {
+						for (; iter != vecBlobs[p].end(); iter++) {
+							dataBlobTag[*iter] =
+								vecBlobTags[p].global_id;
+						}
+					} else {
+						for (; iter != vecBlobs[p].end(); iter++) {
+							dataBlobTag[*iter] = 1.0;
+						}
 					}
 				}
 
