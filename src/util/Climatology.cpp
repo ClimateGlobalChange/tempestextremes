@@ -611,9 +611,9 @@ void Climatology(
 				MemoryBytesToString(sOutputTimes * sTotalAuxDims * sizeof(double));
 
 			std::string strFullVariableName = vecVariableNames[v];
-			if (vecVariableSpecifiedDims.size() > 0) {
+			if (vecVariableSpecifiedDims[v].size() > 0) {
 				strFullVariableName += "(";
-				for (int d = 0; d < vecVariableSpecifiedDims.size(); d++) {
+				for (int d = 0; d < vecVariableSpecifiedDims[v].size(); d++) {
 					strFullVariableName += vecVariableSpecifiedDims[v][d];
 					if (d != vecVariableSpecifiedDims.size()-1) {
 						strFullVariableName += ",";
