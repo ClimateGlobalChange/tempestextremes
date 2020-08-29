@@ -19,15 +19,17 @@ src/depend/*
 
 bin/*
 
+test
+
 test/*.nc
+
+test/*.nc4
 
 test/*.dat
 
 test/*.txt
 
 test/*.g
-
-test/*.nc4
 
 test/cfsr_tests
 
