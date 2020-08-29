@@ -180,8 +180,8 @@ try {
 		Announce("Applying Fourier filter to dimension %i", iFourierDimension);
 
 		// Load in data and Fourier filter
-		if (varIn->type() != ncFloat) {
-			_EXCEPTIONT("Only variables of type \"float\" currently supported");
+		if ((varIn->type() != ncFloat) && (varIn->type() != ncDouble)) {
+			_EXCEPTIONT("Only variables of type \"float\" or \"double\" currently supported");
 		}
 
 		NcVar * varOut = ncoutfile.get_var(varIn->name());
