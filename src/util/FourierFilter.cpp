@@ -210,28 +210,50 @@ try {
 		}
 
 		// Perform filtering
-		DataArray1D<float> data(sTotalSize);
-		varIn->get(&(data[0]), &(lSize[0]));
+		if (varIn->type() == ncFloat) {
+			DataArray1D<float> data(sTotalSize);
+			varIn->get(&(data[0]), &(lSize[0]));
 
-		DataArray1D<float> an(sFourierCount);
-		DataArray1D<float> bn(sFourierCount);
+			DataArray1D<float> an(sFourierCount);
+			DataArray1D<float> bn(sFourierCount);
 
-		//std::cout << sFourierCount << std::endl;
-		//std::cout << sFourierStride << std::endl;
-		for (size_t s = 0; s < sFourierOuterLoops; s++) {
-		for (size_t i = 0; i < sFourierStride; i++) {
-			fourier_filter<float>(
-				&(data[s * sFourierStride * sFourierCount + i]),
-				sFourierCount,
-				sFourierStride,
-				static_cast<size_t>(nFourierModes),
-				an, bn);
+			//std::cout << sFourierCount << std::endl;
+			//std::cout << sFourierStride << std::endl;
+			for (size_t s = 0; s < sFourierOuterLoops; s++) {
+			for (size_t i = 0; i < sFourierStride; i++) {
+				fourier_filter<float>(
+					&(data[s * sFourierStride * sFourierCount + i]),
+					sFourierCount,
+					sFourierStride,
+					static_cast<size_t>(nFourierModes),
+					an, bn);
+			}
+			}
+
+			varOut->put(&(data[0]), &(lSize[0]));
+
+		} else {
+			DataArray1D<double> data(sTotalSize);
+			varIn->get(&(data[0]), &(lSize[0]));
+
+			DataArray1D<double> an(sFourierCount);
+			DataArray1D<double> bn(sFourierCount);
+
+			//std::cout << sFourierCount << std::endl;
+			//std::cout << sFourierStride << std::endl;
+			for (size_t s = 0; s < sFourierOuterLoops; s++) {
+			for (size_t i = 0; i < sFourierStride; i++) {
+				fourier_filter<double>(
+					&(data[s * sFourierStride * sFourierCount + i]),
+					sFourierCount,
+					sFourierStride,
+					static_cast<size_t>(nFourierModes),
+					an, bn);
+			}
+			}
+
+			varOut->put(&(data[0]), &(lSize[0]));
 		}
-		}
-
-		// Write data
-		varOut->put(&(data[0]), &(lSize[0]));
-
 		AnnounceEndBlock("Done");
 	}
 
