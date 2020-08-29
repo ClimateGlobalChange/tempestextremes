@@ -1257,8 +1257,8 @@ void DetectBlobs(
 	std::vector<bool> vecTimeRetained;
 	std::vector<Time> vecOutputTimes;
 #ifndef TEMPEST_NOREGEX
-	vecTimeRetained.resize(vecTimes.size(), false);
 	if (param.strTimeFilter != "") {
+		vecTimeRetained.resize(vecTimes.size(), false);
 		for (int t = 0; t < vecTimes.size(); t++) {
 			std::string strTime = vecTimes[t].ToString();
 			std::smatch match;
