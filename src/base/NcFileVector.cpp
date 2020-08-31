@@ -57,35 +57,41 @@ void NcFileVector::InsertFile(
 	m_vecNcFile.push_back(pNewFile);
 	m_vecFilenames.push_back(strFile);
 	m_vecTimeIxs.push_back(lTimeIndex);
-	m_vecFileTime.resize(m_vecFileTime.size()+1);
+	m_vecFileTime.push_back(NcTimeDimension());
+
+	// If a time index is already specified no need to read in the "time" variable
+	if (lTimeIndex != InvalidTimeIndex) {
+		m_vecFileType.push_back(FileType_Unknown);
 
 	// Identify the FileType by the properties of the "time" variable
-	NcDim * dimTime = pNewFile->get_dim("time");
-	if (dimTime == NULL) {
-		m_vecFileType.push_back(FileType_NoTimeDim);
 	} else {
-		NcVar * varTime = pNewFile->get_var("time");
-		if (varTime == NULL) {
-			m_vecFileType.push_back(FileType_NoTimeVar);
+		NcDim * dimTime = pNewFile->get_dim("time");
+		if (dimTime == NULL) {
+			m_vecFileType.push_back(FileType_NoTimeDim);
 		} else {
-			// If the time variable exists read it in
-			ReadCFTimeDataFromNcFile(
-				pNewFile,
-				strFile,
-				m_vecFileTime[m_vecFileTime.size()-1],
-				false);
-
-			// Check time type
-			NcAtt * attType = varTime->get_att("type");
-			if (attType == NULL) {
-				m_vecFileType.push_back(FileType_Standard);
+			NcVar * varTime = pNewFile->get_var("time");
+			if (varTime == NULL) {
+				m_vecFileType.push_back(FileType_NoTimeVar);
 			} else {
-				std::string strType = attType->as_string(0);
-				if (strType == "daily mean climatology") {
-					m_vecFileType.push_back(FileType_DailyMeanClimo);
+				// If the time variable exists read it in
+				ReadCFTimeDataFromNcFile(
+					pNewFile,
+					strFile,
+					m_vecFileTime[m_vecFileTime.size()-1],
+					false);
+
+				// Check time type
+				NcAtt * attType = varTime->get_att("type");
+				if (attType == NULL) {
+					m_vecFileType.push_back(FileType_Standard);
 				} else {
-					_EXCEPTION2("Unrecognized time::type (%s) in file \"%s\"",
-						strType.c_str(), strFile.c_str());
+					std::string strType = attType->as_string(0);
+					if (strType == "daily mean climatology") {
+						m_vecFileType.push_back(FileType_DailyMeanClimo);
+					} else {
+						_EXCEPTION2("Unrecognized time::type (%s) in file \"%s\"",
+							strType.c_str(), strFile.c_str());
+					}
 				}
 			}
 		}
