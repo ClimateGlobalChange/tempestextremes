@@ -366,6 +366,13 @@ public:
 	}
 
 	///	<summary>
+	///		Get the zero-indexed month.
+	///	</summary>
+	inline int GetZeroIndexedMonth() const {
+		return m_iMonth;
+	}
+
+	///	<summary>
 	///		Get the month.
 	///	</summary>
 	inline int GetMonth() const {
@@ -374,6 +381,13 @@ public:
 		} else {
 			return m_iMonth;
 		}
+	}
+
+	///	<summary>
+	///		Get the zero-indexed day.
+	///	</summary>
+	inline int GetZeroIndexedDay() const {
+		return m_iDay;
 	}
 
 	///	<summary>

@@ -392,6 +392,16 @@ void SplitVariableStrings(
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		Possible climatology periods that can be calculated with Climatology().
+///	</summary>
+enum ClimatologyPeriod {
+	ClimatologyPeriod_Daily,
+	ClimatologyPeriod_Monthly,
+	ClimatologyPeriod_Seasonal,
+	ClimatologyPeriod_Annual
+};
+
+///	<summary>
 ///		Possible climatology types that can be calculated with Climatology().
 ///	</summary>
 enum ClimatologyType {
@@ -409,6 +419,7 @@ void Climatology(
 	const std::vector< std::vector<std::string> > & vecVariableSpecifiedDims,
 	size_t sMemoryMax,
 	bool fIncludeLeapDays,
+	ClimatologyPeriod eClimoPeriod,
 	ClimatologyType eClimoType,
 	int nFourierModes,
 	bool fMissingData,
@@ -418,6 +429,15 @@ void Climatology(
 	_ASSERT(vecInputFileList.size() > 0);
 	_ASSERT(vecVariableNames.size() > 0);
 	_ASSERT(vecVariableNames.size() == vecVariableSpecifiedDims.size());
+
+	// Climatology period
+	if ((eClimoPeriod != ClimatologyPeriod_Daily) &&
+		(eClimoPeriod != ClimatologyPeriod_Monthly) &&
+		(eClimoPeriod != ClimatologyPeriod_Seasonal) &&
+		(eClimoPeriod != ClimatologyPeriod_Annual)
+	) {
+		_EXCEPTIONT("Invalid eClimoPeriod");
+	}
 
 	// Climatology type
 	if ((eClimoType != ClimatologyType_Mean) &&
@@ -504,6 +524,15 @@ void Climatology(
 				Announce("Calendar contains 365 days per year",
 					strTimeCalendar.c_str());
 				sOutputTimes = 365;
+			}
+
+			// Other climatologies
+			if (eClimoPeriod == ClimatologyPeriod_Monthly) {
+				sOutputTimes = 12;
+			} else if (eClimoPeriod == ClimatologyPeriod_Seasonal) {
+				sOutputTimes = 4;
+			} else if (eClimoPeriod == ClimatologyPeriod_Annual) {
+				sOutputTimes = 1;
 			}
 		}
 		AnnounceEndBlock("Done");
@@ -639,47 +668,72 @@ void Climatology(
 		AnnounceStartBlock("Initializing output file");
 
 		Announce("Initialize time dimension and variable");
-		NcDim * dimOutTime = ncoutfile.add_dim("time", (long)sOutputTimes);
-		if (dimOutTime == NULL) {
-			_EXCEPTIONT("Unable to create output dimension \"time\" in output file");
+		//NcDim * dimOutTime = ncoutfile.add_dim("time", (long)sOutputTimes);
+		//if (dimOutTime == NULL) {
+		//	_EXCEPTIONT("Unable to create output dimension \"time\" in output file");
+		//}
+
+		//NcVar * varOutTime = ncoutfile.add_var("time", varInTime->type(), dimOutTime);
+		//if (varOutTime == NULL) {
+		//	_EXCEPTIONT("Unable to create output dimension \"time\" in output file");
+		//}
+
+		//if (fIncludeLeapDays) {
+		//	_EXCEPTIONT("--include_leap_days not implemented");
+		//} else {
+		//	varOutTime->add_att("calendar", "noleap");
+		//}
+		//varOutTime->add_att("units", strTimeUnits.c_str());
+
+		NcTimeDimension vecTimes;
+		vecTimes.m_nctype = varInTime->type();
+		vecTimes.m_units = strTimeUnits;
+
+		if (eClimoPeriod == ClimatologyPeriod_Daily) {
+			Time timeOut("0001-01-01-00000-000000", Time::CalendarNoLeap);
+			for (size_t s = 0; s < sOutputTimes; s++) {
+				vecTimes.push_back(timeOut);
+				timeOut.AddDays(1);
+			}
+
+		} else if (eClimoPeriod == ClimatologyPeriod_Monthly) {
+			Time timeOut("0001-01-01-00000-000000", Time::CalendarNoLeap);
+			for (size_t s = 0; s < sOutputTimes; s++) {
+				vecTimes.push_back(timeOut);
+				timeOut.AddMonths(1);
+			}
+
+		} else if (eClimoPeriod == ClimatologyPeriod_Seasonal) {
+			Time timeOut("0001-01-01-00000-000000", Time::CalendarNoLeap);
+			for (size_t s = 0; s < sOutputTimes; s++) {
+				vecTimes.push_back(timeOut);
+				timeOut.AddMonths(3);
+			}
+
+		} else if (eClimoPeriod == ClimatologyPeriod_Annual) {
+			Time timeOut("0001-01-01-00000-000000", Time::CalendarNoLeap);
+			vecTimes.push_back(timeOut);
 		}
 
-		NcVar * varOutTime = ncoutfile.add_var("time", varInTime->type(), dimOutTime);
-		if (varOutTime == NULL) {
-			_EXCEPTIONT("Unable to create output dimension \"time\" in output file");
-		}
+		WriteCFTimeDataToNcFile(
+			&ncoutfile,
+			strOutputFile,
+			vecTimes,
+			true);
 
-		if (fIncludeLeapDays) {
-			_EXCEPTIONT("--include_leap_days not implemented");
-		} else {
-			varOutTime->add_att("calendar", "noleap");
-		}
-		varOutTime->add_att("units", strTimeUnits.c_str());
-		varOutTime->add_att("type", "daily mean climatology");
+		NcDim * dimOutTime = ncoutfile.get_dim("time");
+		_ASSERT(dimOutTime != NULL);
 
-		if (varOutTime->type() == ncInt) {
-			DataArray1D<int> nTimes(sOutputTimes);
-			for (size_t s = 0; s < sOutputTimes; s++) {
-				nTimes[s] = static_cast<int>(s);
-			}
-			varOutTime->put(&(nTimes[0]), sOutputTimes);
-
-		} else if (varOutTime->type() == ncDouble) {
-			DataArray1D<double> dTimes(sOutputTimes);
-			for (size_t s = 0; s < sOutputTimes; s++) {
-				dTimes[s] = static_cast<double>(s);
-			}
-			varOutTime->put(&(dTimes[0]), sOutputTimes);
-
-		} else if (varOutTime->type() == ncInt64) {
-			DataArray1D<ncint64> dTimes(sOutputTimes);
-			for (size_t s = 0; s < sOutputTimes; s++) {
-				dTimes[s] = static_cast<ncint64>(s);
-			}
-			varOutTime->put(&(dTimes[0]), sOutputTimes);
-
-		} else {
-			_EXCEPTIONT("Invalid type of \"time\" variable, expected \"int\" or \"double\"");
+		NcVar * varOutTime = ncoutfile.get_var("time");
+		_ASSERT(varOutTime != NULL);
+		if (eClimoPeriod == ClimatologyPeriod_Daily) {
+			varOutTime->add_att("type", "daily mean climatology");
+		} else if (eClimoPeriod == ClimatologyPeriod_Monthly) {
+			varOutTime->add_att("type", "monthly mean climatology");
+		} else if (eClimoPeriod == ClimatologyPeriod_Seasonal) {
+			varOutTime->add_att("type", "seasonal mean climatology");
+		} else if (eClimoPeriod == ClimatologyPeriod_Annual) {
+			varOutTime->add_att("type", "annual mean climatology");
 		}
 
 		// Copy dimension information to output file
@@ -934,43 +988,68 @@ void Climatology(
 					timeJan01.SetMonth(1);
 					timeJan01.SetDay(1);
 
-					int iDay = vecTimes[t].DayNumber() - timeJan01.DayNumber();
-					if ((vecTimes[t].IsLeapYear()) && (iDay >= 60)) {
-						iDay--;
+					int iTimeIndex;
+					if (eClimoPeriod == ClimatologyPeriod_Daily) {
+						iTimeIndex = vecTimes[t].DayNumber() - timeJan01.DayNumber();
+						if ((vecTimes[t].IsLeapYear()) && (iTimeIndex >= 60)) {
+							iTimeIndex--;
+						}
+
+						_ASSERT((iTimeIndex >= 0) && (iTimeIndex < 365));
+
+					} else if (eClimoPeriod == ClimatologyPeriod_Monthly) {
+						iTimeIndex = vecTimes[t].GetZeroIndexedMonth();
+						_ASSERT((iTimeIndex >= 0) && (iTimeIndex < 12));
+
+					} else if (eClimoPeriod == ClimatologyPeriod_Seasonal) {
+						int iMonth = vecTimes[t].GetZeroIndexedMonth();
+						_ASSERT((iMonth >= 0) && (iMonth < 12));
+						if ((iMonth == 11) || (iMonth == 0) || (iMonth == 1)) {
+							iTimeIndex = 0;
+						} else if ((iMonth == 2) || (iMonth == 3) || (iMonth == 4)) {
+							iTimeIndex = 1;
+						} else if ((iMonth == 5) || (iMonth == 6) || (iMonth == 7)) {
+							iTimeIndex = 2;
+						} else if ((iMonth == 8) || (iMonth == 9) || (iMonth == 10)) {
+							iTimeIndex = 3;
+						}
+
+					} else if (eClimoPeriod == ClimatologyPeriod_Annual) {
+						iTimeIndex = 0;
 					}
 
-					_ASSERT((iDay >= 0) && (iDay < 365));
-
+					// Count number of time slices at each point and accumulate data
 					if (fMissingData) {
 						if (eClimoType == ClimatologyType_Mean) {
 							for (size_t i = 0; i < sGetRows; i++) {
 								if (dDataIn[i] != dFillValue) {
-									nTimeSlicesGrid[iDay][i]++;
-									dAccumulatedData[iDay][i] += static_cast<double>(dDataIn[i]);
+									nTimeSlicesGrid[iTimeIndex][i]++;
+									dAccumulatedData[iTimeIndex][i] += static_cast<double>(dDataIn[i]);
 								}
 							}
 
 						} else if (eClimoType == ClimatologyType_MeanSq) {
 							for (size_t i = 0; i < sGetRows; i++) {
 								if (dDataIn[i] != dFillValue) {
-									nTimeSlicesGrid[iDay][i]++;
-									dAccumulatedData[iDay][i] +=
+									nTimeSlicesGrid[iTimeIndex][i]++;
+									dAccumulatedData[iTimeIndex][i] +=
 										static_cast<double>(dDataIn[i])
 										* static_cast<double>(dDataIn[i]);
 								}
 							}
 						}
 
+					// Count number of time slices at each time and accumulate data
 					} else {
-						nTimeSlices[iDay]++;
+						nTimeSlices[iTimeIndex]++;
 						if (eClimoType == ClimatologyType_Mean) {
 							for (size_t i = 0; i < sGetRows; i++) {
-								dAccumulatedData[iDay][i] += static_cast<double>(dDataIn[i]);
+								dAccumulatedData[iTimeIndex][i] += static_cast<double>(dDataIn[i]);
 							}
 
 						} else if (eClimoType == ClimatologyType_MeanSq) {
 							for (size_t i = 0; i < sGetRows; i++) {
-								dAccumulatedData[iDay][i] +=
+								dAccumulatedData[iTimeIndex][i] +=
 									static_cast<double>(dDataIn[i])
 									* static_cast<double>(dDataIn[i]);
 							}
@@ -1614,7 +1693,7 @@ try {
 	std::string strMemoryMax;
 
 	// Period of the climatology
-	std::string strPeriod;
+	std::string strClimoPeriod;
 
 	// Type of climatology
 	std::string strClimoType;
@@ -1644,7 +1723,7 @@ try {
 		CommandLineString(strOutputFile, "out_data", "");
 		CommandLineString(strVariable, "var", "");
 		CommandLineStringD(strMemoryMax, "memmax", "2G", "[#K,#M,#G]");
-		CommandLineStringD(strPeriod, "period", "daily", "[daily|monthly|seasonal|annual]");
+		CommandLineStringD(strClimoPeriod, "period", "daily", "[daily|monthly|seasonal|annual]");
 		CommandLineStringD(strClimoType, "type", "mean", "[mean|meansq]");
 		CommandLineBool(fIncludeLeapDays, "include_leap_days");
 		//CommandLineInt(nFourierModes, "time_modes", 0);
@@ -1675,9 +1754,19 @@ try {
 		_EXCEPTIONT("--include_leap_days not implemented");
 	}
 
-	// Period
-	if (strPeriod != "daily") {
-		_EXCEPTIONT("Only --period \"daily\" is currently implemented");
+	// Climatology period
+	ClimatologyPeriod eClimoPeriod;
+	STLStringHelper::ToLower(strClimoPeriod);
+	if (strClimoPeriod == "daily") {
+		eClimoPeriod = ClimatologyPeriod_Daily;
+	} else if (strClimoPeriod == "monthly") {
+		eClimoPeriod = ClimatologyPeriod_Monthly;
+	} else if (strClimoPeriod == "seasonal") {
+		eClimoPeriod = ClimatologyPeriod_Seasonal;
+	} else if (strClimoPeriod == "annual") {
+		eClimoPeriod = ClimatologyPeriod_Annual;
+	} else {
+		_EXCEPTIONT("--period invalid; expected \"daily\", \"monthly\", \"seasonal\" or \"annual\"");
 	}
 
 	// Climatology type
@@ -1808,6 +1897,7 @@ try {
 		vecVariableSpecifiedDims,
 		sMemoryMax,
 		fIncludeLeapDays,
+		eClimoPeriod,
 		eClimoType,
 		nFourierModes,
 		fMissingData,
@@ -1840,16 +1930,25 @@ try {
 				}
 
 				std::vector<std::string> vecTempVariableNames;
-				if (strPeriod == "daily") {
-					if (eClimoType == ClimatologyType_Mean) {
-						for (int v = 0; v < vecVariableNames.size(); v++) {
-							vecTempVariableNames.push_back(std::string("dailymean_") + vecVariableNames[v]);
-						}
-					} else if (eClimoType == ClimatologyType_MeanSq) {
-						for (int v = 0; v < vecVariableNames.size(); v++) {
-							vecTempVariableNames.push_back(std::string("dailymeansq_") + vecVariableNames[v]);
-						}
-					}
+
+				std::string strVariablePrefix;
+				if (eClimoPeriod == ClimatologyPeriod_Daily) {
+					strVariablePrefix = "daily";
+				} else if (eClimoPeriod == ClimatologyPeriod_Monthly) {
+					strVariablePrefix = "monthly";
+				} else if (eClimoPeriod == ClimatologyPeriod_Seasonal) {
+					strVariablePrefix = "seasonal";
+				} else if (eClimoPeriod == ClimatologyPeriod_Annual) {
+					strVariablePrefix = "annual";
+				}
+				if (eClimoType == ClimatologyType_Mean) {
+					strVariablePrefix += "mean_";
+				} else if (eClimoType == ClimatologyType_MeanSq) {
+					strVariablePrefix += "meansq_";
+				}
+
+				for (int v = 0; v < vecVariableNames.size(); v++) {
+					vecTempVariableNames.push_back(strVariablePrefix + vecVariableNames[v]);
 				}
 
 				AverageOverNcFiles(
