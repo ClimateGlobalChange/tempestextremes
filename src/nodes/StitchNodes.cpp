@@ -85,7 +85,8 @@ void ParseDetectNodesFile(
 	const std::string & strInputFile,
 	const std::vector< std::string > & vecFormatStrings,
 	TimeToCandidateInfoMap & mapCandidateInfo,
-	Time::CalendarType caltype
+	Time::CalendarType caltype,
+	bool fAllowRepeatedTimes
 ) {
 	// Open file for reading
 	FILE * fp = fopen(strInputFile.c_str(), "r");
@@ -175,20 +176,29 @@ void ParseDetectNodesFile(
 
 			auto it = mapCandidateInfo.find(time);
 			if (it != mapCandidateInfo.end()) {
-				_EXCEPTION1("Repated time \"%s\" found in candidate files",
-					time.ToString().c_str());
-			}
-			auto ins =
-				mapCandidateInfo.insert(
-					TimeToCandidateInfoPair(
-						time, TimesliceCandidateInformation(nCandidates)));
+				if (fAllowRepeatedTimes) {
+					iterCurrentTime = it;
+					iCandidate = iterCurrentTime->second.size();
+					iterCurrentTime->second.resize(iCandidate + nCandidates);
 
-			if (!ins.second) {
-				_EXCEPTION1("Insertion of time \"%s\" into candidate info map failed",
-					time.ToString().c_str());
-			}
+				} else {
+					_EXCEPTION1("Repated time \"%s\" found in candidate files",
+						time.ToString().c_str());
+				}
 
-			iterCurrentTime = ins.first;
+			} else {
+				auto ins =
+					mapCandidateInfo.insert(
+						TimeToCandidateInfoPair(
+							time, TimesliceCandidateInformation(nCandidates)));
+
+				if (!ins.second) {
+					_EXCEPTION1("Insertion of time \"%s\" into candidate info map failed",
+						time.ToString().c_str());
+				}
+
+				iterCurrentTime = ins.first;
+			}
 
 			// Prepare to parse candidate data
 			if (nCandidates != 0) {
@@ -212,7 +222,7 @@ void ParseDetectNodesFile(
 			}
 
 			iCandidate++;
-			if (iCandidate == nCandidates) {
+			if (iCandidate == tscinfo.size()) {
 				eReadState = ReadState_Time;
 				iCandidate = 0;
 				iterCurrentTime = mapCandidateInfo.end();
@@ -618,6 +628,9 @@ try {
 	// Calendar type
 	std::string strCalendar;
 
+	// Allow repeated times
+	bool fAllowRepeatedTimes;
+
 	// Output format
 	std::string strOutputFileFormat;
 
@@ -641,6 +654,7 @@ try {
 		CommandLineStringD(strThreshold, "threshold", "",
 			"[col,op,value,count;...]");
 		CommandLineStringD(strCalendar, "caltype", "standard", "(none|standard|noleap|360_day)");
+		CommandLineBool(fAllowRepeatedTimes, "allow_repeated_times");
 		//CommandLineInt(nTimeStride, "timestride", 1);
 		CommandLineStringD(strOutputFileFormat, "out_file_format", "gfdl", "(gfdl|csv|csvnohead)");
 
@@ -840,7 +854,8 @@ try {
 				vecInputFiles[f],
 				vecFormatStrings,
 				mapCandidateInfo,
-				caltype);
+				caltype,
+				fAllowRepeatedTimes);
 		}
 
 		if (mapCandidateInfo.size() == 0) {
