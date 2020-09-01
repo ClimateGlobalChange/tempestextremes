@@ -31,6 +31,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <cmath>
 
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
@@ -423,6 +424,7 @@ void Climatology(
 	ClimatologyType eClimoType,
 	int nFourierModes,
 	bool fMissingData,
+	const std::string & strFillValueOverride,
 	bool fOutputSliceCounts,
 	bool fVerbose
 ) {
@@ -946,15 +948,25 @@ void Climatology(
 
 				// Get the fill value
 				if (fMissingData) {
-					NcAtt * attFillValue = varIn->get_att("_FillValue");
-					if (attFillValue == NULL) {
-						_EXCEPTION2("Variable \"%s\" missing _FillValue attribute, "
-							"needed for --missingdata in NetCDF file \"%s\"",
-							vecVariableNames[v].c_str(),
-							vecInputFileList[f].c_str());
-					}
+					if (strFillValueOverride != "") {
+						if (strFillValueOverride == "nan") {
+							dFillValue = NAN;
+						} else if (STLStringHelper::IsFloat(strFillValueOverride)) {
+							dFillValue = std::stof(strFillValueOverride);
+						} else {
+							_EXCEPTIONT("Invalid --fillvalue argument");
+						}
+					} else {
+						NcAtt * attFillValue = varIn->get_att("_FillValue");
+						if (attFillValue == NULL) {
+							_EXCEPTION2("Variable \"%s\" missing _FillValue attribute, "
+								"needed for --missingdata in NetCDF file \"%s\"",
+								vecVariableNames[v].c_str(),
+								vecInputFileList[f].c_str());
+						}
 
-					dFillValue = attFillValue->as_float(0);
+						dFillValue = attFillValue->as_float(0);
+					}
 				}
 
 				// TODO: Verify variable dimensionality
@@ -1173,7 +1185,8 @@ void AverageOverNcFiles(
 	const std::vector<std::string> & vecInputFilenames,
 	const std::string & strOutputFile,
 	const std::vector<std::string> & vecVariableNames,
-	size_t sMemoryMax
+	size_t sMemoryMax,
+	const std::string & strFillValueOverride
 ) {
 	_ASSERT(vecInputFilenames.size() > 0);
 	_ASSERT(vecVariableNames.size() > 0);
@@ -1255,17 +1268,40 @@ void AverageOverNcFiles(
 			if (f == 0) {
 				nctype = var->type();
 
-				NcAtt * attFill = var->get_att("_FillValue");
-				if (attFill != NULL) {
-					if (attFill->type() != nctype) {
-						_EXCEPTION1("Variable \"%s\" attribute \"_FillValue\" has incompatible type",
-							vecVariableNames[v].c_str());
+				if (strFillValueOverride != "") {
+					if (strFillValueOverride == "nan") {
+						if (var->type() == ncFloat) {
+							dFillValueFloat = NAN;
+						} else if (var->type() == ncDouble) {
+							dFillValueDouble = NAN;
+						} else {
+							_EXCEPTION();
+						}
+					} else if (STLStringHelper::IsFloat(strFillValueOverride)) {
+						if (var->type() == ncFloat) {
+							dFillValueFloat = std::stof(strFillValueOverride);
+						} else if (var->type() == ncDouble) {
+							dFillValueDouble = std::stod(strFillValueOverride);
+						} else {
+							_EXCEPTION();
+						}
+					} else {
+						_EXCEPTIONT("Invalid --fillvalue argument");
 					}
-					if (nctype == ncFloat) {
-						dFillValueFloat = attFill->as_float(0);
-					}
-					if (nctype == ncDouble) {
-						dFillValueDouble = attFill->as_double(0);
+
+				} else {
+					NcAtt * attFill = var->get_att("_FillValue");
+					if (attFill != NULL) {
+						if (attFill->type() != nctype) {
+							_EXCEPTION1("Variable \"%s\" attribute \"_FillValue\" has incompatible type",
+								vecVariableNames[v].c_str());
+						}
+						if (nctype == ncFloat) {
+							dFillValueFloat = attFill->as_float(0);
+						}
+						if (nctype == ncDouble) {
+							dFillValueDouble = attFill->as_double(0);
+						}
 					}
 				}
 
@@ -1710,6 +1746,9 @@ try {
 	// Path to write temporary cliamtology files
 	std::string strTempFilePath;
 
+	// Override the fillvalue
+	std::string strFillValueOverride;
+
 	// Do not delete temp files after completing climatology
 	bool fKeepTempFiles;
 
@@ -1729,6 +1768,7 @@ try {
 		//CommandLineInt(nFourierModes, "time_modes", 0);
 		CommandLineBool(fMissingData, "missingdata");
 		CommandLineString(strTempFilePath, "temp_file_path", "/tmp");
+		CommandLineString(strFillValueOverride, "*fillvalue", "");
 		CommandLineBool(fKeepTempFiles, "keep_temp_files");
 		CommandLineBool(fVerbose, "verbose");
 
@@ -1901,6 +1941,7 @@ try {
 		eClimoType,
 		nFourierModes,
 		fMissingData,
+		strFillValueOverride,
 		fOutputSliceCounts,
 		fVerbose
 	);
@@ -1955,7 +1996,8 @@ try {
 					vecAllOutputFileList,
 					strOutputFile,
 					vecTempVariableNames,
-					sMemoryMax);
+					sMemoryMax,
+					strFillValueOverride);
 			}
 		}
 	}
