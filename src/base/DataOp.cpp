@@ -630,7 +630,6 @@ bool DataOp_MIN::Apply(
 		}
 	}
 
-	dataout.Zero();
 	for (int v = 1; v < vecArgData.size(); v++) {
 
 		if (vecArgData[v] == NULL) {
@@ -694,7 +693,6 @@ bool DataOp_MAX::Apply(
 		}
 	}
 
-	dataout.Zero();
 	for (int v = 1; v < vecArgData.size(); v++) {
 
 		if (vecArgData[v] == NULL) {
