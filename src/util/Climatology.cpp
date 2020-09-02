@@ -410,6 +410,33 @@ enum ClimatologyType {
 	ClimatologyType_MeanSq
 };
 
+///////////////////////////////////////////////////////////////////////////////
+
+std::string ClimoVariablePrefix(
+	ClimatologyPeriod eClimoPeriod,
+	ClimatologyType eClimoType
+) {
+	std::string strVariablePrefix;
+	if (eClimoPeriod == ClimatologyPeriod_Daily) {
+		strVariablePrefix = "daily";
+	} else if (eClimoPeriod == ClimatologyPeriod_Monthly) {
+		strVariablePrefix = "monthly";
+	} else if (eClimoPeriod == ClimatologyPeriod_Seasonal) {
+		strVariablePrefix = "seasonal";
+	} else if (eClimoPeriod == ClimatologyPeriod_Annual) {
+		strVariablePrefix = "annual";
+	}
+	if (eClimoType == ClimatologyType_Mean) {
+		strVariablePrefix += "mean_";
+	} else if (eClimoType == ClimatologyType_MeanSq) {
+		strVariablePrefix += "meansq_";
+	}
+	return strVariablePrefix;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+
 ///	<summary>
 ///		Produce a climatology over the given input files.
 ///	</summary>
@@ -767,14 +794,11 @@ void Climatology(
 				_ASSERT(itNcDim != mapOutputNcDim.end());
 				vecVarNcDims.push_back(itNcDim->second);
 			}
-			std::string strOutVar;
-			if (eClimoType == ClimatologyType_Mean) {
-				strOutVar = std::string("dailymean_") + vecVariableNames[v];
-			} else if (eClimoType == ClimatologyType_MeanSq) {
-				strOutVar = std::string("dailymeansq_") + vecVariableNames[v];
-			} else {
-				_EXCEPTIONT("Invalid eClimoType");
-			}
+
+			std::string strOutVar =
+				ClimoVariablePrefix(eClimoPeriod, eClimoType)
+				+ vecVariableNames[v];
+
 			NcVar * varOut =
 				ncoutfile.add_var(
 					strOutVar.c_str(),
@@ -1972,21 +1996,8 @@ try {
 
 				std::vector<std::string> vecTempVariableNames;
 
-				std::string strVariablePrefix;
-				if (eClimoPeriod == ClimatologyPeriod_Daily) {
-					strVariablePrefix = "daily";
-				} else if (eClimoPeriod == ClimatologyPeriod_Monthly) {
-					strVariablePrefix = "monthly";
-				} else if (eClimoPeriod == ClimatologyPeriod_Seasonal) {
-					strVariablePrefix = "seasonal";
-				} else if (eClimoPeriod == ClimatologyPeriod_Annual) {
-					strVariablePrefix = "annual";
-				}
-				if (eClimoType == ClimatologyType_Mean) {
-					strVariablePrefix += "mean_";
-				} else if (eClimoType == ClimatologyType_MeanSq) {
-					strVariablePrefix += "meansq_";
-				}
+				std::string strVariablePrefix =
+					ClimoVariablePrefix(eClimoPeriod, eClimoType);
 
 				for (int v = 0; v < vecVariableNames.size(); v++) {
 					vecTempVariableNames.push_back(strVariablePrefix + vecVariableNames[v]);
