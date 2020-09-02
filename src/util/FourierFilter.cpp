@@ -66,6 +66,9 @@ try {
 	// Variable to apply Fourier transform to
 	std::string strVarName;
 
+	// Variables to preserve
+	std::string strPreserveVarName;
+
 	// Dimension along which to perform Fourier transform
 	std::string strDimName;
 
@@ -77,6 +80,7 @@ try {
 		CommandLineString(strInputFile, "in", "");
 		CommandLineString(strOutputFile, "out", "");
 		CommandLineString(strVarName, "var", "");
+		CommandLineString(strPreserveVarName, "preserve", "");
 		CommandLineString(strDimName, "dim", "");
 		CommandLineInt(nFourierModes, "modes", 4);
 
@@ -104,6 +108,11 @@ try {
 	std::vector<std::string> vecVariableStrings;
 	STLStringHelper::ParseVariableList(strVarName, vecVariableStrings);
 
+	// Prase preserve list
+	std::vector<std::string> vecPreserveVariableStrings;
+	STLStringHelper::ParseVariableList(strPreserveVarName, vecPreserveVariableStrings);
+
+	// Begin processing
 	AnnounceBanner();
 	AnnounceStartBlock("Initializing output file");
 
@@ -135,6 +144,20 @@ try {
 	}
 
 	AnnounceEndBlock("Done");
+
+	// Copy preserve variables
+	if (strPreserveVarName != "") {
+		AnnounceStartBlock("Preserving variables");
+
+		for (int v = 0; v < ncinfile.num_vars(); v++) {
+			CopyNcVar(
+				ncinfile,
+				ncoutfile,
+				vecPreserveVariableStrings[v]);
+		}
+
+		AnnounceEndBlock("Done");
+	}
 
 	// Copy variables from input file into output file
 	AnnounceStartBlock("Processing");
@@ -258,6 +281,7 @@ try {
 	}
 
 	AnnounceEndBlock("Done");
+
 	AnnounceBanner();
 
 } catch(Exception & e) {
