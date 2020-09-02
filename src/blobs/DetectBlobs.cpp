@@ -987,6 +987,7 @@ public:
 	///	</summary>
 	DetectBlobsParam() :
 		dMinAbsLat(0.0),
+		dMaxAbsLat(90.0),
 		dMinLat(-90.0),
 		dMaxLat(90.0),
 		fRegional(false),
@@ -1005,6 +1006,9 @@ public:
 public:
 	// Minimum absolute latitude (in degrees)
 	double dMinAbsLat;
+
+	// Minimum absolute latitude (in degrees)
+	double dMaxAbsLat;
 
 	// Minimum latitude (in degrees)
 	double dMinLat;
@@ -1439,13 +1443,16 @@ void DetectBlobs(
 
 		// Set all points within the specified latitude bounds to 1
 		for (int i = 0; i < grid.GetSize(); i++) {
-			if (fabs(grid.m_dLat[i]) < param.dMinAbsLat * M_PI / 180.0) {
+			if (fabs(grid.m_dLat[i]) < DegToRad(param.dMinAbsLat)) {
 				continue;
 			}
-			if (grid.m_dLat[i] < param.dMinLat * M_PI / 180.0) {
+			if (fabs(grid.m_dLat[i]) > DegToRad(param.dMaxAbsLat)) {
 				continue;
 			}
-			if (grid.m_dLat[i] > param.dMaxLat * M_PI / 180.0) {
+			if (grid.m_dLat[i] < DegToRad(param.dMinLat)) {
+				continue;
+			}
+			if (grid.m_dLat[i] > DegToRad(param.dMaxLat)) {
 				continue;
 			}
 
@@ -1692,6 +1699,7 @@ try {
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,name;...]");
 		CommandLineString(dbparam.strTimeFilter, "timefilter", "");
 		CommandLineDouble(dbparam.dMinAbsLat, "minabslat", 0.0);
+		CommandLineDouble(dbparam.dMaxAbsLat, "maxabslat", 90.0);
 		CommandLineDouble(dbparam.dMinLat, "minlat", -90.0);
 		CommandLineDouble(dbparam.dMaxLat, "maxlat", 90.0);
 		CommandLineBool(dbparam.fRegional, "regional");
