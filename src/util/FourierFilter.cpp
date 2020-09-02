@@ -149,7 +149,7 @@ try {
 	if (strPreserveVarName != "") {
 		AnnounceStartBlock("Preserving variables");
 
-		for (int v = 0; v < ncinfile.num_vars(); v++) {
+		for (int v = 0; v < vecPreserveVariableStrings.size(); v++) {
 			CopyNcVar(
 				ncinfile,
 				ncoutfile,
