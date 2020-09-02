@@ -506,6 +506,21 @@ void ReadCFTimeDataFromNcFile(
 			strFilename.c_str());
 	}
 
+	// Type attribute
+	NcAtt * attTimeType = varTime->get_att("type");
+	if (attTimeType != NULL) {
+		std::string strTimeType = attTimeType->as_string(0);
+		if (strTimeType == "daily mean climatology") {
+			vecTimes.m_dimtype = NcTimeDimension::TimeDimType_DailyMean;
+		} else if (strTimeType == "monthly mean climatology") {
+			vecTimes.m_dimtype = NcTimeDimension::TimeDimType_MonthlyMean;
+		} else if (strTimeType == "seasonal mean climatology") {
+			vecTimes.m_dimtype = NcTimeDimension::TimeDimType_SeasonalMean;
+		} else if (strTimeType == "annual mean climatology") {
+			vecTimes.m_dimtype = NcTimeDimension::TimeDimType_AnnualMean;
+		}
+	}
+
 	// Store details of time dimension
 	vecTimes.m_nctype = varTime->type();
 	vecTimes.m_units = attTimeUnits->as_string(0);
@@ -602,13 +617,13 @@ void WriteCFTimeDataToNcFile(
 		}
 	}
 
-	NcVar * varTime = ncfile->add_var("time", vecTimes.type(), dimTime);
+	NcVar * varTime = ncfile->add_var("time", vecTimes.nctype(), dimTime);
 	if (varTime == NULL) {
 		_EXCEPTION1("Unable to create variable \"time\" in file \"%s\"",
 			strFilename.c_str());
 	}
 
-	if (vecTimes.type() == ncInt) {
+	if (vecTimes.nctype() == ncInt) {
 		DataArray1D<int> nTimes(vecTimes.size());
 		for (int t = 0; t < nTimes.GetRows(); t++) {
 			nTimes[t] =
@@ -617,7 +632,7 @@ void WriteCFTimeDataToNcFile(
 		}
 		varTime->put(&(nTimes[0]), nTimes.GetRows());
 
-	} else if (vecTimes.type() == ncFloat) {
+	} else if (vecTimes.nctype() == ncFloat) {
 		DataArray1D<float> dTimes(vecTimes.size());
 		for (int t = 0; t < dTimes.GetRows(); t++) {
 			dTimes[t] =
@@ -626,7 +641,7 @@ void WriteCFTimeDataToNcFile(
 		}
 		varTime->put(&(dTimes[0]), dTimes.GetRows());
 
-	} else if (vecTimes.type() == ncDouble) {
+	} else if (vecTimes.nctype() == ncDouble) {
 		DataArray1D<double> dTimes(vecTimes.size());
 		for (int t = 0; t < dTimes.GetRows(); t++) {
 			dTimes[t] =
@@ -634,7 +649,7 @@ void WriteCFTimeDataToNcFile(
 		}
 		varTime->put(&(dTimes[0]), dTimes.GetRows());
 
-	} else if (vecTimes.type() == ncInt64) {
+	} else if (vecTimes.nctype() == ncInt64) {
 		DataArray1D<ncint64> nTimes(vecTimes.size());
 		for (int t = 0; t < nTimes.GetRows(); t++) {
 			nTimes[t] =
@@ -650,6 +665,18 @@ void WriteCFTimeDataToNcFile(
 	varTime->add_att("long_name", "time");
 	varTime->add_att("calendar", vecTimes[0].GetCalendarName().c_str());
 	varTime->add_att("units", vecTimes.units().c_str());
+
+	if (vecTimes.dimtype() != NcTimeDimension::TimeDimType_Standard) {
+		if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_DailyMean) {
+			varTime->add_att("type", "daily mean climatology");
+		} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_MonthlyMean) {
+			varTime->add_att("type", "monthly mean climatology");
+		} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_SeasonalMean) {
+			varTime->add_att("type", "seasonal mean climatology");
+		} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_AnnualMean) {
+			varTime->add_att("type", "annual mean climatology");
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////

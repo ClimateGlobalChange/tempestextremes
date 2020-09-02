@@ -29,9 +29,31 @@ class NcTimeDimension : public std::vector<Time> {
 
 public:
 	///	<summary>
+	///		Type of time dimension.
+	///	</summary>
+	enum TimeDimType {
+		TimeDimType_Standard,
+		TimeDimType_DailyMean,
+		TimeDimType_MonthlyMean,
+		TimeDimType_SeasonalMean,
+		TimeDimType_AnnualMean
+	};
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	NcTimeDimension() :
+		m_nctype(ncDouble),
+		m_units(""),
+		m_dimtype(TimeDimType_Standard)
+	{ }
+
+public:
+	///	<summary>
 	///		Get the type.
 	///	</summary>
-	NcType type() const {
+	NcType nctype() const {
 		return m_nctype;
 	}
 
@@ -42,9 +64,16 @@ public:
 		return m_units;
 	}
 
+	///	<summary>
+	///		Get the dimension type.
+	///	</summary>
+	TimeDimType dimtype() const {
+		return m_dimtype;
+	}
+
 public:
 	///	<summary>
-	///		Associated type.
+	///		Associated NcType.
 	///	</summary>
 	NcType m_nctype;
 
@@ -52,6 +81,11 @@ public:
 	///		Associated units.
 	///	</summary>
 	std::string m_units;
+
+	///	<summary>
+	///		Associated type of time.
+	///	</summary>
+	TimeDimType m_dimtype;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
