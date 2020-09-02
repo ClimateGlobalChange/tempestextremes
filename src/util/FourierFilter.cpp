@@ -150,6 +150,7 @@ try {
 		AnnounceStartBlock("Preserving variables");
 
 		for (int v = 0; v < vecPreserveVariableStrings.size(); v++) {
+			Announce("Variable %s", vecPreserveVariableStrings[v].c_str());
 			CopyNcVar(
 				ncinfile,
 				ncoutfile,
