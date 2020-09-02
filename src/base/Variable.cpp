@@ -34,10 +34,12 @@ VariableRegistry::VariableRegistry() {
 	m_domDataOp.Add("_SUM");
 	m_domDataOp.Add("_AVG");
 	m_domDataOp.Add("_DIFF");
-	m_domDataOp.Add("_MULT");
+	m_domDataOp.Add("_PROD");
 	m_domDataOp.Add("_DIV");
 	m_domDataOp.Add("_MIN");
 	m_domDataOp.Add("_MAX");
+	m_domDataOp.Add("_SQRT");
+	m_domDataOp.Add("_POW");
 	m_domDataOp.Add("_LAT");
 	m_domDataOp.Add("_F");
 }

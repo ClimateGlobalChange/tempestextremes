@@ -91,6 +91,12 @@ DataOp * DataOpManager::Add(
 	
 	} else if (strName == "_MAX") {
 		return Add(new DataOp_MAX);
+	
+	} else if (strName == "_SQRT") {
+		return Add(new DataOp_SQRT);
+	
+	} else if (strName == "_POW") {
+		return Add(new DataOp_POW);
 
 	} else if (strName == "_LAT") {
 		return Add(new DataOp_LAT);
@@ -141,6 +147,9 @@ DataOp * DataOpManager::Add(
 		}
 
 		return Add(new DataOp_LAPLACIAN(strName, nPoints, dDist));
+
+	} else {
+		_EXCEPTION1("Invalid DataOp \"%s\"", strName.c_str());
 	}
 
 	return NULL;
@@ -704,6 +713,99 @@ bool DataOp_MAX::Apply(
 				}
 			}
 		}
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_SQRT
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_SQRT::name = "_SQRT";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_SQRT::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 1) {
+		_EXCEPTION2("%s expects one argument: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+
+	if (vecArgData[0] == NULL) {
+		float dValue = atof(strArg[0].c_str());
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = sqrt(dValue);
+		}
+
+	} else {
+		const DataArray1D<float> & data = *(vecArgData[0]);
+
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = sqrt(data[i]);
+		}
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_POW
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_POW::name = "_POW";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_POW::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 2) {
+		_EXCEPTION2("%s expects two arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+
+	if ((vecArgData[0] == NULL) && (vecArgData[1] == NULL)) {
+		float dValue = atof(strArg[0].c_str());
+		float dExponent = atof(strArg[1].c_str());
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = pow(dValue, dExponent);
+		}
+
+	} else if ((vecArgData[0] == NULL) && (vecArgData[1] != NULL)) {
+		float dValue = atof(strArg[0].c_str());
+		const DataArray1D<float> & data = *(vecArgData[1]);
+
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = pow(dValue, data[i]);
+		}
+
+	} else if ((vecArgData[0] != NULL) && (vecArgData[1] == NULL)) {
+		const DataArray1D<float> & data = *(vecArgData[0]);
+		float dExponent = atof(strArg[1].c_str());
+
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = pow(data[i],dExponent);
+		}
+
+	} else if ((vecArgData[0] != NULL) && (vecArgData[1] == NULL)) {
+		const DataArray1D<float> & dataValue = *(vecArgData[0]);
+		const DataArray1D<float> & dataExponent = *(vecArgData[1]);
+
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = pow(dataValue[i],dataExponent[i]);
+		}
+	
+	} else {
+		_EXCEPTION();
 	}
 
 	return true;
