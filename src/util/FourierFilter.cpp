@@ -77,8 +77,8 @@ try {
 
 	// Parse the command line
 	BeginCommandLine()
-		CommandLineString(strInputFile, "in", "");
-		CommandLineString(strOutputFile, "out", "");
+		CommandLineString(strInputFile, "in_data", "");
+		CommandLineString(strOutputFile, "out_data", "");
 		CommandLineString(strVarName, "var", "");
 		CommandLineString(strPreserveVarName, "preserve", "");
 		CommandLineString(strDimName, "dim", "");
