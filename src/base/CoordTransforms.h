@@ -89,7 +89,9 @@ inline void RLLtoXYZ_Rad(
 	double & dY,
 	double & dZ
 ) {
-	_ASSERT(fabs(dLatRad) <= 0.5 * M_PI + HighTolerance);
+	if (fabs(dLatRad) > 0.5 * M_PI + HighTolerance) {
+		_EXCEPTION1("Latitude out of range (%2.14f)", dLatRad);
+	}
 
 	dX = cos(dLonRad) * cos(dLatRad);
 	dY = sin(dLonRad) * cos(dLatRad);

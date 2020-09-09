@@ -1047,9 +1047,16 @@ try {
 					const PathNode & pathnode = path[vecPathNodes[p].second];
 
 					double dPathNodeLonRad =
-						pathnode.GetColumnDataAsDouble(iLonColIx) * M_PI / 180.0;
+						DegToRad(pathnode.GetColumnDataAsDouble(iLonColIx));
 					double dPathNodeLatRad =
-						pathnode.GetColumnDataAsDouble(iLatColIx) * M_PI / 180.0;
+						DegToRad(pathnode.GetColumnDataAsDouble(iLatColIx));
+
+					if (dPathNodeLatRad > 0.5 * M_PI + HighTolerance) {
+						_EXCEPTION3("Latitude out of range (%2.14f) of pathnode (%i,%i)",
+							RadToDeg(dPathNodeLatRad),
+							vecPathNodes[p].first,
+							vecPathNodes[p].second);
+					}
 /*
 					int ixOrigin = static_cast<int>(pathnode.m_gridix);
 
