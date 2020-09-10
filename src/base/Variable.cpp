@@ -755,9 +755,29 @@ void Variable::LoadGridData(
 		// Load the data
 		var->get(&(m_data[0]), &(nDataSize[0]));
 
-		NcError err;
+		NcError err(NcError::silent_nonfatal);
 		if (err.get_err() != NC_NOERR) {
 			_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
+		}
+
+		// Check for scale_factor attribute
+		NcAtt * attScaleFactor = var->get_att("scale_factor");
+		if (attScaleFactor != NULL) {
+			float dScaleFactor = attScaleFactor->as_float(0);
+
+			for (int i = 0; i < m_data.GetRows(); i++) {
+				m_data[i] *= dScaleFactor;
+			}
+		}
+
+		// Check for add_offset attribute
+		NcAtt * attAddOffset = var->get_att("add_offset");
+		if (attAddOffset != NULL) {
+			float dAddOffset = attAddOffset->as_float(0);
+
+			for (int i = 0; i < m_data.GetRows(); i++) {
+				m_data[i] += dAddOffset;
+			}
 		}
 
 		return;
