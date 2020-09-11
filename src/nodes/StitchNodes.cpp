@@ -319,6 +319,21 @@ class PathThresholdOp {
 
 public:
 	///	<summary>
+	///		Index denoting all points along path.
+	///	</summary>
+	static const int Count_All = (-1);
+
+	///	<summary>
+	///		Index denoting only the first point along the path.
+	///	</summary>
+	static const int Count_First = (-2);
+
+	///	<summary>
+	///		Index denoting only the last point along the path.
+	///	</summary>
+	static const int Count_Last = (-3);
+
+	///	<summary>
 	///		Possible operations.
 	///	</summary>
 	enum Operation {
@@ -413,12 +428,16 @@ public:
 				// Read in minimum count
 				} else if (eReadMode == ReadMode_MinCount) {
 					if (strSubStr == "all") {
-						m_nMinimumCount = (-1);
+						m_nMinimumCount = Count_All;
+					} else if (strSubStr == "first") {
+						m_nMinimumCount = Count_First;
+					} else if (strSubStr == "last") {
+						m_nMinimumCount = Count_Last;
 					} else {
 						m_nMinimumCount = atoi(strSubStr.c_str());
 					}
 
-					if (m_nMinimumCount < -1) {
+					if (m_nMinimumCount < (-3)) {
 						_EXCEPTION1("Invalid minimum count \"%i\"",
 							m_nMinimumCount);
 					}
@@ -487,6 +506,13 @@ public:
 			int t = path.m_iTimes[s];
 			int i = path.m_iCandidates[s];
 
+			if ((m_nMinimumCount == Count_First) && (s > 0)) {
+				continue;
+			}
+			if ((m_nMinimumCount == Count_Last) && (s < path.m_iTimes.size()-1)) {
+				continue;
+			}
+
 			_ASSERT((t >= 0) && (t < vecCandidates.size()));
 
 			double dCandidateValue =
@@ -542,8 +568,17 @@ public:
 		}
 
 		// Check that the criteria is satisfied for all segments
-		if (m_nMinimumCount == (-1)) {
+		if (m_nMinimumCount == Count_All) {
 			if (nCount == (int)(path.m_iTimes.size())) {
+				return true;
+			} else {
+				return false;
+			}
+		}
+	
+		// Check that the criteria are satisfied for the first or last segment
+		if ((m_nMinimumCount == Count_First) || (m_nMinimumCount == Count_Last)) {
+			if (nCount == 1) {
 				return true;
 			} else {
 				return false;
