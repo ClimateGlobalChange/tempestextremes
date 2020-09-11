@@ -437,7 +437,7 @@ public:
 						m_nMinimumCount = atoi(strSubStr.c_str());
 					}
 
-					if (m_nMinimumCount < (-3)) {
+					if (m_nMinimumCount < Count_Last) {
 						_EXCEPTION1("Invalid minimum count \"%i\"",
 							m_nMinimumCount);
 					}
@@ -484,8 +484,12 @@ public:
 		strDescription += szValue;
 
 		char szMinCount[160];
-		if (m_nMinimumCount == -1) {
+		if (m_nMinimumCount == Count_All) {
 			strDescription += " at all times";
+		} else if (m_nMinimumCount == Count_First) {
+			strDescription += " at the first time";
+		} else if (m_nMinimumCount == Count_Last) {
+			strDescription += " at the last time";
 		} else {
 			sprintf(szMinCount, " at least %i time(s)", m_nMinimumCount);
 			strDescription += szMinCount;
