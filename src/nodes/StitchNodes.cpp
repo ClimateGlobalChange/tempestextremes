@@ -86,7 +86,8 @@ void ParseDetectNodesFile(
 	const std::vector< std::string > & vecFormatStrings,
 	TimeToCandidateInfoMap & mapCandidateInfo,
 	Time::CalendarType caltype,
-	bool fAllowRepeatedTimes
+	bool fAllowRepeatedTimes,
+	size_t sGridDims
 ) {
 	// Open file for reading
 	FILE * fp = fopen(strInputFile.c_str(), "r");
@@ -109,13 +110,21 @@ void ParseDetectNodesFile(
 	} eReadState = ReadState_Time;
 
 	// Number of entries per candidate
-	int nFormatEntries = vecFormatStrings.size();
+	size_t sFormatEntries = vecFormatStrings.size();
+
+	if (sFormatEntries < sGridDims) {
+		_EXCEPTION2("Number of format entries (%lu) must be greater than number of grid dimensions (%lu)",
+			sFormatEntries, sGridDims);
+	}
 
 	// Current candidate at this time
 	int iCandidate = 0;
 
 	// Current candidate information
 	TimeToCandidateInfoMapIterator iterCurrentTime = mapCandidateInfo.end();
+
+	// Line number
+	size_t sLineNumber = 0;
 
 	// Total candidates at this time
 	int nCandidates = 0;
@@ -131,6 +140,7 @@ void ParseDetectNodesFile(
 				break;
 			}
 		}
+		sLineNumber++;
 
 		// Check for eof
 		if (feof(fp)) {
@@ -162,7 +172,7 @@ void ParseDetectNodesFile(
 			ParseVariableList(strLine, vecTimeString);
 
 			if (vecTimeString.size() != 5) {
-				_EXCEPTION1("Malformed time string:\n%s", strLine.c_str());
+				_EXCEPTION2("Malformed time string on line (%lu):\n%s", sLineNumber, strLine.c_str());
 			}
 
 			iCandidate = 0;
@@ -182,8 +192,8 @@ void ParseDetectNodesFile(
 					iterCurrentTime->second.resize(iCandidate + nCandidates);
 
 				} else {
-					_EXCEPTION1("Repated time \"%s\" found in candidate files",
-						time.ToString().c_str());
+					_EXCEPTION2("Repated time \"%s\" found in candidate files on line (%s)",
+						time.ToString().c_str(), sLineNumber);
 				}
 
 			} else {
@@ -193,8 +203,8 @@ void ParseDetectNodesFile(
 							time, TimesliceCandidateInformation(nCandidates)));
 
 				if (!ins.second) {
-					_EXCEPTION1("Insertion of time \"%s\" into candidate info map failed",
-						time.ToString().c_str());
+					_EXCEPTION2("Insertion of time \"%s\" into candidate info map failed on line (%lu)",
+						time.ToString().c_str(), sLineNumber);
 				}
 
 				iterCurrentTime = ins.first;
@@ -217,8 +227,16 @@ void ParseDetectNodesFile(
 
 			ParseVariableList(strLine, tscinfo[iCandidate]);
 
-			if (tscinfo[iCandidate].size() != nFormatEntries) {
+			if (tscinfo[iCandidate].size() != sFormatEntries) {
 				fWarnInsufficientCandidateInfo = true;
+			}
+
+			for (size_t d = 0; d < sGridDims; d++) {
+				if (!STLStringHelper::IsIntegerIndex(tscinfo[iCandidate][d])) {
+					_EXCEPTION2("On line %lu first %lu columns are not integer indices (equal to number of grid dimensions); "
+						"if an unstructured grid is being used make sure --in_connect is specified.",
+						sLineNumber, sGridDims);
+				}
 			}
 
 			iCandidate++;
@@ -744,6 +762,7 @@ try {
 		}
 	}
 */
+	size_t sGridDims = 0;
 	if (strFormatOld != "") {
 		Announce("WARNING: --format is deprecated.  Consider using --in_fmt and --in_connect instead");
 		strFormat = strFormatOld;
@@ -751,8 +770,10 @@ try {
 	} else {
 		if (strConnectivityFile != "") {
 			strFormat = std::string("i,") + strFormat;
+			sGridDims = 1;
 		} else {
 			strFormat = std::string("i,j,") + strFormat;
+			sGridDims = 2;
 		}
 	}
 
@@ -894,7 +915,8 @@ try {
 				vecFormatStrings,
 				mapCandidateInfo,
 				caltype,
-				fAllowRepeatedTimes);
+				fAllowRepeatedTimes,
+				sGridDims);
 		}
 
 		if (mapCandidateInfo.size() == 0) {
