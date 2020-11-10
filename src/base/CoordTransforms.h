@@ -247,6 +247,43 @@ inline double AverageLongitude_Rad(
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		Calculate the great circle distance between two points on the sphere.
+///	</summary>
+inline double GreatCircleDistanceXYZ_Deg(
+	double dX0,
+	double dY0,
+	double dZ0,
+	double dX1,
+	double dY1,
+	double dZ1
+) {
+	double dDX = dX1 - dX0;
+	double dDY = dY1 - dY0;
+	double dDZ = dZ1 - dZ0;
+
+	double dHalfDist = 0.5 * sqrt(dDX * dDX + dDY * dDY + dDZ * dDZ);
+	if (dHalfDist > 1.0) {
+		_ASSERT(dHalfDist < 1.0 + 1.0e-8);
+		dHalfDist = 1.0;
+	}
+
+	return RadToDeg(2.0 * asin(dHalfDist));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Calculate the chord length from the great circle distnance (in degrees).
+///	</summary>
+inline double ChordLengthFromGreatCircleDistance_Deg(
+	double dGCDDeg
+) {
+	return 2.0 * sin(0.5 * DegToRad(dGCDDeg));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Calculate the great circle distance (in radians) between two RLL points.
 ///	</summary>
 inline double GreatCircleDistance_Rad(

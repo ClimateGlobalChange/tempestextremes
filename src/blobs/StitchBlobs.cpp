@@ -33,6 +33,7 @@
 #include "NetCDFUtilities.h"
 #include "SimpleGrid.h"
 #include "Variable.h"
+#include "kdtree.h"
 
 #include <cstring>
 #include <cstdlib>
@@ -43,6 +44,7 @@
 #include <string>
 #include <set>
 #include <map>
+#include <queue>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -531,6 +533,14 @@ protected:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+struct Node3 {
+	double dX;
+	double dY;
+	double dZ;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 #if defined(TEMPEST_MPIOMP)
@@ -610,6 +620,9 @@ try {
 	// Maximum longitude for detections
 	double dMaxLonDeg;
 
+	// Merge distance (maximum distance between two blobs for them to be considered the same)
+	double dMergeDistDeg;
+
 	// Flatten data
 	bool fFlatten;
 
@@ -650,6 +663,7 @@ try {
 		CommandLineDoubleD(dMaxPercentOverlapPrev, "max_overlap_prev", 100.0, "(%)")
 		CommandLineDoubleD(dMinPercentOverlapNext, "min_overlap_next", 0.0, "(%)")
 		CommandLineDoubleD(dMaxPercentOverlapNext, "max_overlap_next", 100.0, "(%)")
+		CommandLineDouble(dMergeDistDeg, "merge_dist", 0.0); 
 		CommandLineStringD(strRestrictRegion, "restrict_region", "", "(lat0,lat1,lon0,lon1,count)");
 		CommandLineBool(fRegional, "regional");
 		CommandLineDouble(dMinLatDeg, "minlat", -90.0);
@@ -765,6 +779,11 @@ try {
 	dMinPercentOverlapNext /= 100.0;
 	dMaxPercentOverlapNext /= 100.0;
 
+	// Merge nearby blobs
+	if ((dMergeDistDeg < 0.0) || (dMergeDistDeg > 180.0)) {
+		_EXCEPTION1("--merge_dist must be between 0.0 and 180.0 (given %1.5f)", dMergeDistDeg);
+	}
+
 	// Ensure --minlat and --maxlat values are in range
 	if ((dMinLatDeg < -90.0) || (dMinLatDeg > 90.0)) {
 		_EXCEPTION1("--minlat must be in range [-90,90] (given %1.5f)", dMinLatDeg);
@@ -809,7 +828,7 @@ try {
 			) {
 				std::string strSubStr =
 					strThresholdCmd.substr(iLast, i - iLast);
-			
+
 				int iNextOp = (int)(vecThresholdOp.size());
 				vecThresholdOp.resize(iNextOp + 1);
 				vecThresholdOp[iNextOp].Parse(strSubStr);
@@ -978,6 +997,11 @@ try {
 
 			std::vector< LatLonBox<double> > & vecBlobBoxesDeg = vecAllBlobBoxesDeg[iTime];
 
+			// KD-trees for points in blob at this time step (used for --merge_dist)
+			std::vector<kdtree*> vecBlobTrees;
+
+			std::vector<IndicatorSet> vecBlobPerimeters;
+
 			// New announcement block for timestep
 			if (vecGlobalTimes.size() == 1) {
 				_ASSERT((iTime >= 0) && (iTime < vecGlobalTimes[0].size()));
@@ -1050,14 +1074,14 @@ try {
 				}
 			}
 
-			Announce("Tagged points: %i", setIndicators.size());
+			Announce("Finding blobs (%i tagged points)", setIndicators.size());
 
 			// Rejections due to insufficient node count
 			int nRejectedMinSize = 0;
 
 			DataArray1D<int> nRejectedThreshold(vecThresholdOp.size());
 
-			// Find all patches
+			// Find all contiguous patches
 			for (; setIndicators.size() != 0;) {
 
 				// Next starting location
@@ -1067,6 +1091,12 @@ try {
 				int ixBlob = vecBlobs.size();
 				vecBlobs.resize(ixBlob+1);
 				vecBlobBoxesDeg.resize(ixBlob+1, LatLonBox<double>(fRegional));
+
+				if (dMergeDistDeg > 0.0) {
+					vecBlobPerimeters.resize(ixBlob+1);
+					vecBlobTrees.resize(ixBlob+1);
+					vecBlobTrees[ixBlob] = kd_create(3);
+				}
 
 				// Initialize bounding box
 				LatLonBox<double> & boxDeg = vecBlobBoxesDeg[ixBlob];
@@ -1105,44 +1135,204 @@ try {
 						LonDegToStandardRange(RadToDeg(grid.m_dLon[ixNode])));
 
 					// Insert neighbors
+					bool fPerimeter = false;
 					for (int i = 0; i < grid.m_vecConnectivity[ixNode].size(); i++) {
-						setNeighbors.insert(
-							grid.m_vecConnectivity[ixNode][i]);
+						int ixNeighbor = grid.m_vecConnectivity[ixNode][i];
+
+						// Perimeter point
+						if (dataIndicator[ixNeighbor] == 0) {
+							fPerimeter = true;
+						} else {
+							setNeighbors.insert(
+								grid.m_vecConnectivity[ixNode][i]);
+						}
+					}
+					if (fPerimeter && (vecBlobPerimeters.size() != 0)) {
+						vecBlobPerimeters[ixBlob].insert(ixNode);
+						double dX, dY, dZ;
+						RLLtoXYZ_Rad(
+							grid.m_dLon[ixNode],
+							grid.m_dLat[ixNode],
+							dX, dY, dZ);
+						kd_insert3(vecBlobTrees[ixBlob], dX, dY, dZ, NULL);
 					}
 				}
+			}
 
-				// Check blob size
-				if (vecBlobs[ixBlob].size() < nMinBlobSize) {
-					nRejectedMinSize++;
-					vecBlobs.resize(ixBlob);
-					vecBlobBoxesDeg.resize(ixBlob);
+			// Merge blobs
+			if (vecBlobTrees.size() != 0) {
 
-				// Check other thresholds
-				} else {
-					for (int x = 0; x < vecThresholdOp.size(); x++) {
+				Announce("Merging blobs (from %lu blobs)", vecBlobs.size());
 
-						bool fSatisfies =
-							vecThresholdOp[x].Apply(
-								grid,
-								vecBlobs[ixBlob],
-								boxDeg);
+				// Use squared Cartesian distance for comparisons
+				double dMergeDistChordLength2 = ChordLengthFromGreatCircleDistance_Deg(dMergeDistDeg);
+				dMergeDistChordLength2 *= dMergeDistChordLength2;
 
-						if (!fSatisfies) {
-							nRejectedThreshold[x]++;
-							vecBlobs.resize(ixBlob);
-							vecBlobBoxesDeg.resize(ixBlob);
-							break;
+				// Build a set of all pairs that need to be merged
+				std::vector< std::set<int> > vecMergeGraph(vecBlobs.size());
+				for (int ixBlob = 0; ixBlob < vecBlobs.size(); ixBlob++) {
+/*
+					printf("%lu total points, %lu perimeter points\n",
+						vecBlobs[ixBlob].size(),
+						vecBlobPerimeters[ixBlob].size());
+*/
+					// Convert perimeter points to xyz
+					std::vector<Node3> vecPerimeterXYZ;
+					vecPerimeterXYZ.reserve(vecBlobPerimeters[ixBlob].size());
+					for (auto it = vecBlobPerimeters[ixBlob].begin(); it != vecBlobPerimeters[ixBlob].end(); it++) {
+						Node3 xyzPerim;
+						RLLtoXYZ_Rad(
+							grid.m_dLon[*it],
+							grid.m_dLat[*it],
+							xyzPerim.dX, xyzPerim.dY, xyzPerim.dZ);
+/*
+						if ((RadToDeg(grid.m_dLon[*it]) < 187.25) &&
+							(RadToDeg(grid.m_dLon[*it]) > 178.00) &&
+							(RadToDeg(grid.m_dLat[*it]) < -24.0) &&
+							(RadToDeg(grid.m_dLat[*it]) > -50.0)
+							//(RadToDeg(grid.m_dLat[*it]) < -50.0) &&
+							//(RadToDeg(grid.m_dLat[*it]) > -57.0)
+						) {
+							printf("%i %i\n", ixBlob, *it);
+						}
+*/
+						vecPerimeterXYZ.push_back(xyzPerim);
+					}
+
+					// Search all perimeter points of this blob against perimeter points of other blobs
+					for (int ixBlobNext = ixBlob+1; ixBlobNext != vecBlobs.size(); ixBlobNext++) {
+						for (int i = 0; i < vecPerimeterXYZ.size(); i++) {
+
+							const Node3 & xyzPerim = vecPerimeterXYZ[i];
+							kdres * kdr = kd_nearest3(vecBlobTrees[ixBlobNext], xyzPerim.dX, xyzPerim.dY, xyzPerim.dZ);
+							double dX1, dY1, dZ1;
+							kd_res_item3(kdr, &dX1, &dY1, &dZ1);
+							kd_res_free(kdr);
+
+							double dDX = xyzPerim.dX - dX1;
+							double dDY = xyzPerim.dY - dY1;
+							double dDZ = xyzPerim.dZ - dZ1;
+							double dDist = dDX * dDX + dDY * dDY + dDZ * dDZ;
+/*
+							if ((ixBlob == 10) && (ixBlobNext == 15)) {
+								printf("%1.5e %1.5e %1.5e %1.5e %1.5e %1.5e %1.10f\n",
+									xyzPerim.dX, xyzPerim.dY, xyzPerim.dZ,
+									dX1, dY1, dZ1, sqrt(dDist));
+							}
+*/
+							if (dDist < dMergeDistChordLength2) {
+								//printf("Merge %i %i\n", ixBlob, ixBlobNext);
+								vecMergeGraph[ixBlob].insert(ixBlobNext);
+								vecMergeGraph[ixBlobNext].insert(ixBlob);
+								break;
+							}
 						}
 					}
 				}
+
+				// Merge blobs
+				for (int ixBlob = 0; ixBlob < vecBlobs.size(); ixBlob++) {
+
+					// Find the ultimate blob id of each blob via graph search for minimum id
+					int ixFinalBlobId = ixBlob;
+
+					std::set<int> setVisited;
+					std::queue<int> queueToVisit;
+					queueToVisit.push(ixBlob);
+
+					while (queueToVisit.size() != 0) {
+						int ixCurrentBlobId = queueToVisit.front();
+						queueToVisit.pop();
+
+						if (setVisited.find(ixCurrentBlobId) != setVisited.end()) {
+							continue;
+						}
+						setVisited.insert(ixCurrentBlobId);
+						//std::cout << ixBlob << " " << ixCurrentBlobId << std::endl;
+
+						if (ixCurrentBlobId < ixFinalBlobId) {
+							ixFinalBlobId = ixCurrentBlobId;
+						}
+
+						for (auto it = vecMergeGraph[ixCurrentBlobId].begin(); it != vecMergeGraph[ixCurrentBlobId].end(); it++) {
+							queueToVisit.push(*it);
+						}
+					}
+
+					// Move points into final blob tag
+					if (ixFinalBlobId != ixBlob) {
+						//printf("Merging blob %i into blob %i\n", ixBlob, ixFinalBlobId);
+						for (auto it = vecBlobs[ixBlob].begin(); it != vecBlobs[ixBlob].end(); it++) {
+							vecBlobs[ixFinalBlobId].insert(*it);
+							vecBlobBoxesDeg[ixFinalBlobId].insert(
+								RadToDeg(grid.m_dLat[*it]),
+								LonDegToStandardRange(RadToDeg(grid.m_dLon[*it])));
+						}
+						vecBlobs[ixBlob].clear();
+					}
+				}
+				//std::cout << std::endl;
+				//_EXCEPTION();
+
+				// Clean up
+				for (int ixBlob = 0; ixBlob < vecBlobs.size(); ixBlob++) {
+					if (vecBlobs[ixBlob].size() == 0) {
+						vecBlobs.erase(vecBlobs.begin() + ixBlob);
+						vecBlobBoxesDeg.erase(vecBlobBoxesDeg.begin() + ixBlob);
+						ixBlob--;
+					}
+				}
+				for (int ixBlob = 0; ixBlob < vecBlobTrees.size(); ixBlob++) {
+					kd_free(vecBlobTrees[ixBlob]);
+				}
+				vecBlobTrees.clear();
+				vecBlobPerimeters.clear();
+			}
+
+			// Filter blobs
+			if ((nMinBlobSize > 1) || (vecThresholdOp.size() != 0)) {
+				AnnounceStartBlock("Applying filters (from %lu blobs)", vecBlobs.size());
+
+				for (int ixBlob = 0; ixBlob < vecBlobs.size(); ixBlob++) {
+
+					// Check blob size
+					if (vecBlobs[ixBlob].size() < nMinBlobSize) {
+						nRejectedMinSize++;
+						vecBlobs.erase(vecBlobs.begin() + ixBlob);
+						vecBlobBoxesDeg.erase(vecBlobBoxesDeg.begin() + ixBlob);
+						ixBlob--;
+
+					// Check other thresholds
+					} else {
+						for (int x = 0; x < vecThresholdOp.size(); x++) {
+
+							bool fSatisfies =
+								vecThresholdOp[x].Apply(
+									grid,
+									vecBlobs[ixBlob],
+									vecBlobBoxesDeg[ixBlob]);
+
+							if (!fSatisfies) {
+								nRejectedThreshold[x]++;
+								vecBlobs.erase(vecBlobs.begin() + ixBlob);
+								vecBlobBoxesDeg.erase(vecBlobBoxesDeg.begin() + ixBlob);
+								ixBlob--;
+								break;
+							}
+						}
+					}
+				}
+
+				Announce("Rejected (min size): %i", nRejectedMinSize);
+				for (int x = 0; x < vecThresholdOp.size(); x++) {
+					Announce("Rejected (threshold %i): %i",
+						x, nRejectedThreshold[x]);
+				}
+
+				AnnounceEndBlock(NULL);
 			}
 
 			Announce("Blobs detected: %i", vecBlobs.size());
-			Announce("Rejected (min size): %i", nRejectedMinSize);
-			for (int x = 0; x < vecThresholdOp.size(); x++) {
-				Announce("Rejected (threshold %i): %i",
-					x, nRejectedThreshold[x]);
-			}
 
 			if (fVerbose) {
 				for (int p = 0; p < vecBlobBoxesDeg.size(); p++) {
