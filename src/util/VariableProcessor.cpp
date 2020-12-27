@@ -292,7 +292,9 @@ try {
 			AnnounceOutputOnAllRanks();
 		}
 #endif
-		AnnounceStartBlock("Line %lu/%lu", f+1, vecInputFileList.size());
+		if (vecInputFileList.size() != 1) {
+			AnnounceStartBlock("DataList line %lu/%lu", f+1, vecInputFileList.size());
+		}
 
 		// Get the list of data files
 		NcFileVector vecFiles;
@@ -344,6 +346,7 @@ try {
 		NcDim * dimTime = ncout.get_dim("time");
 		_ASSERT(dimTime != NULL);
 
+		// Write grid dimensions
 		NcDim * dim0 = NULL;
 		NcDim * dim1 = NULL;
 		if (grid.m_nGridDim.size() == 1) {
@@ -370,26 +373,46 @@ try {
 			_EXCEPTIONT("Only 1D or 2D spatial data supported");
 		}
 
-		// Loop through all variables
+		// Build up the processing queue
+		varreg.ClearProcessingQueue();
+
 		std::vector<NcVar *> vecNcVarOut(vecVarIxIn.size());
 		for (int v = 0; v < vecVarIxIn.size(); v++) {
 			NcVar * varOut = NULL;
 
-			if (grid.m_nGridDim.size() == 1) {
-				vecNcVarOut[v] = ncout.add_var(
-					vecVariableNamesOut[v].c_str(),
-					ncFloat,
-					dimTime,
-					dim0);
+			DimInfoVector vecAuxDimInfo;
+			varreg.AppendVariableToProcessingQueue(
+				vecFiles,
+				grid,
+				vecVarIxIn[v],
+				&vecAuxDimInfo);
 
-			} else if (grid.m_nGridDim.size() == 2) {
-				vecNcVarOut[v] = ncout.add_var(
-					vecVariableNamesOut[v].c_str(),
-					ncFloat,
-					dimTime,
-					dim0,
-					dim1);
+			std::vector<NcDim *> vecDimOut;
+			vecDimOut.push_back(dimTime);
+
+			for (long d = 0; d < vecAuxDimInfo.size(); d++) {
+				NcDim * dim =
+					AddNcDimOrUseExisting(
+						ncout,
+						vecAuxDimInfo[d].name,
+						vecAuxDimInfo[d].size);
+
+				vecDimOut.push_back(dim);
 			}
+
+			if (grid.m_nGridDim.size() == 1) {
+				vecDimOut.push_back(dim0);
+			} else if (grid.m_nGridDim.size() == 2) {
+				vecDimOut.push_back(dim0);
+				vecDimOut.push_back(dim1);
+			}
+
+			vecNcVarOut[v] = ncout.add_var(
+				vecVariableNamesOut[v].c_str(),
+				ncFloat,
+				vecDimOut.size(),
+				const_cast<const NcDim**>(&(vecDimOut[0])));
+
 			if (vecNcVarOut[v] == NULL) {
 				_EXCEPTION2("Error creating variable \"%s\" in file \"%s\"",
 				vecVariableNamesOut[v].c_str(),
@@ -406,26 +429,44 @@ try {
 			vecFiles.SetTime(vecOutputTimes[t]);
 
 			// Loop through all variables
-			for (int v = 0; v < vecVarIxIn.size(); v++) {
-				Announce("Processing \"%s\" -> \"%s\"",
-					vecVariableNamesIn[v].c_str(),
-					vecVariableNamesOut[v].c_str());
+			//for (int v = 0; v < vecVarIxIn.size(); v++) {
+			varreg.ResetProcessingQueue();
+			while(varreg.AdvanceProcessingQueue()) {
+				size_t v = varreg.GetProcessingQueueVarPos();
+
+				_ASSERT(v < vecVariableNamesIn.size());
+				_ASSERT(v < vecVariableNamesOut.size());
 
 				// Load the data for the search variable
-				Variable & var = varreg.Get(vecVarIxIn[v]);
+				Variable & var = varreg.GetProcessingQueueVariable();
+				Announce("Processing \"%s\" -> \"%s\"",
+					var.ToString(varreg).c_str(),
+					vecVariableNamesOut[v].c_str());
+
 				var.LoadGridData(varreg, vecFiles, grid);
 				const DataArray1D<float> & dataState = var.GetData();
 
-				// Write the data
+				// Get the output position and size
+				VariableAuxIndex lPos = varreg.GetProcessingQueueAuxIx();
+				lPos.insert(lPos.begin(), t);
+				VariableAuxIndex lSize(lPos.size(), 1);
+
 				if (grid.m_nGridDim.size() == 1) {
 					_ASSERT(dataState.GetRows() == dim0->size());
-					vecNcVarOut[v]->set_cur(t,0);
-					vecNcVarOut[v]->put(&(dataState[0]), 1, dim0->size());
+					lPos.push_back(0);
+					lSize.push_back(dim0->size());
+
 				} else {
 					_ASSERT(dataState.GetRows() == dim0->size() * dim1->size());
-					vecNcVarOut[v]->set_cur(t,0,0);
-					vecNcVarOut[v]->put(&(dataState[0]), 1, dim0->size(), dim1->size());
+					lPos.push_back(0);
+					lPos.push_back(0);
+					lSize.push_back(dim0->size());
+					lSize.push_back(dim1->size());
 				}
+
+				// Write output
+				vecNcVarOut[v]->set_cur(&(lPos[0]));
+				vecNcVarOut[v]->put(&(dataState[0]), &(lSize[0]));
 
 				NcError err;
 				if (err.get_err() != NC_NOERR) {
@@ -434,7 +475,9 @@ try {
 			}
 			AnnounceEndBlock(NULL);
 		}
-		AnnounceEndBlock("Done");
+		if (vecInputFileList.size() != 1) {
+			AnnounceEndBlock("Done");
+		}
 
 #if defined(TEMPEST_MPIOMP)
 		AnnounceSetOutputBuffer(stdout);

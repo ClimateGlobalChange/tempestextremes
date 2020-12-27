@@ -26,7 +26,9 @@
 // VariableRegistry
 ///////////////////////////////////////////////////////////////////////////////
 
-VariableRegistry::VariableRegistry() {
+VariableRegistry::VariableRegistry() :
+	m_sProcessingQueueVarPos(-1)
+{
 	m_domDataOp.Add("_VECMAG");
 	m_domDataOp.Add("_ABS");
 	m_domDataOp.Add("_SIGN");
@@ -164,8 +166,12 @@ int VariableRegistry::FindOrRegisterSubStr(
 					_EXCEPTIONT("Invalid dimension index in variable");
 				}
 				pvar->m_strArg.push_back(strDim);
-				//pvar->m_lArg.push_back(std::stol(strDim));
 				pvar->m_varArg.push_back(InvalidVariableIndex);
+				if (strDim == ":") {
+					pvar->m_fFreeArg.push_back(true);
+				} else {
+					pvar->m_fFreeArg.push_back(false);
+				}
 				strDim = "";
 
 				if (strIn[n] == ')') {
@@ -214,7 +220,7 @@ int VariableRegistry::FindOrRegisterSubStr(
 				}
 				pvar->m_strArg.push_back(strFloat);
 				pvar->m_varArg.push_back(InvalidVariableIndex);
-				//pvar->m_lArg.push_back(Variable::InvalidArgument);
+				pvar->m_fFreeArg.push_back(false);
 
 			// Check for string argument
 			} else if (strIn[n] == '\"') {
@@ -240,7 +246,7 @@ int VariableRegistry::FindOrRegisterSubStr(
 
 				pvar->m_strArg.push_back(strIn.substr(nStart+1,n-nStart-1));
 				pvar->m_varArg.push_back(InvalidVariableIndex);
-				//pvar->m_lArg.push_back(Variable::InvalidArgument);
+				pvar->m_fFreeArg.push_back(false);
 
 			// Check for variable
 			} else {
@@ -249,7 +255,7 @@ int VariableRegistry::FindOrRegisterSubStr(
 
 				pvar->m_strArg.push_back("");
 				pvar->m_varArg.push_back(varix);
-				//pvar->m_lArg.push_back(Variable::InvalidArgument);
+				pvar->m_fFreeArg.push_back(false);
 			}
 
 			if (strIn[n] == ')') {
@@ -286,7 +292,7 @@ Variable & VariableRegistry::Get(
 	VariableIndex varix
 ) {
 	if ((varix < 0) || (varix >= m_vecVariables.size())) {
-		_EXCEPTIONT("Variable index out of range");
+		_EXCEPTION1("Variable index (%i) out of range", varix);
 	}
 	return *(m_vecVariables[varix]);
 }
@@ -297,7 +303,7 @@ std::string VariableRegistry::GetVariableString(
 	VariableIndex varix
 ) const {
 	if ((varix < 0) || (varix >= m_vecVariables.size())) {
-		_EXCEPTIONT("Variable index out of range");
+		_EXCEPTION1("Variable index (%i) out of range", varix);
 	}
 	return m_vecVariables[varix]->ToString(*this);
 }
@@ -464,6 +470,257 @@ void VariableRegistry::GetAuxiliaryDimInfoAndVerifyConsistency(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void VariableRegistry::GetAuxiliaryDimInfo(
+	const NcFileVector & vecncDataFiles,
+	const SimpleGrid & grid,
+	VariableIndex varix,
+	DimInfoVector & vecAuxDimInfo
+) const {
+	if ((varix < 0) || (varix >= m_vecVariables.size())) {
+		_EXCEPTIONT("Variable index out of range");
+	}
+
+	// Recursively add dimension information
+	if (m_vecVariables[varix]->IsOp()) {
+		const VariableIndexVector & varArg =
+			m_vecVariables[varix]->GetArgumentVarIxs();
+		for (int i = 0; i < varArg.size(); i++) {
+			if (varArg[i] != InvalidVariableIndex) {
+				DimInfoVector vecAuxDimInfoRecurse;
+				GetAuxiliaryDimInfo(
+					vecncDataFiles,
+					grid,
+					varArg[i],
+					vecAuxDimInfoRecurse);
+
+				if (vecAuxDimInfo.size() == 0) {
+					vecAuxDimInfo = vecAuxDimInfoRecurse;
+				} else if (vecAuxDimInfo != vecAuxDimInfoRecurse) {
+					_EXCEPTION3("Incompatible variable \"%s\" in operator: expected dimensions %s, found %s",
+						GetVariableString(varArg[i]).c_str(),
+						vecAuxDimInfo.ToString().c_str(),
+						vecAuxDimInfoRecurse.ToString().c_str());
+				}
+			}
+		}
+
+	// Reached a Variable that is not an operator; check if it exists already
+	// in the list and if not add it.
+	} else {
+
+		_ASSERT((varix >= 0) && (varix < m_vecVariables.size()));
+		const Variable * pvar = m_vecVariables[varix];
+
+		DimInfoVector vecAuxDimInfoRecurse;
+		GetAuxiliaryDimInfo(
+			vecncDataFiles,
+			grid,
+			pvar->GetName(),
+			vecAuxDimInfoRecurse);
+
+		if (vecAuxDimInfoRecurse.size() != pvar->m_fFreeArg.size()) {
+			_EXCEPTION3("Incompatible variable \"%s\": File variable contains %lu auxiliary dimensions but %lu specified",
+				GetVariableString(varix).c_str(),
+				vecAuxDimInfoRecurse.size(),
+				pvar->m_fFreeArg.size());
+		}
+
+		DimInfoVector vecAuxDimInfoRecurse_FreeDimOnly;
+		for (size_t a = 0; a < pvar->m_fFreeArg.size(); a++) {
+			if (pvar->m_fFreeArg[a]) {
+				vecAuxDimInfoRecurse_FreeDimOnly.push_back(vecAuxDimInfoRecurse[a]);
+			}
+		}
+
+		if (vecAuxDimInfo.size() == 0) {
+			vecAuxDimInfo = vecAuxDimInfoRecurse_FreeDimOnly;
+		} else if (vecAuxDimInfo != vecAuxDimInfoRecurse_FreeDimOnly) {
+			_EXCEPTION3("Incompatible variable \"%s\": expected %s, found %s",
+				GetVariableString(varix).c_str(),
+				vecAuxDimInfo.ToString().c_str(),
+				vecAuxDimInfoRecurse_FreeDimOnly.ToString().c_str());
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VariableRegistry::AssignAuxiliaryIndicesRecursive(
+	Variable & var,
+	const std::vector<std::string> & vecArg
+) {
+	var.UnloadGridData();
+
+	// Assign free indices to this variable
+	if (!var.m_fOp) {
+		_ASSERT(var.m_fFreeArg.size() == var.m_strArg.size());
+		_ASSERT(var.m_fFreeArg.size() == var.m_varArg.size());
+		size_t sFreeArgs = 0;
+		for (int d = 0; d < var.m_fFreeArg.size(); d++) {
+			if (var.m_fFreeArg[d]) {
+				sFreeArgs++;
+			}
+		}
+		if (sFreeArgs != vecArg.size()) {
+			_EXCEPTION3("Incompatible auxiliary indices in variable \"%s\": Expected %lu indices, received %lu indcies",
+				var.GetName().c_str(), sFreeArgs, vecArg.size());
+		}
+
+		// Copy over free arguments
+		size_t a = 0;
+		for (size_t d = 0; d < var.m_fFreeArg.size(); d++) {
+			if (var.m_fFreeArg[d]) {
+				var.m_strArg[d] = vecArg[a];
+				var.m_varArg[d] = InvalidVariableIndex;
+				a++;
+			}
+		}
+	}
+
+	// Recursively assign indices
+	for (size_t v = 0; v < var.m_varArg.size(); v++) {
+		if (var.m_varArg[v] != InvalidVariableIndex) {
+			AssignAuxiliaryIndicesRecursive(
+				Get(var.m_varArg[v]),
+				vecArg);
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VariableRegistry::ClearProcessingQueue() {
+	m_sProcessingQueueVarPos = (-1);
+	m_vecProcessingQueue.clear();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VariableRegistry::AppendVariableToProcessingQueue(
+	const NcFileVector & vecncDataFiles,
+	const SimpleGrid & grid,
+	VariableIndex varix,
+	DimInfoVector * pvecAuxDimInfo
+) {
+	if (m_sProcessingQueueVarPos != (-1)) {
+		_EXCEPTIONT("LOGIC ERROR: Processing queue locked");
+	}
+
+	DimInfoVector vecAuxDimInfo;
+	GetAuxiliaryDimInfo(
+		vecncDataFiles,
+		grid,
+		varix,
+		vecAuxDimInfo);
+
+	VariableAuxIndex auxix(vecAuxDimInfo.size());
+	for (size_t d = 0; d < vecAuxDimInfo.size(); d++) {
+		auxix[d] = vecAuxDimInfo[d].size;
+	}
+	VariableAuxIndexIterator auxiter;
+	auxiter.Initialize(varix, auxix, false);
+	m_vecProcessingQueue.push_back(auxiter);
+
+	if (pvecAuxDimInfo != NULL) {
+		(*pvecAuxDimInfo) = vecAuxDimInfo;
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+size_t VariableRegistry::GetProcessingQueueVarPos() const {
+	return m_sProcessingQueueVarPos;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+VariableIndex VariableRegistry::GetProcessingQueueVarIx() const {
+	_ASSERT(m_sProcessingQueueVarPos < m_vecProcessingQueue.size());
+
+	const VariableAuxIndexIterator & auxit =
+		m_vecProcessingQueue[m_sProcessingQueueVarPos];
+	
+	return auxit.m_varix;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+Variable & VariableRegistry::GetProcessingQueueVariable() {
+	_ASSERT(m_sProcessingQueueVarPos < m_vecProcessingQueue.size());
+
+	const VariableAuxIndexIterator & auxit =
+		m_vecProcessingQueue[m_sProcessingQueueVarPos];
+
+	VariableIndex varix = auxit.m_varix;
+	if ((varix < 0) || (varix >= m_vecVariables.size())) {
+		_EXCEPTIONT("Variable index out of range");
+	}
+
+	Variable & var = *(m_vecVariables[varix]);
+
+	// Assign auxiliary indices and clear existing data
+	if (auxit.m_vecValue.size() != 0) {
+		std::vector<std::string> vecArg(auxit.m_vecValue.size());
+		for (size_t d = 0; d < auxit.m_vecValue.size(); d++) {
+			vecArg[d] = std::to_string(auxit.m_vecValue[d]);
+		}
+		AssignAuxiliaryIndicesRecursive(var, vecArg);
+		var.UnloadGridData();
+	}
+
+	return var;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+const VariableAuxIndex & VariableRegistry::GetProcessingQueueAuxIx() const {
+	_ASSERT(m_sProcessingQueueVarPos < m_vecProcessingQueue.size());
+
+	const VariableAuxIndexIterator & auxit =
+		m_vecProcessingQueue[m_sProcessingQueueVarPos];
+
+	return auxit.m_vecValue;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool VariableRegistry::AdvanceProcessingQueue() {
+	if (m_sProcessingQueueVarPos == (-1)) {
+		m_sProcessingQueueVarPos = 0;
+		if (m_vecProcessingQueue.size() == 0) {
+			return false;
+		}
+		return true;
+	}
+	if (m_sProcessingQueueVarPos >= m_vecProcessingQueue.size()) {
+		return false;
+	}
+
+	_ASSERT(!m_vecProcessingQueue[m_sProcessingQueueVarPos].at_end());
+
+	m_vecProcessingQueue[m_sProcessingQueueVarPos]++;
+
+	if (m_vecProcessingQueue[m_sProcessingQueueVarPos].at_end()) {
+		m_sProcessingQueueVarPos++;
+		if (m_sProcessingQueueVarPos >= m_vecProcessingQueue.size()) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VariableRegistry::ResetProcessingQueue() {
+	m_sProcessingQueueVarPos = (-1);
+	for (size_t d = 0; d < m_vecProcessingQueue.size(); d++) {
+		m_vecProcessingQueue[d].Reset();
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 DataOp * VariableRegistry::GetDataOp(
 	const std::string & strName
 ) {
@@ -479,10 +736,6 @@ DataOp * VariableRegistry::GetDataOp(
 // Variable
 ///////////////////////////////////////////////////////////////////////////////
 
-const long Variable::InvalidArgument = (-1);
-
-///////////////////////////////////////////////////////////////////////////////
-
 bool Variable::operator==(
 	const Variable & var
 ) {
@@ -495,17 +748,12 @@ bool Variable::operator==(
 	if (m_strArg.size() != var.m_strArg.size()) {
 		return false;
 	}
-	//_ASSERT(m_strArg.size() == m_lArg.size());
 	_ASSERT(m_strArg.size() == m_varArg.size());
-	//_ASSERT(m_strArg.size() == var.m_lArg.size());
 	_ASSERT(m_strArg.size() == var.m_varArg.size());
 	for (int i = 0; i < m_strArg.size(); i++) {
 		if (m_strArg[i] != var.m_strArg[i]) {
 			return false;
 		}
-		//if (m_lArg[i] != var.m_lArg[i]) {
-		//	return false;
-		//}
 		if (m_varArg[i] != var.m_varArg[i]) {
 			return false;
 		}
@@ -518,24 +766,22 @@ bool Variable::operator==(
 std::string Variable::ToString(
 	const VariableRegistry & varreg
 ) const {
+	_ASSERT(m_varArg.size() == m_strArg.size());
 	char szBuffer[20];
 	std::string strOut = m_strName;
-	if (m_varArg.size() == 0) {
-		return strOut;
-	}
-	strOut += "(";
-	_ASSERT(m_varArg.size() == m_strArg.size());
-	//_ASSERT(m_varArg.size() == m_lArg.size());
-	for (size_t d = 0; d < m_varArg.size(); d++) {
-		if (m_varArg[d] != InvalidVariableIndex) {
-			strOut += varreg.GetVariableString(m_varArg[d]);
-		} else {
-			strOut += m_strArg[d];
-		}
-		if (d != m_varArg.size()-1) {
-			strOut += ",";
-		} else {
-			strOut += ")";
+	if (m_varArg.size() != 0) {
+		strOut += "(";
+		for (size_t d = 0; d < m_varArg.size(); d++) {
+			if (m_varArg[d] != InvalidVariableIndex) {
+				strOut += varreg.GetVariableString(m_varArg[d]);
+			} else {
+				strOut += m_strArg[d];
+			}
+			if (d != m_varArg.size()-1) {
+				strOut += ",";
+			} else {
+				strOut += ")";
+			}
 		}
 	}
 	return strOut;
@@ -592,7 +838,7 @@ NcVar * Variable::GetNcVarFromNcFileVector(
 		nRequestedVarDims++;
 	}
 	if (nVarDims != nRequestedVarDims) {
-		_EXCEPTION4("Variable \"%s\" in file \"%s\" has fewer auxiliary dimensions (%i) than specified on command line (%i)",
+		_EXCEPTION4("Variable \"%s\" in file \"%s\" has inconsistent auxiliary dimensions (%i) than specified on command line (%i)",
 			m_strName.c_str(),
 			ncfilevec.GetFilename(sPos).c_str(),
 			nVarDims,

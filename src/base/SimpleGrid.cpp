@@ -20,6 +20,7 @@
 #include "GaussLobattoQuadrature.h"
 #include "Announce.h"
 #include "CoordTransforms.h"
+#include "NetCDFUtilities.h"
 #include "kdtree.h"
 
 #include <cstdlib>
@@ -299,34 +300,65 @@ void SimpleGrid::GenerateLatitudeLongitude(
 	bool fRegional,
 	bool fDiagonalConnectivity
 ) {
+	_ASSERT(ncFile != NULL);
+
 	if (IsInitialized()) {
 		_EXCEPTIONT("Attempting to call GenerateLatitudeLongitude() on previously initialized grid");
 	}
 
-	NcDim * dimLat = ncFile->get_dim(strLatitudeName.c_str());
+	// Load latitude variable
+	NcVar * varLat;
+	NcDim * dimLat;
+
+	std::vector<std::string> vecLatitudeNames;
+	if (strLatitudeName == std::string("[auto]")) {
+		vecLatitudeNames.push_back("lat");
+		vecLatitudeNames.push_back("latitude");
+		vecLatitudeNames.push_back("LAT");
+		vecLatitudeNames.push_back("latitude0");
+		vecLatitudeNames.push_back("Latitude");
+		vecLatitudeNames.push_back("XLAT");
+	} else {
+		vecLatitudeNames.push_back(strLatitudeName);
+	}
+
+	size_t sLatIx = NcGetVarFromList(*ncFile, vecLatitudeNames, &varLat, &dimLat);
+	if (sLatIx == vecLatitudeNames.size()) {
+		_EXCEPTION1("No variable %s found in input file",
+			STLStringHelper::ConcatenateStringVector(vecLatitudeNames, ", ").c_str());
+	}
 	if (dimLat == NULL) {
-		_EXCEPTION1("No dimension \"%s\" found in input file",
-			strLatitudeName.c_str());
+		_EXCEPTION1("In NetCDF file variable \"%s\" must have dimension with same name",
+			vecLatitudeNames[sLatIx].c_str());
 	}
 
-	NcDim * dimLon = ncFile->get_dim(strLongitudeName.c_str());
+	// Load longitude variable
+	NcVar * varLon;
+	NcDim * dimLon;
+
+	std::vector<std::string> vecLongitudeNames;
+	if (strLatitudeName == std::string("[auto]")) {
+		vecLongitudeNames.push_back("lon");
+		vecLongitudeNames.push_back("longitude");
+		vecLongitudeNames.push_back("LON");
+		vecLongitudeNames.push_back("longitude0");
+		vecLongitudeNames.push_back("Longitude");
+		vecLongitudeNames.push_back("XLONG");
+	} else {
+		vecLongitudeNames.push_back(strLongitudeName);
+	}
+
+	size_t sLonIx = NcGetVarFromList(*ncFile, vecLongitudeNames, &varLon, &dimLon);
+	if (sLonIx == vecLatitudeNames.size()) {
+		_EXCEPTION1("No variable %s found in input file",
+			STLStringHelper::ConcatenateStringVector(vecLatitudeNames, ", ").c_str());
+	}
 	if (dimLon == NULL) {
-		_EXCEPTION1("No dimension \"%s\" found in input file",
-			strLongitudeName.c_str());
+		_EXCEPTION1("In NetCDF file variable \"%s\" must have dimension with same name",
+			vecLongitudeNames[sLonIx].c_str());
 	}
 
-	NcVar * varLat = ncFile->get_var(strLatitudeName.c_str());
-	if (varLat == NULL) {
-		_EXCEPTION1("No variable \"%s\" found in input file",
-			strLatitudeName.c_str());
-	}
-
-	NcVar * varLon = ncFile->get_var(strLongitudeName.c_str());
-	if (varLon == NULL) {
-		_EXCEPTION1("No variable \"%s\" found in input file",
-			strLongitudeName.c_str());
-	}
-
+	// Load lat/lon data
 	int nLat = dimLat->size();
 	int nLon = dimLon->size();
 

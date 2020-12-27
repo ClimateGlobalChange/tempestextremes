@@ -26,6 +26,69 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 
+size_t NcGetVarFromList(
+	NcFile & ncFile,
+	const std::vector<std::string> & vecVarNames,
+	NcVar ** pvar,
+	NcDim ** pdim
+) {
+	for (size_t v = 0; v < vecVarNames.size(); v++) {
+		NcVar * var = ncFile.get_var(vecVarNames[v].c_str());
+		if (var != NULL) {
+			if (pvar != NULL) {
+				(*pvar) = var;
+			}
+
+			if (pdim != NULL) {
+				NcDim * dim = ncFile.get_dim(vecVarNames[v].c_str());
+				if (dim != NULL) {
+					(*pdim) = dim;
+				} else {
+					(*pdim) = NULL;
+				}
+			}
+			return v;
+		}
+	}
+	return vecVarNames.size();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void NcGetLatitudeLongitudeName(
+	NcFile & ncFile,
+	std::string & strLatitudeName,
+	std::string & strLongitudeName
+) {
+	// Check possible latitude names
+	std::vector<std::string> vecLatitudeNames;
+	if (strLatitudeName == std::string("[auto]")) {
+		vecLatitudeNames.push_back("lat");
+		vecLatitudeNames.push_back("latitude");
+		vecLatitudeNames.push_back("LAT");
+		vecLatitudeNames.push_back("latitude0");
+		vecLatitudeNames.push_back("Latitude");
+		vecLatitudeNames.push_back("XLAT");
+	} else {
+		vecLatitudeNames.push_back(strLatitudeName);
+	}
+
+	// Check possible longitude names
+	std::vector<std::string> vecLongitudeNames;
+	if (strLatitudeName == std::string("[auto]")) {
+		vecLongitudeNames.push_back("lon");
+		vecLongitudeNames.push_back("longitude");
+		vecLongitudeNames.push_back("LON");
+		vecLongitudeNames.push_back("longitude0");
+		vecLongitudeNames.push_back("Longitude");
+		vecLongitudeNames.push_back("XLONG");
+	} else {
+		vecLongitudeNames.push_back(strLongitudeName);
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void CopyNcFileAttributes(
 	NcFile * fileIn,
 	NcFile * fileOut
@@ -126,6 +189,27 @@ void CopyNcVarAttributes(
 
 		delete pValues;
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+NcDim * AddNcDimOrUseExisting(
+	NcFile & ncFile,
+	const std::string & strDimName,
+	long lDimSize
+) {
+	NcDim * dim = ncFile.get_dim(strDimName.c_str());
+	if (dim == NULL) {
+		dim = ncFile.add_dim(strDimName.c_str(), lDimSize);
+		if (dim == NULL) {
+			_EXCEPTION2("Error adding dimension \"%s\" (%li) to file",
+				strDimName.c_str(), lDimSize);
+		}
+	} else if (dim->size() != lDimSize) {
+		_EXCEPTION3("Attempting to redefine dimension \"%s\" from size %li to %li",
+			strDimName.c_str(), dim->size(), lDimSize);
+	}
+	return dim;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

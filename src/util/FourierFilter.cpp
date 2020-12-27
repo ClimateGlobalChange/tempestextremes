@@ -89,10 +89,10 @@ try {
 
 	// Validate arguments
 	if (strInputFile.length() == 0) {
-		_EXCEPTIONT("No input data file (--in) specified");
+		_EXCEPTIONT("No input data file (--in_data) specified");
 	}
 	if (strOutputFile.length() == 0) {
-		_EXCEPTIONT("No output data file (--out) specified");
+		_EXCEPTIONT("No output data file (--out_data) specified");
 	}
 	if (strVarName.length() == 0) {
 		_EXCEPTIONT("No variables (--var) specified");
@@ -125,7 +125,7 @@ try {
 
 	// Open the output file
 	NcFile ncoutfile(strOutputFile.c_str(), NcFile::Replace);
-	if (!ncinfile.is_valid()) {
+	if (!ncoutfile.is_valid()) {
 		_EXCEPTION1("Unable to open NetCDF file \"%s\"",
 			strOutputFile.c_str());
 	}

@@ -25,6 +25,7 @@
 #include "NcFileVector.h"
 
 #include <vector>
+#include <string>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -72,6 +73,16 @@ public:
 		return false;
 	}
 
+	///	<summary>
+	///		Equality comparator.
+	///	</summary>
+	bool operator== (const DimInfo & di) const {
+		if ((name == di.name) && (size == di.size)) {
+			return true;
+		}
+		return false;
+	}
+
 public:
 	///	<summary>
 	///		Dimension name.
@@ -87,7 +98,47 @@ public:
 ///	<summary>
 ///		A vector of DimInfo.
 ///	</summary>
-typedef std::vector<DimInfo> DimInfoVector;
+class DimInfoVector : public std::vector<DimInfo> {
+
+public:
+	///	<summary>
+	///		Convert this to a string.
+	///	</summary>
+	std::string ToString() const {
+		std::string str;
+		for (size_t d = 0; d < size(); d++) {
+			str += "[" + (*this)[d].name + "," + std::to_string((*this)[d].size) + "]";
+		}
+		if (str.length() == 0) {
+			str = "[]";
+		}
+		return str;
+	}
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class Variable;
+
+///	<summary>
+///		A vector of pointers to Variable.
+///	</summary>
+typedef std::vector<Variable *> VariableVector;
+
+///	<summary>
+///		A unique index assigned to each Variable.
+///	</summary>
+typedef int VariableIndex;
+
+///	<summary>
+///		The invalid variable index.
+///	</summary>
+static const VariableIndex InvalidVariableIndex = (-1);
+
+///	<summary>
+///		A vector for storing VariableIndex.
+///	</summary>
+class VariableIndexVector : public std::vector<VariableIndex> {};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -97,27 +148,30 @@ typedef std::vector<DimInfo> DimInfoVector;
 ///	</summary>
 class VariableAuxIndexIterator {
 
-friend class Variable;
+friend class VariableRegistry;
 
 public:
 	///	<summary>
 	///		Constructor.
 	///	</summary>
 	VariableAuxIndexIterator() :
+		m_varix(InvalidVariableIndex),
 		m_fEnd(false)
 	{ }
 
 protected:
 	///	<summary>
-	///		Initializer, only accessible from Variable.
+	///		Initializer, only accessible from VariableRegistry.
 	///	</summary>
 	void Initialize(
+		VariableIndex varix,
 		const VariableAuxIndex & vecSize,
 		bool fEnd
 	) {
+		m_varix = varix;
 		m_fEnd = fEnd;
 		m_vecSize = vecSize;
-		m_vecValue.resize(m_vecSize.size());
+		m_vecValue.resize(m_vecSize.size(), 0);
 		for (size_t d = 0; d < m_vecSize.size(); d++) {
 			if (m_vecSize[d] <= 0) {
 				_EXCEPTIONT("Invalid auxiliary index size entry");
@@ -126,6 +180,16 @@ protected:
 		if ((fEnd) && (vecSize.size() > 0)) {
 			m_vecValue[0] = m_vecSize[0];
 		}
+	}
+
+	///	<summary>
+	///		Reset the value to zero.
+	///	</summary>
+	void Reset() {
+		for (size_t d = 0; d < m_vecValue.size(); d++) {
+			m_vecValue[d] = 0;
+		}
+		m_fEnd = false;
 	}
 
 public:
@@ -249,7 +313,19 @@ public:
 		return m_vecSize.size();
 	}
 
+	///	<summary>
+	///		Returns true if this iterator is at the end.
+	///	</summary>
+	bool at_end() const {
+		return m_fEnd;
+	}
+
 protected:
+	///	<summary>
+	///		VariableIndex associated with this iterator.
+	///	</summary>
+	VariableIndex m_varix;
+
 	///	<summary>
 	///		The sizes of the auxiliary indices.
 	///	</summary>
@@ -265,30 +341,6 @@ protected:
 	///	</summary>
 	bool m_fEnd;
 };
-
-///////////////////////////////////////////////////////////////////////////////
-
-class Variable;
-
-///	<summary>
-///		A vector of pointers to Variable.
-///	</summary>
-typedef std::vector<Variable *> VariableVector;
-
-///	<summary>
-///		A unique index assigned to each Variable.
-///	</summary>
-typedef int VariableIndex;
-
-///	<summary>
-///		The invalid variable index.
-///	</summary>
-static const VariableIndex InvalidVariableIndex = (-1);
-
-///	<summary>
-///		A vector for storing VariableIndex.
-///	</summary>
-class VariableIndexVector : public std::vector<VariableIndex> {};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -406,6 +458,73 @@ public:
 
 public:
 	///	<summary>
+	///		Obtain auxiliary dimension sizes for the specified variables.
+	///	</summary>
+	void GetAuxiliaryDimInfo(
+		const NcFileVector & vecncDataFiles,
+		const SimpleGrid & grid,
+		VariableIndex varix,
+		DimInfoVector & vecAuxDimInfo
+	) const;
+
+private:
+	///	<summary>
+	///		Recursively assign auxiliary indices to Variables.
+	///	</summary>
+	void AssignAuxiliaryIndicesRecursive(
+		Variable & var,
+		const std::vector<std::string> & vecArg
+	);
+
+public:
+	///	<summary>
+	///		Clear the processing queue.
+	///	</summary>
+	void ClearProcessingQueue();
+
+	///	<summary>
+	///		Add a new variable and its auxiliary indices to the processing
+	///		queue for this VariableRegistry.
+	///	</summary>
+	void AppendVariableToProcessingQueue(
+		const NcFileVector & vecncDataFiles,
+		const SimpleGrid & grid,
+		VariableIndex varix,
+		DimInfoVector * pvecAuxDimInfo = NULL
+	);
+
+	///	<summary>
+	///		Get the current position in the processing queue.
+	///	</summary>
+	size_t GetProcessingQueueVarPos() const;
+
+	///	<summary>
+	///		Get the current processing queue variable index.
+	///	</summary>
+	VariableIndex GetProcessingQueueVarIx() const;
+
+	///	<summary>
+	///		Get the variable currently in the processing queue.
+	///	</summary>
+	Variable & GetProcessingQueueVariable();
+
+	///	<summary>
+	///		Get the current processing queue auxiliary index.
+	///	</summary>
+	const VariableAuxIndex & GetProcessingQueueAuxIx() const;
+
+	///	<summary>
+	///		Advance the processing queue.
+	///	</summary>
+	bool AdvanceProcessingQueue();
+
+	///	<summary>
+	///		Reset the processing queue.
+	///	</summary>
+	void ResetProcessingQueue();
+
+public:
+	///	<summary>
 	///		Get the DataOp with the specified name.
 	///	</summary>
 	DataOp * GetDataOp(const std::string & strName);
@@ -420,6 +539,17 @@ private:
 	///		Map of data operators.
 	///	</summary>
 	DataOpManager m_domDataOp;
+
+private:
+	///	<summary>
+	///		Current variable index in the processing queue.
+	///	</summary>
+	size_t m_sProcessingQueueVarPos;
+
+	///	<summary>
+	///		Map of auxiliary index iterators.
+	///	</summary>
+	std::vector<VariableAuxIndexIterator> m_vecProcessingQueue;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -438,12 +568,6 @@ friend class VariableRegistry;
 
 public:
 	///	<summary>
-	///		Invalid argument.
-	///	</summary>
-	static const long InvalidArgument;
-
-public:
-	///	<summary>
 	///		Default constructor.
 	///	</summary>
 	Variable() :
@@ -451,7 +575,6 @@ public:
 		m_fOp(false),
 		m_fNoTimeInNcFile(false),
 		m_timeStored(Time::CalendarUnknown)
-		//m_lTime(NcFileVector::InvalidTimeIndex)
 	{ }
 
 public:
@@ -479,7 +602,6 @@ public:
 	///	</summary>
 	size_t GetArgumentCount() const {
 		_ASSERT(m_strArg.size() == m_varArg.size());
-		//_ASSERT(m_strArg.size() == m_lArg.size());
 		return m_strArg.size();
 	}
 
@@ -489,14 +611,7 @@ public:
 	const std::vector<std::string> & GetArgumentStrings() const {
 		return m_strArg;
 	}
-/*
-	///	<summary>
-	///		Get the array of specified operator arguments (as long).
-	///	</summary>
-	const std::vector<long> & GetArgumentLongs() const {
-		return m_lArg;
-	}
-*/
+
 	///	<summary>
 	///		Get the array of specified operator Variables.
 	///	</summary>
@@ -562,14 +677,14 @@ protected:
 	bool m_fOp;
 
 	///	<summary>
-	///		Specified operator arguments (as std::string).
+	///		Free operator arguments.
 	///	</summary>
-	std::vector<std::string> m_strArg;
+	std::vector<bool> m_fFreeArg;
 
 	///	<summary>
-	///		Specified operator arguments (as long, for NetCDF file indexing).
+	///		Specified operator arguments or auxiliary indices (as std::string).
 	///	</summary>
-	//std::vector<long> m_lArg;
+	std::vector<std::string> m_strArg;
 
 	///	<summary>
 	///		Specified operator arguments (as VariableIndex).
@@ -609,17 +724,7 @@ public:
 	///		Flag indicating this Variable has no time index in NetCDF file.
 	///	</summary>
 	bool m_fNoTimeInNcFile;
-/*
-	///	<summary>
-	///		Filename associated with data loaded in this Variable.
-	///	</summary>
-	std::string m_strFilename;
 
-	///	<summary>
-	///		Time index associated with data loaded in this Variable.
-	///	</summary>
-	long m_lTime;
-*/
 	///	<summary>
 	///		Time currently stored in this Variable.
 	///	</summary>

@@ -189,6 +189,22 @@ static void ParseVariableList(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static std::string ConcatenateStringVector(
+	const std::vector< std::string > & vecStrings,
+	std::string strDelimiter
+) {
+	std::string strConcat;
+	for (int v = 0; v < vecStrings.size(); v++) {
+		strConcat += vecStrings[v];
+		if (v != vecStrings.size() - 1) {
+			strConcat += strDelimiter;
+		}
+	}
+	return strConcat;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 };
 
 #endif

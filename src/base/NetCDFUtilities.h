@@ -91,6 +91,33 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		Load one of several possible names for a given variable.
+///	</summary>
+///	<returns>
+///		The index in the vecVarNames array of the variable found, or
+///		vecVarNames.size() if not found.
+///	</returns>
+size_t NcGetVarFromList(
+	NcFile & ncFile,
+	const std::vector<std::string> & vecVarNames,
+	NcVar ** pvar = NULL,
+	NcDim ** pdim = NULL
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Get the name of the latitude and longitude dimension from a file.
+///	</summary>
+void NcGetLatitudeLongitudeName(
+	NcFile & ncFile,
+	std::string & strLatitudeName,
+	std::string & strLongitudeName
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Copy NetCDF attribute metadata from one file to another.
 ///	</summary>
 void CopyNcFileAttributes(
@@ -106,6 +133,17 @@ void CopyNcFileAttributes(
 void CopyNcVarAttributes(
 	NcVar * varIn,
 	NcVar * varOut
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Insert a new dimension into the NcFile, or use existing.
+///	</summary>
+NcDim * AddNcDimOrUseExisting(
+	NcFile & ncFile,
+	const std::string & strDimName,
+	long lDimSize
 );
 
 ////////////////////////////////////////////////////////////////////////////////
