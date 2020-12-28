@@ -63,13 +63,16 @@ try {
 	// Output data file
 	std::string strOutputFile;
 
-	// Variable to apply Fourier transform to
+	// Variable to integrate
 	std::string strVarName;
+
+	// Names for output variables after integration
+	std::string strVarOutName;
 
 	// Variables to preserve
 	std::string strPreserveVarName;
 
-	// Dimension along which to perform Fourier transform
+	// Dimension along which to perform integration
 	std::string strDimName;
 
 	// Variable name for surface pressure
@@ -86,6 +89,7 @@ try {
 		CommandLineString(strInputFiles, "in_data", "");
 		CommandLineString(strOutputFile, "out_data", "");
 		CommandLineString(strVarName, "var", "");
+		CommandLineString(strVarOutName, "varout", "");
 		CommandLineString(strPreserveVarName, "preserve", "");
 		CommandLineString(strDimName, "dim", "lev");
 		CommandLineString(strPSVariableName, "psvarname", "PS");
@@ -117,6 +121,18 @@ try {
 	// Parse variable list (--var)
 	std::vector<std::string> vecVariableStrings;
 	STLStringHelper::ParseVariableList(strVarName, vecVariableStrings);
+
+	// Parse output variable list (--outvar)
+	std::vector<std::string> vecOutputVariableStrings;
+	if (strVarOutName.length() == 0) {
+		vecOutputVariableStrings = vecVariableStrings;
+	} else {
+		STLStringHelper::ParseVariableList(strVarOutName, vecOutputVariableStrings);
+		if (vecVariableStrings.size() != vecOutputVariableStrings.size()) {
+			_EXCEPTION2("Inconsistent number of variables in --var (%lu) and --varout (%lu)",
+				vecVariableStrings.size(), vecOutputVariableStrings.size());
+		}
+	}
 
 	// Parse preserve list (--preserve)
 	std::vector<std::string> vecPreserveVariableStrings;
@@ -242,9 +258,17 @@ try {
 
 	// Begin processing
 	AnnounceStartBlock("Processing");
+	_ASSERT(vecVariableStrings.size() == vecOutputVariableStrings.size());
 	for (int v = 0; v < vecVariableStrings.size(); v++) {
 
-		AnnounceStartBlock("Variable \"%s\"", vecVariableStrings[v].c_str());
+		if (vecVariableStrings[v] == vecOutputVariableStrings[v]) {
+			AnnounceStartBlock("Variable \"%s\"",
+				vecVariableStrings[v].c_str());
+		} else {
+			AnnounceStartBlock("Variable \"%s\" -> \"%s\"",
+				vecVariableStrings[v].c_str(),
+				vecOutputVariableStrings[v].c_str());
+		}
 
 		// Find the file containing this variable
 		NcVar * varIn;
@@ -359,7 +383,7 @@ try {
 		// Create output variable
 		NcVar * varOut =
 			ncoutfile.add_var(
-				varIn->name(),
+				vecOutputVariableStrings[v].c_str(),
 				ncFloat,
 				vecDimOut.size(),
 				const_cast<const NcDim**>(&(vecDimOut[0])));
