@@ -64,6 +64,9 @@ try {
 	// Output list of data files
 	std::string strOutputDataList;
 
+	// List of variables to preserve
+	std::string strPreserveVarName;
+
 	// List of variables to process
 	std::string strVariables;
 
@@ -90,6 +93,7 @@ try {
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineString(strOutputDataList, "out_data_list", "");
 
+		CommandLineString(strPreserveVarName, "preserve", "");
 		CommandLineString(strVariables, "var", "");
 		CommandLineString(strOutputVariables, "varout", "");
 		CommandLineString(strTimeFilter, "timefilter", "");
@@ -153,6 +157,10 @@ try {
 		_EXCEPTION2("Inconsistent number of variables in --var (%lu) and --varout (%lu)",
 			vecVarIxIn.size(), vecVariableNamesOut.size());
 	}
+
+	// Prase preserve list (--preserve)
+	std::vector<std::string> vecPreserveVariableStrings;
+	STLStringHelper::ParseVariableList(strPreserveVarName, vecPreserveVariableStrings);
 
 	// Store input data
 	FilenameList vecInputFileList;
@@ -371,6 +379,32 @@ try {
 
 		} else {
 			_EXCEPTIONT("Only 1D or 2D spatial data supported");
+		}
+
+		// Copy preserve variables
+		if (strPreserveVarName != "") {
+			AnnounceStartBlock("Preserving variables");
+
+			for (int v = 0; v < vecPreserveVariableStrings.size(); v++) {
+				Announce("Variable %s", vecPreserveVariableStrings[v].c_str());
+
+				NcVar * var;
+				size_t sFileIx = vecFiles.FindContainingVariable(vecPreserveVariableStrings[v], &var);
+				if (var == NULL) {
+					_EXCEPTION1("Unable to find variable \"%s\" in specified files",
+						vecPreserveVariableStrings[v].c_str());
+				}
+
+				NcFile * ncinfile = vecFiles[sFileIx];
+				_ASSERT(ncinfile != NULL);
+
+				CopyNcVar(
+					(*ncinfile),
+					ncout,
+					vecPreserveVariableStrings[v]);
+			}
+
+			AnnounceEndBlock("Done");
 		}
 
 		// Build up the processing queue
