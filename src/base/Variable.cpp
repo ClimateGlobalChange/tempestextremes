@@ -684,6 +684,28 @@ const VariableAuxIndex & VariableRegistry::GetProcessingQueueAuxIx() const {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+const VariableAuxIndex & VariableRegistry::GetProcessingQueueAuxSize() const {
+	_ASSERT(m_sProcessingQueueVarPos < m_vecProcessingQueue.size());
+
+	const VariableAuxIndexIterator & auxit =
+		m_vecProcessingQueue[m_sProcessingQueueVarPos];
+
+	return auxit.m_vecSize;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+size_t VariableRegistry::GetProcessingQueueOffset() const {
+	_ASSERT(m_sProcessingQueueVarPos < m_vecProcessingQueue.size());
+
+	const VariableAuxIndexIterator & auxit =
+		m_vecProcessingQueue[m_sProcessingQueueVarPos];
+
+	return auxit.Offset();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 bool VariableRegistry::AdvanceProcessingQueue() {
 	if (m_sProcessingQueueVarPos == (-1)) {
 		m_sProcessingQueueVarPos = 0;

@@ -102,6 +102,17 @@ class DimInfoVector : public std::vector<DimInfo> {
 
 public:
 	///	<summary>
+	///		Get the total size of this DimInfoVector.
+	///	</summary>
+	size_t GetTotalSize() const {
+		size_t sTotalSize = 1;
+		for (size_t i = 0; i < size(); i++) {
+			sTotalSize *= static_cast<size_t>((*this)[i].size);
+		}
+		return sTotalSize;
+	}
+
+	///	<summary>
 	///		Convert this to a string.
 	///	</summary>
 	std::string ToString() const {
@@ -285,6 +296,19 @@ public:
 	}
 
 	///	<summary>
+	///		Get the flattened index of the iterator.
+	///	</summary>
+	const size_t Offset() const {
+		size_t sValue = 0;
+		size_t sAccumulatedSize = 1;
+		for (long d = static_cast<long>(m_vecValue.size())-1; d >= 0; d--) {
+			sValue += m_vecValue[d] * sAccumulatedSize;
+			sAccumulatedSize *= m_vecSize[d];
+		}
+		return sValue;
+	}
+
+	///	<summary>
 	///		Convert to a std::string.
 	///	</summary>
 	std::string ToString() const {
@@ -434,7 +458,7 @@ public:
 		std::vector<std::string> & vecDependentVarNames
 	) const;
 
-public:
+private:
 	///	<summary>
 	///		Obtain auxiliary dimension sizes for the specified variables.
 	///	</summary>
@@ -512,6 +536,16 @@ public:
 	///		Get the current processing queue auxiliary index.
 	///	</summary>
 	const VariableAuxIndex & GetProcessingQueueAuxIx() const;
+
+	///	<summary>
+	///		Get the current processing queue auxiliary dimension size.
+	///	</summary>
+	const VariableAuxIndex & GetProcessingQueueAuxSize() const;
+
+	///	<summary>
+	///		Get the current processing queue auxiliary index offset.
+	///	</summary>
+	size_t GetProcessingQueueOffset() const;
 
 	///	<summary>
 	///		Advance the processing queue.

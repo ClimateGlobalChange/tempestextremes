@@ -293,8 +293,7 @@ try {
 	AnnounceBanner();
 
 	// Create Variable registries
-	VariableRegistry varregIn;
-	VariableRegistry varregOut;
+	VariableRegistry varreg;
 
 	// Create autocurator
 	AutoCurator autocurator;
@@ -415,10 +414,10 @@ try {
 		std::string strVariablesTemp = strVariables;
 		for (;;) {
 			VariableIndex varixIn;
-			int iLast = varregIn.FindOrRegisterSubStr(strVariablesTemp, &varixIn) + 1;
+			int iLast = varreg.FindOrRegisterSubStr(strVariablesTemp, &varixIn) + 1;
 
 			vecVarIxIn.push_back(varixIn);
-			vecVariableNamesIn.push_back(varregIn.GetVariableString(varixIn));
+			vecVariableNamesIn.push_back(varreg.GetVariableString(varixIn));
 
 			if (iLast >= strVariablesTemp.length()) {
 				break;
@@ -486,7 +485,7 @@ try {
 		for (;;) {
 			if ((i == strHistogramOp.length()) || (strHistogramOp[i] == ';')) {
 				HistogramOp opHistogram;
-				opHistogram.Parse(varregIn, strHistogramOp.substr(iLast, i - iLast));
+				opHistogram.Parse(varreg, strHistogramOp.substr(iLast, i - iLast));
 
 				int v = 0;
 				for (; v < vecVarIxIn.size(); v++) {
@@ -496,11 +495,11 @@ try {
 				}
 				if (v == vecVarIxIn.size()) {
 					_EXCEPTION1("Variable \"%s\" must appear in --var argument",
-						varregIn.GetVariableString(opHistogram.m_varix).c_str());
+						varreg.GetVariableString(opHistogram.m_varix).c_str());
 				}
 				if (iVarHistogramOpIx[v] != NoHistogram) {
 					_EXCEPTION1("Variable \"%s\" can only appear once in --histogram",
-						varregIn.GetVariableString(opHistogram.m_varix).c_str());
+						varreg.GetVariableString(opHistogram.m_varix).c_str());
 				}
 
 				iVarHistogramOpIx[v] = vecHistogramOps.size();
@@ -522,20 +521,6 @@ try {
 		timeMaxDelta.FromFormattedString(strMaxTimeDelta);
 		if (timeMaxDelta.GetTimeType() != Time::TypeDelta) {
 			_EXCEPTIONT("--max_time_delta must be specified as a time difference ([#d][#h][#m][#s])");
-		}
-	}
-
-	// Generate a list of dependent base variables for each variable
-	std::vector< std::vector<std::string> > vecvecDependentVarNames;
-	vecvecDependentVarNames.resize(vecVarIxIn.size());
-	for (int v = 0; v < vecVarIxIn.size(); v++) {
-		varregIn.GetDependentVariableNames(
-			vecVarIxIn[v],
-			vecvecDependentVarNames[v]);
-
-		if (vecvecDependentVarNames[v].size() == 0) {
-			_EXCEPTION1("Variable \"%s\" has no dependent base variables",
-				varregIn.GetVariableString(vecVarIxIn[v]).c_str());
 		}
 	}
 
@@ -651,6 +636,9 @@ try {
 	}
 
 	// Write dimensions
+	long lOutputDimSize0 = (-1);
+	long lOutputDimSize1 = (-1);
+
 	if (strOutputGrid == "xy") {
 		NcDim * dimX = ncoutfile.add_dim("x", nResolutionX);
 		NcDim * dimY = ncoutfile.add_dim("y", nResolutionX);
@@ -671,6 +659,9 @@ try {
 		varY->put(&(dX[0]), nResolutionX);
 		varY->add_att("name", "stereographic y coordinate");
 		varY->add_att("units", "degrees_north");
+
+		lOutputDimSize0 = nResolutionX;
+		lOutputDimSize1 = nResolutionX;
 
 	} else if (strOutputGrid == "rad") {
 		NcDim * dimX = ncoutfile.add_dim("az", nResolutionA);
@@ -696,6 +687,9 @@ try {
 		varR->put(&(dR[0]), nResolutionX);
 		varR->add_att("name", "stereographic great circle distance");
 		varR->add_att("units", "degrees");
+
+		lOutputDimSize0 = nResolutionA;
+		lOutputDimSize1 = nResolutionX;
 
 	} else if (strOutputGrid == "rll") {
 		NcDim * dimX = ncoutfile.add_dim("lon", nResolutionX);
@@ -727,6 +721,9 @@ try {
 		varLon->add_att("name", "latitude");
 		varLat->add_att("units", "degrees_north");
 
+		lOutputDimSize0 = nResolutionX;
+		lOutputDimSize1 = nResolutionX;
+
 	} else {
 		_EXCEPTIONT("Invalid grid");
 	}
@@ -750,7 +747,6 @@ try {
 	int nHistogramGrids = 0;
 	typedef std::map<int, DataArray1D<int> *> HistogramMap;
 	std::vector<HistogramMap> vecmapHistograms;
-	vecmapHistograms.resize(vecVarIxIn.size());
 
 	// Vector of output NcDim * for each variable
 	std::vector< std::vector<NcDim *> > vecOutputNcDim;
@@ -911,61 +907,60 @@ try {
 			// and generate the output data structures and file.
 			if (!fOutputInitialized) {
 
-				AnnounceStartBlock("Initializing output variables");
+				AnnounceStartBlock("Initializing processing queue and output variables");
+
+				varreg.ClearProcessingQueue();
+
+				_ASSERT(lOutputDimSize0 > 0);
+				_ASSERT(lOutputDimSize1 > 0);
 
 				// Loop through all variables
 				for (int v = 0; v < vecVarIxIn.size(); v++) {
 
 					// Get auxiliary dimension info and verify consistency
 					DimInfoVector vecAuxDimInfo;
-/*
-					varregIn.GetAuxiliaryDimInfoAndVerifyConsistency(
+
+					varreg.AppendVariableToProcessingQueue(
 						vecncDataFiles,
 						grid,
-						vecvecDependentVarNames[v],
-						vecAuxDimInfo);
-*/
+						vecVarIxIn[v],
+						&vecAuxDimInfo);
+
+					size_t s2DVariables = vecAuxDimInfo.GetTotalSize();
+
+					if ((s2DVariables != 1) && (vecHistogramOps.size() != 0)) {
+						_EXCEPTIONT("Not implemented: Histograms only available for 2D variables");
+					}
+
 					// Generate output variables
-					int nOutputDimSize0;
-					int nOutputDimSize1;
-
 					if (strOutputGrid == "xy") {
-						nOutputDimSize0 = nResolutionX;
-						nOutputDimSize1 = nResolutionX;
-
-						vecAuxDimInfo.push_back(DimInfo("y", nResolutionX));
-						vecAuxDimInfo.push_back(DimInfo("x", nResolutionX));
+						vecAuxDimInfo.push_back(DimInfo("y", lOutputDimSize0));
+						vecAuxDimInfo.push_back(DimInfo("x", lOutputDimSize1));
 
 					} else if (strOutputGrid == "rad") {
-						nOutputDimSize0 = nResolutionX;
-						nOutputDimSize1 = nResolutionA;
-
-						vecAuxDimInfo.push_back(DimInfo("r", nResolutionX));
-						vecAuxDimInfo.push_back(DimInfo("az", nResolutionA));
+						vecAuxDimInfo.push_back(DimInfo("r", lOutputDimSize0));
+						vecAuxDimInfo.push_back(DimInfo("az", lOutputDimSize1));
 
 					} else if (strOutputGrid == "rll") {
-						nOutputDimSize0 = nResolutionX;
-						nOutputDimSize1 = nResolutionX;
-
-						vecAuxDimInfo.push_back(DimInfo("lat", nResolutionX));
-						vecAuxDimInfo.push_back(DimInfo("lon", nResolutionX));
+						vecAuxDimInfo.push_back(DimInfo("lat", lOutputDimSize0));
+						vecAuxDimInfo.push_back(DimInfo("lon", lOutputDimSize1));
 					}
 
 					// Initialize data storage for output
 					if (fSnapshots) {
-						dOutputDataSnapshot.Allocate(nOutputDimSize0 * nOutputDimSize1);
+						dOutputDataSnapshot.Allocate(lOutputDimSize0 * lOutputDimSize1);
 					}
 					if (fCompositeMean) {
-						vecOutputDataMean[v].Allocate(nOutputDimSize0 * nOutputDimSize1);
+						vecOutputDataMean[v].Allocate(vecAuxDimInfo.GetTotalSize());
 					}
 					if (fCompositeMin) {
-						vecOutputDataMin[v].Allocate(nOutputDimSize0 * nOutputDimSize1);
+						vecOutputDataMin[v].Allocate(vecAuxDimInfo.GetTotalSize());
 						for (int i = 0; i < vecOutputDataMin[v].GetRows(); i++) {
 							vecOutputDataMin[v][i] = FLT_MAX;
 						}
 					}
 					if (fCompositeMax) {
-						vecOutputDataMax[v].Allocate(nOutputDimSize0 * nOutputDimSize1);
+						vecOutputDataMax[v].Allocate(vecAuxDimInfo.GetTotalSize());
 						for (int i = 0; i < vecOutputDataMin[v].GetRows(); i++) {
 							vecOutputDataMax[v][i] = -FLT_MAX;
 						}
@@ -980,10 +975,17 @@ try {
 							vecOutputNcDim[v][d] = ncoutfile.add_dim(
 								vecAuxDimInfo[d].name.c_str(),
 								vecAuxDimInfo[d].size);
+
+							if (vecOutputNcDim[v][d] == NULL) {
+								_EXCEPTION2("Error adding dimension \"%s\" (%li) to output file",
+									vecAuxDimInfo[d].name.c_str(),
+									vecAuxDimInfo[d].size);
+							}
+
 						} else {
 							if (vecOutputNcDim[v][d]->size() != vecAuxDimInfo[d].size) {
 								std::string strVarName =
-									varregIn.GetVariableString(vecVarIxIn[v]);
+									varreg.GetVariableString(vecVarIxIn[v]);
 
 								_EXCEPTION4("Dimension size mismatch when initializing variable \"%s\": Expected dimension \"%s\" to have size \"%li\" (found \"%li\")",
 									strVarName.c_str(),
@@ -1021,6 +1023,11 @@ try {
 					}
 				}
 
+				// Allocate storage for histograms
+				if (vecHistogramOps.size() != 0) {
+					vecmapHistograms.resize(vecVarIxIn.size());
+				}
+
 				// Done
 				fOutputInitialized = true;
 
@@ -1032,13 +1039,27 @@ try {
 			const PathNodeIndexVector & vecPathNodes = iter->second;
 
 			// Loop through all Variables
-			for (int v = 0; v < vecVarIxIn.size(); v++) {
+			varreg.ResetProcessingQueue();
+			while(varreg.AdvanceProcessingQueue()) {
+			//for (int v = 0; v < vecVarIxIn.size(); v++) {
+				size_t v = varreg.GetProcessingQueueVarPos();
+
+				_ASSERT(v < vecVarIxIn.size());
 
 				// Load the data for the search variable
-				Variable & var = varregIn.Get(vecVarIxIn[v]);
-				var.LoadGridData(varregIn, vecncDataFiles, grid);
+				Variable & var = varreg.GetProcessingQueueVariable();
+				var.LoadGridData(varreg, vecncDataFiles, grid);
 				const DataArray1D<float> & dataState = var.GetData();
 				_ASSERT(dataState.GetRows() == grid.GetSize());
+
+				Announce("%s", var.ToString(varreg).c_str());
+
+				// Get the offset from the beginning of the array
+				VariableAuxIndex auxix = varreg.GetProcessingQueueAuxIx();
+
+				size_t sOffset = varreg.GetProcessingQueueOffset() * lOutputDimSize0 * lOutputDimSize1;
+
+				//std::cout << sOffset << "/" << vecOutputDataMean[v].GetRows() << std::endl;
 
 				/////////////////////////////////
 				// PathNode centered composite
@@ -1106,8 +1127,8 @@ try {
 					}
 
 					// Only calculate the mean
-					if (fCompositeMean && !fCompositeMin && !fCompositeMax && !fSnapshots) {
-						for (int i = 0; i < gridNode.GetSize(); i++) {
+					if (fCompositeMean && !fCompositeMin && !fCompositeMax && !fSnapshots && (vecHistogramOps.size() == 0)) {
+						for (size_t i = 0; i < gridNode.GetSize(); i++) {
 							int ixGridIn =
 								grid.NearestNode(
 									gridNode.m_dLon[i],
@@ -1121,13 +1142,13 @@ try {
 									grid.m_dLat[ixGridIn] * 180.0 / M_PI);
 							}
 */
-							vecOutputDataMean[v][i] +=
+							vecOutputDataMean[v][sOffset+i] +=
 								dataState[ixGridIn];
 						}
 
 					// Calculate some subset of mean, min, max
 					} else {
-						for (int i = 0; i < gridNode.GetSize(); i++) {
+						for (size_t i = 0; i < gridNode.GetSize(); i++) {
 							int ixGridIn =
 								grid.NearestNode(
 									gridNode.m_dLon[i],
@@ -1138,22 +1159,23 @@ try {
 									dataState[ixGridIn];
 							}
 							if (fCompositeMean) {
-								vecOutputDataMean[v][i] +=
+								vecOutputDataMean[v][sOffset+i] +=
 									dataState[ixGridIn];
 							}
 							if (fCompositeMin) {
-								if (dataState[ixGridIn] < vecOutputDataMin[v][i]) {
-									vecOutputDataMin[v][i] = dataState[ixGridIn];
+								if (dataState[ixGridIn] < vecOutputDataMin[v][sOffset+i]) {
+									vecOutputDataMin[v][sOffset+i] = dataState[ixGridIn];
 								}
 							}
 							if (fCompositeMax) {
-								if (dataState[ixGridIn] > vecOutputDataMax[v][i]) {
-									vecOutputDataMax[v][i] = dataState[ixGridIn];
+								if (dataState[ixGridIn] > vecOutputDataMax[v][sOffset+i]) {
+									vecOutputDataMax[v][sOffset+i] = dataState[ixGridIn];
 								}
 							}
 
 							// Build histograms
 							if (vecHistogramOps.size() != 0) {
+								size_t sHistIx = varreg.GetProcessingQueueOffset();
 								for (int hop = 0; hop < vecHistogramOps.size(); hop++) {
 									int iBin =
 										static_cast<int>(
@@ -1162,13 +1184,13 @@ try {
 										) / vecHistogramOps[hop].m_dBinWidth;
 
 									HistogramMap::iterator iter =
-										vecmapHistograms[v].find(iBin);
+										vecmapHistograms[sHistIx].find(iBin);
 
 									DataArray1D<int> * pdata = NULL;
-									if (iter == vecmapHistograms[v].end()) {
+									if (iter == vecmapHistograms[sHistIx].end()) {
 										nHistogramGrids++;
 										pdata = new DataArray1D<int>(gridNode.GetSize());
-										vecmapHistograms[v].insert(
+										vecmapHistograms[sHistIx].insert(
 											HistogramMap::value_type(iBin, pdata));
 									} else {
 										pdata = iter->second;
@@ -1176,7 +1198,7 @@ try {
 									if (nHistogramGrids > MaxHistogramGrids) {
 										_EXCEPTION1("Sanity check failed: NodeFileCompose limits number of histogram grids to %i", MaxHistogramGrids);
 									}
-									(*pdata)[i]++;
+									(*pdata)[sOffset+i]++;
 								}
 							}
 						}
@@ -1191,27 +1213,33 @@ try {
 								pathnode.m_fileix, sSnapshotCount);
 						}
 
-						//std::cout << "Variable " << v << " pos " << pathnode.m_fileix << std::endl;
+						VariableAuxIndex lSize;
+						lSize.push_back(1);
+						for (size_t d = 0; d < auxix.size(); d++) {
+							lSize.push_back(1);
+						}
+						lSize.push_back(lOutputDimSize0);
+						lSize.push_back(lOutputDimSize1);
 
-						NcDim * dimSnapshot0 =
-							vecvarSnapshots[v]->get_dim(
-								vecvarSnapshots[v]->num_dims()-2);
-
-						NcDim * dimSnapshot1 =
-							vecvarSnapshots[v]->get_dim(
-								vecvarSnapshots[v]->num_dims()-1);
-
-						_ASSERT(dimSnapshot0->size() * dimSnapshot1->size()
-							== dOutputDataSnapshot.GetRows());
-
-						vecvarSnapshots[v]->set_cur(
-							pathnode.m_fileix);
+						VariableAuxIndex lPos = auxix;
+						lPos.insert(lPos.begin(), pathnode.m_fileix);
+						lPos.push_back(0);
+						lPos.push_back(0);
+/*
+						for (size_t d = 0; d < lSize.size(); d++) {
+							std::cout << lSize[d] << ",";
+						}
+						std::cout << std::endl;
+						for (size_t d = 0; d < lPos.size(); d++) {
+							std::cout << lPos[d] << ",";
+						}
+						std::cout << std::endl;
+*/
+						vecvarSnapshots[v]->set_cur(&(lPos[0]));
 
 						vecvarSnapshots[v]->put(
 							&(dOutputDataSnapshot[0]),
-							1,
-							dimSnapshot0->size(),
-							dimSnapshot1->size());
+							&(lSize[0]));
 					}
 
 					// Fixed point composites only use the time, not the location
@@ -1227,14 +1255,14 @@ try {
 
 		// Average all Variables
 		if ((dFixedLatitudeRad != -999.) || (dFixedLongitudeRad != -999.)) {
-			for (int v = 0; v < vecVarIxIn.size(); v++) {
+			for (int v = 0; v < vecOutputDataMean.size(); v++) {
 				for (int i = 0; i < vecOutputDataMean[v].GetRows(); i++) {
 					vecOutputDataMean[v][i] /=
 						static_cast<float>(sPathCount);
 				}
 			}
 		} else {
-			for (int v = 0; v < vecVarIxIn.size(); v++) {
+			for (int v = 0; v < vecOutputDataMean.size(); v++) {
 				for (int i = 0; i < vecOutputDataMean[v].GetRows(); i++) {
 					vecOutputDataMean[v][i] /=
 						static_cast<float>(sSnapshotCount);
@@ -1259,30 +1287,44 @@ try {
 				_ASSERT(vecVarIxIn.size() == vecOutputDataMax.size());
 			}
 
-			int nOutputDimSize0;
-			int nOutputDimSize1;
+			long lOutputDimSize0;
+			long lOutputDimSize1;
 
 			if (strOutputGrid == "xy") {
-				nOutputDimSize0 = nResolutionX;
-				nOutputDimSize1 = nResolutionX;
+				lOutputDimSize0 = nResolutionX;
+				lOutputDimSize1 = nResolutionX;
 			} else if (strOutputGrid == "rad") {
-				nOutputDimSize0 = nResolutionX;
-				nOutputDimSize1 = nResolutionA;
+				lOutputDimSize0 = nResolutionX;
+				lOutputDimSize1 = nResolutionA;
 			} else if (strOutputGrid == "rll") {
-				nOutputDimSize0 = nResolutionX;
-				nOutputDimSize1 = nResolutionX;
+				lOutputDimSize0 = nResolutionX;
+				lOutputDimSize1 = nResolutionX;
 			}
 
+			//varreg.ResetProcessingQueue();
+			//while(varreg.AdvanceProcessingQueue()) {
 			for (int v = 0; v < vecVarIxIn.size(); v++) {
-				std::string strVarName =
-					vecVariableNamesOut[v];
 
-				AnnounceStartBlock(strVarName.c_str());
+				Variable & var = varreg.Get(vecVarIxIn[v]);
+				if (vecVariableNamesIn[v] == vecVariableNamesOut[v]) {
+					AnnounceStartBlock("Writing \"%s\"",
+						vecVariableNamesIn[v].c_str());
+
+				} else {
+					AnnounceStartBlock("Writing \"%s\" -> \"%s\"",
+						vecVariableNamesIn[v].c_str(),
+						vecVariableNamesOut[v].c_str());
+				}
+
+				std::vector<long> lSize(vecOutputNcDim[v].size());
+				for (size_t d = 0; d < vecOutputNcDim[v].size(); d++) {
+					lSize[d] = vecOutputNcDim[v][d]->size();
+				}
 
 				// Mean of composite
 				if (fCompositeMean) {
 					Announce("mean");
-					std::string strVarNameMean = strVarName;
+					std::string strVarNameMean = vecVariableNamesOut[v];
 
 					NcVar * pvar =
 						ncoutfile.add_var(
@@ -1296,16 +1338,13 @@ try {
 							strVarNameMean.c_str());
 					}
 
-					pvar->put(
-						&(vecOutputDataMean[v][0]),
-						nOutputDimSize0,
-						nOutputDimSize1);
+					pvar->put(&(vecOutputDataMean[v][0]), &(lSize[0]));
 				}
 
 				// Min of composite
 				if (fCompositeMin) {
 					Announce("min");
-					std::string strVarNameMin = strVarName + "_min";
+					std::string strVarNameMin = vecVariableNamesOut[v] + "_min";
 
 					NcVar * pvar =
 						ncoutfile.add_var(
@@ -1319,16 +1358,13 @@ try {
 							strVarNameMin.c_str());
 					}
 
-					pvar->put(
-						&(vecOutputDataMin[v][0]),
-						nOutputDimSize0,
-						nOutputDimSize1);
+					pvar->put(&(vecOutputDataMin[v][0]), &(lSize[0]));
 				}
 
 				// Max of composite
 				if (fCompositeMax) {
 					Announce("max");
-					std::string strVarNameMax = strVarName + "_max";
+					std::string strVarNameMax = vecVariableNamesOut[v] + "_max";
 
 					NcVar * pvar =
 						ncoutfile.add_var(
@@ -1342,16 +1378,13 @@ try {
 							strVarNameMax.c_str());
 					}
 
-					pvar->put(
-						&(vecOutputDataMax[v][0]),
-						nOutputDimSize0,
-						nOutputDimSize1);
+					pvar->put(&(vecOutputDataMax[v][0]), &(lSize[0]));
 				}
 
 				// Histogram of composite
 				if (iVarHistogramOpIx[v] != NoHistogram) {
 					const HistogramOp & opHist = vecHistogramOps[iVarHistogramOpIx[v]];
-					std::string strVarNameHist = strVarName + "_hist";
+					std::string strVarNameHist = vecVariableNamesOut[v] + "_hist";
 
 					int nBins = vecmapHistograms[v].size();
 
@@ -1417,8 +1450,8 @@ try {
 						pvar->put(
 							&(dataHist[0]),
 							1,
-							nOutputDimSize0,
-							nOutputDimSize1);
+							lOutputDimSize0,
+							lOutputDimSize1);
 					}
 					AnnounceEndBlock("Done");
 				}
@@ -1442,6 +1475,9 @@ try {
 
 		// Done processing this nodefile
 		AnnounceEndBlock("Done");
+
+		// Done
+		AnnounceBanner();
 	}
 
 } catch(Exception & e) {
