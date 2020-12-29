@@ -147,7 +147,7 @@ void FindAllLocalMaxima(
 ) {
 	int sFaces = grid.m_vecConnectivity.size();
 	for (int f = 0; f < sFaces; f++) {
-		
+
 		bool fMaximum = true;
 
 		real dValue = data[f];
@@ -161,6 +161,111 @@ void FindAllLocalMaxima(
 
 		if (fMaximum) {
 			setMaxima.insert(f);
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+template <typename real>
+void FindAllLocalMinMaxWithGraphDistance(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & data,
+	bool fMinima,
+	int nMaxGraphDistance,
+	std::set<int> & setMinMax
+) {
+	const real dSign = (fMinima)?(-1.0):(1.0);
+
+	// If max graph distance is 1 then this is just FindAllLocalMinima/Maxima
+	if (nMaxGraphDistance <= 1) {
+		if (fMinima) {
+			FindAllLocalMinima<real>(grid, data, setMinMax);
+		} else {
+			FindAllLocalMaxima<real>(grid, data, setMinMax);
+		}
+	}
+
+	// Get first pass set
+	std::set<int> setFirstPass;
+	if (fMinima) {
+		FindAllLocalMinima<real>(grid, data, setFirstPass);
+	} else {
+		FindAllLocalMaxima<real>(grid, data, setFirstPass);
+	}
+
+	// Use graph search to eliminate candidates within specified graph distance
+	for (auto it = setFirstPass.begin(); it != setFirstPass.end(); it++) {
+
+		real dValue = data[*it];
+
+		std::queue<int> queueToVisit;
+		std::set<int> setVisited;
+
+		// Insert this node and its neighbors into the "visited" set
+		setVisited.insert(*it);
+		size_t sNeighbors = grid.m_vecConnectivity[*it].size();
+		for (size_t n = 0; n < sNeighbors; n++) {
+			int ixNeighbor = grid.m_vecConnectivity[*it][n];
+			setVisited.insert(ixNeighbor);
+		}
+
+		// Insert this node's neighbor's neighbors into the "tovisit" set
+		for (size_t n = 0; n < sNeighbors; n++) {
+			int ixNeighbor = grid.m_vecConnectivity[*it][n];
+			size_t sSubNeighbors = grid.m_vecConnectivity[ixNeighbor].size();
+			for (size_t m = 0; m < sSubNeighbors; m++) {
+				int ixSubNeighbor = grid.m_vecConnectivity[*it][n];
+				if (setVisited.find(ixSubNeighbor) != setVisited.end()) {
+					queueToVisit.push(ixSubNeighbor);
+				}
+			}
+		}
+
+		// Perform breadth-first search
+		bool fExtrema = true;
+
+		int nCurrentDistance = 2;
+		int nNodesVisitedAtDist = 0;
+		int nCurrentDistanceSize = queueToVisit.size();
+		if (nCurrentDistanceSize == 0) {
+			setMinMax.insert(*it);
+			continue;
+		}
+
+		for (;;) {
+			if (nNodesVisitedAtDist == nCurrentDistanceSize) {
+				nNodesVisitedAtDist = 0;
+				nCurrentDistanceSize = queueToVisit.size();
+				nCurrentDistance++;
+
+				if (nCurrentDistanceSize == 0) {
+					break;
+				}
+			}
+
+			int ix = queueToVisit.front();
+			queueToVisit.pop();
+			nNodesVisitedAtDist++;
+
+			setVisited.insert(ix);
+
+			if (dSign * data[ix] > dSign * dValue) {
+				fExtrema = false;
+				break;
+			}
+
+			if (nCurrentDistance < nMaxGraphDistance) {
+				for (size_t n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+					int ixNeighbor = grid.m_vecConnectivity[ix][n];
+					if (setVisited.find(ixNeighbor) == setVisited.end()) {
+						queueToVisit.push(grid.m_vecConnectivity[ix][n]);
+					}
+				}
+			}
+		}
+		if (fExtrema) {
+			setMinMax.insert(*it);
 		}
 	}
 }
@@ -289,6 +394,22 @@ template void FindAllLocalMaxima<double>(
 	const SimpleGrid & grid,
 	const DataArray1D<double> & data,
 	std::set<int> & setMaxima
+);
+
+template void FindAllLocalMinMaxWithGraphDistance<float>(
+	const SimpleGrid & grid,
+	const DataArray1D<float> & data,
+	bool fMinima,
+	int nMaxGraphDistance,
+	std::set<int> & setMinMax
+);
+
+template void FindAllLocalMinMaxWithGraphDistance<double>(
+	const SimpleGrid & grid,
+	const DataArray1D<double> & data,
+	bool fMinima,
+	int nMaxGraphDistance,
+	std::set<int> & setMinMax
 );
 
 template void FindLocalAverage<float>(

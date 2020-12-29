@@ -302,6 +302,8 @@ public:
 		fpLog(NULL),
 		ixSearchBy(0),
 		fSearchByMinima(false),
+		nInitialSearchDist(1),
+		nInitialSearchDistSafe(1),
 		dMaxLatitude(0.0),
 		dMinLatitude(0.0),
 		dMinAbsLatitude(0.0),
@@ -329,6 +331,12 @@ public:
 
 	// Serach on minima
 	bool fSearchByMinima;
+
+	// Graph distance for initial search
+	int nInitialSearchDist;
+
+	// Graph distance for initial search (checking mergedist)
+	int nInitialSearchDistSafe;
 
 	// Maximum latitude for detection
 	double dMaxLatitude;
@@ -559,10 +567,19 @@ void DetectCyclonesUnstructured(
 		// Tag all minima
 		std::set<int> setCandidates;
 
-		if (param.fSearchByMinima) {
-			FindAllLocalMinima<float>(grid, dataSearch, setCandidates);
-		} else {
-			FindAllLocalMaxima<float>(grid, dataSearch, setCandidates);
+		if ((param.nInitialSearchDist != 1) && (param.nInitialSearchDistSafe != 1)) {
+			_EXCEPTIONT("Only one of --searchbydist and --searchbydistsafe may be specified");
+
+		} else if ((param.nInitialSearchDist == 1) && (param.nInitialSearchDistSafe == 1)) {
+			if (param.fSearchByMinima) {
+				FindAllLocalMinima<float>(grid, dataSearch, setCandidates);
+			} else {
+				FindAllLocalMaxima<float>(grid, dataSearch, setCandidates);
+			}
+
+		} else if (param.nInitialSearchDist != 1) {
+			FindAllLocalMinMaxWithGraphDistance<float>(
+				grid, dataSearch, param.fSearchByMinima, param.nInitialSearchDist, setCandidates);
 		}
 
 		// Total number of candidates
@@ -1014,6 +1031,8 @@ try {
 		CommandLineString(strOutputFileList, "out_file_list", "");
 		CommandLineStringD(strSearchByMin, "searchbymin", "", "(default PSL)");
 		CommandLineString(strSearchByMax, "searchbymax", "");
+		CommandLineInt(dcuparam.nInitialSearchDist, "searchbydist", 1);
+		//CommandLineInt(dcuparam.nInitialSearchDistSafe, "searchbydistsafe", 1);
 		CommandLineDoubleD(dcuparam.dMinLongitude, "minlon", 0.0, "(degrees)");
 		CommandLineDoubleD(dcuparam.dMaxLongitude, "maxlon", 0.0, "(degrees)");
 		CommandLineDoubleD(dcuparam.dMinLatitude, "minlat", 0.0, "(degrees)");

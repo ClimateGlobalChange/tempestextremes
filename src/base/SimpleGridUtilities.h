@@ -73,6 +73,19 @@ void FindAllLocalMaxima(
 );
 
 ///	<summary>
+///		Find the locations of all minima in the given DataArray1D
+///		for a given search distance.
+///	</summary>
+template <typename real>
+void FindAllLocalMinMaxWithGraphDistance(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & data,
+	bool fMinima,
+	int nMaxGraphDistance,
+	std::set<int> & setMinMax
+);
+
+///	<summary>
 ///		Find the local average of a field near the given point.
 ///	</summary>
 ///	<param name="dMaxDist">
