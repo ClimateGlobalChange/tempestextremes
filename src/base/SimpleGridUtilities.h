@@ -74,6 +74,19 @@ void FindAllLocalMaxima(
 
 ///	<summary>
 ///		Find the locations of all minima in the given DataArray1D
+///		with a prescribed threshold.
+///	</summary>
+template <typename real>
+void FindAllLocalMinMaxWithThreshold(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & data,
+	bool fMinima,
+	const std::string & strThreshold,
+	std::set<int> & setMinima
+);
+
+///	<summary>
+///		Find the locations of all local min/max in the given DataArray1D
 ///		for a given search distance.
 ///	</summary>
 template <typename real>

@@ -34,7 +34,7 @@
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
 
-#include "../nodes/ThresholdOp.h"
+#include "ThresholdOp.h"
 
 #include <set>
 #include <queue>

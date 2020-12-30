@@ -15,6 +15,7 @@
 ///	</remarks>
 
 #include "SimpleGridUtilities.h"
+#include "ThresholdOp.h"
 
 #include <queue>
 
@@ -161,6 +162,125 @@ void FindAllLocalMaxima(
 
 		if (fMaximum) {
 			setMaxima.insert(f);
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+template <typename real>
+void FindAllLocalMinMaxWithThreshold(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & data,
+	bool fMinima,
+	const std::string & strThreshold,
+	std::set<int> & setMinima
+) {
+	ThresholdOp::Operation opThreshold = ThresholdOp::NoThreshold;
+	real dThresholdValue;
+
+	if (strThreshold.length() != 0) {
+		if (strThreshold.length() < 2) {
+			_EXCEPTION1("Threshold operator \"%s\" must be of form \"<op><value>\"", strThreshold.c_str());
+		}
+
+		std::string strThreshold1 = strThreshold.substr(0,1);
+		std::string strThreshold2 = strThreshold.substr(0,2);
+		std::string strThresholdValue;
+
+		if (strThreshold2 == ">=") {
+			opThreshold = ThresholdOp::GreaterThanEqualTo;
+			strThresholdValue = strThreshold.substr(2);
+
+		} else if (strThreshold2 == "<=") {
+			opThreshold = ThresholdOp::LessThanEqualTo;
+			strThresholdValue = strThreshold.substr(2);
+
+		} else if (strThreshold2 == "!=") {
+			opThreshold = ThresholdOp::NotEqualTo;
+			strThresholdValue = strThreshold.substr(2);
+
+		} else if (strThreshold1 == ">") {
+			opThreshold = ThresholdOp::GreaterThan;
+			strThresholdValue = strThreshold.substr(1);
+
+		} else if (strThreshold1 == "<") {
+			opThreshold = ThresholdOp::LessThan;
+			strThresholdValue = strThreshold.substr(1);
+
+		} else if (strThreshold1 == "=") {
+			opThreshold = ThresholdOp::EqualTo;
+			strThresholdValue = strThreshold.substr(1);
+
+		} else {
+			_EXCEPTION1("Threshold operator \"%s\" must be of form \"<op><value>\" where <op> is one of >=,<=,!=,>,<,=",
+				strThreshold.c_str());
+		}
+
+		// Extract value
+		if (!STLStringHelper::IsFloat(strThresholdValue)) {
+			_EXCEPTION1("Threshold operator \"%s\" must be of form \"<op><value>\" where <value> is a floating point number",
+				strThreshold.c_str());
+		}
+		dThresholdValue = static_cast<real>(std::stod(strThresholdValue));
+	}
+
+	real dSign = (fMinima)?(-1.0):(1.0);
+
+	int sFaces = grid.m_vecConnectivity.size();
+	for (int f = 0; f < sFaces; f++) {
+		
+		real dValue = data[f];
+
+		// Check thresholds
+		if (opThreshold != ThresholdOp::NoThreshold) {
+			if (opThreshold == ThresholdOp::GreaterThan) {
+				if (dValue <= static_cast<real>(dThresholdValue)) {
+					continue;
+				}
+
+			} else if (opThreshold == ThresholdOp::LessThan) {
+				if (dValue >= static_cast<real>(dThresholdValue)) {
+					continue;
+				}
+
+			} else if (opThreshold == ThresholdOp::GreaterThanEqualTo) {
+				if (dValue < static_cast<real>(dThresholdValue)) {
+					continue;
+				}
+
+			} else if (opThreshold == ThresholdOp::LessThanEqualTo) {
+				if (dValue > static_cast<real>(dThresholdValue)) {
+					continue;
+				}
+
+			} else if (opThreshold == ThresholdOp::EqualTo) {
+				if (dValue != static_cast<real>(dThresholdValue)) {
+					continue;
+				}
+
+			} else if (opThreshold == ThresholdOp::NotEqualTo) {
+				if (dValue == static_cast<real>(dThresholdValue)) {
+					continue;
+				}
+
+			} else {
+				_EXCEPTIONT("Invalid operator");
+			}
+		}
+
+		// Check neighbors
+		bool fExtrema = true;
+		int sNeighbors = grid.m_vecConnectivity[f].size();
+		for (int n = 0; n < sNeighbors; n++) {
+			if (dSign * data[grid.m_vecConnectivity[f][n]] > dSign * dValue) {
+				fExtrema = false;
+				break;
+			}
+		}
+
+		if (fExtrema) {
+			setMinima.insert(f);
 		}
 	}
 }
@@ -394,6 +514,22 @@ template void FindAllLocalMaxima<double>(
 	const SimpleGrid & grid,
 	const DataArray1D<double> & data,
 	std::set<int> & setMaxima
+);
+
+template void FindAllLocalMinMaxWithThreshold<float>(
+	const SimpleGrid & grid,
+	const DataArray1D<float> & data,
+	bool fMinima,
+	const std::string & strThreshold,
+	std::set<int> & setMinima
+);
+
+template void FindAllLocalMinMaxWithThreshold<double>(
+	const SimpleGrid & grid,
+	const DataArray1D<double> & data,
+	bool fMinima,
+	const std::string & strThreshold,
+	std::set<int> & setMinima
 );
 
 template void FindAllLocalMinMaxWithGraphDistance<float>(

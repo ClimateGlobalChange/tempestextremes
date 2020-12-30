@@ -301,6 +301,7 @@ public:
 	DetectCyclonesParam() :
 		fpLog(NULL),
 		ixSearchBy(0),
+		strSearchByThreshold(),
 		fSearchByMinima(false),
 		nInitialSearchDist(1),
 		nInitialSearchDistSafe(1),
@@ -328,6 +329,9 @@ public:
 
 	// Variable index to search on
 	VariableIndex ixSearchBy;
+
+	// Threshold for search operation
+	std::string strSearchByThreshold;
 
 	// Serach on minima
 	bool fSearchByMinima;
@@ -567,6 +571,22 @@ void DetectCyclonesUnstructured(
 		// Tag all minima
 		std::set<int> setCandidates;
 
+		if (param.strSearchByThreshold == "") {
+			if (param.fSearchByMinima) {
+				FindAllLocalMinima<float>(grid, dataSearch, setCandidates);
+			} else {
+				FindAllLocalMaxima<float>(grid, dataSearch, setCandidates);
+			}
+
+		} else {
+			FindAllLocalMinMaxWithThreshold<float>(
+				grid,
+				dataSearch,
+				param.fSearchByMinima,
+				param.strSearchByThreshold,
+				setCandidates);
+		}
+/*
 		if ((param.nInitialSearchDist != 1) && (param.nInitialSearchDistSafe != 1)) {
 			_EXCEPTIONT("Only one of --searchbydist and --searchbydistsafe may be specified");
 
@@ -581,7 +601,7 @@ void DetectCyclonesUnstructured(
 			FindAllLocalMinMaxWithGraphDistance<float>(
 				grid, dataSearch, param.fSearchByMinima, param.nInitialSearchDist, setCandidates);
 		}
-
+*/
 		// Total number of candidates
 		int nTotalCandidates = setCandidates.size();
 
@@ -1031,7 +1051,8 @@ try {
 		CommandLineString(strOutputFileList, "out_file_list", "");
 		CommandLineStringD(strSearchByMin, "searchbymin", "", "(default PSL)");
 		CommandLineString(strSearchByMax, "searchbymax", "");
-		CommandLineInt(dcuparam.nInitialSearchDist, "searchbydist", 1);
+		//CommandLineInt(dcuparam.nInitialSearchDist, "searchbydist", 1);
+		CommandLineString(dcuparam.strSearchByThreshold, "searchbythreshold", "");
 		//CommandLineInt(dcuparam.nInitialSearchDistSafe, "searchbydistsafe", 1);
 		CommandLineDoubleD(dcuparam.dMinLongitude, "minlon", 0.0, "(degrees)");
 		CommandLineDoubleD(dcuparam.dMaxLongitude, "maxlon", 0.0, "(degrees)");

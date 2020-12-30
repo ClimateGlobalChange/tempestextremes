@@ -17,6 +17,7 @@
 #ifndef _THRESHOLDOP_H_
 #define _THRESHOLDOP_H_
 
+#include "Announce.h"
 #include "Variable.h"
 
 #include <string>
@@ -38,7 +39,8 @@ public:
 		GreaterThanEqualTo,
 		LessThanEqualTo,
 		EqualTo,
-		NotEqualTo
+		NotEqualTo,
+		NoThreshold
 	};
 
 public:
