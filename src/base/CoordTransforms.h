@@ -79,6 +79,34 @@ inline double LonRadToStandardRange(
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		Calculate the chord length from the great circle distance (in degrees).
+///	</summary>
+inline double ChordLengthFromGreatCircleDistance_Deg(
+	double dGCDDeg
+) {
+	return 2.0 * sin(0.5 * DegToRad(dGCDDeg));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Calculate the great circle distance (in radians) from the chord length.
+///	</summary>
+inline double GreatCircleDistanceFromChordLength_Rad(
+	double dChordLength
+) {
+	double dHalfDist = 0.5 * dChordLength;
+	if (dHalfDist > 1.0) {
+		_ASSERT(dHalfDist < 1.0 + 1.0e-8);
+		dHalfDist = 1.0;
+	}
+
+	return 2.0 * asin(dHalfDist);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Calculate 3D Cartesian coordinates from latitude and longitude,
 ///		in radians.
 ///	</summary>
@@ -247,9 +275,10 @@ inline double AverageLongitude_Rad(
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		Calculate the great circle distance between two points on the sphere.
+///		Calculate the great circle distance between two points on the sphere,
+///		with return value in radians.
 ///	</summary>
-inline double GreatCircleDistanceXYZ_Deg(
+inline double GreatCircleDistanceXYZ_Rad(
 	double dX0,
 	double dY0,
 	double dZ0,
@@ -261,24 +290,26 @@ inline double GreatCircleDistanceXYZ_Deg(
 	double dDY = dY1 - dY0;
 	double dDZ = dZ1 - dZ0;
 
-	double dHalfDist = 0.5 * sqrt(dDX * dDX + dDY * dDY + dDZ * dDZ);
-	if (dHalfDist > 1.0) {
-		_ASSERT(dHalfDist < 1.0 + 1.0e-8);
-		dHalfDist = 1.0;
-	}
+	double dChordLength = sqrt(dDX * dDX + dDY * dDY + dDZ * dDZ);
 
-	return RadToDeg(2.0 * asin(dHalfDist));
+	return GreatCircleDistanceFromChordLength_Rad(dChordLength);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		Calculate the chord length from the great circle distnance (in degrees).
+///		Calculate the great circle distance between two points on the sphere,
+///		with return value in degrees.
 ///	</summary>
-inline double ChordLengthFromGreatCircleDistance_Deg(
-	double dGCDDeg
+inline double GreatCircleDistanceXYZ_Deg(
+	double dX0,
+	double dY0,
+	double dZ0,
+	double dX1,
+	double dY1,
+	double dZ1
 ) {
-	return 2.0 * sin(0.5 * DegToRad(dGCDDeg));
+	return RadToDeg(GreatCircleDistanceXYZ_Rad(dX0, dY0, dZ0, dX1, dY1, dZ1));
 }
 
 ///////////////////////////////////////////////////////////////////////////////

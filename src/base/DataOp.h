@@ -611,5 +611,57 @@ protected:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class DataOp_CURL : public DataOp {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_CURL(
+		const std::string & strName,
+		int nCurlPoints,
+		double dCurlDist
+	);
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
+
+protected:
+	///	<summary>
+	///		Number of points in this curl operator.
+	///	</summary>
+	int m_nCurlPoints;
+
+	///	<summary>
+	///		Evaluation distance for the curl operator.
+	///	</summary>
+	double m_dCurlDist;
+
+	///	<summary>
+	///		Flag indicating the sparse matrix operator is initialized.
+	///	</summary>
+	bool m_fInitialized;
+
+	///	<summary>
+	///		Sparse matrix operator (eastward component).
+	///	</summary>
+	SparseMatrix<float> m_opCurlE;
+
+	///	<summary>
+	///		Sparse matrix operator (northward component).
+	///	</summary>
+	SparseMatrix<float> m_opCurlN;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 #endif
 

@@ -173,7 +173,8 @@ public:
 	///	</summary>
 	void Apply(
 		const DataArray1D<DataType> & dataVectorIn,
-		DataArray1D<DataType> & dataVectorOut
+		DataArray1D<DataType> & dataVectorOut,
+		bool fZeroOutputArray = true
 	) const {
 /*
 		if (dataVectorIn.GetRows() != m_nCols) {
@@ -183,7 +184,9 @@ public:
 			_EXCEPTION1("dataVectorOut has incorrect row count (%i)", m_nRows);
 		}
 */
-		dataVectorOut.Zero();
+		if (fZeroOutputArray) {
+			dataVectorOut.Zero();
+		}
 
 		SparseMapConstIterator iter = m_mapEntries.begin();
 		for (; iter != m_mapEntries.end(); iter++) {

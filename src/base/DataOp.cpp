@@ -21,6 +21,8 @@
 #include "SimpleGrid.h"
 #include "STLStringHelper.h"
 #include "kdtree.h"
+#include "Constants.h"
+#include "CoordTransforms.h"
 
 #include <cstdlib>
 #include <set>
@@ -104,6 +106,7 @@ DataOp * DataOpManager::Add(
 	} else if (strName == "_F") {
 		return Add(new DataOp_F);
 
+	// Laplacian operator
 	} else if (strName.substr(0,10) == "_LAPLACIAN") {
 		int nPoints = 0;
 		double dDist = 0.0;
@@ -147,6 +150,51 @@ DataOp * DataOpManager::Add(
 		}
 
 		return Add(new DataOp_LAPLACIAN(strName, nPoints, dDist));
+
+	// Curl operator
+	} else if (strName.substr(0,5) == "_CURL") {
+		int nPoints = 0;
+		double dDist = 0.0;
+
+		int iMode = 0;
+		int iLast = 0;
+		for (int i = 0; i < strName.length(); i++) {
+			if (iMode == 0) {
+				if (strName[i] == '{') {
+					iLast = i;
+					iMode = 1;
+				}
+				continue;
+
+			} else if (iMode == 1) {
+				if (strName[i] == ',') {
+					if ((i-iLast-1) < 1) {
+						_EXCEPTIONT("Malformed _CURL{npts,dist} name");
+					}
+					nPoints = atoi(strName.substr(iLast+1, i-iLast-1).c_str());
+					iLast = i;
+					iMode = 2;
+				}
+
+			} else if (iMode == 2) {
+				if (strName[i] == '}') {
+					if ((i-iLast-1) < 1) {
+						_EXCEPTIONT("Malformed _CURL{npts,dist} name");
+					}
+					dDist = atof(strName.substr(iLast+1, i-iLast-1).c_str());
+					iLast = i;
+					iMode = 3;
+				}
+
+			} else if (iMode == 3) {
+				_EXCEPTIONT("Malformed _CURL{npts,dist} name");
+			}
+		}
+		if (iMode != 3) {
+			_EXCEPTIONT("Malformed _CURL{npts,dist} name");
+		}
+
+		return Add(new DataOp_CURL(strName, nPoints, dDist));
 
 	} else {
 		_EXCEPTION1("Invalid DataOp \"%s\"", strName.c_str());
@@ -879,7 +927,7 @@ void GenerateEqualDistanceSpherePoints(
 	double dY0,
 	double dZ0,
 	int nPoints,
-	double dDist,
+	double dDistDeg,
 	std::vector<double> & dXout,
 	std::vector<double> & dYout,
 	std::vector<double> & dZout
@@ -888,10 +936,11 @@ void GenerateEqualDistanceSpherePoints(
 	dYout.resize(nPoints);
 	dZout.resize(nPoints);
 
-	// Pick a quasi-arbitrary reference direction
 	double dX1;
 	double dY1;
 	double dZ1;
+/*
+	// Pick a quasi-arbitrary reference direction
 	if ((fabs(dX0) >= fabs(dY0)) && (fabs(dX0) >= fabs(dZ0))) {
 		dX1 = dX0;
 		dY1 = dY0 + 1.0;
@@ -905,14 +954,27 @@ void GenerateEqualDistanceSpherePoints(
 		dY1 = dY0;
 		dZ1 = dZ0;
 	}
+*/
+	// Pick eastward reference direction
+	if (fabs(fabs(dZ0) - 1.0) > 1.0e-10) {
+		dX1 = dY0;
+		dY1 = - dX0;
+		dZ1 = 0.0;
 
+	// At poles point to grand meridian
+	} else {
+		dX1 = 1.0;
+		dY1 = 0.0;
+		dZ1 = 0.0;
+	}
+/*
 	// Project perpendicular to detection location
 	double dDot = dX1 * dX0 + dY1 * dY0 + dZ1 * dZ0;
 
 	dX1 -= dDot * dX0;
 	dY1 -= dDot * dY0;
 	dZ1 -= dDot * dZ0;
-
+*/
 	// Normalize
 	double dMag1 = sqrt(dX1 * dX1 + dY1 * dY1 + dZ1 * dZ1);
 
@@ -920,14 +982,14 @@ void GenerateEqualDistanceSpherePoints(
 		_EXCEPTIONT("Logic error");
 	}
 
-	double dScale1 = tan(dDist * M_PI / 180.0) / dMag1;
+	double dScale1 = tan(DegToRad(dDistDeg)) / dMag1;
 
 	dX1 *= dScale1;
 	dY1 *= dScale1;
 	dZ1 *= dScale1;
 
 	// Verify dot product is zero
-	dDot = dX0 * dX1 + dY0 * dY1 + dZ0 * dZ1;
+	double dDot = dX0 * dX1 + dY0 * dY1 + dZ0 * dZ1;
 	if (fabs(dDot) > 1.0e-12) {
 		_EXCEPTIONT("Logic error");
 	}
@@ -973,7 +1035,7 @@ void GenerateEqualDistanceSpherePoints(
 void BuildLaplacianOperator(
 	const SimpleGrid & grid,
 	int nLaplacianPoints,
-	double dLaplacianDist,
+	double dLaplacianDistDeg,
 	SparseMatrix<float> & opLaplacian
 ) {
 	opLaplacian.Clear();
@@ -1015,12 +1077,8 @@ void BuildLaplacianOperator(
 		GenerateEqualDistanceSpherePoints(
 			dXi[i], dYi[i], dZi[i],
 			nLaplacianPoints,
-			dLaplacianDist,
+			dLaplacianDistDeg,
 			dXout, dYout, dZout);
-
-		dXout.push_back(dXi[i]);
-		dYout.push_back(dYi[i]);
-		dZout.push_back(dZi[i]);
 /*
 		kdres * kdr = kd_nearest_range3(kdGrid, dXi[i], dYi[i], dZi[i], dMaxDist);
 		if (kdr == NULL) {
@@ -1182,6 +1240,305 @@ bool DataOp_LAPLACIAN::Apply(
 	}
 
 	m_opLaplacian.Apply(*(vecArgData[0]), dataout);
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Build a sparse Curl operator on an unstructured SimpleGrid.
+///	</summary>
+///	<param name="dCurlDist">
+///		Great circle radius of the Curl operator, in degrees.
+///	</param>
+void BuildCurlOperator(
+	const SimpleGrid & grid,
+	int nCurlPoints,
+	double dCurlDistDeg,
+	SparseMatrix<float> & opCurlE,
+	SparseMatrix<float> & opCurlN
+) {
+	opCurlE.Clear();
+	opCurlN.Clear();
+
+	int iRef = 0;
+
+	// Scaling factor used in Curl calculation
+	const double dScale = 2.0 / (EarthRadius * static_cast<double>(nCurlPoints) * DegToRad(dCurlDistDeg));
+
+	// TODO: Use SimpleGrid's built-in functionality
+	// Create a kdtree with all nodes in grid
+	kdtree * kdGrid = kd_create(3);
+	if (kdGrid == NULL) {
+		_EXCEPTIONT("Error creating kdtree");
+	}
+
+	DataArray1D<double> dXi(grid.GetSize());
+	DataArray1D<double> dYi(grid.GetSize());
+	DataArray1D<double> dZi(grid.GetSize());
+	for (int i = 0; i < grid.GetSize(); i++) {
+		double dLat = grid.m_dLat[i];
+		double dLon = grid.m_dLon[i];
+
+		dXi[i] = cos(dLon) * cos(dLat);
+		dYi[i] = sin(dLon) * cos(dLat);
+		dZi[i] = sin(dLat);
+
+		kd_insert3(kdGrid, dXi[i], dYi[i], dZi[i], (void*)((&iRef)+i));
+	}
+
+	// Construct the Curl operator using SPH
+	for (int i = 0; i < grid.GetSize(); i++) {
+
+		// Generate points for the Curl
+		std::vector<double> dXout;
+		std::vector<double> dYout;
+		std::vector<double> dZout;
+
+		GenerateEqualDistanceSpherePoints(
+			dXi[i], dYi[i], dZi[i],
+			nCurlPoints,
+			dCurlDistDeg,
+			dXout, dYout, dZout);
+/*
+		kdres * kdr = kd_nearest_range3(kdGrid, dXi[i], dYi[i], dZi[i], dMaxDist);
+		if (kdr == NULL) {
+			_EXCEPTIONT("Error in kd_nearest_range3");
+		}
+		int nNodes = kd_res_size(kdr);
+
+		std::cout << nNodes << " found at distance " << dMaxDist << std::endl;
+*/
+		//std::vector<int> vecCols;
+		//std::vector<double> vecWeight;
+		std::set<int> setPoints;
+		setPoints.insert(i);
+
+		double dAccumulatedDiff = 0.0;
+
+		// Center point in spherical coordinates
+		double dLonRadI, dLatRadI;
+		XYZtoRLL_Rad(dXi[i], dYi[i], dZi[i], dLonRadI, dLatRadI);
+
+		//printf("%1.5e %1.5e\n", RadToDeg(grid.m_dLon[i]), RadToDeg(grid.m_dLat[i]));
+		for (int j = 0; j < dXout.size(); j++) {
+
+			// Find the nearest grid point to the output point
+			kdres * kdr = kd_nearest3(kdGrid, dXout[j], dYout[j], dZout[j]);
+			if (kdr == NULL) {
+				_EXCEPTIONT("NULL return value in call to kd_nearest3");
+			}
+
+			void* pData = kd_res_item_data(kdr);
+			if (pData == NULL) {
+				_EXCEPTIONT("NULL data index");
+			}
+			int k = ((int*)(pData)) - (&iRef);
+
+			kd_res_free(kdr);
+
+			if (k == i) {
+				continue;
+			}
+
+			if (k > dXi.GetRows()) {
+				_EXCEPTIONT("Invalid point index");
+			}
+
+			// Ensure points are not duplicated
+			if (setPoints.find(k) != setPoints.end()) {
+				continue;
+			} else {
+				setPoints.insert(k);
+			}
+	/*
+			// ============== BEGIN DEBUGGING =============================
+			double dLon0 = atan2(dYi[i], dXi[i]) * 180.0 / M_PI;
+			double dLat0 = asin(dZi[i]) * 180.0 / M_PI;
+
+			double dLon1 = atan2(dYout[j], dXout[j]) * 180.0 / M_PI;
+			double dLat1 = asin(dZout[j]) * 180.0 / M_PI;
+
+			double dDist0 =
+				sqrt(
+					(dXout[j] - dXi[i]) * (dXout[j] - dXi[i])
+					+ (dYout[j] - dYi[i]) * (dYout[j] - dYi[i])
+					+ (dZout[j] - dZi[i]) * (dZout[j] - dZi[i]));
+
+			std::cout << 2.0 * sin(dDist0 / 2.0) * 180.0 / M_PI << std::endl;
+
+			double dDist1 =
+				sqrt(
+					(dXi[k] - dXi[i]) * (dXi[k] - dXi[i])
+					+ (dYi[k] - dYi[i]) * (dYi[k] - dYi[i])
+					+ (dZi[k] - dZi[i]) * (dZi[k] - dZi[i]));
+
+			std::cout << 2.0 * sin(dDist1 / 2.0) * 180.0 / M_PI << std::endl;
+
+			double dLon2 = atan2(dYi[k], dXi[k]) * 180.0 / M_PI;
+			double dLat2 = asin(dZi[k]) * 180.0 / M_PI;
+
+			printf("XY: %1.3f %1.3f :: %1.3f %1.3f :: %1.3f %1.3f\n", dXi[i], dYi[i], dXout[j], dYout[j], dXi[k], dYi[k]);
+			printf("LL: %1.2f %1.2f :: %1.2f %1.2f\n", dLon0, dLat0, dLon1, dLat1);
+			// ============== END DEBUGGING =============================
+*/
+
+			// Local point in spherical coordinates
+			double dLonRadK, dLatRadK;
+			XYZtoRLL_Rad(dXi[k], dYi[k], dZi[k], dLonRadK, dLatRadK);
+
+			// Calculate local radial vector from central lat/lon
+			// i.e. project \vec{X}_k - \vec{X}_i to the surface of the
+			//      sphere and normalize to unit length.
+			double dRx = dXi[k] - dXi[i];
+			double dRy = dYi[k] - dYi[i];
+			double dRz = dZi[k] - dZi[i];
+
+			double dChordLength = sqrt(dRx * dRx + dRy * dRy + dRz * dRz);
+
+			if (dChordLength < 1.0e-12) {
+				_EXCEPTIONT("Curl sample point not distinct from center point: increase radius of operator.");
+			}
+
+			// Calculate azimuthal velocity vector at point I
+			double dDot = dRx * dXi[i] + dRy * dYi[i] + dRz * dZi[i];
+
+			dRx -= dDot * dXi[i];
+			dRy -= dDot * dYi[i];
+			dRz -= dDot * dZi[i];
+
+			double dMag = sqrt(dRx * dRx + dRy * dRy + dRz * dRz);
+
+			_ASSERT(dMag >= 1.0e-12);
+
+			dRx /= dMag;
+			dRy /= dMag;
+			dRz /= dMag;
+
+			double dAxI = dYi[i] * dRz - dZi[i] * dRy;
+			double dAyI = dZi[i] * dRx - dXi[i] * dRz;
+			double dAzI = dXi[i] * dRy - dYi[i] * dRx;
+
+			// Calculate azimuthal velocity vector at point K
+			dDot = dRx * dXi[k] + dRy * dYi[k] + dRz * dZi[k];
+
+			dRx -= dDot * dXi[k];
+			dRy -= dDot * dYi[k];
+			dRz -= dDot * dZi[k];
+
+			dMag = sqrt(dRx * dRx + dRy * dRy + dRz * dRz);
+
+			_ASSERT(dMag >= 1.0e-12);
+
+			dRx /= dMag;
+			dRy /= dMag;
+			dRz /= dMag;
+
+			double dAxK = dYi[k] * dRz - dZi[k] * dRy;
+			double dAyK = dZi[k] * dRx - dXi[k] * dRz;
+			double dAzK = dXi[k] * dRy - dYi[k] * dRx;
+
+			// Great circle distance between points I and K
+			double dRdeg =
+				RadToDeg(GreatCircleDistanceFromChordLength_Rad(dChordLength));
+
+			// Coefficients for linear interpolation / extrapolation to distance dCurlDistDeg
+			double dCoeff0 = (dRdeg - dCurlDistDeg) / dRdeg;
+			double dCoeff1 = dCurlDistDeg / dRdeg;
+/*
+			if (i == 98928) {
+				if (j == 0) {
+					printf("%1.5f %1.5f\n", RadToDeg(dLonRadI), RadToDeg(dLatRadI));
+				}
+				printf("%1.5f %1.5f : %1.5e %1.5e %1.5e %1.5e\n", RadToDeg(dLonRadK), RadToDeg(dLatRadK), dCurlDistDeg, dRdeg, dCoeff0, dCoeff1);
+			}
+*/
+			// Multiplicative coefficients for converting spherical velocities to azimuthal velocities
+			double dAzLonCoeffI = - sin(dLonRadI) * dAxI + cos(dLonRadI) * dAyI;
+			double dAzLatCoeffI = - sin(dLatRadI) * (cos(dLonRadI) * dAxI + sin(dLonRadI) * dAyI) + cos(dLatRadI) * dAzI;
+
+			double dAzLonCoeffK = - sin(dLonRadK) * dAxK + cos(dLonRadK) * dAyK;
+			double dAzLatCoeffK = - sin(dLatRadK) * (cos(dLonRadK) * dAxK + sin(dLonRadK) * dAyK) + cos(dLatRadK) * dAzK;
+
+			// Add contributions to sparse matrix operator
+			opCurlE(i,i) += dScale * dCoeff0 * dAzLonCoeffI;
+			opCurlN(i,i) += dScale * dCoeff0 * dAzLatCoeffI;
+
+			opCurlE(i,k) += dScale * dCoeff1 * dAzLonCoeffK;
+			opCurlN(i,k) += dScale * dCoeff1 * dAzLatCoeffK;
+
+/*
+			if (i == 98928) {
+				double dLonDegK = RadToDeg(dLonRadK);
+				double dLatDegK = RadToDeg(dLatRadK);
+				printf("%1.5f %1.5f : %1.5e %1.5e\n", dLonDegK, dLatDegK, opCurlE(i,k), opCurlN(i,k));
+			}
+*/
+		}
+
+		if (setPoints.size() < 4) {
+			Announce("WARNING: Only %i points used for Curl in cell %i"
+				" -- accuracy may be affected", setPoints.size(), i);
+		}
+	}
+/*
+	for (
+		SparseMatrix<double>::SparseMapIterator iter = opCurl.begin();
+		iter != opCurl.end(); iter++
+	) {
+		std::cout << iter->first.first << " " << iter->first.second << " " << iter->second << std::endl;
+	}
+*/
+	kd_free(kdGrid);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+DataOp_CURL::DataOp_CURL(
+	const std::string & strName,
+	int nCurlPoints,
+	double dCurlDist
+) :
+	DataOp(strName),
+	m_nCurlPoints(nCurlPoints),
+	m_dCurlDist(dCurlDist),
+	m_fInitialized(false)
+{ }
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_CURL::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 2) {
+		_EXCEPTION2("%s expects two arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
+		_EXCEPTION1("Arguments to %s must be data variables",
+			m_strName.c_str());
+	}
+
+	if (!m_fInitialized) {
+		Announce("Building Curl operator %s (%i, %1.2f)",
+			m_strName.c_str(), m_nCurlPoints, m_dCurlDist);
+
+		BuildCurlOperator(
+			grid,
+			m_nCurlPoints,
+			m_dCurlDist,
+			m_opCurlE,
+			m_opCurlN);
+
+		m_fInitialized = true;
+	}
+
+	m_opCurlE.Apply(*(vecArgData[0]), dataout, true);
+	m_opCurlN.Apply(*(vecArgData[1]), dataout, false); 
 
 	return true;
 }
