@@ -663,5 +663,144 @@ protected:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class DataOp_DIVERGENCE : public DataOp {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_DIVERGENCE(
+		const std::string & strName,
+		int nDivPoints,
+		double dDivDist
+	);
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
+
+protected:
+	///	<summary>
+	///		Number of points in this curl operator.
+	///	</summary>
+	int m_nDivPoints;
+
+	///	<summary>
+	///		Evaluation distance for the curl operator.
+	///	</summary>
+	double m_dDivDist;
+
+	///	<summary>
+	///		Flag indicating the sparse matrix operator is initialized.
+	///	</summary>
+	bool m_fInitialized;
+
+	///	<summary>
+	///		Sparse matrix operator (eastward component).
+	///	</summary>
+	SparseMatrix<float> m_opDivE;
+
+	///	<summary>
+	///		Sparse matrix operator (northward component).
+	///	</summary>
+	SparseMatrix<float> m_opDivN;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class DataOp_GRADMAG : public DataOp {
+
+public:
+	///	<summary>
+	///		A pair that supports in-place addition and subtraction.
+	///	</summary>
+	template<typename T>
+	class pair_with_plus_minus : public std::pair<T,T> {
+		public:
+			pair_with_plus_minus(
+				const T & a_first,
+				const T & a_second
+			) :
+				std::pair<T,T>(a_first, a_second)
+			{ }
+
+			pair_with_plus_minus(
+				const T & a_val
+			) :
+				std::pair<T,T>(a_val, a_val)
+			{ }
+
+			pair_with_plus_minus<T> & operator+=(const pair_with_plus_minus<T> & pr) {
+				std::pair<T,T>::first += pr.first;
+				std::pair<T,T>::second += pr.second;
+				return (*this);
+			}
+
+			pair_with_plus_minus<T> & operator-=(const pair_with_plus_minus<T> & pr) {
+				std::pair<T,T>::first -= pr.first;
+				std::pair<T,T>::second -= pr.second;
+				return (*this);
+			}
+
+			pair_with_plus_minus<T> & operator=(const T & val) {
+				std::pair<T,T>::first = val;
+				std::pair<T,T>::second = val;
+				return (*this);
+			}
+	};
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_GRADMAG(
+		const std::string & strName,
+		int nGradPoints,
+		double dGradDist
+	);
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
+
+protected:
+	///	<summary>
+	///		Number of points in this curl operator.
+	///	</summary>
+	int m_nGradPoints;
+
+	///	<summary>
+	///		Evaluation distance for the curl operator.
+	///	</summary>
+	double m_dGradDist;
+
+	///	<summary>
+	///		Flag indicating the sparse matrix operator is initialized.
+	///	</summary>
+	bool m_fInitialized;
+
+	///	<summary>
+	///		Sparse matrix operator (eastward component).
+	///	</summary>
+	SparseMatrix< pair_with_plus_minus<float> > m_opGrad;
+
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 #endif
 

@@ -196,6 +196,96 @@ DataOp * DataOpManager::Add(
 
 		return Add(new DataOp_CURL(strName, nPoints, dDist));
 
+	// Divergence operator
+	} else if (strName.substr(0,11) == "_DIVERGENCE") {
+		int nPoints = 0;
+		double dDist = 0.0;
+
+		int iMode = 0;
+		int iLast = 0;
+		for (int i = 0; i < strName.length(); i++) {
+			if (iMode == 0) {
+				if (strName[i] == '{') {
+					iLast = i;
+					iMode = 1;
+				}
+				continue;
+
+			} else if (iMode == 1) {
+				if (strName[i] == ',') {
+					if ((i-iLast-1) < 1) {
+						_EXCEPTIONT("Malformed _DIVERGENCE{npts,dist} name");
+					}
+					nPoints = atoi(strName.substr(iLast+1, i-iLast-1).c_str());
+					iLast = i;
+					iMode = 2;
+				}
+
+			} else if (iMode == 2) {
+				if (strName[i] == '}') {
+					if ((i-iLast-1) < 1) {
+						_EXCEPTIONT("Malformed _DIVERGENCE{npts,dist} name");
+					}
+					dDist = atof(strName.substr(iLast+1, i-iLast-1).c_str());
+					iLast = i;
+					iMode = 3;
+				}
+
+			} else if (iMode == 3) {
+				_EXCEPTIONT("Malformed _DIVERGENCE{npts,dist} name");
+			}
+		}
+		if (iMode != 3) {
+			_EXCEPTIONT("Malformed _DIVERGENCE{npts,dist} name");
+		}
+
+		return Add(new DataOp_DIVERGENCE(strName, nPoints, dDist));
+
+	// Divergence operator
+	} else if (strName.substr(0,8) == "_GRADMAG") {
+		int nPoints = 0;
+		double dDist = 0.0;
+
+		int iMode = 0;
+		int iLast = 0;
+		for (int i = 0; i < strName.length(); i++) {
+			if (iMode == 0) {
+				if (strName[i] == '{') {
+					iLast = i;
+					iMode = 1;
+				}
+				continue;
+
+			} else if (iMode == 1) {
+				if (strName[i] == ',') {
+					if ((i-iLast-1) < 1) {
+						_EXCEPTIONT("Malformed _GRADMAG{npts,dist} name");
+					}
+					nPoints = atoi(strName.substr(iLast+1, i-iLast-1).c_str());
+					iLast = i;
+					iMode = 2;
+				}
+
+			} else if (iMode == 2) {
+				if (strName[i] == '}') {
+					if ((i-iLast-1) < 1) {
+						_EXCEPTIONT("Malformed _GRADMAG{npts,dist} name");
+					}
+					dDist = atof(strName.substr(iLast+1, i-iLast-1).c_str());
+					iLast = i;
+					iMode = 3;
+				}
+
+			} else if (iMode == 3) {
+				_EXCEPTIONT("Malformed _GRADMAG{npts,dist} name");
+			}
+		}
+		if (iMode != 3) {
+			_EXCEPTIONT("Malformed _GRADMAG{npts,dist} name");
+		}
+
+		return Add(new DataOp_GRADMAG(strName, nPoints, dDist));
+
 	} else {
 		_EXCEPTION1("Invalid DataOp \"%s\"", strName.c_str());
 	}
@@ -1245,6 +1335,8 @@ bool DataOp_LAPLACIAN::Apply(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// DataOp_CURL
+///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
 ///		Build a sparse Curl operator on an unstructured SimpleGrid.
@@ -1446,14 +1538,7 @@ void BuildCurlOperator(
 			// Coefficients for linear interpolation / extrapolation to distance dCurlDistDeg
 			double dCoeff0 = (dRdeg - dCurlDistDeg) / dRdeg;
 			double dCoeff1 = dCurlDistDeg / dRdeg;
-/*
-			if (i == 98928) {
-				if (j == 0) {
-					printf("%1.5f %1.5f\n", RadToDeg(dLonRadI), RadToDeg(dLatRadI));
-				}
-				printf("%1.5f %1.5f : %1.5e %1.5e %1.5e %1.5e\n", RadToDeg(dLonRadK), RadToDeg(dLatRadK), dCurlDistDeg, dRdeg, dCoeff0, dCoeff1);
-			}
-*/
+
 			// Multiplicative coefficients for converting spherical velocities to azimuthal velocities
 			double dAzLonCoeffI = - sin(dLonRadI) * dAxI + cos(dLonRadI) * dAyI;
 			double dAzLatCoeffI = - sin(dLatRadI) * (cos(dLonRadI) * dAxI + sin(dLonRadI) * dAyI) + cos(dLatRadI) * dAzI;
@@ -1467,14 +1552,6 @@ void BuildCurlOperator(
 
 			opCurlE(i,k) += dScale * dCoeff1 * dAzLonCoeffK;
 			opCurlN(i,k) += dScale * dCoeff1 * dAzLatCoeffK;
-
-/*
-			if (i == 98928) {
-				double dLonDegK = RadToDeg(dLonRadK);
-				double dLatDegK = RadToDeg(dLatRadK);
-				printf("%1.5f %1.5f : %1.5e %1.5e\n", dLonDegK, dLatDegK, opCurlE(i,k), opCurlN(i,k));
-			}
-*/
 		}
 
 		if (setPoints.size() < 4) {
@@ -1482,14 +1559,7 @@ void BuildCurlOperator(
 				" -- accuracy may be affected", setPoints.size(), i);
 		}
 	}
-/*
-	for (
-		SparseMatrix<double>::SparseMapIterator iter = opCurl.begin();
-		iter != opCurl.end(); iter++
-	) {
-		std::cout << iter->first.first << " " << iter->first.second << " " << iter->second << std::endl;
-	}
-*/
+
 	kd_free(kdGrid);
 }
 
@@ -1539,6 +1609,555 @@ bool DataOp_CURL::Apply(
 
 	m_opCurlE.Apply(*(vecArgData[0]), dataout, true);
 	m_opCurlN.Apply(*(vecArgData[1]), dataout, false); 
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_DIVERGENCE
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Build a sparse Div operator on an unstructured SimpleGrid.
+///	</summary>
+///	<param name="dDivDist">
+///		Great circle radius of the Div operator, in degrees.
+///	</param>
+void BuildDivergenceOperator(
+	const SimpleGrid & grid,
+	int nDivPoints,
+	double dDivDistDeg,
+	SparseMatrix<float> & opDivE,
+	SparseMatrix<float> & opDivN
+) {
+	opDivE.Clear();
+	opDivN.Clear();
+
+	int iRef = 0;
+
+	// Scaling factor used in Div calculation
+	const double dScale = 2.0 / (EarthRadius * static_cast<double>(nDivPoints) * DegToRad(dDivDistDeg));
+
+	// TODO: Use SimpleGrid's built-in functionality
+	// Create a kdtree with all nodes in grid
+	kdtree * kdGrid = kd_create(3);
+	if (kdGrid == NULL) {
+		_EXCEPTIONT("Error creating kdtree");
+	}
+
+	DataArray1D<double> dXi(grid.GetSize());
+	DataArray1D<double> dYi(grid.GetSize());
+	DataArray1D<double> dZi(grid.GetSize());
+	for (int i = 0; i < grid.GetSize(); i++) {
+		double dLat = grid.m_dLat[i];
+		double dLon = grid.m_dLon[i];
+
+		dXi[i] = cos(dLon) * cos(dLat);
+		dYi[i] = sin(dLon) * cos(dLat);
+		dZi[i] = sin(dLat);
+
+		kd_insert3(kdGrid, dXi[i], dYi[i], dZi[i], (void*)((&iRef)+i));
+	}
+
+	// Construct the Div operator using SPH
+	for (int i = 0; i < grid.GetSize(); i++) {
+
+		// Generate points for the Div
+		std::vector<double> dXout;
+		std::vector<double> dYout;
+		std::vector<double> dZout;
+
+		GenerateEqualDistanceSpherePoints(
+			dXi[i], dYi[i], dZi[i],
+			nDivPoints,
+			dDivDistDeg,
+			dXout, dYout, dZout);
+/*
+		kdres * kdr = kd_nearest_range3(kdGrid, dXi[i], dYi[i], dZi[i], dMaxDist);
+		if (kdr == NULL) {
+			_EXCEPTIONT("Error in kd_nearest_range3");
+		}
+		int nNodes = kd_res_size(kdr);
+
+		std::cout << nNodes << " found at distance " << dMaxDist << std::endl;
+*/
+		//std::vector<int> vecCols;
+		//std::vector<double> vecWeight;
+		std::set<int> setPoints;
+		setPoints.insert(i);
+
+		double dAccumulatedDiff = 0.0;
+
+		// Center point in spherical coordinates
+		double dLonRadI, dLatRadI;
+		XYZtoRLL_Rad(dXi[i], dYi[i], dZi[i], dLonRadI, dLatRadI);
+
+		//printf("%1.5e %1.5e\n", RadToDeg(grid.m_dLon[i]), RadToDeg(grid.m_dLat[i]));
+		for (int j = 0; j < dXout.size(); j++) {
+
+			// Find the nearest grid point to the output point
+			kdres * kdr = kd_nearest3(kdGrid, dXout[j], dYout[j], dZout[j]);
+			if (kdr == NULL) {
+				_EXCEPTIONT("NULL return value in call to kd_nearest3");
+			}
+
+			void* pData = kd_res_item_data(kdr);
+			if (pData == NULL) {
+				_EXCEPTIONT("NULL data index");
+			}
+			int k = ((int*)(pData)) - (&iRef);
+
+			kd_res_free(kdr);
+
+			if (k == i) {
+				continue;
+			}
+
+			if (k > dXi.GetRows()) {
+				_EXCEPTIONT("Invalid point index");
+			}
+
+			// Ensure points are not duplicated
+			if (setPoints.find(k) != setPoints.end()) {
+				continue;
+			} else {
+				setPoints.insert(k);
+			}
+	/*
+			// ============== BEGIN DEBUGGING =============================
+			double dLon0 = atan2(dYi[i], dXi[i]) * 180.0 / M_PI;
+			double dLat0 = asin(dZi[i]) * 180.0 / M_PI;
+
+			double dLon1 = atan2(dYout[j], dXout[j]) * 180.0 / M_PI;
+			double dLat1 = asin(dZout[j]) * 180.0 / M_PI;
+
+			double dDist0 =
+				sqrt(
+					(dXout[j] - dXi[i]) * (dXout[j] - dXi[i])
+					+ (dYout[j] - dYi[i]) * (dYout[j] - dYi[i])
+					+ (dZout[j] - dZi[i]) * (dZout[j] - dZi[i]));
+
+			std::cout << 2.0 * sin(dDist0 / 2.0) * 180.0 / M_PI << std::endl;
+
+			double dDist1 =
+				sqrt(
+					(dXi[k] - dXi[i]) * (dXi[k] - dXi[i])
+					+ (dYi[k] - dYi[i]) * (dYi[k] - dYi[i])
+					+ (dZi[k] - dZi[i]) * (dZi[k] - dZi[i]));
+
+			std::cout << 2.0 * sin(dDist1 / 2.0) * 180.0 / M_PI << std::endl;
+
+			double dLon2 = atan2(dYi[k], dXi[k]) * 180.0 / M_PI;
+			double dLat2 = asin(dZi[k]) * 180.0 / M_PI;
+
+			printf("XY: %1.3f %1.3f :: %1.3f %1.3f :: %1.3f %1.3f\n", dXi[i], dYi[i], dXout[j], dYout[j], dXi[k], dYi[k]);
+			printf("LL: %1.2f %1.2f :: %1.2f %1.2f\n", dLon0, dLat0, dLon1, dLat1);
+			// ============== END DEBUGGING =============================
+*/
+
+			// Local point in spherical coordinates
+			double dLonRadK, dLatRadK;
+			XYZtoRLL_Rad(dXi[k], dYi[k], dZi[k], dLonRadK, dLatRadK);
+
+			// Calculate local radial vector from central lat/lon
+			// i.e. project \vec{X}_k - \vec{X}_i to the surface of the
+			//      sphere and normalize to unit length.
+			double dRx = dXi[k] - dXi[i];
+			double dRy = dYi[k] - dYi[i];
+			double dRz = dZi[k] - dZi[i];
+
+			double dChordLength = sqrt(dRx * dRx + dRy * dRy + dRz * dRz);
+
+			if (dChordLength < 1.0e-12) {
+				_EXCEPTIONT("Div sample point not distinct from center point: increase radius of operator.");
+			}
+
+			// Calculate radial unit vector at point I
+			double dDot = dRx * dXi[i] + dRy * dYi[i] + dRz * dZi[i];
+
+			double dRxI = dRx - dDot * dXi[i];
+			double dRyI = dRy - dDot * dYi[i];
+			double dRzI = dRz - dDot * dZi[i];
+
+			double dMagI = sqrt(dRxI * dRxI + dRyI * dRyI + dRzI * dRzI);
+
+			_ASSERT(dMagI >= 1.0e-12);
+
+			dRxI /= dMagI;
+			dRyI /= dMagI;
+			dRzI /= dMagI;
+
+			// Calculate radial unit vector at point K
+			dDot = dRx * dXi[k] + dRy * dYi[k] + dRz * dZi[k];
+
+			double dRxK = dRx - dDot * dXi[k];
+			double dRyK = dRy - dDot * dYi[k];
+			double dRzK = dRz - dDot * dZi[k];
+
+			double dMagK = sqrt(dRxK * dRxK + dRyK * dRyK + dRzK * dRzK);
+
+			_ASSERT(dMagK >= 1.0e-12);
+
+			dRxK /= dMagK;
+			dRyK /= dMagK;
+			dRzK /= dMagK;
+
+			// Great circle distance between points I and K
+			double dRdeg =
+				RadToDeg(GreatCircleDistanceFromChordLength_Rad(dChordLength));
+
+			// Coefficients for linear interpolation / extrapolation to distance dDivDistDeg
+			double dCoeff0 = (dRdeg - dDivDistDeg) / dRdeg;
+			double dCoeff1 = dDivDistDeg / dRdeg;
+
+			// Multiplicative coefficients for converting spherical velocities to azimuthal velocities
+			double dRaLonCoeffI = - sin(dLonRadI) * dRxI + cos(dLonRadI) * dRyI;
+			double dRaLatCoeffI = - sin(dLatRadI) * (cos(dLonRadI) * dRxI + sin(dLonRadI) * dRyI) + cos(dLatRadI) * dRzI;
+
+			double dRaLonCoeffK = - sin(dLonRadK) * dRxK + cos(dLonRadK) * dRyK;
+			double dRaLatCoeffK = - sin(dLatRadK) * (cos(dLonRadK) * dRxK + sin(dLonRadK) * dRyK) + cos(dLatRadK) * dRzK;
+
+			// Add contributions to sparse matrix operator
+			opDivE(i,i) += dScale * dCoeff0 * dRaLonCoeffI;
+			opDivN(i,i) += dScale * dCoeff0 * dRaLatCoeffI;
+
+			opDivE(i,k) += dScale * dCoeff1 * dRaLonCoeffK;
+			opDivN(i,k) += dScale * dCoeff1 * dRaLatCoeffK;
+		}
+
+		if (setPoints.size() < 4) {
+			Announce("WARNING: Only %i points used for Div in cell %i"
+				" -- accuracy may be affected", setPoints.size(), i);
+		}
+	}
+/*
+	for (
+		SparseMatrix<double>::SparseMapIterator iter = opDiv.begin();
+		iter != opDiv.end(); iter++
+	) {
+		std::cout << iter->first.first << " " << iter->first.second << " " << iter->second << std::endl;
+	}
+*/
+	kd_free(kdGrid);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+DataOp_DIVERGENCE::DataOp_DIVERGENCE(
+	const std::string & strName,
+	int nDivPoints,
+	double dDivDist
+) :
+	DataOp(strName),
+	m_nDivPoints(nDivPoints),
+	m_dDivDist(dDivDist),
+	m_fInitialized(false)
+{ }
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_DIVERGENCE::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 2) {
+		_EXCEPTION2("%s expects two arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
+		_EXCEPTION1("Arguments to %s must be data variables",
+			m_strName.c_str());
+	}
+
+	if (!m_fInitialized) {
+		Announce("Building Div operator %s (%i, %1.2f)",
+			m_strName.c_str(), m_nDivPoints, m_dDivDist);
+
+		BuildDivergenceOperator(
+			grid,
+			m_nDivPoints,
+			m_dDivDist,
+			m_opDivE,
+			m_opDivN);
+
+		m_fInitialized = true;
+	}
+
+	m_opDivE.Apply(*(vecArgData[0]), dataout, true);
+	m_opDivN.Apply(*(vecArgData[1]), dataout, false); 
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Build a sparse gradient magnitude operator on an unstructured SimpleGrid.
+///	</summary>
+///	<param name="dGradMagDistDeg">
+///		Great circle radius of the gradient magnitude operator, in degrees.
+///	</param>
+void BuildGradOperator(
+	const SimpleGrid & grid,
+	int nGradPoints,
+	double dGradDistDeg,
+	SparseMatrix< DataOp_GRADMAG::pair_with_plus_minus<float> > & opGrad
+) {
+	opGrad.Clear();
+
+	int iRef = 0;
+
+	// Scaling factor used in Laplacian calculation
+	const double dScale = 2.0 / (EarthRadius * static_cast<double>(nGradPoints) * DegToRad(dGradDistDeg));
+
+	// TODO: Use SimpleGrid's built-in functionality
+	// Create a kdtree with all nodes in grid
+	kdtree * kdGrid = kd_create(3);
+	if (kdGrid == NULL) {
+		_EXCEPTIONT("Error creating kdtree");
+	}
+
+	DataArray1D<double> dXi(grid.GetSize());
+	DataArray1D<double> dYi(grid.GetSize());
+	DataArray1D<double> dZi(grid.GetSize());
+	for (int i = 0; i < grid.GetSize(); i++) {
+		double dLat = grid.m_dLat[i];
+		double dLon = grid.m_dLon[i];
+
+		dXi[i] = cos(dLon) * cos(dLat);
+		dYi[i] = sin(dLon) * cos(dLat);
+		dZi[i] = sin(dLat);
+
+		kd_insert3(kdGrid, dXi[i], dYi[i], dZi[i], (void*)((&iRef)+i));
+	}
+
+	// Construct the gradient magnitude operator
+	for (int i = 0; i < grid.GetSize(); i++) {
+
+		// Generate points for the Laplacian
+		std::vector<double> dXout;
+		std::vector<double> dYout;
+		std::vector<double> dZout;
+
+		GenerateEqualDistanceSpherePoints(
+			dXi[i], dYi[i], dZi[i],
+			nGradPoints,
+			dGradDistDeg,
+			dXout, dYout, dZout);
+/*
+		kdres * kdr = kd_nearest_range3(kdGrid, dXi[i], dYi[i], dZi[i], dMaxDist);
+		if (kdr == NULL) {
+			_EXCEPTIONT("Error in kd_nearest_range3");
+		}
+		int nNodes = kd_res_size(kdr);
+
+		std::cout << nNodes << " found at distance " << dMaxDist << std::endl;
+*/
+		//std::vector<int> vecCols;
+		//std::vector<double> vecWeight;
+		std::set<int> setPoints;
+		setPoints.insert(i);
+
+		double dAccumulatedDiff = 0.0;
+
+		for (int j = 0; j < dXout.size(); j++) {
+
+			// Find the nearest grid point to the output point
+			kdres * kdr = kd_nearest3(kdGrid, dXout[j], dYout[j], dZout[j]);
+			if (kdr == NULL) {
+				_EXCEPTIONT("NULL return value in call to kd_nearest3");
+			}
+
+			void* pData = kd_res_item_data(kdr);
+			if (pData == NULL) {
+				_EXCEPTIONT("NULL data index");
+			}
+			int k = ((int*)(pData)) - (&iRef);
+
+			kd_res_free(kdr);
+
+			if (k == i) {
+				continue;
+			}
+
+			if (k > dXi.GetRows()) {
+				_EXCEPTIONT("Invalid point index");
+			}
+
+			// Ensure points are not duplicated
+			if (setPoints.find(k) != setPoints.end()) {
+				continue;
+			} else {
+				setPoints.insert(k);
+			}
+	/*
+			// ============== BEGIN DEBUGGING =============================
+			double dLon0 = atan2(dYi[i], dXi[i]) * 180.0 / M_PI;
+			double dLat0 = asin(dZi[i]) * 180.0 / M_PI;
+
+			double dLon1 = atan2(dYout[j], dXout[j]) * 180.0 / M_PI;
+			double dLat1 = asin(dZout[j]) * 180.0 / M_PI;
+
+			double dDist0 =
+				sqrt(
+					(dXout[j] - dXi[i]) * (dXout[j] - dXi[i])
+					+ (dYout[j] - dYi[i]) * (dYout[j] - dYi[i])
+					+ (dZout[j] - dZi[i]) * (dZout[j] - dZi[i]));
+
+			std::cout << 2.0 * sin(dDist0 / 2.0) * 180.0 / M_PI << std::endl;
+
+			double dDist1 =
+				sqrt(
+					(dXi[k] - dXi[i]) * (dXi[k] - dXi[i])
+					+ (dYi[k] - dYi[i]) * (dYi[k] - dYi[i])
+					+ (dZi[k] - dZi[i]) * (dZi[k] - dZi[i]));
+
+			std::cout << 2.0 * sin(dDist1 / 2.0) * 180.0 / M_PI << std::endl;
+
+			double dLon2 = atan2(dYi[k], dXi[k]) * 180.0 / M_PI;
+			double dLat2 = asin(dZi[k]) * 180.0 / M_PI;
+
+			printf("XY: %1.3f %1.3f :: %1.3f %1.3f :: %1.3f %1.3f\n", dXi[i], dYi[i], dXout[j], dYout[j], dXi[k], dYi[k]);
+			printf("LL: %1.2f %1.2f :: %1.2f %1.2f\n", dLon0, dLat0, dLon1, dLat1);
+			// ============== END DEBUGGING =============================
+*/
+
+			// Calculate local radial vector from central lat/lon
+			// i.e. project \vec{X}_k - \vec{X}_i to the surface of the
+			//      sphere and normalize to unit length.
+			double dRx = dXi[k] - dXi[i];
+			double dRy = dYi[k] - dYi[i];
+			double dRz = dZi[k] - dZi[i];
+
+			double dChordLength = sqrt(dRx * dRx + dRy * dRy + dRz * dRz);
+
+			if (dChordLength < 1.0e-12) {
+				_EXCEPTIONT("Grad sample point not distinct from center point: increase radius of operator.");
+			}
+
+			// Generate perpendicular vector fields in Cartesian coords
+			double dEx, dEy, dEz;
+			double dNx, dNy, dNz;
+
+			// Pick eastward and northward reference directions
+			if (fabs(fabs(dZi[i]) - 1.0) > 1.0e-10) {
+				double dEmag = sqrt(dXi[i] * dXi[i] + dYi[i] * dYi[i]);
+
+				dEx = dYi[i] / dEmag;
+				dEy = - dXi[i] / dEmag;
+				dEz = 0.0;
+
+				dNx = dEy * dZi[i];
+				dNy = - dEx * dZi[i];
+				dNz = dEmag;
+
+			// At poles point
+			} else {
+				dEx = 1.0;
+				dEy = 0.0;
+				dEz = 0.0;
+
+				dNx = 0.0;
+				dNy = 1.0;
+				dNz = 0.0;
+			}
+
+			// Calculate radial unit vector at point K
+			double dDot = dRx * dXi[k] + dRy * dYi[k] + dRz * dZi[k];
+
+			double dRxK = dRx - dDot * dXi[k];
+			double dRyK = dRy - dDot * dYi[k];
+			double dRzK = dRz - dDot * dZi[k];
+
+			double dMagK = sqrt(dRxK * dRxK + dRyK * dRyK + dRzK * dRzK);
+
+			_ASSERT(dMagK >= 1.0e-12);
+
+			dRxK /= dMagK;
+			dRyK /= dMagK;
+			dRzK /= dMagK;
+
+			// Coefficients of gradient operators
+			double dEDotRK = dRxK * dEx + dRyK * dEy + dRzK * dEz;
+			double dNDotRK = dRxK * dNx + dRyK * dNy + dRzK * dNz;
+
+			opGrad(i,k) += DataOp_GRADMAG::pair_with_plus_minus<float>(dScale * dEDotRK, dScale * dNDotRK);
+			opGrad(i,i) -= DataOp_GRADMAG::pair_with_plus_minus<float>(dScale * dEDotRK, dScale * dNDotRK);
+		}
+
+		if (setPoints.size() < 4) {
+			Announce("WARNING: Only %i points used for gradient in cell %i"
+				" -- accuracy may be affected", setPoints.size(), i);
+		}
+	}
+/*
+	for (
+		SparseMatrix<double>::SparseMapIterator iter = opLaplacian.begin();
+		iter != opLaplacian.end(); iter++
+	) {
+		std::cout << iter->first.first << " " << iter->first.second << " " << iter->second << std::endl;
+	}
+*/
+	kd_free(kdGrid);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+DataOp_GRADMAG::DataOp_GRADMAG(
+	const std::string & strName,
+	int nGradPoints,
+	double dGradDist
+) :
+	DataOp(strName),
+	m_nGradPoints(nGradPoints),
+	m_dGradDist(dGradDist),
+	m_fInitialized(false)
+{ }
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_GRADMAG::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 1) {
+		_EXCEPTION2("%s expects one argument: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	if (vecArgData[0] == NULL) {
+		_EXCEPTION1("Arguments to %s must be data variables",
+			m_strName.c_str());
+	}
+
+	if (!m_fInitialized) {
+		Announce("Building gradient operator %s (%i, %1.2f)",
+			m_strName.c_str(), m_nGradPoints, m_dGradDist);
+
+		BuildGradOperator(
+			grid,
+			m_nGradPoints,
+			m_dGradDist,
+			m_opGrad);
+
+		m_fInitialized = true;
+	}
+
+	DataArray1D<float> const & data = *(vecArgData[0]);
+	DataArray1D<float> datatemp(dataout.GetRows());
+	dataout.Zero();
+	for (auto it = m_opGrad.begin(); it != m_opGrad.end(); it++) {
+		int row = it->first.first;
+		int col = it->first.second;
+		dataout[row] += it->second.first * data[col];
+		datatemp[row] += it->second.second * data[col];
+	}
+	for (int i = 0; i < dataout.GetRows(); i++) {
+		dataout[i] = sqrt(dataout[i] * dataout[i] + datatemp[i] * datatemp[i]);
+	}
 
 	return true;
 }
