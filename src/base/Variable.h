@@ -298,7 +298,7 @@ public:
 	///	<summary>
 	///		Get the flattened index of the iterator.
 	///	</summary>
-	const size_t Offset() const {
+	size_t Offset() const {
 		size_t sValue = 0;
 		size_t sAccumulatedSize = 1;
 		for (long d = static_cast<long>(m_vecValue.size())-1; d >= 0; d--) {
