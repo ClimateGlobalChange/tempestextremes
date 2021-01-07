@@ -99,6 +99,9 @@ public:
 				// Read in column name
 				if (eReadMode == ReadMode_Column) {
 					m_iColumn = cdhInput.GetIndexFromString(strSubStr);
+					if (m_iColumn == (-1)) {
+						_EXCEPTION1("Unknown column header \"%s\"", strSubStr.c_str());
+					}
 
 					iLast = i + 1;
 					eReadMode = ReadMode_Op;
@@ -957,8 +960,8 @@ void CalculateCycloneMetrics(
 	double dRadius = pathnode.GetColumnDataAsDouble(cdh, strRadius);
 
 	// Check arguments
-	if ((dRadius <= 0) || (dRadius > 180.0)) {
-		_EXCEPTIONT("Radius must be in the range (0.0, 180.0]");
+	if ((dRadius < 0.0) || (dRadius > 180.0)) {
+		_EXCEPTIONT("Radius must be in the range [0.0, 180.0]");
 	}
 
 	// Get the center grid index
@@ -2054,7 +2057,26 @@ try {
 
 				continue;
 			}
+/*
+			// min,max
+			if (((*pargtree)[2] == "min") ||
+			    ((*pargtree)[2] == "max")
+			) {
+				if (nArguments < 2) {
+					_EXCEPTION1("Syntax error: Function \"%s\" requires at least two arguments",
+						(*pargtree)[2].c_str());
+				}
 
+				for (int i = 0; i < pargtree->size(); i++) {
+					int ix = cdhWorking.GetIndexFromString((*pargfunc)[0]);
+					if (ix == (-1)) {
+						_EXCEPTION1("Invalid column header \"%s\"", (*pargfunc)[0].c_str());
+					}
+				}
+
+				continue;
+			}
+*/
 /*
 			// sum_radius
 			if ((*pargtree)[2] == "sum_radius") {
