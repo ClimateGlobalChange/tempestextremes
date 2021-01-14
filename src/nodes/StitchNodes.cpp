@@ -87,6 +87,8 @@ void ParseDetectNodesFile(
 	TimeToCandidateInfoMap & mapCandidateInfo,
 	Time::CalendarType caltype,
 	bool fAllowRepeatedTimes,
+	const Time & timeBegin,
+	const Time & timeEnd,
 	size_t sGridDims
 ) {
 	// Open file for reading
@@ -128,6 +130,9 @@ void ParseDetectNodesFile(
 
 	// Total candidates at this time
 	int nCandidates = 0;
+
+	// Do not include this time slice
+	bool fIncludeTimeSlice = true;
 
 	for (;;) {
 
@@ -184,30 +189,45 @@ void ParseDetectNodesFile(
 			time.SetDay(std::stoi(vecTimeString[2]));
 			time.SetSecond(std::stoi(vecTimeString[4]) * 3600);
 
-			auto it = mapCandidateInfo.find(time);
-			if (it != mapCandidateInfo.end()) {
-				if (fAllowRepeatedTimes) {
-					iterCurrentTime = it;
-					iCandidate = iterCurrentTime->second.size();
-					iterCurrentTime->second.resize(iCandidate + nCandidates);
+			fIncludeTimeSlice = true;
+			if (timeBegin.GetCalendarType() != Time::CalendarUnknown) {
+				if (time < timeBegin) {
+					fIncludeTimeSlice = false;
+				}
+			}
+			if (timeEnd.GetCalendarType() != Time::CalendarUnknown) {
+				if (time > timeEnd) {
+					fIncludeTimeSlice = false;
+				}
+			}
+
+			if (fIncludeTimeSlice) {
+				auto it = mapCandidateInfo.find(time);
+				if (it != mapCandidateInfo.end()) {
+					if (fAllowRepeatedTimes) {
+						iterCurrentTime = it;
+						iCandidate = iterCurrentTime->second.size();
+						nCandidates += iCandidate;
+						iterCurrentTime->second.resize(iCandidate + nCandidates);
+
+					} else {
+						_EXCEPTION2("Repated time \"%s\" found in candidate files on line (%lu)",
+							time.ToString().c_str(), sLineNumber);
+					}
 
 				} else {
-					_EXCEPTION2("Repated time \"%s\" found in candidate files on line (%s)",
-						time.ToString().c_str(), sLineNumber);
+					auto ins =
+						mapCandidateInfo.insert(
+							TimeToCandidateInfoPair(
+								time, TimesliceCandidateInformation(nCandidates)));
+
+					if (!ins.second) {
+						_EXCEPTION2("Insertion of time \"%s\" into candidate info map failed on line (%lu)",
+							time.ToString().c_str(), sLineNumber);
+					}
+
+					iterCurrentTime = ins.first;
 				}
-
-			} else {
-				auto ins =
-					mapCandidateInfo.insert(
-						TimeToCandidateInfoPair(
-							time, TimesliceCandidateInformation(nCandidates)));
-
-				if (!ins.second) {
-					_EXCEPTION2("Insertion of time \"%s\" into candidate info map failed on line (%lu)",
-						time.ToString().c_str(), sLineNumber);
-				}
-
-				iterCurrentTime = ins.first;
 			}
 
 			// Prepare to parse candidate data
@@ -218,29 +238,33 @@ void ParseDetectNodesFile(
 		// Parse candidate information
 		} else if (eReadState == ReadState_Candidate) {
 
-			// Parse candidates
-			_ASSERT(iterCurrentTime != mapCandidateInfo.end());
+			if (fIncludeTimeSlice) {
 
-			TimesliceCandidateInformation & tscinfo = iterCurrentTime->second;
+				// Parse candidates
+				_ASSERT(iterCurrentTime != mapCandidateInfo.end());
 
-			_ASSERT(iCandidate < tscinfo.size());
+				TimesliceCandidateInformation & tscinfo = iterCurrentTime->second;
 
-			ParseVariableList(strLine, tscinfo[iCandidate]);
+				_ASSERT(iCandidate < tscinfo.size());
 
-			if (tscinfo[iCandidate].size() != sFormatEntries) {
-				fWarnInsufficientCandidateInfo = true;
-			}
+				ParseVariableList(strLine, tscinfo[iCandidate]);
 
-			for (size_t d = 0; d < sGridDims; d++) {
-				if (!STLStringHelper::IsIntegerIndex(tscinfo[iCandidate][d])) {
-					_EXCEPTION2("On line %lu first %lu columns are not integer indices (equal to number of grid dimensions); "
-						"if an unstructured grid is being used make sure --in_connect is specified.",
-						sLineNumber, sGridDims);
+				if (tscinfo[iCandidate].size() != sFormatEntries) {
+					fWarnInsufficientCandidateInfo = true;
+				}
+
+				for (size_t d = 0; d < sGridDims; d++) {
+					if (!STLStringHelper::IsIntegerIndex(tscinfo[iCandidate][d])) {
+						_EXCEPTION2("On line %lu first %lu columns are not integer indices (equal to number of grid dimensions); "
+							"if an unstructured grid is being used make sure --in_connect is specified.",
+							sLineNumber, sGridDims);
+					}
 				}
 			}
 
+			// Advance candidate number
 			iCandidate++;
-			if (iCandidate == tscinfo.size()) {
+			if (iCandidate == nCandidates) {
 				eReadState = ReadState_Time;
 				iCandidate = 0;
 				iterCurrentTime = mapCandidateInfo.end();
@@ -667,6 +691,12 @@ try {
 	// Minimum duration of path
 	std::string strMinTime;
 
+	// Begin time for analysis
+	std::string strTimeBegin;
+
+	// End time for analysis
+	std::string strTimeEnd;
+
 	// Minimum path length
 	int nMinPathLength;
 
@@ -705,6 +735,8 @@ try {
 		CommandLineDoubleD(dRange, "range", 5.0, "(degrees)");
 		CommandLineString(strMinTime, "mintime", "3");
 		CommandLineInt(nMinPathLength, "*minlength", 1);
+		CommandLineString(strTimeBegin, "time_begin", "");
+		CommandLineString(strTimeEnd, "time_end", "");
 		CommandLineDoubleD(dMinEndpointDistance, "min_endpoint_dist", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinPathDistance, "min_path_dist", 0.0, "(degrees)");
 		CommandLineString(strMaxGapSize, "maxgap", "0");
@@ -830,6 +862,24 @@ try {
 		}
 	}
 
+	// Parse --time_begin and --time_end
+	Time timeBegin(Time::CalendarUnknown);
+	Time timeEnd(Time::CalendarUnknown);
+	if (strTimeBegin != "") {
+		timeBegin = Time(caltype);
+		timeBegin.FromFormattedString(strTimeBegin);
+		if (timeBegin.GetTimeType() != Time::TypeFixed) {
+			_EXCEPTIONT("Time specified by --time_begin must correspond to a specific date");
+		}
+	}
+	if (strTimeEnd != "") {
+		timeEnd = Time(caltype);
+		timeEnd.FromFormattedString(strTimeEnd);
+		if (timeEnd.GetTimeType() != Time::TypeFixed) {
+			_EXCEPTIONT("Time specified by --time_end must correspond to a specific date");
+		}
+	}
+
 	// Output format
 	if ((strOutputFileFormat != "gfdl") &&
 		(strOutputFileFormat != "csv") &&
@@ -916,6 +966,8 @@ try {
 				mapCandidateInfo,
 				caltype,
 				fAllowRepeatedTimes,
+				timeBegin,
+				timeEnd,
 				sGridDims);
 		}
 
