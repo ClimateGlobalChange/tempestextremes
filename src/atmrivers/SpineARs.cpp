@@ -450,7 +450,10 @@ float BilinearInterp(
 	_ASSERT((dLon0Rad >= dLonRad[0]) && (dLon0Rad < dLonRad[0] + 2.0 * M_PI));
 
 	// NOTE: This needs to be modified if the domain is regional
-	if (dLon0Rad >= dLonRad[dLonRad.GetRows()-1]) {
+	if (dLon0Rad >= dLonRad[dLonRad.GetRows()-1] - 1.0e-12) {
+		if (dLon0Rad < dLonRad[dLonRad.GetRows()-1]) {
+			dLon0Rad = dLonRad[dLonRad.GetRows()-1];
+		}
 		ix0 = dLonRad.GetRows()-1;
 		ix1 = 0;
 		dI = (dLonRad[0] + 2.0 * M_PI - dLon0Rad)
@@ -462,12 +465,11 @@ float BilinearInterp(
 			/ (dLonRad[dLonRad.GetRows()-1] - dLonRad[0])
 			* static_cast<double>(dLonRad.GetRows()-1);
 
-		//printf("%i %1.15e %1.15e %1.15e\n",
-		//	ix, dLon0Rad, dLonRad[0], dLonRad[dLonRad.GetRows()-1]);
-
 		int it = 0;
 		for (; it < dLonRad.GetRows(); it++) {
-			_ASSERT((ix >= 0) && (ix < dLonRad.GetRows()-1));
+			if ((ix < 0) || (ix >= dLonRad.GetRows()-1)) {
+				_EXCEPTION1("Sample index (%i) out of range", ix);
+			}
 			if (dLonRad[ix] > dLon0Rad) {
 				ix--;
 				continue;
@@ -483,8 +485,6 @@ float BilinearInterp(
 
 		ix0 = ix;
 		ix1 = ix+1;
-
-		//printf(":%i %1.15e %1.15e %1.15e\n", ix0, dLonRad[ix0], dLon0Rad, dLonRad[ix1]);
 
 		dI = (dLonRad[ix+1] - dLon0Rad) / (dLonRad[ix+1] - dLonRad[ix]);
 	}
