@@ -169,6 +169,10 @@ void NodeFile::Read(
 						0,
 						caltype);
 
+				if (nCount == 0) {
+					m_pathvec[m_pathvec.size()-1].m_timeEnd =
+						m_pathvec[m_pathvec.size()-1].m_timeStart;
+				}
 				m_pathvec[m_pathvec.size()-1].resize(nCount);
 			}
 
@@ -500,12 +504,12 @@ void NodeFile::Interpolate(
 	for (size_t p = 0; p < m_pathvec.size(); p++) {
 		const Path & path = m_pathvec[p];
 
+		if (path.size() == 0) {
+			continue;
+		}
+
 		if ((path.m_timeStart <= time) && (path.m_timeEnd >= time)) {
 			m_vecInterpPathId.push_back(p);
-
-			if (path.size() == 0) {
-				_EXCEPTION1("Zero length path (%i) found in nodefile", p);
-			}
 
 			if (path.size() == 1) {
 				m_vecInterpTimeId.push_back(0);
