@@ -75,6 +75,9 @@ try {
 	// Number of Fourier modes
 	int nFourierModes;
 
+	// Output phase and magnitude
+	bool fOutputCoeffs;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in_data", "");
@@ -83,9 +86,12 @@ try {
 		CommandLineString(strPreserveVarName, "preserve", "");
 		CommandLineString(strDimName, "dim", "");
 		CommandLineInt(nFourierModes, "modes", 4);
+		CommandLineBool(fOutputCoeffs, "output_coeffs");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
+
+	AnnounceBanner();
 
 	// Validate arguments
 	if (strInputFile.length() == 0) {
@@ -113,7 +119,6 @@ try {
 	STLStringHelper::ParseVariableList(strPreserveVarName, vecPreserveVariableStrings);
 
 	// Begin processing
-	AnnounceBanner();
 	AnnounceStartBlock("Initializing output file");
 
 	// Open the input file
@@ -201,6 +206,32 @@ try {
 			continue;
 		}
 
+		// Vector of dimensions for phase and magnitude outputs
+		std::vector<long> vecdimCoeffOutSize;
+		std::vector<NcDim*> vecdimCoeffOut;
+		if (fOutputCoeffs) {
+			NcDim * dimMode = ncoutfile.add_dim("fourier_mode", nFourierModes);
+			if (dimMode == NULL) {
+				_EXCEPTIONT("Unable to create dimension \"fourier_mode\" in output file");
+			}
+			vecdimCoeffOut.push_back(dimMode);
+			vecdimCoeffOutSize.push_back(nFourierModes);
+			for (int d = 0; d < varIn->num_dims(); d++) {
+				NcDim * dimIn = varIn->get_dim(d);
+				if (strDimName == dimIn->name()) {
+					continue;
+				}
+				NcDim * dimOut = ncoutfile.get_dim(dimIn->name());
+				if (dimOut == NULL) {
+					_EXCEPTION1("Missing dimension \"%s\" in output file",
+						dimIn->name());
+				}
+				vecdimCoeffOut.push_back(dimOut);
+				vecdimCoeffOutSize.push_back(dimOut->size());
+			}
+		}
+
+		// Apply Fourier filter
 		Announce("Applying Fourier filter to dimension %i", iFourierDimension);
 
 		// Load in data and Fourier filter
@@ -233,8 +264,37 @@ try {
 			}
 		}
 
-		// Perform filtering
+		// Perform filtering on variables of type float
 		if (varIn->type() == ncFloat) {
+
+			// Output phase and magnitude
+			DataArray1D<float> dMagnitude;
+			DataArray1D<float> dPhase;
+
+			NcVar * varMagnitude;
+			NcVar * varPhase;
+
+			if (fOutputCoeffs) {
+				dMagnitude.Allocate(nFourierModes * sTotalSize);
+				dPhase.Allocate(nFourierModes * sTotalSize);
+
+				std::string strMagnitudeName = std::string(varIn->name()) + "_mag";
+				varMagnitude =
+					ncoutfile.add_var(
+						strMagnitudeName.c_str(),
+						ncFloat,
+						vecdimCoeffOut.size(),
+						const_cast<const NcDim**>(&(vecdimCoeffOut[0])));
+
+				std::string strPhaseName = std::string(varIn->name()) + "_phase";
+				varPhase =
+					ncoutfile.add_var(
+							strPhaseName.c_str(),
+							ncFloat,
+							vecdimCoeffOut.size(),
+							const_cast<const NcDim**>(&(vecdimCoeffOut[0])));
+			}
+
 			DataArray1D<float> data(sTotalSize);
 			varIn->get(&(data[0]), &(lSize[0]));
 
@@ -245,17 +305,35 @@ try {
 			//std::cout << sFourierStride << std::endl;
 			for (size_t s = 0; s < sFourierOuterLoops; s++) {
 			for (size_t i = 0; i < sFourierStride; i++) {
+				size_t sDataIx = s * sFourierStride * sFourierCount + i;
+
 				fourier_filter<float>(
-					&(data[s * sFourierStride * sFourierCount + i]),
+					&(data[sDataIx]),
 					sFourierCount,
 					sFourierStride,
 					static_cast<size_t>(nFourierModes),
 					an, bn);
+
+				if (fOutputCoeffs) {
+					for (int m = 0; m < nFourierModes; m++) {
+						size_t sModeSize = sTotalSize / sFourierCount;
+						dMagnitude[m * sModeSize + sDataIx] =
+							sqrt(an[m] * an[m] + bn[m] * bn[m]) / static_cast<float>(sFourierCount);
+						dPhase[m * sModeSize + sDataIx] =
+							atan2(bn[m], an[m]);
+					}
+				}
 			}
 			}
 
 			varOut->put(&(data[0]), &(lSize[0]));
 
+			if (fOutputCoeffs) {
+				varMagnitude->put(&(dMagnitude[0]), &(vecdimCoeffOutSize[0]));
+				varPhase->put(&(dPhase[0]), &(vecdimCoeffOutSize[0]));
+			}
+
+		// Perform filtering on variables of type double
 		} else {
 			DataArray1D<double> data(sTotalSize);
 			varIn->get(&(data[0]), &(lSize[0]));
