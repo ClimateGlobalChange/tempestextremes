@@ -287,7 +287,7 @@ DataOp * DataOpManager::Add(
 		return Add(new DataOp_GRADMAG(strName, nPoints, dDist));
 
 	// Vector dot gradient operator
-	} else if (strName.substr(0,8) == "_VECDOTGRAD") {
+	} else if (strName.substr(0,11) == "_VECDOTGRAD") {
 		int nPoints = 0;
 		double dDist = 0.0;
 
