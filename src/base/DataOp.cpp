@@ -241,7 +241,7 @@ DataOp * DataOpManager::Add(
 
 		return Add(new DataOp_DIVERGENCE(strName, nPoints, dDist));
 
-	// Divergence operator
+	// Gradient magnitude operator
 	} else if (strName.substr(0,8) == "_GRADMAG") {
 		int nPoints = 0;
 		double dDist = 0.0;
@@ -285,6 +285,51 @@ DataOp * DataOpManager::Add(
 		}
 
 		return Add(new DataOp_GRADMAG(strName, nPoints, dDist));
+
+	// Vector dot gradient operator
+	} else if (strName.substr(0,8) == "_VECDOTGRAD") {
+		int nPoints = 0;
+		double dDist = 0.0;
+
+		int iMode = 0;
+		int iLast = 0;
+		for (int i = 0; i < strName.length(); i++) {
+			if (iMode == 0) {
+				if (strName[i] == '{') {
+					iLast = i;
+					iMode = 1;
+				}
+				continue;
+
+			} else if (iMode == 1) {
+				if (strName[i] == ',') {
+					if ((i-iLast-1) < 1) {
+						_EXCEPTIONT("Malformed _VECDOTGRAD{npts,dist} name");
+					}
+					nPoints = atoi(strName.substr(iLast+1, i-iLast-1).c_str());
+					iLast = i;
+					iMode = 2;
+				}
+
+			} else if (iMode == 2) {
+				if (strName[i] == '}') {
+					if ((i-iLast-1) < 1) {
+						_EXCEPTIONT("Malformed _VECDOTGRAD{npts,dist} name");
+					}
+					dDist = atof(strName.substr(iLast+1, i-iLast-1).c_str());
+					iLast = i;
+					iMode = 3;
+				}
+
+			} else if (iMode == 3) {
+				_EXCEPTIONT("Malformed _VECDOTGRAD{npts,dist} name");
+			}
+		}
+		if (iMode != 3) {
+			_EXCEPTIONT("Malformed _VECDOTGRAD{npts,dist} name");
+		}
+
+		return Add(new DataOp_VECDOTGRAD(strName, nPoints, dDist));
 
 	} else {
 		_EXCEPTION1("Invalid DataOp \"%s\"", strName.c_str());
@@ -2157,6 +2202,68 @@ bool DataOp_GRADMAG::Apply(
 	}
 	for (int i = 0; i < dataout.GetRows(); i++) {
 		dataout[i] = sqrt(dataout[i] * dataout[i] + datatemp[i] * datatemp[i]);
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+DataOp_VECDOTGRAD::DataOp_VECDOTGRAD(
+	const std::string & strName,
+	int nGradPoints,
+	double dGradDist
+) :
+	DataOp(strName),
+	m_nGradPoints(nGradPoints),
+	m_dGradDist(dGradDist),
+	m_fInitialized(false)
+{ }
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_VECDOTGRAD::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 3) {
+		_EXCEPTION2("%s expects three arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL) || (vecArgData[2] == NULL)) {
+		_EXCEPTION1("Arguments to %s must be data variables",
+			m_strName.c_str());
+	}
+
+	if (!m_fInitialized) {
+		Announce("Building gradient operator %s (%i, %1.2f)",
+			m_strName.c_str(), m_nGradPoints, m_dGradDist);
+
+		BuildGradOperator(
+			grid,
+			m_nGradPoints,
+			m_dGradDist,
+			m_opGrad);
+
+		m_fInitialized = true;
+	}
+
+	DataArray1D<float> const & dataU = *(vecArgData[0]);
+	DataArray1D<float> const & dataV = *(vecArgData[1]);
+
+	DataArray1D<float> const & data = *(vecArgData[2]);
+	DataArray1D<float> datatemp(dataout.GetRows());
+	dataout.Zero();
+	for (auto it = m_opGrad.begin(); it != m_opGrad.end(); it++) {
+		int row = it->first.first;
+		int col = it->first.second;
+		dataout[row] += it->second.first * data[col];
+		datatemp[row] += it->second.second * data[col];
+	}
+	for (int i = 0; i < dataout.GetRows(); i++) {
+		dataout[i] = dataU[i] * dataout[i] + dataV[i] * datatemp[i];
 	}
 
 	return true;

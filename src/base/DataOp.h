@@ -797,7 +797,53 @@ protected:
 	///		Sparse matrix operator (eastward component).
 	///	</summary>
 	SparseMatrix< pair_with_plus_minus<float> > m_opGrad;
+};
 
+///////////////////////////////////////////////////////////////////////////////
+
+class DataOp_VECDOTGRAD : public DataOp {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_VECDOTGRAD(
+		const std::string & strName,
+		int nGradPoints,
+		double dGradDist
+	);
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
+
+protected:
+	///	<summary>
+	///		Number of points in this curl operator.
+	///	</summary>
+	int m_nGradPoints;
+
+	///	<summary>
+	///		Evaluation distance for the curl operator.
+	///	</summary>
+	double m_dGradDist;
+
+	///	<summary>
+	///		Flag indicating the sparse matrix operator is initialized.
+	///	</summary>
+	bool m_fInitialized;
+
+	///	<summary>
+	///		Sparse matrix operator (eastward component).
+	///	</summary>
+	SparseMatrix< DataOp_GRADMAG::pair_with_plus_minus<float> > m_opGrad;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
