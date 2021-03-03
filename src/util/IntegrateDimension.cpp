@@ -351,7 +351,7 @@ try {
 
 				DataArray2D<double> dBounds(2, lDimSize);
 
-				var->get(&(dBounds(0,0)), lDimSize, 2);
+				var->get(&(dBounds(0,0)), 2, lDimSize);
 
 				for (int i = 0; i < lDimSize; i++) {
 					vecExprContents[t].bounds(i,0) = dBounds(0,i);
