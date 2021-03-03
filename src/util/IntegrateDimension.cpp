@@ -48,7 +48,8 @@ public:
 		Unknown,
 		Scalar,
 		BoundsVector,
-		Field
+		Field2D,
+		Field3D
 	};
 
 public:
@@ -361,9 +362,20 @@ try {
 
 			// Fields
 			} else {
-				Announce("%s (field)", token.str.c_str());
+				bool f3DField = false;
+				for (int d = 0; d < var->num_dims(); d++) {
+					if (strDimName == std::string(var->get_dim(d)->name())) {
+						f3DField = true;
+					}
+				}
+				if (f3DField) {
+					Announce("%s (3D field)", token.str.c_str());
+					vecExprContents[t].type = FieldUnion<double>::Type::Field3D;
+				} else {
+					Announce("%s (2D field)", token.str.c_str());
+					vecExprContents[t].type = FieldUnion<double>::Type::Field2D;
+				}
 
-				vecExprContents[t].type = FieldUnion<double>::Type::Field;
 				vecExprContents[t].fieldvar = var;
 			}
 		}
@@ -529,7 +541,7 @@ try {
 				}
 			}
 
-			if (vecExprContents[t].type != FieldUnion<double>::Type::Field) {
+			if (vecExprContents[t].type != FieldUnion<double>::Type::Field2D) {
 				continue;
 			}
 
@@ -609,7 +621,7 @@ try {
 		DataArray1D<double> dDataOut(lGridSize);
 
 		for (int t = 0; t < vecExprContents.size(); t++) {
-			if (vecExprContents[t].type != FieldUnion<double>::Type::Field) {
+			if (vecExprContents[t].type != FieldUnion<double>::Type::Field2D) {
 				continue;
 			}
 			vecExprContents[t].fielddata.Allocate(lGridSize);
@@ -648,14 +660,14 @@ try {
 					strPos.c_str());
 			}
 
-			// Load field data
+			// Load 2D field data
 			std::vector<long> lPosF = lPos;
 			std::vector<long> lSizeF = lSize;
 			lPosF.erase(lPosF.begin() + lIntegralDimIx);
 			lSizeF.erase(lSizeF.begin() + lIntegralDimIx);
 
 			for (int t = 0; t < vecExprContents.size(); t++) {
-				if (vecExprContents[t].type != FieldUnion<double>::Type::Field) {
+				if (vecExprContents[t].type != FieldUnion<double>::Type::Field2D) {
 					continue;
 				}
 
@@ -678,7 +690,7 @@ try {
 				(exprHybridExpr[3].str == "+") &&
 				(vecExprContents[4].type == FieldUnion<double>::Type::BoundsVector) &&
 				(exprHybridExpr[5].str == "*") &&
-				(vecExprContents[6].type == FieldUnion<double>::Type::Field)
+				(vecExprContents[6].type == FieldUnion<double>::Type::Field2D)
 			) {
 				double dRefValue = vecExprContents[2].scalar;
 
@@ -707,7 +719,7 @@ try {
 				(exprHybridExpr[1].str == "+") &&
 				(vecExprContents[2].type == FieldUnion<double>::Type::BoundsVector) &&
 				(exprHybridExpr[3].str == "*") &&
-				(vecExprContents[4].type == FieldUnion<double>::Type::Field)
+				(vecExprContents[4].type == FieldUnion<double>::Type::Field2D)
 			) {
 
 				for (long lLev = 0; lLev < lIntegralDimSize; lLev++) {
@@ -730,6 +742,74 @@ try {
 						//}
 
 						dDataOut[lGrid] += fabs(dPu - dPl) * dDataVar[lGrid];
+					}
+				}
+
+			// "p3" style hybrid expression
+			} else if ((exprHybridExpr.size() == 1) &&
+				(vecExprContents[4].type == FieldUnion<double>::Type::Field3D)
+			) {
+				NcVar * varF = vecExprContents[0].fieldvar;
+
+				if (varF->num_dims() != varIn->num_dims()) {
+					_EXCEPTION4("Dimension count of field variable \"%s\" (%li) must match input variable \"%s\" (%li)",
+						varF->name(),
+						varF->num_dims(),
+						varIn->name(),
+						varIn->num_dims());
+				}
+				for (long d = 0; d < varIn->num_dims(); d++) {
+					if (d != lIntegralDimIx) {
+						if (varIn->get_dim(d)->size() != varF->get_dim(d)->size()) {
+							_EXCEPTION5("Dimension %i of field variable \"%s\" has size %li, "
+								"which must match input variable \"%s\" size %li",
+								d,
+								varF->name(),
+								varF->get_dim(d)->size(),
+								varIn->name(),
+								varIn->get_dim(d)->size());
+						}
+
+					} else {
+						if (varIn->get_dim(d)->size()+1 != varF->get_dim(d)->size()) {
+							_EXCEPTION5("Dimension %i of field variable \"%s\" has size %li, "
+								"which must be one larger than input variable \"%s\" size %li",
+								d,
+								varF->name(),
+								varF->get_dim(d)->size(),
+								varIn->name(),
+								varIn->get_dim(d)->size());
+						}
+					}
+				}
+
+				// Storage for 3D field data
+				DataArray1D<double> dFl(lGridSize);
+				DataArray1D<double> dFu(lGridSize);
+
+				lPos[lIntegralDimIx] = 0;
+				varF->set_cur(&(lPos[0]));
+				varF->get(&(dFl[0]), &(lSize[0]));
+
+				for (long lLev = 0; lLev < lIntegralDimSize; lLev++) {
+
+					if (lLev % 2 == 0) {
+						lPos[lIntegralDimIx] = lLev+1;
+						varF->set_cur(&(lPos[0]));
+						varF->get(&(dFu[0]), &(lSize[0]));
+
+					} else {
+						lPos[lIntegralDimIx] = lLev+1;
+						varF->set_cur(&(lPos[0]));
+						varF->get(&(dFl[0]), &(lSize[0]));
+					}
+
+					lPos[lIntegralDimIx] = lLev;
+					varIn->set_cur(&(lPos[0]));
+					varIn->get(&(dDataVar[0]), &(lSize[0]));
+
+					for (long lGrid = 0; lGrid < lGridSize; lGrid++) {
+						dDataOut[lGrid] += fabs(dFu(lGrid) - dFl(lGrid)) * dDataVar[lGrid];
 					}
 				}
 
