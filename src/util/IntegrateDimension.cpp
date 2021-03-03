@@ -248,7 +248,7 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
-	// TODO: Clean up mapExprInterfaces
+	// Build another array that stores the values of the hybrid coordinate array
 	AnnounceStartBlock("Loading interfacial variables");
 	std::vector< FieldUnion<double> > vecExprContents(exprHybridExpr.size());
 	for(size_t t = 0; t < exprHybridExpr.size(); t++) {
@@ -297,7 +297,7 @@ try {
 
 			// Interfacial values (single array)
 			} else if (var->num_dims() == 1) {
-				Announce("%s (interfacial bounds)", var->name());
+				Announce("%s (1D bounds)", var->name());
 
 				long lDimSize = var->get_dim(0)->size();
 				if (lDimSize < 2) {
@@ -317,7 +317,7 @@ try {
 
 			// Interfacial values (bounds)
 			} else if ((var->num_dims() == 2) && (var->get_dim(1)->size() == 2)) {
-				Announce("%s (bounds)", var->name());
+				Announce("%s (2D bounds)", var->name());
 
 				long lDimSize = var->get_dim(0)->size();
 				if (lDimSize < 1) {
@@ -335,6 +335,28 @@ try {
 				//	printf("(%i %i) %1.15f\n", i, j, (*parray)(i,j));
 				//}
 				//}
+
+			// Interfacial values (bounds) in reverse order (why?)
+			} else if ((var->num_dims() == 2) && (var->get_dim(0)->size() == 2)) {
+				Announce("%s (2D bounds)", var->name());
+
+				long lDimSize = var->get_dim(1)->size();
+				if (lDimSize < 1) {
+					_EXCEPTION2("Interfacial variable \"%s\" dimension \"%s\" must have size >= 1",
+						var->name(), var->get_dim(0)->name());
+				}
+
+				vecExprContents[t].type = FieldUnion<double>::Type::BoundsVector;
+				vecExprContents[t].bounds.Allocate(lDimSize, 2);
+
+				DataArray2D<double> dBounds(2, lDimSize);
+
+				var->get(&(dBounds(0,0)), lDimSize, 2);
+
+				for (int i = 0; i < lDimSize; i++) {
+					vecExprContents[t].bounds(i,0) = dBounds(0,i);
+					vecExprContents[t].bounds(i,1) = dBounds(1,i);
+				}
 
 			// Fields
 			} else {
