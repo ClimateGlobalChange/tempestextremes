@@ -339,6 +339,7 @@ try {
 			// Interfacial values (bounds) in reverse order (why?)
 			} else if ((var->num_dims() == 2) && (var->get_dim(0)->size() == 2)) {
 				Announce("%s (2D bounds)", var->name());
+				Announce("WARNING: \"bnds\" dimension appears first. This may indicate something is incorrect with your vertical level array ordering");
 
 				long lDimSize = var->get_dim(1)->size();
 				if (lDimSize < 1) {
@@ -349,13 +350,13 @@ try {
 				vecExprContents[t].type = FieldUnion<double>::Type::BoundsVector;
 				vecExprContents[t].bounds.Allocate(lDimSize, 2);
 
-				DataArray2D<double> dBounds(2, lDimSize);
+				DataArray2D<double> dBounds(lDimSize, 2);
 
 				var->get(&(dBounds(0,0)), 2, lDimSize);
 
 				for (int i = 0; i < lDimSize; i++) {
-					vecExprContents[t].bounds(i,0) = dBounds(0,i);
-					vecExprContents[t].bounds(i,1) = dBounds(1,i);
+					vecExprContents[t].bounds(i,0) = dBounds(i,0);
+					vecExprContents[t].bounds(i,1) = dBounds(i,1);
 				}
 
 			// Fields
@@ -723,6 +724,10 @@ try {
 						double dPu =
 							vecExprContents[0].bounds(lLev,1)
 							+ vecExprContents[2].bounds(lLev,1) * vecExprContents[4].fielddata(lGrid);
+
+						//if (lGrid == 0) {
+						//	printf("%1.8f %1.8f : %1.8f\n", dPu, dPl, vecExprContents[4].fielddata(lGrid));
+						//}
 
 						dDataOut[lGrid] += fabs(dPu - dPl) * dDataVar[lGrid];
 					}
