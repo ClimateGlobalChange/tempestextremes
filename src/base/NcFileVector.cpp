@@ -89,8 +89,9 @@ void NcFileVector::InsertFile(
 					if (strType == "daily mean climatology") {
 						m_vecFileType.push_back(FileType_DailyMeanClimo);
 					} else {
-						_EXCEPTION2("Unrecognized time::type (%s) in file \"%s\"",
-							strType.c_str(), strFile.c_str());
+						m_vecFileType.push_back(FileType_Standard);
+						//_EXCEPTION2("Unrecognized time::type (%s) in file \"%s\"",
+						//	strType.c_str(), strFile.c_str());
 					}
 				}
 			}
