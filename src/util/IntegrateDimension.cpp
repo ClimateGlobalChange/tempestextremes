@@ -17,10 +17,13 @@
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
+#include "Constants.h"
 #include "STLStringHelper.h"
 #include "NetCDFUtilities.h"
 #include "DataArray1D.h"
+#include "DataArray2D.h"
 #include "NcFileVector.h"
+#include "MathExpression.h"
 
 #include "netcdfcpp.h"
 
@@ -31,6 +34,58 @@
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
 #endif
+
+///////////////////////////////////////////////////////////////////////////////
+
+template <typename T>
+class FieldUnion {
+
+public:
+	///	<summary>
+	///		Type stored in this FieldUnion.
+	///	</summary>
+	enum class Type {
+		Unknown,
+		Scalar,
+		BoundsVector,
+		Field
+	};
+
+public:
+	///	<summary>
+	///		Default constructor.
+	///	</summary>
+	FieldUnion() :
+		type(Type::Unknown),
+		fieldvar(NULL)
+	{ }
+
+public:
+	///	<summary>
+	///		Type being stored.
+	///	</summary>
+	Type type;
+
+	///	<summary>
+	///		Scalar value.
+	///	</summary>
+	T scalar;
+
+	///	<summary>
+	///		Interfacial bounds.
+	///	</summary>
+	DataArray2D<T> bounds;
+
+	///	<summary>
+	///		Field.
+	///	</summary>
+	NcVar * fieldvar;
+
+	///	<summary>
+	///		Field data.
+	///	</summary>
+	DataArray1D<T> fielddata;
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -78,11 +133,11 @@ try {
 	// Variable name for surface pressure
 	std::string strPSVariableName;
 
-	// Reference pressure
-	double dReferencePressure;
+	// Variable name for reference pressure
+	std::string strHybridExpr;
 
-	// Scale factor
-	double dScaleFactor;
+	// Type of hybrid coordinate
+	std::string strHybridCoordType;
 
 	// Parse the command line
 	BeginCommandLine()
@@ -92,12 +147,13 @@ try {
 		CommandLineString(strVarOutName, "varout", "");
 		CommandLineString(strPreserveVarName, "preserve", "");
 		CommandLineString(strDimName, "dim", "lev");
-		CommandLineString(strPSVariableName, "psvarname", "PS");
-		CommandLineDouble(dReferencePressure, "psref", 1.0e5);
-		CommandLineDouble(dScaleFactor, "scale", 1.0);
+		CommandLineString(strHybridExpr, "hybridexpr", "a*p0+b*ps");
+		CommandLineStringD(strHybridCoordType, "hybridtype", "p", "[p|z]");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
+
+	AnnounceBanner();
 
 	// Validate arguments
 	if (strInputFiles.length() == 0) {
@@ -111,6 +167,9 @@ try {
 	}
 	if (strDimName.length() == 0) {
 		_EXCEPTIONT("No dimension name (--dim) specified");
+	}
+	if ((strHybridCoordType != "p") && (strHybridCoordType != "z")) {
+		_EXCEPTIONT("Hybrid coordinate type (--hytype) must be either \"p\" or \"z\"");
 	}
 
 	// Parse input file list (--in_data)
@@ -143,8 +202,15 @@ try {
 
 	STLStringHelper::ParseVariableList(strPreserveVarName, vecPreserveVariableStrings);
 
+	// Parse the hybrid expression
+	enum class HybridExprType {
+		ValuePlusDoubleProduct,
+		DoubleProductPlusDoubleProduct,
+	};
+
+	MathExpression exprHybridExpr(strHybridExpr);
+
 	// Begin processing
-	AnnounceBanner();
 	AnnounceStartBlock("Initializing output file");
 
 	// Open the output file
@@ -181,6 +247,110 @@ try {
 
 		AnnounceEndBlock("Done");
 	}
+
+	// TODO: Clean up mapExprInterfaces
+	AnnounceStartBlock("Loading interfacial variables");
+	std::vector< FieldUnion<double> > vecExprContents(exprHybridExpr.size());
+	for(size_t t = 0; t < exprHybridExpr.size(); t++) {
+		const MathExpression::Token & token = exprHybridExpr[t];
+		if (token.type == MathExpression::Token::Type::Variable) {
+			NcVar * var;
+
+			std::string strBnds = token.str + "_bnds";
+			std::string strHy = "hy" + token.str + "i";
+
+			size_t sFileIx = vecInputFileList.FindContainingVariable(token.str, &var);
+
+			// Interfacial variables need to be of the form $_bnds or hy$i
+			if (sFileIx != NcFileVector::InvalidIndex) {
+				if (var->num_dims() == 1) {
+					sFileIx = NcFileVector::InvalidIndex;
+				}
+				if ((var->num_dims() == 2) && (var->get_dim(1)->size() == 2)) {
+					sFileIx = NcFileVector::InvalidIndex;
+				}
+			}
+
+			if (sFileIx == NcFileVector::InvalidIndex) {
+				sFileIx = vecInputFileList.FindContainingVariable(strBnds, &var);
+			}
+
+			if (sFileIx == NcFileVector::InvalidIndex) {
+				sFileIx = vecInputFileList.FindContainingVariable(strHy, &var);
+			}
+
+			if (sFileIx == NcFileVector::InvalidIndex) {
+				_EXCEPTION3("Cannot file variables \"%s\" or \"%s\" in input files (or missing corresponding interfacial variables)",
+					token.str.c_str(), strBnds.c_str(), strHy.c_str());
+			}
+
+			_ASSERT(var != NULL);
+
+			// Constants
+			if (var->num_dims() == 0) {
+				Announce("%s (constant)", var->name());
+				double dValue;
+				var->get(&dValue, 1);
+
+				vecExprContents[t].type = FieldUnion<double>::Type::Scalar;
+				vecExprContents[t].scalar = dValue;
+
+			// Interfacial values (single array)
+			} else if (var->num_dims() == 1) {
+				Announce("%s (interfacial bounds)", var->name());
+
+				long lDimSize = var->get_dim(0)->size();
+				if (lDimSize < 2) {
+					_EXCEPTION2("Interfacial variable \"%s\" dimension \"%s\" must have size >= 2",
+						var->name(), var->get_dim(0)->name());
+				}
+
+				vecExprContents[t].type = FieldUnion<double>::Type::BoundsVector;
+				vecExprContents[t].bounds.Allocate(lDimSize-1, 2);
+
+				DataArray1D<double> data(lDimSize);
+				var->get(&(data[0]), lDimSize);
+				for (long l = 0; l < lDimSize-1; l++) {
+					vecExprContents[t].bounds(l,0) = data(l);
+					vecExprContents[t].bounds(l,1) = data(l+1);
+				}
+
+			// Interfacial values (bounds)
+			} else if ((var->num_dims() == 2) && (var->get_dim(1)->size() == 2)) {
+				Announce("%s (bounds)", var->name());
+
+				long lDimSize = var->get_dim(0)->size();
+				if (lDimSize < 1) {
+					_EXCEPTION2("Interfacial variable \"%s\" dimension \"%s\" must have size >= 1",
+						var->name(), var->get_dim(0)->name());
+				}
+
+				vecExprContents[t].type = FieldUnion<double>::Type::BoundsVector;
+				vecExprContents[t].bounds.Allocate(lDimSize, 2);
+
+				var->get(&(vecExprContents[t].bounds(0,0)), lDimSize, 2);
+
+				//for (int i = 0; i < (*parray).GetRows(); i++) {
+				//for (int j = 0; j < (*parray).GetColumns(); j++) {
+				//	printf("(%i %i) %1.15f\n", i, j, (*parray)(i,j));
+				//}
+				//}
+
+			// Fields
+			} else {
+				Announce("%s (field)", token.str.c_str());
+
+				vecExprContents[t].type = FieldUnion<double>::Type::Field;
+				vecExprContents[t].fieldvar = var;
+			}
+		}
+	}
+	AnnounceEndBlock("Done");
+/*
+	_EXCEPTION();
+
+	double dScaleFactor = 1.0;
+	double dReferencePressure = 1.0;
 
 	// Load hybrid coefficients (if present)
 	DataArray1D<double> dHYAI;
@@ -255,7 +425,7 @@ try {
 				strPSVariableName.c_str());
 		}
 	}
-
+*/
 	// Begin processing
 	AnnounceStartBlock("Processing");
 	_ASSERT(vecVariableStrings.size() == vecOutputVariableStrings.size());
@@ -294,13 +464,13 @@ try {
 				strDimName.c_str());
 		}
 		lIntegralDimSize = varIn->get_dim(lIntegralDimIx)->size();
-
+/*
 		if (dHYAI.GetRows()-1 != lIntegralDimSize) {
 			_EXCEPTION2("Integral dimension size (%li) must be one less than interface hybrid coefficient array size (%li)",
 				lIntegralDimSize,
 				dHYAI.GetRows());
 		}
-
+*/
 		// Get the number of auxiliary dimensions (dimensions preceding the integral dimension)
 		long lAuxSize = 1;
 		std::vector<long> vecAuxDimSize;
@@ -323,37 +493,56 @@ try {
 			}
 		}
 
-		// Verify PS auxiliary dimension count matches
-		_ASSERT(varPS != NULL);
-		if (varPS->num_dims() != varIn->num_dims()-1) {
-			_EXCEPTION4("Dimension mismatch: Variable \"%s\" has %li dimensions, but \"%s\" has %li dimensions (should be 1 less)",
-				vecVariableStrings[v].c_str(),
-				varIn->num_dims(),
-				strPSVariableName.c_str(),
-				varPS->num_dims());
-		}
-		for (long d = 0; d < vecAuxDimSize.size(); d++) {
-			if (varPS->get_dim(d)->size() != varIn->get_dim(d)->size()) {
-				_EXCEPTION6("Dimension mismatch: Variable \"%s\" dimension %li has size %li, but \"%s\" dimension %li has size %li",
-					vecVariableStrings[v].c_str(),
-					d,
-					varIn->get_dim(d)->size(),
-					strPSVariableName.c_str(),
-					d,
-					varPS->get_dim(d)->size());
+		// Verify auxiliary dimension count matches field variables
+		_ASSERT(exprHybridExpr.size() == vecExprContents.size());
+		for (int t = 0; t < vecExprContents.size(); t++) {
+
+			if (vecExprContents[t].type == FieldUnion<double>::Type::BoundsVector) {
+				if (vecExprContents[t].bounds.GetRows() != lIntegralDimSize) {
+					_EXCEPTION3("Mismatch in vertical bounds for variable \"%s\" (%lu != %lu)",
+						exprHybridExpr[t].str.c_str(),
+						vecExprContents[t].bounds.GetRows(),
+						lIntegralDimSize);
+				}
 			}
-		}
-		for (long d = 0; d < vecGridDimSize.size(); d++) {
-			long dPS = d + vecAuxDimSize.size();
-			long dIn = d + vecAuxDimSize.size() + 1;
-			if (varPS->get_dim(dPS)->size() != varIn->get_dim(dIn)->size()) {
-				_EXCEPTION6("Dimension mismatch: Variable \"%s\" dimension %li has size %li, but \"%s\" dimension %li has size %li",
+
+			if (vecExprContents[t].type != FieldUnion<double>::Type::Field) {
+				continue;
+			}
+
+			std::string strF = exprHybridExpr[t].str;
+			NcVar * varF = vecExprContents[t].fieldvar;
+
+			if (varF->num_dims() != varIn->num_dims()-1) {
+				_EXCEPTION4("Dimension mismatch: Variable \"%s\" has %li dimensions, but \"%s\" has %li dimensions (should be 1 less)",
 					vecVariableStrings[v].c_str(),
-					dIn,
-					varIn->get_dim(dIn)->size(),
-					strPSVariableName.c_str(),
-					dPS,
-					varPS->get_dim(dPS)->size());
+					varIn->num_dims(),
+					strF.c_str(),
+					varF->num_dims());
+			}
+			for (long d = 0; d < vecAuxDimSize.size(); d++) {
+				if (varF->get_dim(d)->size() != varIn->get_dim(d)->size()) {
+					_EXCEPTION6("Dimension mismatch: Variable \"%s\" dimension %li has size %li, but \"%s\" dimension %li has size %li",
+						vecVariableStrings[v].c_str(),
+						d,
+						varIn->get_dim(d)->size(),
+						strF.c_str(),
+						d,
+						varF->get_dim(d)->size());
+				}
+			}
+			for (long d = 0; d < vecGridDimSize.size(); d++) {
+				long dPS = d + vecAuxDimSize.size();
+				long dIn = d + vecAuxDimSize.size() + 1;
+				if (varF->get_dim(dPS)->size() != varIn->get_dim(dIn)->size()) {
+					_EXCEPTION6("Dimension mismatch: Variable \"%s\" dimension %li has size %li, but \"%s\" dimension %li has size %li",
+						vecVariableStrings[v].c_str(),
+						dIn,
+						varIn->get_dim(dIn)->size(),
+						strF.c_str(),
+						dPS,
+						varF->get_dim(dPS)->size());
+				}
 			}
 		}
 
@@ -393,9 +582,15 @@ try {
 		}
 
 		// Allocate data
-		DataArray1D<double> dDataPS(lGridSize);
 		DataArray1D<double> dDataVar(lGridSize);
 		DataArray1D<double> dDataOut(lGridSize);
+
+		for (int t = 0; t < vecExprContents.size(); t++) {
+			if (vecExprContents[t].type != FieldUnion<double>::Type::Field) {
+				continue;
+			}
+			vecExprContents[t].fielddata.Allocate(lGridSize);
+		}
 
 		// Loop through auxiliary dimensions
 		for (long lAux = 0; lAux < lAuxSize; lAux++) {
@@ -419,7 +614,7 @@ try {
 				char szPos[10];
 				std::string strPos;
 				for (long d = 0; d < vecAuxDimSize.size(); d++) {
-					sprintf(szPos, "%li", lPos[d]);
+					sprintf(szPos, "%s=%li", varIn->get_dim(d)->name(), lPos[d]);
 					strPos += szPos;
 					if (d != vecAuxDimSize.size()-1) {
 						strPos += ",";
@@ -430,21 +625,101 @@ try {
 					strPos.c_str());
 			}
 
-			// Load PS data
-			std::vector<long> lPosPS = lPos;
-			std::vector<long> lSizePS = lSize;
-			lPosPS.erase(lPosPS.begin() + lIntegralDimIx);
-			lSizePS.erase(lSizePS.begin() + lIntegralDimIx);
-			_ASSERT(lPosPS.size() == varPS->num_dims());
-			_ASSERT(lSizePS.size() == varPS->num_dims());
+			// Load field data
+			std::vector<long> lPosF = lPos;
+			std::vector<long> lSizeF = lSize;
+			lPosF.erase(lPosF.begin() + lIntegralDimIx);
+			lSizeF.erase(lSizeF.begin() + lIntegralDimIx);
 
-			varPS->set_cur(&(lPosPS[0]));
-			varPS->get(&(dDataPS[0]), &(lSizePS[0]));
+			for (int t = 0; t < vecExprContents.size(); t++) {
+				if (vecExprContents[t].type != FieldUnion<double>::Type::Field) {
+					continue;
+				}
+
+				_ASSERT(lPosF.size() == vecExprContents[t].fieldvar->num_dims());
+				_ASSERT(lSizeF.size() == vecExprContents[t].fieldvar->num_dims());
+
+				vecExprContents[t].fieldvar->set_cur(&(lPosF[0]));
+				vecExprContents[t].fieldvar->get(&(vecExprContents[t].fielddata[0]), &(lSizeF[0]));
+			}
 
 			// Loop through integral dimension
 			_ASSERT(lPos.size() > lIntegralDimIx);
 			_ASSERT(varIn->get_dim(lIntegralDimIx)->size() == lIntegralDimSize);
+
+			// "a*p0+b*ps" style hybrid expression
+			if ((exprHybridExpr.size() == 7) &&
+				(vecExprContents[0].type == FieldUnion<double>::Type::BoundsVector) &&
+				(exprHybridExpr[1].str == "*") &&
+				(vecExprContents[2].type == FieldUnion<double>::Type::Scalar) &&
+				(exprHybridExpr[3].str == "+") &&
+				(vecExprContents[4].type == FieldUnion<double>::Type::BoundsVector) &&
+				(exprHybridExpr[5].str == "*") &&
+				(vecExprContents[6].type == FieldUnion<double>::Type::Field)
+			) {
+				double dRefValue = vecExprContents[2].scalar;
+
+				for (long lLev = 0; lLev < lIntegralDimSize; lLev++) {
+
+					lPos[lIntegralDimIx] = lLev;
+					varIn->set_cur(&(lPos[0]));
+					varIn->get(&(dDataVar[0]), &(lSize[0]));
+
+					for (long lGrid = 0; lGrid < lGridSize; lGrid++) {
+						double dPl =
+							vecExprContents[0].bounds(lLev,0) * dRefValue
+							+ vecExprContents[4].bounds(lLev,0) * vecExprContents[6].fielddata(lGrid);
+
+						double dPu =
+							vecExprContents[0].bounds(lLev,1) * dRefValue
+							+ vecExprContents[4].bounds(lLev,1) * vecExprContents[6].fielddata(lGrid);
+
+						dDataOut[lGrid] += fabs(dPu - dPl) * dDataVar[lGrid];
+					}
+				}
+
+			// "ap+b*ps" style hybrid expression
+			} else if ((exprHybridExpr.size() == 5) &&
+				(vecExprContents[0].type == FieldUnion<double>::Type::BoundsVector) &&
+				(exprHybridExpr[1].str == "+") &&
+				(vecExprContents[2].type == FieldUnion<double>::Type::BoundsVector) &&
+				(exprHybridExpr[3].str == "*") &&
+				(vecExprContents[4].type == FieldUnion<double>::Type::Field)
+			) {
+
+				for (long lLev = 0; lLev < lIntegralDimSize; lLev++) {
+
+					lPos[lIntegralDimIx] = lLev;
+					varIn->set_cur(&(lPos[0]));
+					varIn->get(&(dDataVar[0]), &(lSize[0]));
+
+					for (long lGrid = 0; lGrid < lGridSize; lGrid++) {
+						double dPl =
+							vecExprContents[0].bounds(lLev,0)
+							+ vecExprContents[2].bounds(lLev,0) * vecExprContents[4].fielddata(lGrid);
+
+						double dPu =
+							vecExprContents[0].bounds(lLev,1)
+							+ vecExprContents[2].bounds(lLev,1) * vecExprContents[4].fielddata(lGrid);
+
+						dDataOut[lGrid] += fabs(dPu - dPl) * dDataVar[lGrid];
+					}
+				}
+
+			// Unknown expression
+			} else {
+				_EXCEPTION1("Unimplemented --hybridexpr \"%s\"", strHybridExpr.c_str());
+			}
+
+			// Rescale by -1/g
+			if (strHybridCoordType == "p") {
+				for (long lGrid = 0; lGrid < lGridSize; lGrid++) {
+					dDataOut[lGrid] *= 1.0 / EarthGravity;
+				}
+			}
+/*
 			for (long lLev = 0; lLev < lIntegralDimSize; lLev++) {
+
 				lPos[lIntegralDimIx] = lLev;
 				varIn->set_cur(&(lPos[0]));
 				varIn->get(&(dDataVar[0]), &(lSize[0]));
@@ -456,16 +731,10 @@ try {
 					dDataOut[lGrid] += (dPu - dPl) * dDataVar[lGrid];
 				}
 			}
-
-			if (dScaleFactor != 1.0) {
-				for (long lGrid = 0; lGrid < lGridSize; lGrid++) {
-					dDataOut[lGrid] *= dScaleFactor;
-				}
-			}
-
+*/
 			// Write output data
-			varOut->set_cur(&(lPosPS[0]));
-			varOut->put(&(dDataOut[0]), &(lSizePS[0]));
+			varOut->set_cur(&(lPosF[0]));
+			varOut->put(&(dDataOut[0]), &(lSizeF[0]));
 		}
 		AnnounceEndBlock("Done");
 	}
