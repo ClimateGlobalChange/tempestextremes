@@ -88,6 +88,16 @@ public:
 
 public:
 	///	<summary>
+	///		Generate connectivity information for a rectilinear grid.
+	///	</summary>
+	void GenerateRectilinearConnectivity(
+		int nLat,
+		int nLon,
+		bool fRegional,
+		bool fDiagonalConnectivity
+	);
+
+	///	<summary>
 	///		Generate the unstructured grid information for a
 	///		longitude-latitude grid.
 	///	</summary>

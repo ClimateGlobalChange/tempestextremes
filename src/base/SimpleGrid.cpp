@@ -62,6 +62,93 @@ bool SimpleGrid::IsInitialized() const {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void SimpleGrid::GenerateRectilinearConnectivity(
+	int nLat,
+	int nLon,
+	bool fRegional,
+	bool fDiagonalConnectivity
+) {
+	m_vecConnectivity.clear();
+	m_vecConnectivity.resize(nLon * nLat);
+
+	size_t ixs = 0;
+	for (int j = 0; j < nLat; j++) {
+	for (int i = 0; i < nLon; i++) {
+
+		// Connectivity in eight directions
+		if (fDiagonalConnectivity) {
+			if (fRegional) {
+				for (int ix = -1; ix <= 1; ix++) {
+				for (int jx = -1; jx <= 1; jx++) {
+					if ((ix == 0) && (jx == 0)) {
+						continue;
+					}
+
+					int inew = i + ix;
+					int jnew = j + jx;
+
+					if ((inew < 0) || (inew >= nLon)) {
+						continue;
+					}
+					if ((jnew < 0) || (jnew >= nLat)) {
+						continue;
+					}
+
+					m_vecConnectivity[ixs].push_back(jnew * nLon + inew);
+				}
+				}
+
+			} else {
+				for (int ix = -1; ix <= 1; ix++) {
+				for (int jx = -1; jx <= 1; jx++) {
+					if ((ix == 0) && (jx == 0)) {
+						continue;
+					}
+
+					int inew = i + ix;
+					int jnew = j + jx;
+
+					if ((jnew < 0) || (jnew >= nLat)) {
+						continue;
+					}
+					if (inew < 0) {
+						inew += nLon;
+					}
+					if (inew >= nLon) {
+						inew -= nLon;
+					}
+
+					m_vecConnectivity[ixs].push_back(jnew * nLon + inew);
+				}
+				}
+			}
+
+		// Connectivity in the four primary directions
+		} else {
+			if (j != 0) {
+				m_vecConnectivity[ixs].push_back((j-1) * nLon + i);
+			}
+			if (j != nLat-1) {
+				m_vecConnectivity[ixs].push_back((j+1) * nLon + i);
+			}
+
+			if ((!fRegional) ||
+			    ((i != 0) && (i != nLon-1))
+			) {
+				m_vecConnectivity[ixs].push_back(
+					j * nLon + ((i + 1) % nLon));
+				m_vecConnectivity[ixs].push_back(
+					j * nLon + ((i + nLon - 1) % nLon));
+			}
+		}
+
+		ixs++;
+	}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void SimpleGrid::GenerateLatitudeLongitude(
 	const DataArray1D<double> & vecLat,
 	const DataArray1D<double> & vecLon,
@@ -86,7 +173,6 @@ void SimpleGrid::GenerateLatitudeLongitude(
 	m_dLat.Allocate(nLon * nLat);
 	m_dLon.Allocate(nLon * nLat);
 	m_dArea.Allocate(nLon * nLat);
-	m_vecConnectivity.resize(nLon * nLat);
 
 	m_nGridDim.resize(2);
 	m_nGridDim[0] = nLat;
@@ -207,76 +293,12 @@ void SimpleGrid::GenerateLatitudeLongitude(
 			m_dArea[ixs] = 1.0;
 		}
 
-		// Connectivity in eight directions
-		if (fDiagonalConnectivity) {
-			if (fRegional) {
-				for (int ix = -1; ix <= 1; ix++) {
-				for (int jx = -1; jx <= 1; jx++) {
-					if ((ix == 0) && (jx == 0)) {
-						continue;
-					}
-
-					int inew = i + ix;
-					int jnew = j + jx;
-
-					if ((inew < 0) || (inew >= nLon)) {
-						continue;
-					}
-					if ((jnew < 0) || (jnew >= nLat)) {
-						continue;
-					}
-
-					m_vecConnectivity[ixs].push_back(jnew * nLon + inew);
-				}
-				}
-
-			} else {
-				for (int ix = -1; ix <= 1; ix++) {
-				for (int jx = -1; jx <= 1; jx++) {
-					if ((ix == 0) && (jx == 0)) {
-						continue;
-					}
-
-					int inew = i + ix;
-					int jnew = j + jx;
-
-					if ((jnew < 0) || (jnew >= nLat)) {
-						continue;
-					}
-					if (inew < 0) {
-						inew += nLon;
-					}
-					if (inew >= nLon) {
-						inew -= nLon;
-					}
-
-					m_vecConnectivity[ixs].push_back(jnew * nLon + inew);
-				}
-				}
-			}
-
-		// Connectivity in the four primary directions
-		} else {
-			if (j != 0) {
-				m_vecConnectivity[ixs].push_back((j-1) * nLon + i);
-			}
-			if (j != nLat-1) {
-				m_vecConnectivity[ixs].push_back((j+1) * nLon + i);
-			}
-
-			if ((!fRegional) ||
-			    ((i != 0) && (i != nLon-1))
-			) {
-				m_vecConnectivity[ixs].push_back(
-					j * nLon + ((i + 1) % nLon));
-				m_vecConnectivity[ixs].push_back(
-					j * nLon + ((i + nLon - 1) % nLon));
-			}
-		}
-
 		ixs++;
 	}
 	}
+
+	// Generate connectivity
+	GenerateRectilinearConnectivity(nLat, nLon, fRegional, fDiagonalConnectivity);
 
 	// Output total area
 	{
@@ -327,9 +349,15 @@ void SimpleGrid::GenerateLatitudeLongitude(
 		_EXCEPTION1("No variable %s found in input file",
 			STLStringHelper::ConcatenateStringVector(vecLatitudeNames, ", ").c_str());
 	}
-	if (dimLat == NULL) {
-		_EXCEPTION1("In NetCDF file variable \"%s\" must have dimension with same name",
-			vecLatitudeNames[sLatIx].c_str());
+	if ((varLat->num_dims() < 1) || (varLat->num_dims() > 2)) {
+		_EXCEPTION1("In NetCDF file latitude variable \"%s\" must have either one or two dimensions",
+			varLat->name());
+
+	} else if (varLat->num_dims() == 1) {
+		if (dimLat == NULL) {
+			_EXCEPTION1("In NetCDF file latitude variable \"%s\" must have dimension with same name",
+				varLat->name());
+		}
 	}
 
 	// Load longitude variable
@@ -353,36 +381,86 @@ void SimpleGrid::GenerateLatitudeLongitude(
 		_EXCEPTION1("No variable %s found in input file",
 			STLStringHelper::ConcatenateStringVector(vecLatitudeNames, ", ").c_str());
 	}
-	if (dimLon == NULL) {
-		_EXCEPTION1("In NetCDF file variable \"%s\" must have dimension with same name",
-			vecLongitudeNames[sLonIx].c_str());
+	if ((varLon->num_dims() < 1) || (varLon->num_dims() > 2)) {
+		_EXCEPTION1("In NetCDF file longitude variable \"%s\" must have either one or two dimensions",
+			varLon->name());
+
+	} else if (varLon->num_dims() == 1) {
+		if (dimLon == NULL) {
+			_EXCEPTION1("In NetCDF file longitude variable \"%s\" must have dimension with same name",
+				varLon->name());
+		}
 	}
 
-	// Load lat/lon data
-	int nLat = dimLat->size();
-	int nLon = dimLon->size();
-
-	DataArray1D<double> vecLat(nLat);
-	varLat->get(vecLat, nLat);
-
-	for (int j = 0; j < nLat; j++) {
-		vecLat[j] *= M_PI / 180.0;
+	if (varLat->num_dims() != varLon->num_dims()) {
+		_EXCEPTION2("Latitude variable \"%s\" and longitude variable \"%s\" must have same number of dimensions",
+			varLat->name(), varLon->name());
 	}
 
-	DataArray1D<double> vecLon(nLon);
-	varLon->get(vecLon, nLon);
+	// RLL mesh (lat and lon are vectors)
+	if (varLat->num_dims() == 1) {
 
-	for (int i = 0; i < nLon; i++) {
-		vecLon[i] *= M_PI / 180.0;
+		// Load lat/lon data
+		int nLat = dimLat->size();
+		int nLon = dimLon->size();
+
+		DataArray1D<double> vecLat(nLat);
+		varLat->get(vecLat, nLat);
+
+		for (int j = 0; j < nLat; j++) {
+			vecLat[j] *= M_PI / 180.0;
+		}
+
+		DataArray1D<double> vecLon(nLon);
+		varLon->get(vecLon, nLon);
+
+		for (int i = 0; i < nLon; i++) {
+			vecLon[i] *= M_PI / 180.0;
+		}
+
+		// Generate the SimpleGrid
+		GenerateLatitudeLongitude(
+			vecLat,
+			vecLon,
+			fRegional,
+			fDiagonalConnectivity,
+			true);                  // Verbosity enabled
 	}
 
-	// Generate the SimpleGrid
-	GenerateLatitudeLongitude(
-		vecLat,
-		vecLon,
-		fRegional,
-		fDiagonalConnectivity,
-		true);                  // Verbosity enabled
+	// Other rectilinear projection (lat and lon are arrays)
+	if (varLat->num_dims() == 2) {
+
+		long lY = varLat->get_dim(0)->size();
+		long lX = varLat->get_dim(1)->size();
+
+		m_nGridDim.resize(2);
+		m_nGridDim[0] = lY;
+		m_nGridDim[1] = lX;
+
+		if (lY != varLon->get_dim(0)->size()) {
+			_EXCEPTION4("Latitude variable \"%s\" and longitude variable \"%s\" have incompatible first dimension size (%li != %li)",
+				varLat->name(), varLat->get_dim(0)->size(),
+				varLon->name(), varLon->get_dim(0)->size());
+		}
+		if (lX != varLon->get_dim(1)->size()) {
+			_EXCEPTION4("Latitude variable \"%s\" and longitude variable \"%s\" have incompatible second dimension size (%li != %li)",
+				varLat->name(), varLat->get_dim(1)->size(),
+				varLon->name(), varLon->get_dim(1)->size());
+		}
+
+		m_dLon.Allocate(lX * lY);
+		m_dLat.Allocate(lX * lY);
+
+		varLat->get(m_dLat, lY, lX);
+		varLon->get(m_dLon, lY, lX);
+
+		for (size_t s = 0; s < m_dLon.GetRows(); s++) {
+			m_dLon[s] = DegToRad(m_dLon[s]);
+			m_dLat[s] = DegToRad(m_dLat[s]);
+		}
+ 
+		GenerateRectilinearConnectivity(lY, lX, fRegional, fDiagonalConnectivity);
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
