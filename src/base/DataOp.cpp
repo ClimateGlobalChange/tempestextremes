@@ -1129,10 +1129,14 @@ void GenerateEqualDistanceSpherePoints(
 		_EXCEPTIONT("Logic error");
 	}
 
-	// Cross product (magnitude automatically 
-	double dCrossX = dY0 * dZ1 - dZ0 * dY1;
-	double dCrossY = dZ0 * dX1 - dX0 * dZ1;
-	double dCrossZ = dX0 * dY1 - dY0 * dX1;
+	// Cross product to obtain northward vector (magnitude automatically set to 1)
+	double dCrossX = dZ0 * dY1 - dY0 * dZ1;
+	double dCrossY = dX0 * dZ1 - dZ0 * dX1;
+	double dCrossZ = dY0 * dX1 - dX0 * dY1;
+
+	if (fabs(dZ0) < 1.0 - 1.0e-12) {
+		_ASSERT(dCrossZ >= 0.0);
+	}
 
 	// Generate all points
 	for (int j = 0; j < nPoints; j++) {
@@ -2090,12 +2094,12 @@ void BuildGradOperator(
 			if (fabs(fabs(dZi[i]) - 1.0) > 1.0e-10) {
 				double dEmag = sqrt(dXi[i] * dXi[i] + dYi[i] * dYi[i]);
 
-				dEx = dYi[i] / dEmag;
-				dEy = - dXi[i] / dEmag;
+				dEx = - dYi[i] / dEmag;
+				dEy = dXi[i] / dEmag;
 				dEz = 0.0;
 
-				dNx = dEy * dZi[i];
-				dNy = - dEx * dZi[i];
+				dNx = - dEy * dZi[i];
+				dNy = dEx * dZi[i];
 				dNz = dEmag;
 
 			// At poles point
