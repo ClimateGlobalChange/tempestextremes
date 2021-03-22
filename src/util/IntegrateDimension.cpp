@@ -47,6 +47,7 @@ public:
 	enum class Type {
 		Unknown,
 		Scalar,
+		Vector,
 		BoundsVector,
 		Field2D,
 		Field3D
@@ -71,6 +72,11 @@ public:
 	///		Scalar value.
 	///	</summary>
 	T scalar;
+
+	///	<summary>
+	///		Vector levels.
+	///	</summary>
+	DataArray1D<T> vector;
 
 	///	<summary>
 	///		Interfacial bounds.
@@ -140,6 +146,9 @@ try {
 	// Type of hybrid coordinate
 	std::string strHybridCoordType;
 
+	// Interpolation level
+	std::string strInterpolateLev;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFiles, "in_data", "");
@@ -150,6 +159,7 @@ try {
 		CommandLineString(strDimName, "dim", "lev");
 		CommandLineString(strHybridExpr, "hybridexpr", "a*p0+b*ps");
 		CommandLineStringD(strHybridCoordType, "hybridtype", "p", "[p|z]");
+		CommandLineString(strInterpolateLev, "interplev", "");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -203,6 +213,19 @@ try {
 
 	STLStringHelper::ParseVariableList(strPreserveVarName, vecPreserveVariableStrings);
 
+	// Parse variable list (--interplev)
+	std::vector<std::string> vecInterpLevelsStr;
+	STLStringHelper::ParseVariableList(strInterpolateLev, vecInterpLevelsStr);
+
+	std::vector<double> vecInterpLevels(vecInterpLevelsStr.size());
+	for (int i = 0; i < vecInterpLevelsStr.size(); i++) {
+		if (!STLStringHelper::IsFloat(vecInterpLevelsStr[i])) {
+			_EXCEPTION1("Invalid value in --interplev \"%s\", expected float",
+				vecInterpLevelsStr[i].c_str());
+		}
+		vecInterpLevels[i] = std::stod(vecInterpLevelsStr[i]);
+	}
+
 	// Parse the hybrid expression
 	enum class HybridExprType {
 		ValuePlusDoubleProduct,
@@ -250,39 +273,50 @@ try {
 	}
 
 	// Build another array that stores the values of the hybrid coordinate array
-	AnnounceStartBlock("Loading interfacial variables");
+	AnnounceStartBlock("Loading vertical coordinate variables");
 	std::vector< FieldUnion<double> > vecExprContents(exprHybridExpr.size());
 	for(size_t t = 0; t < exprHybridExpr.size(); t++) {
 		const MathExpression::Token & token = exprHybridExpr[t];
 		if (token.type == MathExpression::Token::Type::Variable) {
 			NcVar * var;
 
-			std::string strBnds = token.str + "_bnds";
-			std::string strHy = "hy" + token.str + "i";
+			// Search for possible variables containing model level or interface information
+			std::vector<std::string> strCoordVariableNames;
 
-			size_t sFileIx = vecInputFileList.FindContainingVariable(token.str, &var);
+			if (vecInterpLevels.size() != 0) {
+				strCoordVariableNames.push_back(token.str);
+				strCoordVariableNames.push_back(std::string("hy") + token.str + "m");
+			} else {
+				strCoordVariableNames.push_back(token.str);
+				strCoordVariableNames.push_back(token.str + "_bnds");
+				strCoordVariableNames.push_back(std::string("hy") + token.str + "i");
+			}
 
-			// Interfacial variables need to be of the form $_bnds or hy$i
-			if (sFileIx != NcFileVector::InvalidIndex) {
-				if (var->num_dims() == 1) {
-					sFileIx = NcFileVector::InvalidIndex;
+			size_t sFileIx = NcFileVector::InvalidIndex;
+			for (int i = 0; i < strCoordVariableNames.size(); i++) {
+				sFileIx = vecInputFileList.FindContainingVariable(strCoordVariableNames[i], &var);
+
+				// Interfacial variables need to be of the form $_bnds or hy$i
+				if ((vecInterpLevels.size() == 0) && (i == 0)) {
+					if (sFileIx != NcFileVector::InvalidIndex) {
+						if (var->num_dims() == 1) {
+							sFileIx = NcFileVector::InvalidIndex;
+						}
+						if ((var->num_dims() == 2) && (var->get_dim(1)->size() == 2)) {
+							sFileIx = NcFileVector::InvalidIndex;
+						}
+					}
 				}
-				if ((var->num_dims() == 2) && (var->get_dim(1)->size() == 2)) {
-					sFileIx = NcFileVector::InvalidIndex;
+
+				if (sFileIx != NcFileVector::InvalidIndex) {
+					break;
 				}
 			}
 
 			if (sFileIx == NcFileVector::InvalidIndex) {
-				sFileIx = vecInputFileList.FindContainingVariable(strBnds, &var);
-			}
-
-			if (sFileIx == NcFileVector::InvalidIndex) {
-				sFileIx = vecInputFileList.FindContainingVariable(strHy, &var);
-			}
-
-			if (sFileIx == NcFileVector::InvalidIndex) {
-				_EXCEPTION3("Cannot file variables \"%s\" or \"%s\" in input files (or missing corresponding interfacial variables)",
-					token.str.c_str(), strBnds.c_str(), strHy.c_str());
+				std::string strConcat = STLStringHelper::ConcatenateStringVector(strCoordVariableNames, ",");
+				_EXCEPTION1("Cannot file variables \"%s\" in input files (or missing corresponding interfacial variables)",
+					strConcat.c_str());
 			}
 
 			_ASSERT(var != NULL);
@@ -296,13 +330,22 @@ try {
 				vecExprContents[t].type = FieldUnion<double>::Type::Scalar;
 				vecExprContents[t].scalar = dValue;
 
-			// Interfacial values (single array)
-			} else if (var->num_dims() == 1) {
+			// Vertical vector values (single array)
+			} else if ((var->num_dims() == 1) && (vecInterpLevels.size() != 0)) {
+				Announce("%s (1D vector)", var->name());
+
+				long lDimSize = var->get_dim(0)->size();
+				vecExprContents[t].type = FieldUnion<double>::Type::Vector;
+				vecExprContents[t].vector.Allocate(lDimSize);
+				var->get(&(vecExprContents[t].vector[0]), lDimSize);
+
+			// Vertical coordinate values (single array)
+			} else if ((var->num_dims() == 1) && (vecInterpLevels.size() == 0)) {
 				Announce("%s (1D bounds)", var->name());
 
 				long lDimSize = var->get_dim(0)->size();
 				if (lDimSize < 2) {
-					_EXCEPTION2("Interfacial variable \"%s\" dimension \"%s\" must have size >= 2",
+					_EXCEPTION2("Variable \"%s\" dimension \"%s\" must have size >= 2",
 						var->name(), var->get_dim(0)->name());
 				}
 
@@ -316,13 +359,18 @@ try {
 					vecExprContents[t].bounds(l,1) = data(l+1);
 				}
 
-			// Interfacial values (bounds)
+			// Vertical coordinate values (bounds)
 			} else if ((var->num_dims() == 2) && (var->get_dim(1)->size() == 2)) {
+				if (vecInterpLevels.size() != 0) {
+					_EXCEPTION1("2D bounds array variables \"%s\" can only be specified for vertical integration operations",
+						var->name());
+				}
+
 				Announce("%s (2D bounds)", var->name());
 
 				long lDimSize = var->get_dim(0)->size();
 				if (lDimSize < 1) {
-					_EXCEPTION2("Interfacial variable \"%s\" dimension \"%s\" must have size >= 1",
+					_EXCEPTION2("Variable \"%s\" dimension \"%s\" must have size >= 1",
 						var->name(), var->get_dim(0)->name());
 				}
 
@@ -331,20 +379,19 @@ try {
 
 				var->get(&(vecExprContents[t].bounds(0,0)), lDimSize, 2);
 
-				//for (int i = 0; i < (*parray).GetRows(); i++) {
-				//for (int j = 0; j < (*parray).GetColumns(); j++) {
-				//	printf("(%i %i) %1.15f\n", i, j, (*parray)(i,j));
-				//}
-				//}
-
-			// Interfacial values (bounds) in reverse order (why?)
+			// Vertical coordinate values (bounds) in reverse order (why?)
 			} else if ((var->num_dims() == 2) && (var->get_dim(0)->size() == 2)) {
+				if (vecInterpLevels.size() != 0) {
+					_EXCEPTION1("2D bounds array variables \"%s\" can only be specified for vertical integration operations",
+						var->name());
+				}
+
 				Announce("%s (2D bounds)", var->name());
 				Announce("WARNING: \"bnds\" dimension appears first. This may indicate something is incorrect with your vertical level array ordering");
 
 				long lDimSize = var->get_dim(1)->size();
 				if (lDimSize < 1) {
-					_EXCEPTION2("Interfacial variable \"%s\" dimension \"%s\" must have size >= 1",
+					_EXCEPTION2("Variable \"%s\" dimension \"%s\" must have size >= 1",
 						var->name(), var->get_dim(0)->name());
 				}
 
@@ -381,86 +428,7 @@ try {
 		}
 	}
 	AnnounceEndBlock("Done");
-/*
-	_EXCEPTION();
 
-	double dScaleFactor = 1.0;
-	double dReferencePressure = 1.0;
-
-	// Load hybrid coefficients (if present)
-	DataArray1D<double> dHYAI;
-	DataArray1D<double> dHYBI;
-
-	{
-		// Load in hybrid coefficients
-		NcVar * varHYAI;
-		NcVar * varHYBI;
-
-		size_t sFileIx = vecInputFileList.FindContainingVariable("hyai", &varHYAI);
-		if (varHYAI != NULL) {
-			NcFile * ncinfile = vecInputFileList[sFileIx];
-			_ASSERT(ncinfile != NULL);
-
-			varHYBI = ncinfile->get_var("hybi");
-			if (varHYBI == NULL) {
-				Announce("WARNING: File \"%s\" contains variable \"hyai\" but not \"hybi\"; unable to load hybrid coefficients",
-					vecInputFileList.GetFilename(sFileIx).c_str());
-			} else if (varHYAI->num_dims() != 1) {
-				Announce("WARNING: File \"%s\" variable \"hyai\" has more than one dimension; unable to load hybrid coefficients",
-					vecInputFileList.GetFilename(sFileIx).c_str());
-			} else if (varHYBI->num_dims() != 1) {
-				Announce("WARNING: File \"%s\" variable \"hybi\" has more than one dimension; unable to load hybrid coefficients",
-					vecInputFileList.GetFilename(sFileIx).c_str());
-			} else if (varHYAI->get_dim(0)->size() < 2) {
-				Announce("WARNING: File \"%s\" variable \"hyai\" must have size greater than 1; unable to load hybrid coefficients",
-					vecInputFileList.GetFilename(sFileIx).c_str());
-			} else if (varHYAI->get_dim(0)->size() != varHYBI->get_dim(0)->size()) {
-				Announce("WARNING: File \"%s\" variable \"hyai\" has size %li but \"hybi\" has size %li; unable to load hybrid coefficients",
-					vecInputFileList.GetFilename(sFileIx).c_str(),
-					varHYAI->get_dim(0)->size(),
-					varHYBI->get_dim(0)->size());
-			} else {
-				dHYAI.Allocate(varHYAI->get_dim(0)->size());
-				dHYBI.Allocate(varHYBI->get_dim(0)->size());
-
-				varHYAI->set_cur((long)0);
-				varHYAI->get(&(dHYAI[0]), (long)dHYAI.GetRows());
-				varHYBI->set_cur((long)0);
-				varHYBI->get(&(dHYBI[0]), (long)dHYBI.GetRows());
-			}
-
-			// Verify monotonicity of hybrid pressure coefficients
-			// dSign indicates direction of coordinate (-1.0 = low to high)
-			double dFirstSign = ((dHYAI[1] + dHYBI[1]) > (dHYAI[0] + dHYBI[0]))?(-1.0):(+1.0);
-			for (size_t i = 0; i < dHYAI.GetRows()-1; i++) {
-				double dThisSign = ((dHYAI[i+1] + dHYBI[i+1]) > (dHYAI[i] + dHYBI[i]))?(-1.0):(+1.0);
-				if (dFirstSign != dThisSign) {
-					Announce("WARNING: File \"%s\" variable \"hyai\" and \"hybi\" are non-monotone; unable to load hybrid coefficients",
-						vecInputFileList.GetFilename(sFileIx).c_str());
-				}
-			}
-
-			// Change the scale factor to reflect if data is top -> bottom so
-			// integral is always from the surface to top of atmosphere.
-			dScaleFactor *= dFirstSign;
-		}
-	}
-
-	_ASSERT(dHYAI.GetRows() == dHYBI.GetRows());
-	if (dHYAI.GetRows() == 0) {
-		_EXCEPTIONT("NOT IMPLEMENTED: Currently this executable is only for computing integrals over hybrid coordinates");
-	}
-
-	// Load PS variable
-	NcVar * varPS;
-	{
-		size_t sFileIx = vecInputFileList.FindContainingVariable(strPSVariableName, &varPS);
-		if (varPS == NULL) {
-			_EXCEPTION1("Variable \"%s\" not found among data files",
-				strPSVariableName.c_str());
-		}
-	}
-*/
 	// Begin processing
 	AnnounceStartBlock("Processing");
 	_ASSERT(vecVariableStrings.size() == vecOutputVariableStrings.size());
@@ -499,13 +467,7 @@ try {
 				strDimName.c_str());
 		}
 		lIntegralDimSize = varIn->get_dim(lIntegralDimIx)->size();
-/*
-		if (dHYAI.GetRows()-1 != lIntegralDimSize) {
-			_EXCEPTION2("Integral dimension size (%li) must be one less than interface hybrid coefficient array size (%li)",
-				lIntegralDimSize,
-				dHYAI.GetRows());
-		}
-*/
+
 		// Get the number of auxiliary dimensions (dimensions preceding the integral dimension)
 		long lAuxSize = 1;
 		std::vector<long> vecAuxDimSize;
@@ -584,24 +546,71 @@ try {
 		// Copy dimensions
 		std::vector<NcDim *> vecDimOut;
 		for (long d = 0; d < varIn->num_dims(); d++) {
-			if (d == lIntegralDimIx) {
-				continue;
-			}
 			NcDim * dimIn = varIn->get_dim(d);
-			NcDim * dimOut = ncoutfile.get_dim(dimIn->name());
-			if (dimOut != NULL) {
-				if (dimOut->size() != dimIn->size()) {
-					_EXCEPTION3("Dimension \"%s\" has incompatible size in input (%li) and output (%li)",
-						dimIn->name(), dimIn->size(), dimOut->size());
+
+			// Integral / interpolated dimension
+			if (d == lIntegralDimIx) {
+				if (vecInterpLevels.size() != 0) {
+					std::string strInterpDimName;
+					if (strHybridCoordType == "p") {
+						strInterpDimName = "plev";
+					} else if (strHybridCoordType == "z") {
+						strInterpDimName = "zlev";
+					} else {
+						_EXCEPTION();
+					}
+					NcDim * dimOut = ncoutfile.get_dim(strInterpDimName.c_str());
+					if (dimOut == NULL) {
+						dimOut = ncoutfile.add_dim(strInterpDimName.c_str(), vecInterpLevels.size());
+						if (dimOut == NULL) {
+							_EXCEPTION1("Error creating dimension \"%s\" in output file",
+								strInterpDimName.c_str());
+						}
+						NcVar * varOut = ncoutfile.add_var(strInterpDimName.c_str(), ncDouble, dimOut);
+						if (varOut == NULL) {
+							_EXCEPTION1("Error creating dimension variable \"%s\" in output file",
+								strInterpDimName.c_str());
+						}
+						varOut->set_cur((long)0);
+						varOut->put(&(vecInterpLevels[0]), vecInterpLevels.size());
+
+						if (strHybridCoordType == "p") {
+							varOut->add_att("axis","Z");
+							varOut->add_att("standard_name","pressure");
+							varOut->add_att("long_name","pressure");
+						} else if (strHybridCoordType == "z") {
+							varOut->add_att("axis","Z");
+							varOut->add_att("standard_name","altitude");
+							varOut->add_att("long_name","altitude");
+						} else {
+							_EXCEPTION();
+						}
+
+					} else if (dimOut->size() != vecInterpLevels.size()) {
+						_EXCEPTION3("Dimension \"%s\" already in output has size (%li), but size (%lu) expected",
+							dimIn->name(), dimOut->size(), vecInterpLevels.size());
+					}
+					vecDimOut.push_back(dimOut);
 				}
+
+			// Non-integral / non-interpolated dimension
 			} else {
-				dimOut = ncoutfile.add_dim(dimIn->name(), dimIn->size());
-				if (dimOut == NULL) {
-					_EXCEPTION1("Unable to create dimension \"%s\" in output file",
-						dimIn->name());
+
+				NcDim * dimOut = ncoutfile.get_dim(dimIn->name());
+				if (dimOut != NULL) {
+					if (dimOut->size() != dimIn->size()) {
+						_EXCEPTION3("Dimension \"%s\" has incompatible size in input (%li) and output (%li)",
+							dimIn->name(), dimIn->size(), dimOut->size());
+					}
+				} else {
+					dimOut = ncoutfile.add_dim(dimIn->name(), dimIn->size());
+					if (dimOut == NULL) {
+						_EXCEPTION1("Unable to create dimension \"%s\" in output file",
+							dimIn->name());
+					}
 				}
+				vecDimOut.push_back(dimOut);
 			}
-			vecDimOut.push_back(dimOut);
 		}
 
 		// Create output variable
@@ -618,7 +627,12 @@ try {
 
 		// Allocate data
 		DataArray1D<double> dDataVar(lGridSize);
-		DataArray1D<double> dDataOut(lGridSize);
+
+		long lDataOutputSize = lGridSize;
+		if (vecInterpLevels.size() != 0) {
+			lDataOutputSize *= static_cast<long>(vecInterpLevels.size());
+		}
+		DataArray1D<double> dDataOut(lDataOutputSize);
 
 		for (int t = 0; t < vecExprContents.size(); t++) {
 			if (vecExprContents[t].type != FieldUnion<double>::Type::Field2D) {
@@ -627,10 +641,31 @@ try {
 			vecExprContents[t].fielddata.Allocate(lGridSize);
 		}
 
+		// Handle FillValue
+		// TODO: Handle float and double output data
+		double dFillValue = 1.0e20;
+		float flFillValue = 1.0e20f;
+		NcAtt * attFillValueIn = varIn->get_att("_FillValue");
+		if (attFillValueIn != NULL) {
+			flFillValue = attFillValueIn->as_float(0);
+			dFillValue = static_cast<double>(flFillValue);
+		}
+
+		NcBool fFillVallueAttSuccess = varOut->add_att("_FillValue", flFillValue);
+		if (!fFillVallueAttSuccess) {
+			_EXCEPTION1("Error creating attribute \"_FillValue\" for variable \"%s\"", varOut->name());
+		}
+
 		// Loop through auxiliary dimensions
 		for (long lAux = 0; lAux < lAuxSize; lAux++) {
 
-			dDataOut.Zero();
+			if (vecInterpLevels.size() != 0) {
+				for (long lGrid = 0; lGrid < dDataOut.GetRows(); lGrid++) {
+					dDataOut[lGrid] = dFillValue;
+				}
+			} else {
+				dDataOut.Zero();
+			}
 
 			// Get the data index
 			std::vector<long> lPos(varIn->num_dims(), 0);
@@ -663,6 +698,7 @@ try {
 			// Load 2D field data
 			std::vector<long> lPosF = lPos;
 			std::vector<long> lSizeF = lSize;
+
 			lPosF.erase(lPosF.begin() + lIntegralDimIx);
 			lSizeF.erase(lSizeF.begin() + lIntegralDimIx);
 
@@ -678,12 +714,13 @@ try {
 				vecExprContents[t].fieldvar->get(&(vecExprContents[t].fielddata[0]), &(lSizeF[0]));
 			}
 
-			// Loop through integral dimension
+			// Loop through integral / interpolated dimension
 			_ASSERT(lPos.size() > lIntegralDimIx);
 			_ASSERT(varIn->get_dim(lIntegralDimIx)->size() == lIntegralDimSize);
 
-			// "a*p0+b*ps" style hybrid expression
-			if ((exprHybridExpr.size() == 7) &&
+			// "a*p0+b*ps" style hybrid expression (integration)
+			if ((vecInterpLevels.size() == 0) &&
+				(exprHybridExpr.size() == 7) &&
 				(vecExprContents[0].type == FieldUnion<double>::Type::BoundsVector) &&
 				(exprHybridExpr[1].str == "*") &&
 				(vecExprContents[2].type == FieldUnion<double>::Type::Scalar) &&
@@ -713,8 +750,96 @@ try {
 					}
 				}
 
-			// "ap+b*ps" style hybrid expression
-			} else if ((exprHybridExpr.size() == 5) &&
+			// "a*p0+b*ps" style hybrid expression (interpolation)
+			} else if ((vecInterpLevels.size() != 0) &&
+				(exprHybridExpr.size() == 7) &&
+				(vecExprContents[0].type == FieldUnion<double>::Type::Vector) &&
+				(exprHybridExpr[1].str == "*") &&
+				(vecExprContents[2].type == FieldUnion<double>::Type::Scalar) &&
+				(exprHybridExpr[3].str == "+") &&
+				(vecExprContents[4].type == FieldUnion<double>::Type::Vector) &&
+				(exprHybridExpr[5].str == "*") &&
+				(vecExprContents[6].type == FieldUnion<double>::Type::Field2D)
+			) {
+				double dRefValue = vecExprContents[2].scalar;
+
+				_ASSERT(vecExprContents[0].vector.GetRows() == lIntegralDimSize);
+				_ASSERT(vecExprContents[4].vector.GetRows() == lIntegralDimSize);
+
+				// TODO: Different treatments of level out of range
+				if (lIntegralDimSize == 1) {
+					//lPos[lIntegralDimIx] = 0;
+					//varIn->set_cur(&(lPos[0]));
+					//varIn->get(&(dDataOut[0]), &(lSize[0]));
+				}
+
+				// Loop through all levels of the input data array
+				for (long lLev = 0; lLev < lIntegralDimSize; lLev++) {
+					bool fDataLoaded = false;
+
+					// Loop through all grid points
+					for (long lGrid = 0; lGrid < lGridSize; lGrid++) {
+
+						double dPC =
+							vecExprContents[0].vector(lLev) * dRefValue
+							+ vecExprContents[4].vector(lLev) * vecExprContents[6].fielddata(lGrid);
+
+						double dPP = dPC;
+						if (lLev != 0) {
+							dPP =
+								vecExprContents[0].vector(lLev-1) * dRefValue
+								+ vecExprContents[4].vector(lLev-1) * vecExprContents[6].fielddata(lGrid);
+						}
+						double dPN = dPC;
+						if (lLev != lIntegralDimSize-1) {
+							dPN =
+								vecExprContents[0].vector(lLev+1) * dRefValue
+								+ vecExprContents[4].vector(lLev+1) * vecExprContents[6].fielddata(lGrid);
+						}
+
+						// Loop through all interpolated values
+						for (size_t sInterpLev = 0; sInterpLev < vecInterpLevels.size(); sInterpLev++) {
+							double dAlpha = -1.0;
+							double dPi = vecInterpLevels[sInterpLev];
+
+							if ((dPC > dPP) && (dPi >= dPP) && (dPi <= dPC)) {
+								dAlpha = (dPi - dPP) / (dPC - dPP);
+							} else if ((dPC < dPP) && (dPi >= dPC) && (dPi <= dPP)) {
+								dAlpha = (dPi - dPP) / (dPC - dPP);
+							} else if ((dPN > dPC) && (dPi >= dPC) && (dPi <= dPN)) {
+								dAlpha = (dPi - dPN) / (dPC - dPN);
+							} else if ((dPN < dPC) && (dPi >= dPN) && (dPi <= dPC)) {
+								dAlpha = (dPi - dPN) / (dPC - dPN);
+							}
+
+							if ((dAlpha != -1.0) && ((dAlpha < 0.0) || (dAlpha > 1.0))) {
+								_EXCEPTION();
+							}
+							//if ((lGrid == 0) && (dAlpha != -1.0)) {
+							//	printf("%li %1.15f\n", lLev, dAlpha);
+							//}
+
+							if (dAlpha >= 0.0) {
+								size_t sDataOutIx = sInterpLev * static_cast<size_t>(lGridSize) + static_cast<size_t>(lGrid);
+								if (!fDataLoaded) {
+									lPos[lIntegralDimIx] = lLev;
+									varIn->set_cur(&(lPos[0]));
+									varIn->get(&(dDataVar[0]), &(lSize[0]));
+
+									fDataLoaded = true;
+								}
+								if (dDataOut[sDataOutIx] == dFillValue) {
+									dDataOut[sDataOutIx] = 0.0;
+								}
+								dDataOut[sDataOutIx] += dAlpha * dDataVar[lGrid];
+							}
+						}
+					}
+				}
+
+			// "ap+b*ps" style hybrid expression (integration)
+			} else if ((vecInterpLevels.size() != 0) &&
+				(exprHybridExpr.size() == 5) &&
 				(vecExprContents[0].type == FieldUnion<double>::Type::BoundsVector) &&
 				(exprHybridExpr[1].str == "+") &&
 				(vecExprContents[2].type == FieldUnion<double>::Type::BoundsVector) &&
@@ -746,8 +871,9 @@ try {
 				}
 
 			// "p3" style hybrid expression
-			} else if ((exprHybridExpr.size() == 1) &&
-				(vecExprContents[4].type == FieldUnion<double>::Type::Field3D)
+			} else if ((vecInterpLevels.size() != 0) &&
+				(exprHybridExpr.size() == 1) &&
+				(vecExprContents[0].type == FieldUnion<double>::Type::Field3D)
 			) {
 				NcVar * varF = vecExprContents[0].fieldvar;
 
@@ -818,30 +944,28 @@ try {
 				_EXCEPTION1("Unimplemented --hybridexpr \"%s\"", strHybridExpr.c_str());
 			}
 
-			// Rescale by -1/g
-			if (strHybridCoordType == "p") {
-				for (long lGrid = 0; lGrid < lGridSize; lGrid++) {
-					dDataOut[lGrid] *= 1.0 / EarthGravity;
+			// Write output data (integrated)
+			if (vecInterpLevels.size() == 0) {
+				// Rescale by -1/g
+				if (strHybridCoordType == "p") {
+					for (long lGrid = 0; lGrid < lGridSize; lGrid++) {
+						dDataOut[lGrid] *= 1.0 / EarthGravity;
+					}
 				}
+				varOut->set_cur(&(lPosF[0]));
+				varOut->put(&(dDataOut[0]), &(lSizeF[0]));
+
+			// Write output data (interpolated)
+			} else {
+				std::vector<long> lPosI = lPos;
+				std::vector<long> lSizeI = lSize;
+
+				lPosI[lIntegralDimIx] = 0;
+				lSizeI[lIntegralDimIx] = vecInterpLevels.size();
+
+				varOut->set_cur(&(lPosI[0]));
+				varOut->put(&(dDataOut[0]), &(lSizeI[0]));
 			}
-/*
-			for (long lLev = 0; lLev < lIntegralDimSize; lLev++) {
-
-				lPos[lIntegralDimIx] = lLev;
-				varIn->set_cur(&(lPos[0]));
-				varIn->get(&(dDataVar[0]), &(lSize[0]));
-
-				for (long lGrid = 0; lGrid < lGridSize; lGrid++) {
-					double dPl = dHYAI[lLev] * dReferencePressure + dHYBI[lLev] * dDataPS[lGrid];
-					double dPu = dHYAI[lLev+1] * dReferencePressure + dHYBI[lLev+1] * dDataPS[lGrid];
-
-					dDataOut[lGrid] += (dPu - dPl) * dDataVar[lGrid];
-				}
-			}
-*/
-			// Write output data
-			varOut->set_cur(&(lPosF[0]));
-			varOut->put(&(dDataOut[0]), &(lSizeF[0]));
 		}
 		AnnounceEndBlock("Done");
 	}
