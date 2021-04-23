@@ -55,7 +55,8 @@ public:
 		FileType_Standard = 0,
 		FileType_NoTimeDim,
 		FileType_NoTimeVar,
-		FileType_DailyMeanClimo
+		FileType_DailyMeanClimo,
+		FileType_AnnualMeanClimo
 	};
 
 private:

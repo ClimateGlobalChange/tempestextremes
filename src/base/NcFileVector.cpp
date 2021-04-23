@@ -88,6 +88,8 @@ void NcFileVector::InsertFile(
 					std::string strType = attType->as_string(0);
 					if (strType == "daily mean climatology") {
 						m_vecFileType.push_back(FileType_DailyMeanClimo);
+					} else if (strType == "annual mean climatology") {
+						m_vecFileType.push_back(FileType_AnnualMeanClimo);
 					} else {
 						m_vecFileType.push_back(FileType_Standard);
 						//_EXCEPTION2("Unrecognized time::type (%s) in file \"%s\"",
@@ -200,6 +202,12 @@ long NcFileVector::GetTimeIx(size_t pos) const {
 					return t;
 				}
 			}
+
+		} else if (m_vecFileType[pos] == NcFileVector::FileType_AnnualMeanClimo) {
+			if (vecTimes.size() != 1) {
+				_EXCEPTIONT("Only one time expected in annual mean climatology");
+			}
+			return 0;
 		}
 	}
 	_EXCEPTION2("Unable to identify time \"%s\" in \"%s\"",
