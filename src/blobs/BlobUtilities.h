@@ -322,7 +322,7 @@ public:
 		Type dWidthA = boxA.width();
 		Type dWidthB = boxB.width();
 
-		if ((dWidthA < dWidthNow) || (dWidthB < dWidthNow)) {
+		if ((dWidthA - dWidthNow < -1.0e-14) || (dWidthB - dWidthNow < -1.0e-14)) {
 			_EXCEPTIONT("Logic error");
 		}
 
