@@ -275,9 +275,11 @@ void CopyNcVar(
 					"output file dimension (UNLIMITED / %i)",
 					dimA->name(), dimOut[d]->size());
 			} else if (!dimA->is_unlimited() && dimOut[d]->is_unlimited()) {
-				_EXCEPTION2("Mismatch between input file dimension \"%s\" and "
-					"output file dimension (%i / UNLIMITED)",
-					dimA->name(), dimA->size());
+				if (std::string(dimA->name()) != std::string("time")) {
+					_EXCEPTION2("Mismatch between input file dimension \"%s\" and "
+						"output file dimension (%i / UNLIMITED)",
+						dimA->name(), dimA->size());
+				}
 			} else if (!dimA->is_unlimited() && !dimOut[d]->is_unlimited()) {
 				_EXCEPTION3("Mismatch between input file dimension \"%s\" and "
 					"output file dimension (%i / %i)",
@@ -696,8 +698,8 @@ void WriteCFTimeDataToNcFile(
 		}
 	} else {
 		if (dimTime->size() != vecTimes.size()) {
-			_EXCEPTION1("File \"%s\" already contains dimension \"time\" with unexpected size",
-				strFilename.c_str());
+			_EXCEPTION3("File \"%s\" already contains dimension \"time\" with unexpected size (%li != %li)",
+				strFilename.c_str(), dimTime->size(), vecTimes.size());
 		}
 	}
 

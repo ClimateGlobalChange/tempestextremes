@@ -14,11 +14,9 @@
 ///		or implied warranty.
 ///	</remarks>
 
-/*
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
 #endif
-*/
 
 #include "CommandLine.h"
 #include "Exception.h"
@@ -34,6 +32,7 @@
 #include "SimpleGridUtilities.h"
 #include "GridElements.h"
 #include "FilenameList.h"
+#include "TimeMatch.h"
 
 #include "netcdfcpp.h"
 
@@ -569,27 +568,590 @@ void BuildMask_NearbyBlobs(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-int main(int argc, char** argv) {
+void NodeFileFilter(
+	const std::string & strInputFile,
+	const std::string & strOutputFile,
+	VariableRegistry & varreg,
+	SimpleGrid & grid,
+	NodeFile & nodefile,
+	const Time::CalendarType & caltype,
+	ColumnDataHeader & cdhInput,
+	const std::vector<std::string> & vecVarNames,
+	const std::vector<VariableIndex> & vecVarIx,
+	const std::string & strMaskVariable,
+	const std::string & strFilterByDist,
+	const std::vector<ClosedContourOp> & vecClosedContourOp,
+	const std::vector<NearbyBlobsOp> & vecNearbyBlobsOp,
+	bool fInvert,
+	const std::vector<std::string> & vecPreserveVariables,
+	const std::string & strFillValueIn,
+	const std::string & strTimeFilterIn,
+	const std::string & strLatitudeName,
+	const std::string & strLongitudeName
+) {
+	// Begin processing
+	AnnounceStartBlock("Processing input (%s)", strInputFile.c_str());
+
+	// Parse fillvalue
+	std::string strFillValue = strFillValueIn;
+	bool fHasFillValue = false;
+	float dFillValue = 0.0;
+	if (strFillValue != "") {
+		fHasFillValue = true;
+		STLStringHelper::ToLower(strFillValue);
+		if (strFillValue == "att") {
+		} else if (strFillValue == "nan") {
+			dFillValue = nanf(NULL);
+		} else if (STLStringHelper::IsFloat(strFillValue)) {
+			dFillValue = std::stod(strFillValue);
+		} else {
+			_EXCEPTIONT("Invalid value specified for --fillvalue");
+		}
+	}
+
+	// Parse --timefilter
+	std::string strTimeFilter = strTimeFilterIn;
+#ifdef TEMPEST_NOREGEX
+	if (strTimeFilter != "") {
+		_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
+	}
+#endif
+#ifndef TEMPEST_NOREGEX
+	std::regex reTimeSubset;
+	if (strTimeFilter != "") {
+
+		// Test regex support
+		TestRegex();
+
+		if (strTimeFilter == "3hr") {
+			strTimeFilter = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
+		}
+		if (strTimeFilter == "6hr") {
+			strTimeFilter = "....-..-.. (00|06|12|18):00:00";
+		}
+		if (strTimeFilter == "daily") {
+			strTimeFilter = "....-..-.. 00:00:00";
+		}
+
+		try {
+			reTimeSubset.assign(strTimeFilter);
+		} catch(std::regex_error & reerr) {
+			_EXCEPTION2("Parse error in --timefilter regular expression \"%s\" (code %i)",
+				strTimeFilter.c_str(), reerr.code());
+		}
+	}
+#endif
+
+	// Open input file
+	NcFileVector vecInFiles;
+	vecInFiles.ParseFromString(strInputFile);
+	_ASSERT(vecInFiles.size() > 0);
+
+	NcFile & ncinfile = *(vecInFiles[0]);
+	//if (!ncinfile.is_valid()) {
+	//	_EXCEPTIONT("Unable to open input datafile");
+	//}
+
+	// Get time variable and verify calendar is compatible
+	NcVar * varTime = ncinfile.get_var("time");
+	if (varTime == NULL) {
+		_EXCEPTION1("Missing \"time\" variable in datafile \"%s\"",
+			strInputFile.c_str());
+	}
+
+	NcAtt * attCalendar = varTime->get_att("calendar");
+	if (attCalendar == NULL) {
+		_EXCEPTION1("Missing \"calendar\" metadata in datafile \"%s\"",
+			strInputFile.c_str());
+	}
+
+	Time::CalendarType caltypeThis =
+		Time::CalendarTypeFromString(attCalendar->as_string(0));
+	if (caltype != caltypeThis) {
+		_EXCEPTION1("\"calendar\" mismatch in datafile \"%s\" ",
+			strInputFile.c_str());
+	}
+
+	// Load in vector of Times
+	NcTimeDimension vecTimes;
+	ReadCFTimeDataFromNcFile(&ncinfile, strInputFile, vecTimes, true);
+
+	// Open output file
+	NcFile ncoutfile(strOutputFile.c_str(), NcFile::Replace);
+	if (!ncoutfile.is_valid()) {
+		_EXCEPTION1("Unable to open output datafile \"%s\"",
+			strOutputFile.c_str());
+	}
+
+	// Copy metadata
+	CopyNcFileAttributes(&ncinfile, &ncoutfile);
+
+	// Construct time vector and output
+	NcTimeDimension vecTimesOut;
+
+#ifndef TEMPEST_NOREGEX
+	if (strTimeFilter != "") {
+		vecTimesOut.m_nctype = vecTimes.m_nctype;
+		vecTimesOut.m_units = vecTimes.m_units;
+		vecTimesOut.m_dimtype = vecTimes.m_dimtype;
+		for (long t = 0; t < vecTimes.size(); t++) {
+			std::string strTime = vecTimes[t].ToString();
+			std::smatch match;
+			if (!std::regex_search(strTime, match, reTimeSubset)) {
+				continue;
+			}
+			vecTimesOut.push_back(vecTimes[t]);
+		}
+	} else {
+		vecTimesOut = vecTimes;
+	}
+#endif
+#ifdef TEMPEST_NOREGEX
+	vecTimesOut = vecTimes;
+#endif
+
+	WriteCFTimeDataToNcFile(
+		&ncoutfile,
+		strOutputFile,
+		vecTimesOut);
+
+	NcDim * dimTimeOut = ncoutfile.get_dim("time");
+	if (dimTimeOut == NULL) {
+		_EXCEPTION1("Error writing \"time\" dimension to file \"%s\"",
+			strOutputFile.c_str());
+	}
+
+	// Copy latitude and/or longitude
+	CopyNcVarIfExists(ncinfile, ncoutfile, "lat");
+	CopyNcVarIfExists(ncinfile, ncoutfile, "latitude");
+	CopyNcVarIfExists(ncinfile, ncoutfile, "LAT");
+	CopyNcVarIfExists(ncinfile, ncoutfile, "lat_0");
+
+	CopyNcVarIfExists(ncinfile, ncoutfile, "lon");
+	CopyNcVarIfExists(ncinfile, ncoutfile, "longitude");
+	CopyNcVarIfExists(ncinfile, ncoutfile, "LON");
+	CopyNcVarIfExists(ncinfile, ncoutfile, "lon_0");
+
+	// Copy preserve variables
+	for (int p = 0; p < vecPreserveVariables.size(); p++) {
+		CopyNcVar(ncinfile, ncoutfile, vecPreserveVariables[p]);
+
+		if (vecPreserveVariables[p] == strMaskVariable) {
+			_EXCEPTION1("Variable \"%s\" specified as --maskvar also "
+				"appears in --preserve",
+				strMaskVariable.c_str());
+		}
+	}
+
+	// Create data array
+	DataArray1D<double> data(grid.GetSize());
+
+	// Create mask
+	DataArray1D<double> dataMask(grid.GetSize());
+
+	// Copy masked variables
+	std::vector<NcVar *> vecNcVarIn;
+	std::vector<NcVar *> vecNcVarOut;
+
+	std::vector<std::string> strGridDimNames;
+
+	NcDim * dimNcVarOut0 = NULL;
+	NcDim * dimNcVarOut1 = NULL;
+
+	for (int v = 0; v < vecVarNames.size(); v++) {
+		const std::string & strVariable = vecVarNames[v];
+
+		if (vecVarNames[v] == strMaskVariable) {
+			_EXCEPTION1("Variable \"%s\" specified as --maskvar also appears in --var",
+				strMaskVariable.c_str());
+		}
+
+		// Get pointers to the NcVars associated with these variables
+		NcVar * varIn = ncinfile.get_var(strVariable.c_str());
+		if (varIn == NULL) {
+			_EXCEPTION();
+		}
+		vecNcVarIn.push_back(varIn);
+
+		// Copy the variable from input file to output file
+		//CopyNcVar(ncinfile, ncoutfile, strVariable, true, false);
+
+		{
+			std::vector<NcDim *> vecDimOut;
+			for (long d = 0; d < varIn->num_dims(); d++) {
+				if (std::string(varIn->get_dim(d)->name()) == std::string("time")) {
+					vecDimOut.push_back(dimTimeOut);
+					continue;
+				}
+
+				NcDim * dimOut = ncoutfile.get_dim(varIn->get_dim(d)->name());
+				if (dimOut == NULL) {
+					dimOut = ncoutfile.add_dim(varIn->get_dim(d)->name(), varIn->get_dim(d)->size());
+					if (dimOut == NULL) {
+						_EXCEPTION2("Unable to create dimension \"%s\" in file \"%s\"",
+							varIn->get_dim(d)->name(), strOutputFile.c_str());
+					}
+				}
+				vecDimOut.push_back(dimOut);
+			}
+
+			NcVar * varOut = ncoutfile.add_var(
+				varIn->name(),
+				varIn->type(),
+				vecDimOut.size(),
+				(const NcDim**)&(vecDimOut[0]));
+
+			if (varOut == NULL) {
+				_EXCEPTION2("Unable to create variable \"%s\" in file \"%s\"",
+					varIn->name(), strOutputFile.c_str());
+			}
+
+			CopyNcVarAttributes(varIn, varOut);
+
+			vecNcVarOut.push_back(varOut);
+		}
+
+		// Count variable dimensions
+		long nVarDims = varIn->num_dims();
+		if (nVarDims < 1 + grid.m_nGridDim.size()) {
+			_EXCEPTION2("Insufficient dimensions in variable \"%s\" in file \"%s\"",
+				strVariable.c_str(), strInputFile.c_str()); 
+		}
+		if (strcmp(varIn->get_dim(0)->name(), "time") != 0) {
+			_EXCEPTION2("First dimension of variable \"%s\" in file \"%s\" must be \"time\"",
+				strVariable.c_str(), strInputFile.c_str());
+		}
+
+		// Get output dimensions
+		if (grid.m_nGridDim.size() == 1) {
+			if (varIn->get_dim(nVarDims-1)->size() != grid.m_nGridDim[0]) {
+				_EXCEPTION3("Last dimension of variable \"%s\" in file \"%s\" must have size equal to grid size (%i)",
+					strVariable.c_str(), strInputFile.c_str(), grid.m_nGridDim[0]);
+			}
+			dimNcVarOut0 = ncoutfile.get_dim(varIn->get_dim(nVarDims-1)->name());
+			if (dimNcVarOut0 == NULL) {
+				_EXCEPTION1("Unable to match dimension \"%s\" in output file",
+					varIn->get_dim(nVarDims-1)->name());
+			}
+		}
+		if (grid.m_nGridDim.size() == 2) {
+			if ((varIn->get_dim(nVarDims-2)->size() != grid.m_nGridDim[0]) &&
+				(varIn->get_dim(nVarDims-1)->size() != grid.m_nGridDim[1])
+			) {
+				_EXCEPTION4("Last dimensions of variable \"%s\" in file \"%s\" must have size equal to grid size (%i,%i)",
+					strVariable.c_str(), strOutputFile.c_str(), grid.m_nGridDim[0], grid.m_nGridDim[1]);
+			}
+			dimNcVarOut0 = ncoutfile.get_dim(varIn->get_dim(nVarDims-2)->name());
+			if (dimNcVarOut0 == NULL) {
+				_EXCEPTION1("Unable to match dimension \"%s\" in output file",
+					varIn->get_dim(nVarDims-2)->name());
+			}
+			dimNcVarOut1 = ncoutfile.get_dim(varIn->get_dim(nVarDims-1)->name());
+			if (dimNcVarOut1 == NULL) {
+				_EXCEPTION1("Unable to match dimension \"%s\" in output file",
+					varIn->get_dim(nVarDims-1)->name());
+			}
+
+		}
+	}
+	_ASSERT(vecVarNames.size() == vecNcVarIn.size());
+	_ASSERT(vecVarNames.size() == vecNcVarOut.size());
+
+	// No variables specified, try to guess mask variable dimensions
+	if (dimNcVarOut0 == NULL) {
+		if (grid.m_nGridDim.size() == 1) {
+			dimNcVarOut0 = ncoutfile.get_dim("ncol");
+			if (dimNcVarOut0 == NULL) {
+				dimNcVarOut0 = ncoutfile.add_dim("ncol", grid.m_nGridDim[0]);
+			} else if (dimNcVarOut0->size() != grid.m_nGridDim[0]) {
+				_EXCEPTIONT("Unable to determine grid dimension in output file");
+			}
+		}
+		if (grid.m_nGridDim.size() == 2) {
+			dimNcVarOut0 = ncoutfile.get_dim(strLatitudeName.c_str());
+			dimNcVarOut1 = ncoutfile.get_dim(strLongitudeName.c_str());
+			if (dimNcVarOut0 == NULL) {
+				dimNcVarOut0 = ncoutfile.add_dim(strLatitudeName.c_str(), grid.m_nGridDim[0]);
+			} else if (dimNcVarOut0->size() != grid.m_nGridDim[0]) {
+				_EXCEPTIONT("Unable to determine grid dimension in output file");
+			}
+			if (dimNcVarOut1 == NULL) {
+				dimNcVarOut1 = ncoutfile.add_dim(strLongitudeName.c_str(), grid.m_nGridDim[1]);
+			} else if (dimNcVarOut1->size() != grid.m_nGridDim[1]) {
+				_EXCEPTIONT("Unable to determine grid dimension in output file");
+			}
+		}
+	}
+	_ASSERT(dimNcVarOut0 != NULL);
+	if (grid.m_nGridDim.size() == 2) {
+		_ASSERT(dimNcVarOut1 != NULL);
+	}
+
+	// Create masked variable
+	NcVar * varMask = NULL;
+	if (strMaskVariable != "") {
+		if (grid.m_nGridDim.size() == 1) {
+			varMask = ncoutfile.add_var(
+				strMaskVariable.c_str(),
+				ncDouble,
+				dimTimeOut,
+				dimNcVarOut0
+			);
+
+		} else {
+			varMask = ncoutfile.add_var(
+				strMaskVariable.c_str(),
+				ncDouble,
+				dimTimeOut,
+				dimNcVarOut0,
+				dimNcVarOut1
+			);
+		}
+	}
+
+	// Loop through all times
+	for (int t = 0, to = -1; t < vecTimes.size(); t++) {
+
+		AnnounceStartBlock("Processing time \"%s\"",
+			vecTimes[t].ToString().c_str());
+
+#ifndef TEMPEST_NOREGEX
+		if (strTimeFilter != "") {
+			std::string strTime = vecTimes[t].ToString();
+			std::smatch match;
+			if (!std::regex_search(strTime, match, reTimeSubset)) {
+				AnnounceEndBlock("(skipping)");
+				continue;
+			}
+		}
+#endif
+		to++;
+
+		// Find all paths at this time
+		nodefile.Interpolate(vecTimes[t]);
+
+		// Get coordinates of nodes at this time
+		std::vector<double> vecLonRad;
+		std::vector<double> vecLatRad;
+		nodefile.InterpolatedNodeCoordinatesRad("lon", "lat", vecLonRad, vecLatRad);
+
+		// Build mask
+		dataMask.Zero();
+
+		if (strFilterByDist != "") {
+			AnnounceStartBlock("Building mask (bydist)");
+			BuildMask_ByDist(
+				grid,
+				nodefile,
+				vecLonRad,
+				vecLatRad,
+				strFilterByDist,
+				dataMask);
+			AnnounceEndBlock("Done");
+		}
+		if (vecClosedContourOp.size() != 0) {
+			AnnounceStartBlock("Building mask (byclosedcontourop)");
+			Variable & varOp = varreg.Get(vecClosedContourOp[0].m_varix);
+			vecInFiles.SetConstantTimeIx(t);
+			varOp.LoadGridData(varreg, vecInFiles, grid);
+			const DataArray1D<float> & dataState = varOp.GetData();
+			_ASSERT(dataState.GetRows() == grid.GetSize());
+
+			BuildMask_ByContour<float>(
+				grid,
+				dataState,
+				vecLonRad,
+				vecLatRad,
+				vecClosedContourOp[0],
+				dataMask);
+
+			AnnounceEndBlock("Done");
+		}
+		if (vecNearbyBlobsOp.size() != 0) {
+			AnnounceStartBlock("Building mask (nearbyblobs)");
+			Variable & varOp = varreg.Get(vecNearbyBlobsOp[0].m_varix);
+			vecInFiles.SetConstantTimeIx(t);
+			varOp.LoadGridData(varreg, vecInFiles, grid);
+			const DataArray1D<float> & dataState = varOp.GetData();
+			_ASSERT(dataState.GetRows() == grid.GetSize());
+
+			BuildMask_NearbyBlobs<float>(
+				grid,
+				dataState,
+				vecLonRad,
+				vecLatRad,
+				vecNearbyBlobsOp[0],
+				dataMask);
+
+			AnnounceEndBlock("Done");
+		}
+
+		if (fInvert) {
+			for (int i = 0; i < dataMask.GetRows(); i++) {
+				dataMask[i] = 1.0 - dataMask[i];
+			}
+		}
+
+		// Write mask to file
+		if (varMask != NULL) {
+			AnnounceStartBlock("Writing mask variable to file");
+			if (grid.m_nGridDim.size() == 1) {
+				varMask->set_cur(to,0);
+				varMask->put(&(dataMask[0]), 1, grid.m_nGridDim[0]);
+			} else {
+				varMask->set_cur(to,0,0);
+				varMask->put(&(dataMask[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
+			}
+			AnnounceEndBlock("Done");
+		}
+
+		// Loop through all variables
+		for (int v = 0; v < vecVarNames.size(); v++) {
+
+			const std::string & strVariable = vecVarNames[v];
+
+			Announce("Processing variable \"%s\"", strVariable.c_str());
+
+			// Load input and output variables
+			NcVar * varIn = vecNcVarIn[v];
+			NcVar * varOut = vecNcVarOut[v];
+
+			// Load in data
+			int nGridDims = grid.m_nGridDim.size();
+
+			std::vector<NcDim *> vecDim;
+			for (int d = 0; d < varIn->num_dims(); d++) {
+				vecDim.push_back(varIn->get_dim(d));
+			}
 /*
+			if (vecDim.size() < 1 + nGridDims) {
+				_EXCEPTION2("Insufficient dimensions in variable \"%s\" in file \"%s\"",
+					strVariable.c_str(), strInputFile.c_str());
+			}
+			if (strcmp(vecDim[0]->name(), "time") != 0) {
+				_EXCEPTION2("First dimension of variable \"%s\" in file \"%s\" must be \"time\"",
+					strVariable.c_str(), strInputFile.c_str());
+			}
+*/
+			int nVarSize = 1;
+			for (int d = 0; d < nGridDims; d++) {
+				nVarSize *= vecDim[vecDim.size()-d-1]->size();
+			}
+			if (grid.GetSize() != nVarSize) {
+				_EXCEPTION2("Variable \"%s\" in file \"%s\" dimensionality inconsistent with grid:"
+					" Verify final variable dimensions match grid",
+					strVariable.c_str(), strInputFile.c_str());
+			}
+
+			// Number of auxiliary dimensions and array of sizes for each slice
+			int nAuxDims = 1;
+			for (int d = 1; d < vecDim.size() - nGridDims; d++) {
+				nAuxDims *= vecDim[d]->size();
+			}
+
+			DataArray1D<long> vecDataSize(vecDim.size());
+			for (int d = 0; d < vecDim.size(); d++) {
+				if (d >= vecDim.size() - nGridDims) {
+					vecDataSize[d] = vecDim[d]->size();
+				} else {
+					vecDataSize[d] = 1;
+				}
+			}
+
+			// Check for _FillValue
+			if (strFillValue == "att") {
+				NcAtt * attFillValue = varIn->get_att("_FillValue");
+				if (attFillValue == NULL) {
+					fHasFillValue = false;
+					Announce("WARNING: Variable \"%s\" in file \"%s\" does not have a _FillValue attribute",
+						strVariable.c_str(), strInputFile.c_str());
+
+				} else {
+					fHasFillValue = true;
+					dFillValue = attFillValue->as_float(0);
+				}
+			}
+
+			// Add _FillValue to output variable
+			if ((fHasFillValue) && (strFillValue != "nan")) {
+				NcAtt * attFillValueOut = varOut->get_att("_FillValue");
+				if (attFillValueOut != NULL) {
+					attFillValueOut->remove();
+				}
+				if (varOut->type() == ncFloat) {
+					varOut->add_att("_FillValue", static_cast<float>(dFillValue));
+				} else if (varOut->type() == ncDouble) {
+					varOut->add_att("_FillValue", static_cast<double>(dFillValue));
+				} else if (varOut->type() == ncShort) {
+					varOut->add_att("_FillValue", static_cast<short>(dFillValue));
+				} else if (varOut->type() == ncInt) {
+					varOut->add_att("_FillValue", static_cast<int>(dFillValue));
+				} else {
+					_EXCEPTION1("Invalid type for variable \"%s\"", strVariable.c_str());
+				}
+			}
+
+			// Loop through all auxiliary dimensions (holding time fixed)
+			DataArray1D<long> vecDataPos(vecDim.size());
+
+			for (int i = 0; i < nAuxDims; i++) {
+
+				// Load data
+				int ixDim = i;
+				for (int d = vecDim.size() - nGridDims - 1; d >= 1; d--) {
+					vecDataPos[d] = ixDim % vecDim[d]->size();
+					ixDim /= vecDim[d]->size();
+				}
+				if (ixDim != 0) {
+					_EXCEPTIONT("Logic error");
+				}
+
+				vecDataPos[0] = t;
+				varIn->set_cur(&(vecDataPos[0]));
+				varIn->get(&(data[0]), &(vecDataSize[0]));
+
+				// Apply mask
+				if (!fHasFillValue) {
+					for (int i = 0; i < data.GetRows(); i++) {
+						data[i] *= dataMask[i];
+					}
+
+				} else {
+					for (int i = 0; i < data.GetRows(); i++) {
+						if (dataMask[i] == 0.0) {
+							data[i] = dFillValue;
+						}
+					}
+				}
+
+				// Write data
+				vecDataPos[0] = to;
+				varOut->set_cur(&(vecDataPos[0]));
+				varOut->put(&(data[0]), &(vecDataSize[0]));
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	AnnounceEndBlock("Done");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+int main(int argc, char** argv) {
+
 #if defined(TEMPEST_MPIOMP)
 	// Initialize MPI
 	MPI_Init(&argc, &argv);
-
-	// Not yet implemented
-	int nMPISize;
-	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
-	if (nMPISize > 1) {
-		std::cout << "Sorry!  Parallel processing with MPI is not yet implemented" << std::endl;
-		return (-1);
-	}
 #endif
-*/
+
 	// Turn off fatal errors in NetCDF
 	NcError error(NcError::silent_nonfatal);
-/*
+
 	// Enable output only on rank zero
 	AnnounceOnlyOutputOnRankZero();
-*/
+
 try {
 
 	// Input nodefile
@@ -646,6 +1208,9 @@ try {
 	// Apply the inverted filter
 	bool fInvert;
 
+	// Time filter
+	std::string strTimeFilter;
+
 	// Name of latitude dimension
 	std::string strLatitudeName;
 
@@ -676,8 +1241,9 @@ try {
 		CommandLineStringD(strNearbyBlobs, "nearbyblobs", "", "[var,dist,op,value[,maxdist]]");
 		CommandLineBool(fInvert, "invert");
 
-		CommandLineString(strLongitudeName, "lonname", "lon");
-		CommandLineString(strLatitudeName, "latname", "lat");
+		CommandLineString(strTimeFilter, "timefilter", "");
+		CommandLineString(strLongitudeName, "lonname", "[auto]");
+		CommandLineString(strLatitudeName, "latname", "[auto]");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -718,21 +1284,6 @@ try {
 	//}
 	if ((strVariables.length() == 0) && (strMaskVariable.length() == 0)) {
 		_EXCEPTIONT("One of (--var) or (--maskvar) must be specified");
-	}
-
-	bool fHasFillValue = false;
-	float dFillValue = 0.0;
-	if (strFillValue != "") {
-		fHasFillValue = true;
-		STLStringHelper::ToLower(strFillValue);
-		if (strFillValue == "att") {
-		} else if (strFillValue == "nan") {
-			dFillValue = nanf(NULL);
-		} else if (STLStringHelper::IsFloat(strFillValue)) {
-			dFillValue = std::stod(strFillValue);
-		} else {
-			_EXCEPTIONT("Invalid value specified for --fillvalue");
-		}
 	}
 
 	// Input file type
@@ -918,9 +1469,6 @@ try {
 	}
 
 	// Parse NodeFile
-	PathVector & pathvec = nodefile.GetPathVector();
-	TimeToPathNodeMap & mapTimeToPathNode = nodefile.GetTimeToPathNodeMap();
-
 	AnnounceStartBlock("Parsing nodefile");
 	nodefile.Read(
 		strInputNodeFile,
@@ -932,423 +1480,73 @@ try {
 	nodefile.GenerateTimeToPathNodeMap();
 	AnnounceEndBlock("Done");
 
-	// Create data array
-	DataArray1D<double> data(grid.GetSize());
+#if defined(TEMPEST_MPIOMP)
+	// Spread files across nodes
+	int nMPIRank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &nMPIRank);
 
-	// Create mask
-	DataArray1D<double> dataMask(grid.GetSize());
+	int nMPISize;
+	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+
+	// Set up logging
+	if ((vecInputFileList.size() > 1) && (nMPISize > 1)) {
+		Announce("Logs will be written to logXXXXXX.txt");
+	}
+#endif
 
 	// Loop over all files
 	_ASSERT(vecInputFileList.size() == vecOutputFileList.size());
 
-	for (int f = 0; f < vecInputFileList.size(); f++) {
-
-		AnnounceStartBlock("Processing input (%s)", vecInputFileList[f].c_str());
-
-		// Open input file
-		NcFileVector vecInFiles;
-		vecInFiles.ParseFromString(vecInputFileList[f]);
-		_ASSERT(vecInFiles.size() > 0);
-
-		NcFile & ncinfile = *(vecInFiles[0]);
-		//if (!ncinfile.is_valid()) {
-		//	_EXCEPTIONT("Unable to open input datafile");
-		//}
-
-		// Get time variable and verify calendar is compatible
-		NcVar * varTime = ncinfile.get_var("time");
-		if (varTime == NULL) {
-			_EXCEPTION1("Missing \"time\" variable in datafile \"%s\"",
-				vecInputFileList[f].c_str());
+	for (size_t f = 0; f < vecInputFileList.size(); f++) {
+#if defined(TEMPEST_MPIOMP)
+		if (f % nMPISize != nMPIRank) {
+			continue;
 		}
 
-		NcAtt * attCalendar = varTime->get_att("calendar");
-		if (attCalendar == NULL) {
-			_EXCEPTION1("Missing \"calendar\" metadata in datafile \"%s\"",
-				vecInputFileList[f].c_str());
+		FILE * fpLog = NULL;
+		if ((vecInputFileList.size() > 1) && (nMPISize > 1)) {
+			char szFileIndex[32];
+			sprintf(szFileIndex, "%06lu", f);
+
+			std::string strLogFile = std::string("log") + szFileIndex + ".txt";
+
+			fpLog = fopen(strLogFile.c_str(), "w");
+			if (fpLog == NULL) {
+				_EXCEPTION1("Unable to open log file \"%s\"", strLogFile.c_str());
+			}
+			AnnounceSetOutputBuffer(fpLog);
+			AnnounceOutputOnAllRanks();
 		}
+#endif
+		NodeFileFilter(
+			vecInputFileList[f],
+			vecOutputFileList[f],
+			varreg,
+			grid,
+			nodefile,
+			caltype,
+			cdhInput,
+			vecVarNames,
+			vecVarIx,
+			strMaskVariable,
+			strFilterByDist,
+			vecClosedContourOp,
+			vecNearbyBlobsOp,
+			fInvert,
+			vecPreserveVariables,
+			strFillValue,
+			strTimeFilter,
+			strLatitudeName,
+			strLongitudeName);
 
-		Time::CalendarType caltypeThis =
-			Time::CalendarTypeFromString(attCalendar->as_string(0));
-		if (caltype != caltypeThis) {
-			_EXCEPTION1("\"calendar\" mismatch in datafile \"%s\" ",
-				vecInputFileList[f].c_str());
+#if defined(TEMPEST_MPIOMP)
+		AnnounceSetOutputBuffer(stdout);
+		if (fpLog != NULL) {
+			fclose(fpLog);
 		}
+		AnnounceOnlyOutputOnRankZero();
+#endif
 
-		// Load in vector of Times
-		NcTimeDimension vecTimes;
-		ReadCFTimeDataFromNcFile(&ncinfile, vecInputFileList[f], vecTimes, true);
-
-		// Open output file
-		NcFile ncoutfile(vecOutputFileList[f].c_str(), NcFile::Replace);
-		if (!ncoutfile.is_valid()) {
-			_EXCEPTION1("Unable to open output datafile \"%s\"",
-				vecOutputFileList[f].c_str());
-		}
-
-		// Copy metadata
-		CopyNcFileAttributes(&ncinfile, &ncoutfile);
-
-		// Copy time
-		CopyNcVar(ncinfile, ncoutfile, "time");
-
-		// Get time dimension
-		NcDim * dimTimeOut = ncoutfile.get_dim("time");
-		if (dimTimeOut == NULL) {
-			_EXCEPTIONT("Unable to find \"time\" dimension");
-		}
-
-		// Copy latitude and/or longitude
-		CopyNcVarIfExists(ncinfile, ncoutfile, "lat");
-		CopyNcVarIfExists(ncinfile, ncoutfile, "latitude");
-		CopyNcVarIfExists(ncinfile, ncoutfile, "LAT");
-		CopyNcVarIfExists(ncinfile, ncoutfile, "lat_0");
-
-		CopyNcVarIfExists(ncinfile, ncoutfile, "lon");
-		CopyNcVarIfExists(ncinfile, ncoutfile, "longitude");
-		CopyNcVarIfExists(ncinfile, ncoutfile, "LON");
-		CopyNcVarIfExists(ncinfile, ncoutfile, "lon_0");
-
-		// Copy preserve variables
-		for (int p = 0; p < vecPreserveVariables.size(); p++) {
-			CopyNcVar(ncinfile, ncoutfile, vecPreserveVariables[p]);
-
-			if (vecPreserveVariables[p] == strMaskVariable) {
-				_EXCEPTION1("Variable \"%s\" specified as --maskvar also "
-					"appears in --preserve",
-					strMaskVariable.c_str());
-			}
-		}
-
-		// Copy masked variables
-		std::vector<NcVar *> vecNcVarIn;
-		std::vector<NcVar *> vecNcVarOut;
-
-		std::vector<std::string> strGridDimNames;
-
-		NcDim * dimNcVarOut0 = NULL;
-		NcDim * dimNcVarOut1 = NULL;
-
-		for (int v = 0; v < vecVarNames.size(); v++) {
-			const std::string & strVariable = vecVarNames[v];
-
-			if (vecVarNames[v] == strMaskVariable) {
-				_EXCEPTION1("Variable \"%s\" specified as --maskvar also appears in --var",
-					strMaskVariable.c_str());
-			}
-
-			// Copy the variable from input file to output file
-			CopyNcVar(ncinfile, ncoutfile, strVariable, true, false);
-
-			// Get pointers to the NcVars associated with these variables
-			NcVar * varIn = ncinfile.get_var(strVariable.c_str());
-			if (varIn == NULL) {
-				_EXCEPTION();
-			}
-			vecNcVarIn.push_back(varIn);
-
-			NcVar * varOut = ncoutfile.get_var(strVariable.c_str());
-			if (varOut == NULL) {
-				_EXCEPTION();
-			}
-			vecNcVarOut.push_back(varOut);
-
-			// Count variable dimensions
-			long nVarDims = varIn->num_dims();
-			if (nVarDims < 1 + grid.m_nGridDim.size()) {
-				_EXCEPTION2("Insufficient dimensions in variable \"%s\" in file \"%s\"",
-					strVariable.c_str(), vecOutputFileList[f].c_str()); 
-			}
-			if (strcmp(varIn->get_dim(0)->name(), "time") != 0) {
-				_EXCEPTION2("First dimension of variable \"%s\" in file \"%s\" must be \"time\"",
-					strVariable.c_str(), vecOutputFileList[f].c_str());
-			}
-
-			// Get output dimensions
-			if (grid.m_nGridDim.size() == 1) {
-				if (varIn->get_dim(nVarDims-1)->size() != grid.m_nGridDim[0]) {
-					_EXCEPTION3("Last dimension of variable \"%s\" in file \"%s\" must have size equal to grid size (%i)",
-						strVariable.c_str(), vecOutputFileList[f].c_str(), grid.m_nGridDim[0]);
-				}
-				dimNcVarOut0 = ncoutfile.get_dim(varIn->get_dim(nVarDims-1)->name());
-				if (dimNcVarOut0 == NULL) {
-					_EXCEPTION1("Unable to match dimension \"%s\" in output file",
-						varIn->get_dim(nVarDims-1)->name());
-				}
-			}
-			if (grid.m_nGridDim.size() == 2) {
-				if ((varIn->get_dim(nVarDims-2)->size() != grid.m_nGridDim[0]) &&
-					(varIn->get_dim(nVarDims-1)->size() != grid.m_nGridDim[1])
-				) {
-					_EXCEPTION4("Last dimensions of variable \"%s\" in file \"%s\" must have size equal to grid size (%i,%i)",
-						strVariable.c_str(), vecOutputFileList[f].c_str(), grid.m_nGridDim[0], grid.m_nGridDim[1]);
-				}
-				dimNcVarOut0 = ncoutfile.get_dim(varIn->get_dim(nVarDims-2)->name());
-				if (dimNcVarOut0 == NULL) {
-					_EXCEPTION1("Unable to match dimension \"%s\" in output file",
-						varIn->get_dim(nVarDims-2)->name());
-				}
-				dimNcVarOut1 = ncoutfile.get_dim(varIn->get_dim(nVarDims-1)->name());
-				if (dimNcVarOut1 == NULL) {
-					_EXCEPTION1("Unable to match dimension \"%s\" in output file",
-						varIn->get_dim(nVarDims-1)->name());
-				}
-
-			}
-		}
-		_ASSERT(vecVarNames.size() == vecNcVarIn.size());
-		_ASSERT(vecVarNames.size() == vecNcVarOut.size());
-
-		// No variables specified, try to guess mask variable dimensions
-		if (dimNcVarOut0 == NULL) {
-			if (grid.m_nGridDim.size() == 1) {
-				dimNcVarOut0 = ncoutfile.get_dim("ncol");
-				if (dimNcVarOut0 == NULL) {
-					dimNcVarOut0 = ncoutfile.add_dim("ncol", grid.m_nGridDim[0]);
-				} else if (dimNcVarOut0->size() != grid.m_nGridDim[0]) {
-					_EXCEPTIONT("Unable to determine grid dimension in output file");
-				}
-			}
-			if (grid.m_nGridDim.size() == 2) {
-				dimNcVarOut0 = ncoutfile.get_dim("lat");
-				dimNcVarOut1 = ncoutfile.get_dim("lon");
-				if (dimNcVarOut0 == NULL) {
-					dimNcVarOut0 = ncoutfile.add_dim("lat", grid.m_nGridDim[0]);
-				} else if (dimNcVarOut0->size() != grid.m_nGridDim[0]) {
-					_EXCEPTIONT("Unable to determine grid dimension in output file");
-				}
-				if (dimNcVarOut1 == NULL) {
-					dimNcVarOut1 = ncoutfile.add_dim("lon", grid.m_nGridDim[1]);
-				} else if (dimNcVarOut1->size() != grid.m_nGridDim[1]) {
-					_EXCEPTIONT("Unable to determine grid dimension in output file");
-				}
-			}
-		}
-		_ASSERT(dimNcVarOut0 != NULL);
-		if (grid.m_nGridDim.size() == 2) {
-			_ASSERT(dimNcVarOut1 != NULL);
-		}
-
-		// Create masked variable
-		NcVar * varMask = NULL;
-		if (strMaskVariable != "") {
-			if (grid.m_nGridDim.size() == 1) {
-				varMask = ncoutfile.add_var(
-					strMaskVariable.c_str(),
-					ncDouble,
-					dimTimeOut,
-					dimNcVarOut0
-				);
-
-			} else {
-				varMask = ncoutfile.add_var(
-					strMaskVariable.c_str(),
-					ncDouble,
-					dimTimeOut,
-					dimNcVarOut0,
-					dimNcVarOut1
-				);
-			}
-		}
-
-		// Loop through all times
-		for (int t = 0; t < vecTimes.size(); t++) {
-
-			AnnounceStartBlock("Processing time \"%s\"",
-				vecTimes[t].ToString().c_str());
-
-			// Find all paths at this time
-			nodefile.Interpolate(vecTimes[t]);
-
-			// Get coordinates of nodes at this time
-			std::vector<double> vecLonRad;
-			std::vector<double> vecLatRad;
-			nodefile.InterpolatedNodeCoordinatesRad("lon", "lat", vecLonRad, vecLatRad);
-
-			// Build mask
-			dataMask.Zero();
-
-			if (strFilterByDist != "") {
-				BuildMask_ByDist(
-					grid,
-					nodefile,
-					vecLonRad,
-					vecLatRad,
-					strFilterByDist,
-					dataMask);
-			}
-			if (strFilterByContour != "") {
-				Variable & varOp = varreg.Get(vecClosedContourOp[0].m_varix);
-				vecInFiles.SetConstantTimeIx(t);
-				varOp.LoadGridData(varreg, vecInFiles, grid);
-				const DataArray1D<float> & dataState = varOp.GetData();
-				_ASSERT(dataState.GetRows() == grid.GetSize());
-
-				BuildMask_ByContour<float>(
-					grid,
-					dataState,
-					vecLonRad,
-					vecLatRad,
-					vecClosedContourOp[0],
-					dataMask);
-			}
-			if (vecNearbyBlobsOp.size() != 0) {
-				Variable & varOp = varreg.Get(vecNearbyBlobsOp[0].m_varix);
-				vecInFiles.SetConstantTimeIx(t);
-				varOp.LoadGridData(varreg, vecInFiles, grid);
-				const DataArray1D<float> & dataState = varOp.GetData();
-				_ASSERT(dataState.GetRows() == grid.GetSize());
-
-				BuildMask_NearbyBlobs<float>(
-					grid,
-					dataState,
-					vecLonRad,
-					vecLatRad,
-					vecNearbyBlobsOp[0],
-					dataMask);
-			}
-
-			if (fInvert) {
-				for (int i = 0; i < dataMask.GetRows(); i++) {
-					dataMask[i] = 1.0 - dataMask[i];
-				}
-			}
-
-			// Write mask to file
-			if (varMask != NULL) {
-				if (grid.m_nGridDim.size() == 1) {
-					varMask->set_cur(t,0);
-					varMask->put(&(dataMask[0]), 1, grid.m_nGridDim[0]);
-				} else {
-					varMask->set_cur(t,0,0);
-					varMask->put(&(dataMask[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
-				}
-			}
-
-			// Loop through all variables
-			for (int v = 0; v < vecVarIx.size(); v++) {
-
-				const std::string & strVariable = vecVarNames[v];
-
-				Announce("Processing variable \"%s\"", strVariable.c_str());
-
-				// Load input and output variables
-				NcVar * varIn = vecNcVarIn[v];
-				NcVar * varOut = vecNcVarOut[v];
-
-				// Load in data
-				int nGridDims = grid.m_nGridDim.size();
-
-				std::vector<NcDim *> vecDim;
-				for (int d = 0; d < varIn->num_dims(); d++) {
-					vecDim.push_back(varIn->get_dim(d));
-				}
-/*
-				if (vecDim.size() < 1 + nGridDims) {
-					_EXCEPTION2("Insufficient dimensions in variable \"%s\" in file \"%s\"",
-						strVariable.c_str(), vecOutputFileList[f].c_str());
-				}
-				if (strcmp(vecDim[0]->name(), "time") != 0) {
-					_EXCEPTION2("First dimension of variable \"%s\" in file \"%s\" must be \"time\"",
-						strVariable.c_str(), vecOutputFileList[f].c_str());
-				}
-*/
-				int nVarSize = 1;
-				for (int d = 0; d < nGridDims; d++) {
-					nVarSize *= vecDim[vecDim.size()-d-1]->size();
-				}
-				if (grid.GetSize() != nVarSize) {
-					_EXCEPTION2("Variable \"%s\" in file \"%s\" dimensionality inconsistent with grid:"
-						" Verify final variable dimensions match grid",
-						strVariable.c_str(), vecOutputFileList[f].c_str());
-				}
-
-				// Number of auxiliary dimensions and array of sizes for each slice
-				int nAuxDims = 1;
-				for (int d = 1; d < vecDim.size() - nGridDims; d++) {
-					nAuxDims *= vecDim[d]->size();
-				}
-
-				DataArray1D<long> vecDataSize(vecDim.size());
-				for (int d = 0; d < vecDim.size(); d++) {
-					if (d >= vecDim.size() - nGridDims) {
-						vecDataSize[d] = vecDim[d]->size();
-					} else {
-						vecDataSize[d] = 1;
-					}
-				}
-
-				// Check for _FillValue
-				if (strFillValue == "att") {
-					NcAtt * attFillValue = varIn->get_att("_FillValue");
-					if (attFillValue == NULL) {
-						fHasFillValue = false;
-						Announce("WARNING: Variable \"%s\" in file \"%s\" does not have a _FillValue attribute", strVariable.c_str(), vecInputFileList[f].c_str());
-
-					} else {
-						fHasFillValue = true;
-						dFillValue = attFillValue->as_float(0);
-					}
-				}
-
-				// Add _FillValue to output variable
-				if ((fHasFillValue) && (strFillValue != "nan")) {
-					NcAtt * attFillValueOut = varOut->get_att("_FillValue");
-					if (attFillValueOut != NULL) {
-						attFillValueOut->remove();
-					}
-					if (varOut->type() == ncFloat) {
-						varOut->add_att("_FillValue", static_cast<float>(dFillValue));
-					} else if (varOut->type() == ncDouble) {
-						varOut->add_att("_FillValue", static_cast<double>(dFillValue));
-					} else {
-						_EXCEPTION1("Invalid type for variable \"%s\": Expected \"float\" or \"double\"", strVariable.c_str());
-					}
-				}
-
-				// Loop through all auxiliary dimensions (holding time fixed)
-				DataArray1D<long> vecDataPos(vecDim.size());
-				vecDataPos[0] = t;
-
-				for (int i = 0; i < nAuxDims; i++) {
-
-					// Load data
-					int ixDim = i;
-					for (int d = vecDim.size() - nGridDims - 1; d >= 1; d--) {
-						vecDataPos[d] = ixDim % vecDim[d]->size();
-						ixDim /= vecDim[d]->size();
-					}
-					if (ixDim != 0) {
-						_EXCEPTIONT("Logic error");
-					}
-
-					varIn->set_cur(&(vecDataPos[0]));
-					varIn->get(&(data[0]), &(vecDataSize[0]));
-
-					// Apply mask
-					if (!fHasFillValue) {
-						for (int i = 0; i < data.GetRows(); i++) {
-							data[i] *= dataMask[i];
-						}
-
-					} else {
-						for (int i = 0; i < data.GetRows(); i++) {
-							if (dataMask[i] == 0.0) {
-								data[i] = dFillValue;
-							}
-						}
-					}
-
-					// Write data
-					varOut->set_cur(&(vecDataPos[0]));
-					varOut->put(&(data[0]), &(vecDataSize[0]));
-				}
-			}
-
-			AnnounceEndBlock("Done");
-		}
-
-		AnnounceEndBlock("Done");
 	}
 
 	AnnounceBanner();
@@ -1356,12 +1554,12 @@ try {
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());
 }
-/*
+
 #if defined(TEMPEST_MPIOMP)
 	// Deinitialize MPI
 	MPI_Finalize();
 #endif
-*/
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////
