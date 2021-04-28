@@ -1201,15 +1201,17 @@ void DetectBlobs(
 */
 
 	// Get time dimension
-	NcDim * dimTime = vecFiles[0]->get_dim("time");
-	if (dimTime == NULL) {
-		_EXCEPTION1("File \"%s\" missing \"time\" dimension",
-			vecFiles.GetFilename(0).c_str());
-	}
 	NcVar * varTime = vecFiles[0]->get_var("time");
 	if (varTime == NULL) {
 		_EXCEPTION1("File \"%s\" missing \"time\" variable",
 			vecFiles.GetFilename(0).c_str());
+	}
+	NcDim * dimTime = vecFiles[0]->get_dim("time");
+	if (dimTime == NULL) {
+		if (varTime->num_dims() != 0) {
+			_EXCEPTION1("File \"%s\" missing \"time\" dimension",
+				vecFiles.GetFilename(0).c_str());
+		}
 	}
 /*
 	int nTime = 1;

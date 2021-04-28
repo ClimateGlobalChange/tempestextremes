@@ -549,26 +549,32 @@ void ReadCFTimeDataFromNcFile(
 	// Empty existing Time vector
 	vecTimes.clear();
 
-	// Get time dimension
+	// Get time dimension and  variable
+	long lTimeCount = 0;
 	NcDim * dimTime = ncfile->get_dim("time");
-	if (dimTime == NULL) {
-		_EXCEPTION1("Dimension \"time\" not found in file \"%s\"",
-			strFilename.c_str());
-	}
-
-	// Get time variable
 	NcVar * varTime = ncfile->get_var("time");
+
 	if (varTime == NULL) {
 		_EXCEPTION1("Variable \"time\" not found in file \"%s\"",
 			strFilename.c_str());
 	}
-	if (varTime->num_dims() != 1) {
-		_EXCEPTION1("Variable \"time\" has more than one dimension in file \"%s\"",
-			strFilename.c_str());
-	}
-	if (strcmp(varTime->get_dim(0)->name(), "time") != 0) {
-		_EXCEPTION1("Variable \"time\" does not have dimension \"time\" in file \"%s\"",
-			strFilename.c_str());
+	if (dimTime == NULL) {
+		if (varTime->num_dims() != 0) {
+			_EXCEPTION1("Dimension \"time\" not found in file \"%s\"",
+				strFilename.c_str());
+		}
+		lTimeCount = 1;
+
+	} else {
+		if (varTime->num_dims() != 1) {
+			_EXCEPTION1("Variable \"time\" has more than one dimension in file \"%s\"",
+				strFilename.c_str());
+		}
+		if (strcmp(varTime->get_dim(0)->name(), "time") != 0) {
+			_EXCEPTION1("Variable \"time\" does not have dimension \"time\" in file \"%s\"",
+				strFilename.c_str());
+		}
+		lTimeCount = dimTime->size();
 	}
 
 	// Calendar attribute
@@ -618,24 +624,24 @@ void ReadCFTimeDataFromNcFile(
 	DataArray1D<ncint64> vecTimeInt64;
 
 	if (varTime->type() == ncInt) {
-		vecTimeInt.Allocate(dimTime->size());
+		vecTimeInt.Allocate(lTimeCount);
 		varTime->set_cur((long)0);
-		varTime->get(&(vecTimeInt[0]), dimTime->size());
+		varTime->get(&(vecTimeInt[0]), lTimeCount);
 
 	} else if (varTime->type() == ncFloat) {
-		vecTimeFloat.Allocate(dimTime->size());
+		vecTimeFloat.Allocate(lTimeCount);
 		varTime->set_cur((long)0);
-		varTime->get(&(vecTimeFloat[0]), dimTime->size());
+		varTime->get(&(vecTimeFloat[0]), lTimeCount);
 
 	} else if (varTime->type() == ncDouble) {
-		vecTimeDouble.Allocate(dimTime->size());
+		vecTimeDouble.Allocate(lTimeCount);
 		varTime->set_cur((long)0);
-		varTime->get(&(vecTimeDouble[0]), dimTime->size());
+		varTime->get(&(vecTimeDouble[0]), lTimeCount);
 
 	} else if (varTime->type() == ncInt64) {
-		vecTimeInt64.Allocate(dimTime->size());
+		vecTimeInt64.Allocate(lTimeCount);
 		varTime->set_cur((long)0);
-		varTime->get(&(vecTimeInt64[0]), dimTime->size());
+		varTime->get(&(vecTimeInt64[0]), lTimeCount);
 
 	} else {
 		_EXCEPTION1("Variable \"time\" has invalid type "
@@ -643,7 +649,7 @@ void ReadCFTimeDataFromNcFile(
 			" in file \"%s\"", strFilename.c_str());
 	}
 
-	for (int t = 0; t < dimTime->size(); t++) {
+	for (int t = 0; t < lTimeCount; t++) {
 		Time time(eCalendarType);
 		if (varTime->type() == ncInt) {
 			time.FromCFCompliantUnitsOffsetInt(

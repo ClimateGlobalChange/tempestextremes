@@ -197,15 +197,15 @@ void SimpleGrid::GenerateLatitudeLongitude(
 		}
 	}
 	for (int i = 0; i < nLon; i++) {
-		if (fabs(vecLon[i]) > 2.0 * M_PI + 1.0e-12) {
+		if (fabs(vecLon[i]) > 3.0 * M_PI + 1.0e-12) {
 			if (fRegional) {
-				Announce("WARNING: Latitude array out of bounds [-360,360] "
+				Announce("WARNING: Longitude array out of bounds [-540,540] "
 					"(%1.5f); defaulting grid areas to 1.",
 					RadToDeg(vecLon[i]));
 				fCalculateArea = false;
 				break;
 			} else {
-				_EXCEPTION1("Latitude array out of bounds [-360,360] (%1.5f). "
+				_EXCEPTION1("Longitude array out of bounds [-540,540] (%1.5f). "
 					"Did you mean to specify \"--regional\"?",
 					RadToDeg(vecLon[i]));
 			}

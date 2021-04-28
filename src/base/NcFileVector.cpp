@@ -67,7 +67,17 @@ void NcFileVector::InsertFile(
 	} else {
 		NcDim * dimTime = pNewFile->get_dim("time");
 		if (dimTime == NULL) {
-			m_vecFileType.push_back(FileType_NoTimeDim);
+			NcVar * varTime = pNewFile->get_var("time");
+			if (varTime != NULL) {
+				ReadCFTimeDataFromNcFile(
+					pNewFile,
+					strFile,
+					m_vecFileTime[m_vecFileTime.size()-1],
+					false);
+				m_vecFileType.push_back(FileType_Standard);
+			} else {
+				m_vecFileType.push_back(FileType_NoTimeDim);
+			}
 		} else {
 			NcVar * varTime = pNewFile->get_var("time");
 			if (varTime == NULL) {
