@@ -37,6 +37,7 @@
 #include <string>
 #include <set>
 #include <map>
+#include <queue>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -128,6 +129,9 @@ try {
 	// Input file list
 	std::string strInputFileList;
 
+	// Find blobs
+	bool fFindBlobs;
+
 	// Connectivity file
 	std::string strConnectivity;
 
@@ -165,6 +169,7 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in_file", "");
 		CommandLineString(strInputFileList, "in_list", "");
+		CommandLineBool(fFindBlobs, "findblobs");
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineBool(fDiagonalConnectivity, "diag_connect");
 		CommandLineBool(fRegional, "regional");
@@ -308,9 +313,6 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
-	// Computed quantities associated with each blob
-	AllTimedBlobQuantitiesMap mapAllQuantities;
-
 	// Time index across all files
 	int iTime = 0;
 
@@ -330,7 +332,13 @@ try {
 	}
 
 	// Loop through all files
+	int iBlobIndex = 0;
+
 	for (int f = 0; f < nFiles; f++) {
+		AnnounceStartBlock("File \"%s\"", vecInputFiles[f].c_str());
+
+		// Computed quantities associated with each blob
+		AllTimedBlobQuantitiesMap mapAllQuantities;
 
 		// Time objects for each time in this file
 		NcTimeDimension vecFileTimes;
@@ -401,6 +409,41 @@ try {
 				varIndicator->get(&(dataIndex[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
 			} else {
 				_EXCEPTION();
+			}
+
+			// If find blobs then assign blob indices
+			if (fFindBlobs) {
+				std::set<int> setVisited;
+				std::queue<int> queueToVisit;
+				for (int i = 0; i < grid.GetSize(); i++) {
+					if (dataIndex[i] == 0) {
+						continue;
+					}
+					if (setVisited.find(i) != setVisited.end()) {
+						continue;
+					}
+
+					iBlobIndex++;
+
+					queueToVisit.push(i);
+					while (!queueToVisit.empty()) {
+						int ixNode = queueToVisit.front();
+						queueToVisit.pop();
+						if (setVisited.find(ixNode) != setVisited.end()) {
+							continue;
+						}
+						setVisited.insert(ixNode);
+
+						dataIndex[ixNode] = iBlobIndex;
+
+						for (int k = 0; k < grid.m_vecConnectivity[ixNode].size(); k++) {
+							int ixNeighbor = grid.m_vecConnectivity[ixNode][k];
+							if (dataIndex[ixNeighbor] != 0) {
+								queueToVisit.push(ixNeighbor);
+							}
+						}
+					}
+				}
 			}
 
 			// Last data index
@@ -604,6 +647,7 @@ try {
 				}
 			}
 		}
+		AnnounceEndBlock("Done");
 	}
 
 	fclose(fpout);
