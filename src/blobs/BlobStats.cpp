@@ -1,11 +1,11 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
-///	\file    StitchNodes.cpp
+///	\file    BlobStats.cpp
 ///	\author  Paul Ullrich
-///	\version October 1st, 2014
+///	\version May 14th, 2021
 ///
 ///	<remarks>
-///		Copyright 2000-2014 Paul Ullrich
+///		Copyright 2021 Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -15,8 +15,9 @@
 ///	</remarks>
 
 #include "BlobUtilities.h"
+#include "Constants.h"
 #include "CoordTransforms.h"
-
+#include "Variable.h"
 #include "CommandLine.h"
 #include "Exception.h"
 #include "Announce.h"
@@ -66,11 +67,14 @@ public:
 	///	<summary>
 	///		Constructor.
 	///	</summary>
-	BlobQuantities() :
+	BlobQuantities(
+		size_t sSumVarCount
+	) :
 		dAreaX(0.0),
 		dAreaY(0.0),
 		dAreaZ(0.0),
-		dArea(0.0)
+		dArea(0.0),
+		dSumVars(sSumVarCount)
 	{ }
 
 public:
@@ -100,9 +104,9 @@ public:
 	double dArea;
 
 	///	<summary>
-	///		Array of output variables associated with blob.
+	///		Array of sums associated with blob.
 	///	</summary>
-	std::vector<double> dOutputVars;
+	std::vector<double> dSumVars;
 };
 
 ///	<summary>
@@ -147,6 +151,9 @@ try {
 	// Input variable
 	std::string strInputVariable;
 
+	// Variables to sum over
+	std::string strSumVariables;
+
 	// Summary quantities
 	std::string strOutputQuantities;
 
@@ -175,6 +182,7 @@ try {
 		CommandLineBool(fRegional, "regional");
 		CommandLineString(strOutputFile, "out_file", "");
 		CommandLineString(strInputVariable, "var", "");
+		CommandLineString(strSumVariables, "sumvar", "");
 		CommandLineString(strOutputQuantities, "out", "");
 		CommandLineBool(fOutputHeaders, "out_headers");
 		CommandLineBool(fOutputFullTimes, "out_fulltime");
@@ -313,6 +321,35 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
+	// VariableRegistry
+	VariableRegistry varreg;
+
+	// Parse --var argument
+	VariableIndex varixBlobTag = varreg.FindOrRegister(strInputVariable);
+
+	// Parse --sumvar argument
+	std::vector<std::string> vecSumVarNames;
+	std::vector<VariableIndex> vecSumVarIx;
+	if (strSumVariables != "") {
+		std::string strSumVariablesTemp = strSumVariables;
+		for (;;) {
+			VariableIndex varixSum;
+			int iLast = varreg.FindOrRegisterSubStr(strSumVariablesTemp, &varixSum) + 1;
+
+			if (varixSum == varixBlobTag) {
+				_EXCEPTIONT("--var and --varsum cannot contain the same variables");
+			}
+
+			vecSumVarIx.push_back(varixSum);
+			vecSumVarNames.push_back( strSumVariablesTemp.substr(0,iLast-1) );
+			if (iLast >= strSumVariablesTemp.length()) {
+				break;
+			}
+			strSumVariablesTemp = strSumVariablesTemp.substr(iLast);
+		}
+	}
+	_ASSERT(vecSumVarNames.size() == vecSumVarIx.size());
+
 	// Time index across all files
 	int iTime = 0;
 
@@ -335,6 +372,13 @@ try {
 	int iBlobIndex = 0;
 
 	for (int f = 0; f < nFiles; f++) {
+		NcFileVector vecInFiles;
+		vecInFiles.ParseFromString(vecInputFiles[f].c_str());
+
+		if (vecInFiles.size() == 0) {
+			_EXCEPTION1("Unable to open files in \"%s\"", vecInputFiles[f].c_str());
+		}
+
 		AnnounceStartBlock("File \"%s\"", vecInputFiles[f].c_str());
 
 		// Computed quantities associated with each blob
@@ -343,32 +387,17 @@ try {
 		// Time objects for each time in this file
 		NcTimeDimension vecFileTimes;
 
-		// Load in each file
-		NcFile ncInput(vecInputFiles[f].c_str());
-		if (!ncInput.is_valid()) {
-			_EXCEPTION1("Unable to open input file \"%s\"",
-				vecInputFiles[f].c_str());
-		}
+		// Load in file times
+		ReadCFTimeDataFromNcFile(vecInFiles[0], vecInputFiles[f], vecFileTimes, true);
+		int nLocalTimes = vecFileTimes.size();
+
+		// Load in indicator variable and validate
+		Variable & varBlobTag = varreg.Get(varixBlobTag);
 
 		// Blob index data
 		DataArray1D<int> dataIndex(grid.GetSize());
 
-		// Get current time dimension
-		NcDim * dimTime = ncInput.get_dim("time");
-		if (dimTime == NULL) {
-			_EXCEPTIONT("Dimension \"time\" missing from input file");
-		}
-
-		int nLocalTimes = dimTime->size();
-
-		// Load in file times
-		if (fOutputFullTimes) {
-			ReadCFTimeDataFromNcFile(&ncInput, vecInputFiles[f], vecFileTimes, true);
-		}
-
-		// Load in indicator variable and validate
-		NcVar * varIndicator = ncInput.get_var(strInputVariable.c_str());
-
+/*
 		if (varIndicator == NULL) {
 			_EXCEPTION1("Unable to load variable \"%s\"",
 				strInputVariable.c_str());
@@ -396,22 +425,19 @@ try {
 		} else {
 			_EXCEPTION();
 		}
-
+*/
 		// Loop through all times
 		for (int t = 0; t < nLocalTimes; t++, iTime++) {
 
-			// Load in the data at this time
-			if (grid.DimCount() == 1) {
-				varIndicator->set_cur(t, 0);
-				varIndicator->get(&(dataIndex[0]), 1, grid.GetSize());
-			} else if (grid.DimCount() == 2) {
-				varIndicator->set_cur(t, 0, 0);
-				varIndicator->get(&(dataIndex[0]), 1, grid.m_nGridDim[0], grid.m_nGridDim[1]);
-			} else {
-				_EXCEPTION();
-			}
+			// Set the time index
+			vecInFiles.SetConstantTimeIx(t);
 
-			// If find blobs then assign blob indices
+			// Load in the data
+			varBlobTag.LoadGridData(varreg, vecInFiles, grid);
+			DataArray1D<float> & dataIndex = varBlobTag.GetData();
+			_ASSERT(dataIndex.GetRows() == grid.GetSize());
+
+			// If --findblobs then assign blob indices
 			if (fFindBlobs) {
 				std::set<int> setVisited;
 				std::queue<int> queueToVisit;
@@ -444,6 +470,16 @@ try {
 						}
 					}
 				}
+			}
+
+			// Load in all --sumvar data
+			std::vector< DataArray1D<float> * > vecSumVarData;
+			for (int v = 0; v < vecSumVarIx.size(); v++) {
+				Variable & varSumVar = varreg.Get(vecSumVarIx[v]);
+				varSumVar.LoadGridData(varreg, vecInFiles, grid);
+				DataArray1D<float> & dataSumVar = varSumVar.GetData();
+				vecSumVarData.push_back(&dataSumVar);
+				_ASSERT(dataIndex.GetRows() == grid.GetSize());
 			}
 
 			// Last data index
@@ -498,7 +534,7 @@ try {
 							mapTimedBlobQuantities.insert(
 								TimedBlobQuantitiesMap::value_type(
 									iTime,
-									BlobQuantities()));
+									BlobQuantities(vecSumVarIx.size())));
 
 						if (pr.second == false) {
 							_EXCEPTIONT("Map insertion failed");
@@ -528,6 +564,11 @@ try {
 				bq.dAreaX += dX * grid.m_dArea[i];
 				bq.dAreaY += dY * grid.m_dArea[i];
 				bq.dAreaZ += dZ * grid.m_dArea[i];
+
+				// Add sum variables
+				for (int v = 0; v < vecSumVarIx.size(); v++) {
+					bq.dSumVars[v] += static_cast<double>((*(vecSumVarData[v]))[i]) * grid.m_dArea[i] * EarthRadius * EarthRadius;
+				}
 			}
 		}
 
@@ -638,8 +679,13 @@ try {
 
 						// Area
 						if (vecOutputVars[i] == BlobQuantities::Area) {
-							fprintf(fpout, "\t%1.6e", quants.dArea);
+							fprintf(fpout, "\t%1.6e", quants.dArea * EarthRadius * EarthRadius);
 						}
+					}
+
+					// Sum variables
+					for (int v = 0; v < quants.dSumVars.size(); v++) {
+						fprintf(fpout,"\t%1.6e", quants.dSumVars[v]);
 					}
 
 					// Endline
