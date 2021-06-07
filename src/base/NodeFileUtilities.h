@@ -51,6 +51,12 @@ class ColumnDataHeader {
 
 public:
 	///	<summary>
+	///		Invalid index.
+	///	</summary>
+	static const int InvalidIndex = (-1);
+
+public:
+	///	<summary>
 	///		Assignment operator overload.
 	///	</summary>
 	ColumnDataHeader & operator=(const ColumnDataHeader & cdh) {
@@ -111,7 +117,7 @@ public:
 				return i;
 			}
 		}
-		return (-1);
+		return InvalidIndex;
 	}
 
 	///	<summary>

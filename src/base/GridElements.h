@@ -88,6 +88,21 @@ public:
 	}
 
 	///	<summary>
+	///		Set to a given value.
+	///	</summary>
+	inline const Node & Set(
+		Real _x,
+		Real _y,
+		Real _z
+	) {
+		x = _x;
+		y = _y;
+		z = _z;
+
+		return (*this);
+	}
+
+	///	<summary>
 	///		Assignment operator.
 	///	</summary>
 	const Node & operator=(const Node & node) {
@@ -176,25 +191,65 @@ public:
 	}
 
 	///	<summary>
-	///		muiltiple node position-vector by a constant
+	///		Muiltiply by a constant.
 	///	</summary>
-	Node operator*(const double c) const {
+	Node operator*(const Real c) const {
 		Node result;
-		result.x = x*c;
-		result.y = y*c;
-		result.z = z*c;
+		result.x = x * c;
+		result.y = y * c;
+		result.z = z * c;
 		return result;
 	}
 
 	///	<summary>
-	///		divide node position-vector by a constant
+	///		Divide by a constant.
 	///	</summary>
-	Node operator/(const double c) const {
+	Node operator/(const Real c) const {
 		Node result;
-		result.x = x/c;
-		result.y = y/c;
-		result.z = z/c;
+		result.x = x / c;
+		result.y = y / c;
+		result.z = z / c;
 		return result;
+	}
+
+	///	<summary>
+	///		Sum of two nodes (in place).
+	///	</summary>
+	Node & operator+=(const Node & node) {
+		x += node.x;
+		y += node.y;
+		z += node.z;
+		return (*this);
+	}
+
+	///	<summary>
+	///		Difference between two nodes (in place).
+	///	</summary>
+	Node & operator-=(const Node & node) {
+		x -= node.x;
+		y -= node.y;
+		z -= node.z;
+		return (*this);
+	}
+
+	///	<summary>
+	///		Multiply by a constant (in place).
+	///	</summary>
+	Node & operator*=(const Real c) {
+		x *= c;
+		y *= c;
+		z *= c;
+		return (*this);
+	}
+
+	///	<summary>
+	///		Divide by a constant (in place).
+	///	</summary>
+	Node & operator/=(const Real c) {
+		x /= c;
+		y /= c;
+		z /= c;
+		return (*this);
 	}
 
 	///	<summary>

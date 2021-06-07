@@ -241,6 +241,30 @@ inline void XYZtoRLL_Rad(
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		Convert a vector in RLL coordinates to XYZ.
+///	</summary>
+inline void VecTransRLL2DtoXYZ_Rad(
+	double dLonRad,
+	double dLatRad,
+	double dUlon,
+	double dUlat,
+	double & dUx,
+	double & dUy,
+	double & dUz
+) {
+	double dSinLon = sin(dLonRad);
+	double dCosLon = cos(dLonRad);
+	double dSinLat = sin(dLatRad);
+	double dCosLat = cos(dLatRad);
+
+	dUx = - dSinLon * dUlon - dCosLon * dSinLat * dUlat;
+	dUy =   dCosLon * dUlon - dSinLon * dSinLat * dUlat;
+	dUz =                               dCosLat * dUlat;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Calculate an average longitude from two given longitudes (in radians).
 ///	</summary>
 inline double AverageLongitude_Rad(
