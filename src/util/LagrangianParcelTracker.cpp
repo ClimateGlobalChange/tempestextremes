@@ -1095,7 +1095,7 @@ try {
 				PathNode pn;
 				pn.m_gridix = 0;
 				pn.m_fileix = 0;
-				pn.m_time = itTime->first;
+				pn.m_time = itTimeNext->first;
 				pn.m_vecColumnData.push_back(new ColumnDataDouble(vecX[*itPath].lon));
 				pn.m_vecColumnData.push_back(new ColumnDataDouble(vecX[*itPath].lat));
 				pn.m_vecColumnData.push_back(new ColumnDataDouble(vecX[*itPath].pres));
