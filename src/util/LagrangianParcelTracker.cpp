@@ -800,7 +800,7 @@ try {
 
 	// Get time dimension over all files
 	// strOutTimeUnits is either predetermined or set at the command line
-	AnnounceStartBlock("Loading time array from file");
+	AnnounceStartBlock("Loading time array from files");
 	std::map<Time, std::pair<int, int> > mapGlobalTimeIxToFileTimeIx;
 
 	for (int f = 0; f < vecInputFiles.size(); f++){
@@ -971,6 +971,7 @@ try {
 
 		// No active paths to track
 		if (setActivePathIxs.size() == 0) {
+			AnnounceEndBlock("No parcels (continuing)");
 			continue;
 		}
 
