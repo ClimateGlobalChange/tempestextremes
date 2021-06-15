@@ -675,6 +675,9 @@ try {
 	// Omega variable
 	std::string strWVariable;
 
+	// Tracking time
+	std::string strTrackDuration;
+
 	// Name of latitude dimension
 	std::string strLatitudeName;
 
@@ -694,6 +697,7 @@ try {
 		CommandLineString(strUVariable, "uvar", "U");
 		CommandLineString(strVVariable, "vvar", "V");
 		CommandLineString(strWVariable, "omegavar", "OMEGA");
+		CommandLineString(strTrackDuration, "trackduration", "");
 
 		CommandLineString(strLongitudeName, "lonname", "lon");
 		CommandLineString(strLatitudeName, "latname", "lat");
@@ -836,6 +840,24 @@ try {
 		caltype = it->first.GetCalendarType();
 	}
 
+	// Track duration
+	int nTrackDurationSteps = 0;
+	double dTrackDurationSeconds = 0.0;
+	if (STLStringHelper::IsIntegerIndex(strTrackDuration)) {
+		nTrackDurationSteps = std::stoi(strTrackDuration);
+		if (nTrackDurationSteps < 1) {
+			_EXCEPTIONT("Invalid value of --trackduration; expected positive integer or time delta");
+		}
+
+	} else {
+		Time timeTrackDuration;
+		timeTrackDuration.FromFormattedString(strTrackDuration);
+		dTrackDurationSeconds = timeTrackDuration.AsSeconds();
+		if (dTrackDurationSeconds <= 0.0) {
+			_EXCEPTIONT("Invalid value for --trackduration; expected positive integer or positive time delta");
+		}
+	}
+
 	// Read contents of NodeFile
 	NodeFile nodefilein;
 	std::multimap<Time, LLPPosition> mapStartPositions;
@@ -903,6 +925,9 @@ try {
 	std::vector<LLPPosition> vecX(mapStartPositions.size());
 	std::vector<LLPPosition> vecXs(mapStartPositions.size());
 
+	// Number of points in path
+	std::vector<int> vecTrackLength(mapStartPositions.size(), 0);
+
 	// Map from path index to the bounding levels of the parcel
 	std::map<int, std::pair<int,int> > mapPathIxToBoundingLevelIx;
 
@@ -966,7 +991,33 @@ try {
 			pn.m_vecColumnData.push_back(new ColumnDataDouble(itStartPos->second.pres));
 			nodefileout.m_pathvec[ixNode].push_back(pn);
 
+			vecTrackLength[ixNode]++;
+
 			itStartPos++;
+		}
+		
+		// Remove paths
+		for (auto itPath = setActivePathIxs.begin(); itPath != setActivePathIxs.end();) {
+			bool fRemovePath = false;
+			if (nTrackDurationSteps > 0) {
+				if (nodefileout.m_pathvec[*itPath].size() == nTrackDurationSteps) {
+					fRemovePath = true;
+				}
+			}
+			if (dTrackDurationSeconds > 0.0) {
+				int nNodeCount = nodefileout.m_pathvec[*itPath].size();
+				double dDeltaSeconds =
+					nodefileout.m_pathvec[*itPath][nNodeCount-1].m_time.DeltaSeconds(
+						nodefileout.m_pathvec[*itPath][0].m_time);
+				if (dDeltaSeconds >= dTrackDurationSeconds) {
+					fRemovePath = true;
+				}
+			}
+			if (fRemovePath) {
+				itPath = setActivePathIxs.erase(itPath);
+			} else {
+				itPath++;
+			}
 		}
 
 		// No active paths to track
