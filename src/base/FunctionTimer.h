@@ -36,15 +36,15 @@ public:
 	///	<summary>
 	///		Microseconds per second.
 	///	</summary>
-	static const unsigned long MICROSECONDS_PER_SECOND = 1000000;
+	static const unsigned long long MICROSECONDS_PER_SECOND = 1000000;
 
 public:
 	///	<summary>
 	///		A structure for storing group data.
 	///	</summary>
 	struct TimerGroupData {
-		unsigned long iTotalTime;
-		unsigned int nEntries;
+		unsigned long long iTotalTime;
+		unsigned long long nEntries;
 	};
 
 	///	<summary>
@@ -81,13 +81,13 @@ public:
 	///	<param name="fDone">
 	///		If true stores the elapsed time in the group structure.
 	///	</param>
-	unsigned long Time(bool fDone = false);
+	unsigned long long Time(bool fDone = false);
 
 	///	<summary>
 	///		Return the time elapsed since this timer began and store in
 	///		group data.
 	///	</summary>
-	unsigned long StopTime();
+	unsigned long long StopTime();
 
 public:
 	///	<summary>
@@ -98,17 +98,17 @@ public:
 	///	<summary>
 	///		Retrieve the total time from a group data record.
 	///	</summary>
-	static unsigned long GetTotalGroupTime(const char *szName);
+	static unsigned long long GetTotalGroupTime(const char *szName);
 
 	///	<summary>
 	///		Retrieve the average time from a group data record.
 	///	</summary>
-	static unsigned long GetAverageGroupTime(const char *szName);
+	static unsigned long long GetAverageGroupTime(const char *szName);
 
 	///	<summary>
 	///		Retrieve the number of entries from a group data record.
 	///	</summary>
-	static unsigned int GetNumberOfEntries(const char *szName);
+	static unsigned long long GetNumberOfEntries(const char *szName);
 
 	///	<summary>
 	///		Reset the group data record.

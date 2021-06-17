@@ -47,11 +47,11 @@ void FunctionTimer::Reset() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-unsigned long FunctionTimer::Time(bool fDone) {
+unsigned long long FunctionTimer::Time(bool fDone) {
 	timeval tv;
 	gettimeofday(&tv, NULL);
 
-	unsigned long iTime =
+	unsigned long long iTime =
 	    MICROSECONDS_PER_SECOND * (tv.tv_sec - m_tvStartTime.tv_sec)
 	    + (tv.tv_usec - m_tvStartTime.tv_usec);
 
@@ -87,7 +87,7 @@ unsigned long FunctionTimer::Time(bool fDone) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-unsigned long FunctionTimer::StopTime() {
+unsigned long long FunctionTimer::StopTime() {
 	return Time(true);
 }
 
@@ -112,7 +112,7 @@ const FunctionTimer::TimerGroupData & FunctionTimer::GetGroupTimeRecord(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-unsigned long FunctionTimer::GetTotalGroupTime(const char *szName) {
+unsigned long long FunctionTimer::GetTotalGroupTime(const char *szName) {
 
 	GroupDataMap::iterator iter;
 
@@ -132,7 +132,7 @@ unsigned long FunctionTimer::GetTotalGroupTime(const char *szName) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-unsigned long FunctionTimer::GetAverageGroupTime(const char *szName) {
+unsigned long long FunctionTimer::GetAverageGroupTime(const char *szName) {
 
 	GroupDataMap::iterator iter;
 
@@ -152,7 +152,7 @@ unsigned long FunctionTimer::GetAverageGroupTime(const char *szName) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-unsigned int FunctionTimer::GetNumberOfEntries(const char *szName) {
+unsigned long long FunctionTimer::GetNumberOfEntries(const char *szName) {
 
 	GroupDataMap::iterator iter;
 
