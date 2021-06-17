@@ -96,6 +96,11 @@ public:
 	static const TimerGroupData & GetGroupTimeRecord(const char *szName);
 
 	///	<summary>
+	///		Retrieve the total time from a group data record.
+	///	</summary>
+	static unsigned long GetTotalGroupTime(const char *szName);
+
+	///	<summary>
 	///		Retrieve the average time from a group data record.
 	///	</summary>
 	static unsigned long GetAverageGroupTime(const char *szName);
