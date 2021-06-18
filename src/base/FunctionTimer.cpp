@@ -28,6 +28,9 @@ FunctionTimer::GroupDataMap FunctionTimer::m_mapGroupData;
 
 FunctionTimer::FunctionTimer(const char *szGroup) {
 
+	// Start the timer
+	m_fStopped = false;
+
 	// Assign group name
 	if (szGroup == NULL) {
 		m_strGroup = "";
@@ -42,18 +45,21 @@ FunctionTimer::FunctionTimer(const char *szGroup) {
 ///////////////////////////////////////////////////////////////////////////////
 
 void FunctionTimer::Reset() {
+	m_fStopped = false;
 	gettimeofday(&m_tvStartTime, NULL);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 unsigned long long FunctionTimer::Time(bool fDone) {
-	timeval tv;
-	gettimeofday(&tv, NULL);
+
+	if (!m_fStopped) {
+		gettimeofday(&m_tvStopTime, NULL);
+	}
 
 	unsigned long long iTime =
-	    MICROSECONDS_PER_SECOND * (tv.tv_sec - m_tvStartTime.tv_sec)
-	    + (tv.tv_usec - m_tvStartTime.tv_usec);
+	    MICROSECONDS_PER_SECOND * (m_tvStopTime.tv_sec - m_tvStartTime.tv_sec)
+	    + (m_tvStopTime.tv_usec - m_tvStartTime.tv_usec);
 
 	// If no name associated with this timer, ignore fDone.
 	if (m_strGroup == "") {
@@ -61,7 +67,9 @@ unsigned long long FunctionTimer::Time(bool fDone) {
 	}
 
 	// Add the time to the group record
-	if (fDone) {
+	if ((fDone) && (!m_fStopped)) {
+		m_fStopped = true;
+
 		GroupDataMap::iterator iter;
 
 		iter = m_mapGroupData.find(m_strGroup);

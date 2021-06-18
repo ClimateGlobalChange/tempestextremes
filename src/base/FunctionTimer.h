@@ -123,9 +123,19 @@ private:
 
 private:
 	///	<summary>
+	///		Timer is stopped.
+	///	</summary>
+	bool m_fStopped;
+
+	///	<summary>
 	///		Time at which this timer was constructed.
 	///	</summary
 	timeval m_tvStartTime;
+
+	///	<summary>
+	///		Time at which this timer was stopped.
+	///	</summary
+	timeval m_tvStopTime;
 
 	///	<summary>
 	///		Group name associated with this timer.
