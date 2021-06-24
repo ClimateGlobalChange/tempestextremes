@@ -577,6 +577,7 @@ void NodeFileFilter(
 	const Time::CalendarType & caltype,
 	ColumnDataHeader & cdhInput,
 	const std::vector<std::string> & vecVarNames,
+	const std::vector<std::string> & vecVarOutNames,
 	const std::vector<VariableIndex> & vecVarIx,
 	const std::string & strMaskVariable,
 	const std::string & strFilterByDist,
@@ -589,6 +590,8 @@ void NodeFileFilter(
 	const std::string & strLatitudeName,
 	const std::string & strLongitudeName
 ) {
+	_ASSERT(vecVarNames.size() == vecVarOutNames.size());
+
 	// Begin processing
 	AnnounceStartBlock("Processing input (%s)", strInputFile.c_str());
 
@@ -796,7 +799,7 @@ void NodeFileFilter(
 			}
 
 			NcVar * varOut = ncoutfile.add_var(
-				varIn->name(),
+				vecVarOutNames[v].c_str(),
 				varIn->type(),
 				vecDimOut.size(),
 				(const NcDim**)&(vecDimOut[0]));
@@ -1184,8 +1187,11 @@ try {
 	// Output list of data files
 	std::string strOutputDataList;
 
-	// List of variables to output
+	// List of variables to filter
 	std::string strVariables;
+
+	// List of output names for the variables to filter
+	std::string strVariableOutputs;
 
 	// Output the mask to the given variable
 	std::string strMaskVariable;
@@ -1232,6 +1238,7 @@ try {
 		CommandLineString(strOutputDataList, "out_data_list", "");
 
 		CommandLineString(strVariables, "var", "");
+		CommandLineString(strVariableOutputs, "varout", "");
 		CommandLineString(strMaskVariable, "maskvar", "");
 		CommandLineString(strPreserve, "preserve", "");
 		CommandLineStringD(strFillValue, "fillvalue", "", "[<value>|nan|att]");
@@ -1321,6 +1328,18 @@ try {
 		}
 	}
 	_ASSERT(vecVarNames.size() == vecVarIx.size());
+
+	// Parse --varout argument
+	std::vector<std::string> vecVarOutNames;
+	if (strVariableOutputs == "") {
+		vecVarOutNames = vecVarNames;
+	} else {
+		STLStringHelper::ParseVariableList(strVariableOutputs, vecVarOutNames);
+
+		if (vecVarOutNames.size() != vecVarNames.size()) {
+			_EXCEPTIONT("--var and --varout must have the same length");
+		}
+	}
 
 	// Parse --bydist
 	if (strFilterByDist != "") {
@@ -1527,6 +1546,7 @@ try {
 			caltype,
 			cdhInput,
 			vecVarNames,
+			vecVarOutNames,
 			vecVarIx,
 			strMaskVariable,
 			strFilterByDist,
@@ -1549,6 +1569,7 @@ try {
 
 	}
 
+	MPI_Barrier(MPI_COMM_WORLD);
 	AnnounceBanner();
 
 } catch(Exception & e) {
