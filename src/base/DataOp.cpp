@@ -90,10 +90,13 @@ DataOp * DataOpManager::Add(
 		
 	} else if (strName == "_MIN") {
 		return Add(new DataOp_MIN);
-	
+
 	} else if (strName == "_MAX") {
 		return Add(new DataOp_MAX);
-	
+
+	} else if (strName == "_COND") {
+		return Add(new DataOp_COND);
+
 	} else if (strName == "_SQRT") {
 		return Add(new DataOp_SQRT);
 	
@@ -893,6 +896,111 @@ bool DataOp_MAX::Apply(
 					dataout[i] = data[i];
 				}
 			}
+		}
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_COND
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_COND::name = "_COND";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_COND::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 3) {
+		_EXCEPTION2("%s expects three arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	for (int v = 0; v < vecArgData.size(); v++) {
+		if (vecArgData[v] == NULL) {
+			if (!STLStringHelper::IsFloat(strArg[v])) {
+				_EXCEPTION1("Arguments to %s must be data variables or floats",
+					m_strName.c_str());
+			}
+		}
+	}
+
+	// First conditional is a float
+	if (vecArgData[0] == NULL) {
+		float dValue0 = atof(strArg[0].c_str());
+
+		int ix = 2;
+		if (dValue0 > 0.0) {
+			ix = 1;
+		}
+		if (vecArgData[ix] == NULL) {
+			float dValueRHS = atof(strArg[ix].c_str());
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				dataout[i] = dValueRHS;
+			}
+		} else {
+			const DataArray1D<float> & data = *(vecArgData[ix]);
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				dataout[i] = data[i];
+			}
+		}
+
+	// First conditional is a field
+	} else {
+		const DataArray1D<float> & datacond = *(vecArgData[0]);
+
+		// Outputs are floats
+		if ((vecArgData[1] == NULL) && (vecArgData[2] == NULL)) {
+			float dValue1 = atof(strArg[1].c_str());
+			float dValue2 = atof(strArg[2].c_str());
+			for (int i = 0; i < datacond.GetRows(); i++) {
+				if (datacond[i] > 0.0) {
+					dataout[i] = dValue1;
+				} else {
+					dataout[i] = dValue2;
+				}
+			}
+
+		// First output is a float
+		} else if (vecArgData[1] == NULL) {
+			float dValue1 = atof(strArg[1].c_str());
+			const DataArray1D<float> & data2 = *(vecArgData[2]);
+			for (int i = 0; i < datacond.GetRows(); i++) {
+				if (datacond[i] > 0.0) {
+					dataout[i] = dValue1;
+				} else {
+					dataout[i] = data2[i];
+				}
+			}
+
+		// Second output is a float
+		} else if (vecArgData[2] == NULL) {
+			const DataArray1D<float> & data1 = *(vecArgData[1]);
+			float dValue2 = atof(strArg[2].c_str());
+			for (int i = 0; i < datacond.GetRows(); i++) {
+				if (datacond[i] > 0.0) {
+					dataout[i] = data1[i];
+				} else {
+					dataout[i] = dValue2;
+				}
+			}
+
+		// Both outputs are fields
+		} else {
+			const DataArray1D<float> & data1 = *(vecArgData[1]);
+			const DataArray1D<float> & data2 = *(vecArgData[2]);
+			for (int i = 0; i < datacond.GetRows(); i++) {
+				if (datacond[i] > 0.0) {
+					dataout[i] = data1[i];
+				} else {
+					dataout[i] = data2[i];
+				}
+			}
+
 		}
 	}
 

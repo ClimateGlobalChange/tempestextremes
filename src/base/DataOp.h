@@ -444,6 +444,36 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class DataOp_COND : public DataOp {
+
+public:
+	///	<summary>
+	///		Operartor name.
+	///	</summary>
+	static const char * name;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_COND() :
+		DataOp(name)
+	{ }
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 class DataOp_SQRT : public DataOp {
 
 public:
