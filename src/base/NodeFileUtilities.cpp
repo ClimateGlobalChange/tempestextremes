@@ -496,7 +496,7 @@ void NodeFile::ApplyTimeDelta(
 	const Time & timeDelta,
 	bool fAddTimeDelta
 ) {
-	if (fAddTimeDelta) {
+	if (!fAddTimeDelta) {
 		for (int p = 0; p < m_pathvec.size(); p++) {
 			Path & path = m_pathvec[p];
 			path.m_timeStart -= timeDelta;
