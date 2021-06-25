@@ -230,6 +230,19 @@ public:
 	}
 
 	///	<summary>
+	///		Subtract Time from this object.
+	///	</summary>
+	void SubtractTime(const Time & timeDelta);
+
+	///	<summary>
+	///		Add Time to this object.
+	///	</summary>
+	inline Time & operator-=(const Time & timeDelta) {
+		SubtractTime(timeDelta);
+		return (*this);
+	}
+
+	///	<summary>
 	///		Add a number of seconds to the Time.
 	///	</summary>
 	inline void AddSeconds(int nSeconds) {

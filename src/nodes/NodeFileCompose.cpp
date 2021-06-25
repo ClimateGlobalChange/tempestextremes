@@ -242,6 +242,9 @@ try {
 	// Fixed latitude
 	double dFixedLatitudeDeg;
 
+	// Apply a time delta to the data
+	std::string strApplyTimeDelta;
+
 	// Maximum time difference
 	std::string strMaxTimeDelta;
 
@@ -282,6 +285,7 @@ try {
 		CommandLineDouble(dFixedLongitudeDeg, "fixlon", -999.);
 		CommandLineDouble(dFixedLatitudeDeg, "fixlat", -999.);
 
+		CommandLineString(strApplyTimeDelta, "apply_time_delta", "");
 		CommandLineString(strMaxTimeDelta, "max_time_delta", "");
 
 		CommandLineString(strLongitudeName, "lonname", "lon");
@@ -513,6 +517,17 @@ try {
 
 			i++;
 		}
+	}
+
+	// Parse --apply_time_delta
+	bool fAddTimeDelta = true;
+	Time timeDelta;
+	if (strApplyTimeDelta != "") {
+		if (strApplyTimeDelta[0] == '-') {
+			fAddTimeDelta = false;
+			strApplyTimeDelta = strApplyTimeDelta.substr(1);
+		}
+		timeDelta.FromFormattedString(strApplyTimeDelta);
 	}
 
 	// Parse --max_time_delta
@@ -774,6 +789,10 @@ try {
 			cdhInput,
 			grid,
 			autocurator.GetCalendarType());
+
+		if (strApplyTimeDelta != "") {
+			nodefile.ApplyTimeDelta(timeDelta, fAddTimeDelta);
+		}
 
 		nodefile.GenerateTimeToPathNodeMap();
 		AnnounceEndBlock("Done");

@@ -492,6 +492,39 @@ void NodeFile::GenerateTimeToPathNodeMap() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void NodeFile::ApplyTimeDelta(
+	const Time & timeDelta,
+	bool fAddTimeDelta
+) {
+	if (fAddTimeDelta) {
+		for (int p = 0; p < m_pathvec.size(); p++) {
+			Path & path = m_pathvec[p];
+			path.m_timeStart -= timeDelta;
+			path.m_timeEnd -= timeDelta;
+			for (int n = 0; n < path.size(); n++) {
+				path[n].m_time -= timeDelta;
+			}
+		}
+
+	} else {
+		for (int p = 0; p < m_pathvec.size(); p++) {
+			Path & path = m_pathvec[p];
+			path.m_timeStart += timeDelta;
+			path.m_timeEnd += timeDelta;
+			for (int n = 0; n < path.size(); n++) {
+				path[n].m_time += timeDelta;
+			}
+		}
+	}
+
+	// Rebuild the time to pathnode map
+	if (m_mapTimeToPathNode.size() != 0) {
+		GenerateTimeToPathNodeMap();
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void NodeFile::Interpolate(
 	const Time & time
 ) {

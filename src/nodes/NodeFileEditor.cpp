@@ -1158,6 +1158,9 @@ try {
 	// Calculation commands
 	std::string strCalculate;
 
+	// Time delta
+	std::string strTimeDelta;
+
 	// List of variables to append
 	std::string strAppend;
 
@@ -1191,6 +1194,7 @@ try {
 		CommandLineString(strTimeFilter, "timefilter", "");
 		CommandLineStringD(strColumnFilter, "colfilter", "", "[col,op,value;...]");
 		CommandLineString(strCalculate, "calculate", "");
+		CommandLineString(strTimeDelta, "apply_time_delta", "");
 		//CommandLineString(strAppend, "append", "");
 
 		CommandLineString(strLongitudeName, "lonname", "lon");
@@ -1315,6 +1319,17 @@ try {
 	ArgumentTree calc(true);
 	if (strCalculate != "") {
 		calc.Parse(strCalculate);
+	}
+
+	// Parse --apply_time_delta
+	bool fAddTimeDelta = true;
+	Time timeDelta;
+	if (strTimeDelta != "") {
+		if (strTimeDelta[0] == '-') {
+			fAddTimeDelta = false;
+			strTimeDelta = strTimeDelta.substr(1);
+		}
+		timeDelta.FromFormattedString(strTimeDelta);
 	}
 
 	// Curate input data
@@ -2137,6 +2152,11 @@ try {
 			AnnounceEndBlock("WARNING: Unknown function \"%s\" no operation performed",
 				(*pargtree)[2].c_str());
 
+		}
+
+		// Apply time delta
+		if (strTimeDelta != "") {
+			nodefile.ApplyTimeDelta(timeDelta, fAddTimeDelta);
 		}
 
 		// Output

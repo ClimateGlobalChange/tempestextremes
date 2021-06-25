@@ -319,6 +319,23 @@ void Time::AddTime(const Time & timeDelta) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void Time::SubtractTime(const Time & timeDelta) {
+
+	if (timeDelta.m_eTimeType != TypeDelta) {
+		_EXCEPTIONT("Argument to AddTime() is not a TimeDelta");
+	}
+
+	m_iYear        -= timeDelta.m_iYear;
+	m_iMonth       -= timeDelta.m_iMonth;
+	m_iDay         -= timeDelta.m_iDay;
+	m_iSecond      -= timeDelta.m_iSecond;
+	m_iMicroSecond -= timeDelta.m_iMicroSecond;
+
+	NormalizeTime();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int Time::DayNumber() const {
 
 	// Based on https://alcor.concordia.ca/~gpkatch/gdate-algorithm.html

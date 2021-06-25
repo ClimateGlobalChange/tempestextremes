@@ -727,6 +727,15 @@ public:
 
 public:
 	///	<summary>
+	///		Apply a time delta to the node file.
+	///	</summary>
+	void ApplyTimeDelta(
+		const Time & timeDelta,
+		bool fAddTimeDelta = true
+	);
+
+public:
+	///	<summary>
 	///		Initialize the interpolation indices at the given time.
 	///	</summary>
 	void Interpolate(
