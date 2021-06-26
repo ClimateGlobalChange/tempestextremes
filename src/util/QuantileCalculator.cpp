@@ -35,6 +35,19 @@
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
+/*
+static unsigned int mylog2 (unsigned int val) {
+	if (val == 0) return UINT_MAX;
+	if (val == 1) return 0;
+	unsigned int ret = 0;
+	while (val > 1) {
+		val >>= 1;
+		ret++;
+	}
+	return ret;
+}
+*/
+///////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char** argv) {
 
@@ -89,6 +102,9 @@ try {
 	// Number of quantile bins
 	int nQuantileBins;
 
+	// Number of iterations
+	int nIterations;
+
 	// Name of latitude dimension
 	std::string strLatitudeName;
 
@@ -106,7 +122,8 @@ try {
 		CommandLineString(strVariableName, "var", "");
 		CommandLineString(strVariableOutName, "varout", "");
 		CommandLineDouble(dQuantile, "quantile", 0.95);
-		CommandLineInt(nQuantileBins, "bins", 10);
+		CommandLineInt(nQuantileBins, "bins", 16);
+		CommandLineInt(nIterations, "iter", 8);
 
 		CommandLineString(strLongitudeName, "lonname", "lon");
 		CommandLineString(strLatitudeName, "latname", "lat");
@@ -126,12 +143,21 @@ try {
 	if (strOutputData.length() == 0) {
 		_EXCEPTIONT("No output file (--out_data) specified");
 	}
-
+/*
+	unsigned int nLog2QuantileBins = mylog2((unsigned int) nQuantileBins);
+	if ((1 << nLog2QuantileBins) != nQuantileBins) {
+		_EXCEPTIONT("--bins must be a power of 2");
+	}
+*/
 	if (nQuantileBins < 2) {
 		_EXCEPTIONT("--bins must be at least 2");
 	}
 	if ((dQuantile < 0.0) || (dQuantile > 1.0)) {
 		_EXCEPTIONT("--quantile must be between 0 and 1, inclusive");
+	}
+
+	if (nIterations < 1) {
+		_EXCEPTIONT("--iter must be at least 1");
 	}
 
 	if (strVariableOutName == "") {
@@ -196,6 +222,7 @@ try {
 	DataArray1D<int> nBinCountPreHist(grid.GetSize());
 	DataArray2D<int> nBinCounts(grid.GetSize(), nQuantileBins);
 	DataArray2D<float> dBinEdges(grid.GetSize(), nQuantileBins+1);
+	//DataArray2D<float> dBinEdges(grid.GetSize(), 2);
 
 	// Initialize first pass bin sizes from first file
 	{
@@ -292,8 +319,8 @@ try {
 	}
 
 	// Run the quantile calculation
-	for (int it = 0; it < 10; it++) {
-		AnnounceStartBlock("Running quantiles: Pass %i", it);
+	for (int it = 0; it < nIterations; it++) {
+		AnnounceStartBlock("Running quantiles: Iteration %i / %i", it+1, nIterations);
 
 		// Get the Variable
 		Variable & varQuantile = varreg.Get(varix);
@@ -306,6 +333,8 @@ try {
 		nBinCounts.Zero();
 
 		for (size_t f = 0; f < vecInputFiles.size(); f++) {
+			Announce("File \"%s\"", vecInputFiles[f].c_str());
+
 			NcFileVector ncfilevec;
 			ncfilevec.ParseFromString(vecInputFiles[f]);
 			if (ncfilevec.size() == 0) {
@@ -372,7 +401,7 @@ try {
 				}
 			}
 		}
-
+/*
 		{
 			printf("\n");
 			for (int b = 0; b < nQuantileBins; b++) {
@@ -380,10 +409,15 @@ try {
 			}
 			printf("\n");
 		}
-
+*/
 		// Determine which bin contains the correct quantile
+		Announce("Identifying correct bin for associated quantile");
+
 		int nQuantileIndex = static_cast<int>(static_cast<double>(nTotalPointCount-1) * dQuantile + 0.5);
 		_ASSERT((nQuantileIndex >= 0) && (nQuantileIndex < nTotalPointCount));
+
+		double dAverageBinWidth = 0.0;
+		double dMaximumBinWidth = 0.0;
 
 		for (size_t i = 0; i < grid.GetSize(); i++) {
 			int nAccumulatedCount = nBinCountPreHist[i];
@@ -391,16 +425,20 @@ try {
 			int b = 0;
 			for (; b < nQuantileBins; b++) {
 				nAccumulatedCount += nBinCounts(i,b);
+/*
 				if (i == 0) {
 					printf("%i %i / %i\n", b, nAccumulatedCount, nQuantileIndex);
 				}
+*/
 				if (nAccumulatedCount > nQuantileIndex) {
+/*
 					if (i == 0) {
 						printf("Prev [%1.15f %1.15f] : New [%1.15f %1.15f] : Count %i\n",
 							dBinEdges(i,0), dBinEdges(i,nQuantileBins),
 							dBinEdges(i,b), dBinEdges(i,b+1),
 							nBinCounts(i,b));
 					}
+*/
 					dBinEdges(i,0) = dBinEdges(i,b);
 					dBinEdges(i,nQuantileBins) = dBinEdges(i,b+1);
 					break;
@@ -410,12 +448,20 @@ try {
 				_EXCEPTION1("Index %i", i);
 			}
 
+			double dBinWidth = static_cast<double>(dBinEdges(i,nQuantileBins)) - static_cast<double>(dBinEdges(i,0));
+			dAverageBinWidth += dBinWidth;
+			if (dBinWidth > dMaximumBinWidth) {
+				dMaximumBinWidth = dBinWidth;
+			}
+
 			for (b = 1; b < nQuantileBins; b++) {
 				double dAlpha = static_cast<float>(b) / static_cast<float>(nQuantileBins);
 				dBinEdges(i,b) = (1.0 - dAlpha) * dBinEdges(i,0) + dAlpha * dBinEdges(i,nQuantileBins);
 			}
 		}
 
+		Announce("Average bin width: %1.7e", dAverageBinWidth / static_cast<double>(grid.GetSize()));
+		Announce("Maximum bin width: %1.7e", dMaximumBinWidth);
 		AnnounceEndBlock("Done");
 	}
 
