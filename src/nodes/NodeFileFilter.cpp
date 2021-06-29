@@ -1569,7 +1569,10 @@ try {
 
 	}
 
+#if defined(TEMPEST_MPIOMP)
 	MPI_Barrier(MPI_COMM_WORLD);
+#endif
+
 	AnnounceBanner();
 
 } catch(Exception & e) {
