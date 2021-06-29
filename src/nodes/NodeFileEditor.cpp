@@ -33,6 +33,7 @@
 #include "GridElements.h"
 #include "RLLPolygonArray.h"
 #include "TimeMatch.h"
+#include "NodeOutputOp.h"
 
 #include "netcdfcpp.h"
 
@@ -1537,6 +1538,77 @@ try {
 				} else {
 					nArguments = 1;
 				}
+			}
+
+			// outputcmd
+			if ((*pargtree)[2] == "outputcmd") {
+
+				std::string strOutputCmd;
+				if (nArguments == 3) {
+					strOutputCmd = (*pargfunc)[0] + "," + (*pargfunc)[1] + "," + (*pargfunc)[2];
+				} else if (nArguments == 4) {
+					strOutputCmd = (*pargfunc)[0] + "(" + (*pargfunc)[1] + ")," + (*pargfunc)[2] + "," + (*pargfunc)[3];
+				} else {
+					_EXCEPTIONT("Syntax error: Function \"outputcmd\" "
+						"requires three arguments:\n"
+						"outputcmd(<variable>, <op>, <dist>)");
+				}
+
+				//std::cout << strOutputCmd << std::endl;
+
+				NodeOutputOp opOutputCmd;
+				opOutputCmd.Parse(varreg, strOutputCmd, false);
+
+				std::string strResult;
+
+				// Loop through all Times
+				TimeToPathNodeMap::iterator iterPathNode =
+					mapTimeToPathNode.begin();
+				for (; iterPathNode != mapTimeToPathNode.end(); iterPathNode++) {
+					const Time & time = iterPathNode->first;
+
+					// Unload data from the VariableRegistry
+					varreg.UnloadAllGridData();
+
+					// Open NetCDF files with data at this time
+					NcFileVector vecncDataFiles;
+					autocurator.FindFilesAtTime(time, vecncDataFiles);
+					if (vecncDataFiles.size() == 0) {
+						_EXCEPTION1("Time (%s) does not exist in input data fileset",
+							time.ToString().c_str());
+					}
+
+					// Loop through all PathNodes which need calculating at this Time
+					for (int i = 0; i < iterPathNode->second.size(); i++) {
+						int iPath = iterPathNode->second[i].first;
+						int iPathNode = iterPathNode->second[i].second;
+
+						PathNode & pathnode =
+							pathvec[iPath][iPathNode];
+
+						std::string strResult;
+
+						ApplyNodeOutputOp<float>(
+							opOutputCmd,
+							grid,
+							varreg,
+							vecncDataFiles,
+							time,
+							pathnode.m_gridix,
+							strResult);
+
+						// Add this data to the pathnode
+						pathnode.PushColumnData(
+							new ColumnDataString(strResult));
+					}
+				}
+
+				// Add new variable to ColumnDataHeader
+				cdhWorking.push_back((*pargtree)[0]);
+
+				AnnounceEndBlock("Done");
+				continue;
+
 			}
 
 			// eval_ace, eval_ike, eval_pdi

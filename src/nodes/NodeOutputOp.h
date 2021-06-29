@@ -48,7 +48,8 @@ public:
 	///	</summary>
 	void Parse(
 		VariableRegistry & varreg,
-		const std::string & strOp
+		const std::string & strOp,
+		bool fVerbose = true
 	) {
 		// Read mode
 		enum {
@@ -124,7 +125,19 @@ public:
 			_EXCEPTIONT("For output op, distance must be nonnegative");
 		}
 
+		// Store variable string
+		m_strVariableString = varreg.GetVariableString(m_varix);
+
 		// Output announcement
+		if (fVerbose) {
+			Announce("%s", ToString().c_str());
+		}
+	}
+
+	///	<summary>
+	///		Get the string representation of this operator.
+	///	</summary>
+	std::string ToString() const {
 		std::string strDescription;
 
 		if (m_eOp == Max) {
@@ -143,13 +156,13 @@ public:
 			strDescription += "Coordinates of minimum of ";
 		}
 
-		strDescription += varreg.GetVariableString(m_varix);
+		strDescription += m_strVariableString;
 
 		char szBuffer[128];
 		sprintf(szBuffer, " within %f degrees", m_dDistance);
 		strDescription += szBuffer;
 
-		Announce("%s", strDescription.c_str());
+		return strDescription;
 	}
 
 public:
@@ -157,6 +170,11 @@ public:
 	///		Variable to use for output.
 	///	</summary>
 	VariableIndex m_varix;
+
+	///	<summary>
+	///		Variable string.
+	///	</summary>
+	std::string m_strVariableString;
 
 	///	<summary>
 	///		Operation.
