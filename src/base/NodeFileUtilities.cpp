@@ -79,7 +79,6 @@ void NodeFile::ReadCSV(
 				STLStringHelper::RemoveWhitespaceInPlace(strHeader);
 				iLast = i+1;
 				cdh.push_back(strHeader);
-				std::cout << strHeader << std::endl;
 			}
 		}
 	}
@@ -206,8 +205,6 @@ void NodeFile::ReadCSV(
 		Time time(iYear, iMonth, iDay, iHour * 3600, caltype);
 
 		pathnode.m_time = time;
-
-		std::cout << strBuffer << std::endl;
 
 		for (int v = 0; v < vecValues.size(); v++) {
 			pathnode.m_vecColumnData.push_back(new ColumnDataString(vecValues[v]));
