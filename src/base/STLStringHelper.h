@@ -135,6 +135,34 @@ inline static bool IsFloat(const std::string &str) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+static void RemoveWhitespaceInPlace(
+	std::string & strString
+) {
+	size_t sBegin = strString.length();
+	for (size_t s = 0; s < strString.length(); s++) {
+		if ((strString[s] != ' ') && (strString[s] != '\t')) {
+			sBegin = s;
+			break;
+		}
+	}
+	if (sBegin == strString.length()) {
+		strString = "";
+		return;
+	}
+
+	size_t sEnd = strString.length();
+	for (size_t s = sEnd-1; s > sBegin; s--) {
+		if ((strString[s] != ' ') && (strString[s] != '\t')) {
+			sEnd = s+1;
+			break;
+		}
+	}
+
+	strString = strString.substr(sBegin, sEnd - sBegin);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 static void ParseVariableList(
 	const std::string & strVariables,
 	std::vector< std::string > & vecVariableStrings,

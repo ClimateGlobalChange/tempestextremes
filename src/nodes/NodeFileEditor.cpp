@@ -1120,6 +1120,9 @@ try {
 	// Input list of node files
 	std::string strInputNodeFileList;
 
+	// Input node file format
+	//std::string strInputFileFormat;
+
 	// Input file type
 	std::string strPathType;
 
@@ -1178,6 +1181,7 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputNodeFile, "in_nodefile", "");
 		//CommandLineString(strInputNodeFileList, "in_file_list", "");
+		//CommandLineStringD(strInputFileFormat, "in_nodefile_format", "gfdl", "[gfdl|track]");
 		CommandLineStringD(strPathType, "in_nodefile_type", "SN", "[DN|SN]");
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
@@ -1185,7 +1189,7 @@ try {
 		CommandLineBool(fDiagonalConnectivity, "diag_connect");
 		CommandLineBool(fRegional, "regional");
 
-		CommandLineString(strInputFormat, "in_fmt", "");
+		CommandLineString(strInputFormat, "in_fmt", "(auto)");
 		CommandLineString(strOutputFormat, "out_fmt", "");
 
 		CommandLineString(strOutputFile, "out_nodefile", "");

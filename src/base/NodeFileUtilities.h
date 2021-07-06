@@ -139,6 +139,13 @@ public:
 	}
 
 	///	<summary>
+	///		Clear the contents of this ColumnDataHeader.
+	///	</summary>
+	void clear() {
+		m_vecColumnHeader.clear();
+	}
+
+	///	<summary>
 	///		Add a new header string.
 	///	</summary>
 	void push_back(const std::string & str) {
@@ -687,12 +694,12 @@ public:
 
 public:
 	///	<summary>
-	///		Read in a node file and parse it into a PathVector.
+	///		Read in a nodefile as a CSV and parse it into a PathVector.
 	///	</summary>
-	void Read(
+	void ReadCSV(
 		const std::string & strNodeFile,
 		PathType ePathType,
-		const ColumnDataHeader & cdh,
+		ColumnDataHeader & cdh,
 		const std::vector<size_t> & nGridDim,
 		size_t sGridSize,
 		Time::CalendarType caltype
@@ -704,7 +711,19 @@ public:
 	void Read(
 		const std::string & strNodeFile,
 		PathType ePathType,
-		const ColumnDataHeader & cdh,
+		ColumnDataHeader & cdh,
+		const std::vector<size_t> & nGridDim,
+		size_t sGridSize,
+		Time::CalendarType caltype
+	);
+
+	///	<summary>
+	///		Read in a node file and parse it into a PathVector.
+	///	</summary>
+	void Read(
+		const std::string & strNodeFile,
+		PathType ePathType,
+		ColumnDataHeader & cdh,
 		const SimpleGrid & grid,
 		Time::CalendarType caltype
 	);

@@ -25,10 +25,10 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void NodeFile::Read(
+void NodeFile::ReadCSV(
 	const std::string & strNodeFile,
 	PathType ePathType,
-	const ColumnDataHeader & cdh,
+	ColumnDataHeader & cdh,
 	const std::vector<size_t> & nGridDim,
 	size_t sGridSize,
 	Time::CalendarType caltype
@@ -38,7 +38,225 @@ void NodeFile::Read(
 		_EXCEPTIONT("Not implemented");
 	}
 
-	// Check that this NodeFile
+	// Check that this NodeFile is uninitialized
+	if ((m_cdh.size() != 0) || (m_pathvec.size() != 0)) {
+		_EXCEPTIONT("Attempting to ReadCSV() on an initialized NodeFile");
+	}
+
+	// Store the PathType
+	m_ePathType = ePathType;
+
+	// String buffer
+	std::string strBuffer;
+
+	// Only support grids of dimension 1 or 2
+	if ((nGridDim.size() < 1) || (nGridDim.size() > 2)) {
+		_EXCEPTIONT("Grid dimension out of range:  Only grids of dimension 1 or 2 supported");
+	}
+
+	// Clear the TimeToPathNodeMap
+	m_mapTimeToPathNode.clear();
+
+	// Open the file as an input stream
+	std::ifstream ifInput(strNodeFile);
+	if (!ifInput.is_open()) {
+		_EXCEPTION1("Unable to open nodefile \"%s\"", strNodeFile.c_str());
+	}
+
+	// Attempt to read column data header from file
+	if ((cdh.size() == 1) && (cdh[0] == "(auto)")) {
+		cdh.clear();
+
+		getline(ifInput, strBuffer);
+		if (ifInput.eof()) {
+			_EXCEPTION1("Input nodefile \"%s\" contains no data", strNodeFile.c_str());
+		}
+
+		int iLast = 0;
+		for (int i = 0; i <= strBuffer.length(); i++) {
+			if ((i == strBuffer.length()) || (strBuffer[i] == ',')) {
+				std::string strHeader = strBuffer.substr(iLast, i-iLast);
+				STLStringHelper::RemoveWhitespaceInPlace(strHeader);
+				iLast = i+1;
+				cdh.push_back(strHeader);
+				std::cout << strHeader << std::endl;
+			}
+		}
+	}
+
+	// Store CDH
+	m_cdh = cdh;
+
+	// Check for all necessary headers
+	int iColTrackId = (-1);
+	int iColYear = (-1);
+	int iColMonth = (-1);
+	int iColDay = (-1);
+	int iColHour = (-1);
+	int iColLon = (-1);
+	int iColLat = (-1);
+
+	{
+		for (int iCol = 0; iCol < m_cdh.size(); iCol++) {
+			if (m_cdh[iCol] == "track_id") {
+				iColTrackId = iCol;
+			}
+			if (m_cdh[iCol] == "year") {
+				iColYear = iCol;
+			}
+			if (m_cdh[iCol] == "month") {
+				iColMonth = iCol;
+			}
+			if (m_cdh[iCol] == "day") {
+				iColDay = iCol;
+			}
+			if (m_cdh[iCol] == "hour") {
+				iColHour = iCol;
+			}
+			if ((m_cdh[iCol] == "lon") || (m_cdh[iCol] == "longitude")) {
+				iColLon = iCol;
+			}
+			if ((m_cdh[iCol] == "lat") || (m_cdh[iCol] == "latitude")) {
+				iColLat = iCol;
+			}
+		}
+
+		if (iColTrackId == (-1)) {
+			_EXCEPTION1("Input CSV-formatted nodefile \"%s\" missing column \"track_id\"", strNodeFile.c_str());
+		}
+		if (iColYear == (-1)) {
+			_EXCEPTION1("Input CSV-formatted nodefile \"%s\" missing column \"year\"", strNodeFile.c_str());
+		}
+		if (iColMonth == (-1)) {
+			_EXCEPTION1("Input CSV-formatted nodefile \"%s\" missing column \"month\"", strNodeFile.c_str());
+		}
+		if (iColDay == (-1)) {
+			_EXCEPTION1("Input CSV-formatted nodefile \"%s\" missing column \"day\"", strNodeFile.c_str());
+		}
+		if (iColHour == (-1)) {
+			_EXCEPTION1("Input CSV-formatted nodefile \"%s\" missing column \"hour\"", strNodeFile.c_str());
+		}
+		if (iColLon == (-1)) {
+			_EXCEPTION1("Input CSV-formatted nodefile \"%s\" missing column \"lon\"", strNodeFile.c_str());
+		}
+		if (iColLat == (-1)) {
+			_EXCEPTION1("Input CSV-formatted nodefile \"%s\" missing column \"lat\"", strNodeFile.c_str());
+		}
+	}
+
+	// Current track_id
+	int iTrackId = 0;
+	std::string strTrackId = "";
+
+	// Loop through all lines
+	for (int iLine = 1; ; iLine++) {
+		getline(ifInput, strBuffer);
+		if (ifInput.eof()) {
+			break;
+		}
+
+		// Parse the line into a vector
+		std::vector<std::string> vecValues;
+		int iLast = 0;
+		for (int i = 0; i <= strBuffer.length(); i++) {
+			if ((i == strBuffer.length()) || (strBuffer[i] == ',')) {
+				std::string strValue = strBuffer.substr(iLast, i-iLast);
+				STLStringHelper::RemoveWhitespaceInPlace(strValue);
+				vecValues.push_back(strValue);
+				iLast = i+1;
+			}
+		}
+		if (vecValues.size() != m_cdh.size()) {
+			_EXCEPTION2("Mismatch in number of columns of nodefile \"%s\" on line %i", strNodeFile.c_str(), iLine);
+		}
+
+		// Check track id; if changed change the path
+		if (vecValues[iColTrackId] != strTrackId) {
+			iTrackId = m_pathvec.size();
+			m_pathvec.resize(m_pathvec.size()+1);
+			strTrackId = vecValues[iColTrackId];
+		}
+
+		_ASSERT(iTrackId < m_pathvec.size());
+
+		Path & path = m_pathvec[iTrackId];
+
+		path.resize(path.size()+1);
+
+		PathNode & pathnode = path[path.size()-1];
+
+		if (!STLStringHelper::IsInteger(vecValues[iColYear])) {
+			_EXCEPTION2("year must be of type integer in nodefile \"%s\" on line %i", strNodeFile.c_str(), iLine);
+		}
+		if (!STLStringHelper::IsInteger(vecValues[iColMonth])) {
+			_EXCEPTION2("month must be of type integer in nodefile \"%s\" on line %i", strNodeFile.c_str(), iLine);
+		}
+		if (!STLStringHelper::IsInteger(vecValues[iColDay])) {
+			_EXCEPTION2("day must be of type integer in nodefile \"%s\" on line %i", strNodeFile.c_str(), iLine);
+		}
+		if (!STLStringHelper::IsInteger(vecValues[iColHour])) {
+			_EXCEPTION2("hour must be of type integer in nodefile \"%s\" on line %i", strNodeFile.c_str(), iLine);
+		}
+
+		int iYear = stoi(vecValues[iColYear]);
+		int iMonth = stoi(vecValues[iColMonth]);
+		int iDay = stoi(vecValues[iColDay]);
+		int iHour = stoi(vecValues[iColHour]);
+
+		Time time(iYear, iMonth, iDay, iHour * 3600, caltype);
+
+		pathnode.m_time = time;
+
+		std::cout << strBuffer << std::endl;
+
+		for (int v = 0; v < vecValues.size(); v++) {
+			pathnode.m_vecColumnData.push_back(new ColumnDataString(vecValues[v]));
+		}
+	}
+
+	// Set begin and end of all paths
+	for (int p = 0; p < m_pathvec.size(); p++) {
+		_ASSERT(m_pathvec[p].size() > 0);
+		m_pathvec[p].m_timeStart = m_pathvec[p][0].m_time;
+		m_pathvec[p].m_timeEnd = m_pathvec[p][m_pathvec[p].size()-1].m_time;
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void NodeFile::Read(
+	const std::string & strNodeFile,
+	PathType ePathType,
+	ColumnDataHeader & cdh,
+	const std::vector<size_t> & nGridDim,
+	size_t sGridSize,
+	Time::CalendarType caltype
+) {
+	// Load in file as CSV
+	if (strNodeFile.length() >= 4) {
+		std::string strExt = strNodeFile.substr(strNodeFile.length()-4,4);
+		if (strExt == ".csv") {
+			return ReadCSV(
+				strNodeFile,
+				ePathType,
+				cdh,
+				nGridDim,
+				sGridSize,
+				caltype);
+		}
+	}
+
+	// Cannot automatically load headers from GFDL formatted file
+	if ((cdh.size() == 1) && (cdh[0] == "(auto)")) {
+		_EXCEPTIONT("--in_fmt \"(auto)\" cannot be used for GFDL formatted nodefiles");
+	}
+
+	// Not implemented
+	if (ePathType == PathTypeDN) {
+		_EXCEPTIONT("Not implemented");
+	}
+
+	// Check that this NodeFile is uninitialized
 	if ((m_cdh.size() != 0) || (m_pathvec.size() != 0)) {
 		_EXCEPTIONT("Attempting to Read() on an initialized NodeFile");
 	}
@@ -75,7 +293,7 @@ void NodeFile::Read(
 	// Open the file as an input stream
 	std::ifstream ifInput(strNodeFile);
 	if (!ifInput.is_open()) {
-		_EXCEPTION1("Unable to open input file \"%s\"", strNodeFile.c_str());
+		_EXCEPTION1("Unable to open nodefile \"%s\"", strNodeFile.c_str());
 	}
 
 	// Current pathnode index
@@ -307,7 +525,7 @@ void NodeFile::Read(
 void NodeFile::Read(
 	const std::string & strNodeFile,
 	NodeFile::PathType ePathType,
-	const ColumnDataHeader & cdh,
+	ColumnDataHeader & cdh,
 	const SimpleGrid & grid,
 	Time::CalendarType caltype
 ) {
