@@ -154,7 +154,8 @@ public:
 		double dLatRad0,
 		int nX,
 		double dDeltaXRad,
-		bool fCalculateArea = false
+		bool fFlipSouthernHemisphere,
+		bool fCalculateArea
 	);
 
 	///	<summary>
@@ -167,7 +168,7 @@ public:
 		int nR,
 		int nA,
 		double dDeltaRRad,
-		bool fCalculateArea = false
+		bool fCalculateArea
 	);
 
 	///	<summary>

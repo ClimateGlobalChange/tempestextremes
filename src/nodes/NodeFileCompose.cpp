@@ -242,6 +242,9 @@ try {
 	// Fixed latitude
 	double dFixedLatitudeDeg;
 
+	// Flip the composition in the y direction if the object is in the southern hemisphere.
+	bool fFlipSouthernHemisphere;
+
 	// Apply a time delta to the data
 	std::string strApplyTimeDelta;
 
@@ -284,6 +287,7 @@ try {
 		CommandLineInt(nResolutionA, "resa", 16);
 		CommandLineDouble(dFixedLongitudeDeg, "fixlon", -999.);
 		CommandLineDouble(dFixedLatitudeDeg, "fixlat", -999.);
+		CommandLineBool(fFlipSouthernHemisphere, "flip_hemisphere");
 
 		CommandLineString(strApplyTimeDelta, "apply_time_delta", "");
 		CommandLineString(strMaxTimeDelta, "max_time_delta", "");
@@ -364,6 +368,9 @@ try {
 	}
 	if ((strOutputGrid == "rll") && (dFixedLongitudeDeg == -999.)) {
 		_EXCEPTIONT("Grid \"rll\" may only be used with fixed coordinate composites");
+	}
+	if (fFlipSouthernHemisphere && (strOutputGrid != "xy")) {
+		_EXCEPTIONT("--flip_hemisphere may only be used with --out_grid \"xy\"");
 	}
 
 	// Input file type
@@ -1121,7 +1128,9 @@ try {
 							dPathNodeLonRad,
 							dPathNodeLatRad,
 							nResolutionX,
-							dDeltaXRad);
+							dDeltaXRad,
+							fFlipSouthernHemisphere,
+							false);
 
 					} else if (strOutputGrid == "rad") {
 						gridNode.GenerateRadialStereographic(
@@ -1129,7 +1138,8 @@ try {
 							dPathNodeLatRad,
 							nResolutionX,
 							nResolutionA,
-							dDeltaXRad);
+							dDeltaXRad,
+							false);
 
 					} else if (strOutputGrid == "rll") {
 						double dHalfWidth =

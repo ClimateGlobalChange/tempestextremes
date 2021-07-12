@@ -533,6 +533,7 @@ void SimpleGrid::GenerateRectilinearStereographic(
 	double dLatRad0,
 	int nX,
 	double dDeltaXRad,
+	bool fFlipSouthernHemisphere,
 	bool fCalculateArea
 ) {
 	if (IsInitialized()) {
@@ -581,6 +582,12 @@ void SimpleGrid::GenerateRectilinearStereographic(
 		dXs[i] = sqrt(4.0 * (1.0 - cos(dXgcd)) / (1.0 + cos(dXgcd)));
 		if (dXgcd < 0.0) {
 			dXs[i] *= -1.0;
+		}
+	}
+
+	if (fFlipSouthernHemisphere && (dLatRad0 < 0.0)) {
+		for (int j = 0; j < nX; j++) {
+			dYs[j] *= -1.0;
 		}
 	}
 
