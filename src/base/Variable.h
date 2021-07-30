@@ -26,6 +26,7 @@
 
 #include <vector>
 #include <string>
+#include <limits>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -607,6 +608,7 @@ public:
 	Variable() :
 		m_strName(),
 		m_fOp(false),
+		m_dFillValueFloat(-std::numeric_limits<float>::max()),
 		m_fNoTimeInNcFile(false),
 		m_timeStored(Time::CalendarUnknown)
 	{ }
@@ -651,6 +653,13 @@ public:
 	///	</summary>
 	const VariableIndexVector & GetArgumentVarIxs() const {
 		return m_varArg;
+	}
+
+	///	<summary>
+	///		Get the _FillValue for this variable.
+	///	</summary>
+	float GetFillValueFloat() const {
+		return m_dFillValueFloat;
 	}
 
 public:
@@ -724,6 +733,11 @@ protected:
 	///		Specified operator arguments (as VariableIndex).
 	///	</summary>
 	VariableIndexVector m_varArg;
+
+	///	<summary>
+	///		_FillValue for this Variable.
+	///	</summary>
+	float m_dFillValueFloat;
 
 protected:
 /*

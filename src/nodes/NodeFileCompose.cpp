@@ -219,7 +219,7 @@ try {
 	std::string strOutputVariables;
 
 	// Data contains missing values
-	//bool fMissingData;
+	bool fMissingData;
 
 	// List of operators
 	std::string strOperators;
@@ -277,7 +277,7 @@ try {
 
 		CommandLineString(strVariables, "var", "");
 		CommandLineString(strOutputVariables, "varout", "");
-		//CommandLineBool(fMissingData, "missingdata");
+		CommandLineBool(fMissingData, "missingdata");
 		CommandLineBool(fSnapshots, "snapshots");
 		CommandLineStringD(strOperators, "op", "mean", "[mean|min|max,...]");
 		CommandLineStringD(strHistogramOp, "histogram", "", "[var,offset,binsize;...]");
@@ -426,6 +426,13 @@ try {
 		for (;;) {
 			VariableIndex varixIn;
 			int iLast = varreg.FindOrRegisterSubStr(strVariablesTemp, &varixIn) + 1;
+
+			if (fMissingData) {
+				Variable & var = varreg.Get(varixIn);
+				if (var.IsOp()) {
+					_EXCEPTIONT("When using --missingdata flag, variable --var cannot be an operator (not implemented)");
+				}
+			}
 
 			vecVarIxIn.push_back(varixIn);
 			vecVariableNamesIn.push_back(varreg.GetVariableString(varixIn));
@@ -755,6 +762,9 @@ try {
 	int nDataInstances = 0;
 
 	DataArray1D<float> dOutputDataSnapshot;
+	
+	std::vector<float> vecFillValueFloat;
+	vecFillValueFloat.resize(vecVarIxIn.size());
 
 	std::vector< DataArray1D<float> > vecOutputDataMean;
 	vecOutputDataMean.resize(vecVarIxIn.size());
@@ -809,6 +819,11 @@ try {
 		}
 
 		// Get number of paths and number of snapshots
+		std::vector< DataArray1D<size_t> > vecPathCountNonMissing;
+		if (fMissingData) {
+			vecPathCountNonMissing.resize(vecVarIxIn.size());
+		}
+
 		size_t sPathCount = 0;
 		size_t sSnapshotCount = 0;
 		{
@@ -823,7 +838,7 @@ try {
 			Announce("%lu path snapshots found", sSnapshotCount);
 		}
 
-		// Varaibles used for outputing snapshots
+		// Variables used for outputing snapshots
 		NcDim * dimSnapshot = NULL;
 
 		std::vector<NcVar *> vecvarSnapshots;
@@ -976,6 +991,9 @@ try {
 					if (fSnapshots) {
 						dOutputDataSnapshot.Allocate(lOutputDimSize0 * lOutputDimSize1);
 					}
+					if (fMissingData) {
+						vecPathCountNonMissing[v].Allocate(vecAuxDimInfo.GetTotalSize());
+					}
 					if (fCompositeMean) {
 						vecOutputDataMean[v].Allocate(vecAuxDimInfo.GetTotalSize());
 					}
@@ -1040,6 +1058,10 @@ try {
 								vecSnapshotDims.size(),
 								const_cast<const NcDim**>(&(vecSnapshotDims[0])));
 
+						if (fMissingData) {
+							varSnapshots->add_att("_FillValue", vecFillValueFloat[v]);
+						}
+
 						if (varSnapshots == NULL) {
 							_EXCEPTION1("Unable to create variable \"%s\" in output file",
 								strVarName.c_str());
@@ -1077,6 +1099,8 @@ try {
 				var.LoadGridData(varreg, vecncDataFiles, grid);
 				const DataArray1D<float> & dataState = var.GetData();
 				_ASSERT(dataState.GetRows() == grid.GetSize());
+
+				vecFillValueFloat[v] = var.GetFillValueFloat();
 
 				Announce("%s", var.ToString(varreg).c_str());
 
@@ -1156,7 +1180,7 @@ try {
 					}
 
 					// Only calculate the mean
-					if (fCompositeMean && !fCompositeMin && !fCompositeMax && !fSnapshots && (vecHistogramOps.size() == 0)) {
+					if (fCompositeMean && !fCompositeMin && !fCompositeMax && !fSnapshots && !fMissingData && (vecHistogramOps.size() == 0)) {
 						for (size_t i = 0; i < gridNode.GetSize(); i++) {
 							int ixGridIn =
 								grid.NearestNode(
@@ -1183,10 +1207,19 @@ try {
 									gridNode.m_dLon[i],
 									gridNode.m_dLat[i]);
 
+							if (fMissingData && (dataState[ixGridIn] != vecFillValueFloat[v])) {
+								vecPathCountNonMissing[v][sOffset+i]++;
+							}
+
 							if (fSnapshots) {
 								dOutputDataSnapshot[i] =
 									dataState[ixGridIn];
 							}
+
+							if (fMissingData && (dataState[ixGridIn] == vecFillValueFloat[v])) {
+								continue;
+							}
+
 							if (fCompositeMean) {
 								vecOutputDataMean[v][sOffset+i] +=
 									dataState[ixGridIn];
@@ -1284,17 +1317,45 @@ try {
 
 		// Average all Variables
 		if ((dFixedLatitudeRad != -999.) || (dFixedLongitudeRad != -999.)) {
-			for (int v = 0; v < vecOutputDataMean.size(); v++) {
-				for (int i = 0; i < vecOutputDataMean[v].GetRows(); i++) {
-					vecOutputDataMean[v][i] /=
-						static_cast<float>(sPathCount);
+			if (fMissingData) {
+				for (int v = 0; v < vecOutputDataMean.size(); v++) {
+					for (int i = 0; i < vecOutputDataMean[v].GetRows(); i++) {
+						if (vecPathCountNonMissing[v][i] == 0) {
+							vecOutputDataMean[v][i] = vecFillValueFloat[v];
+						} else {
+							vecOutputDataMean[v][i] /= 
+								static_cast<float>(vecPathCountNonMissing[v][i]);
+						}
+					}
+				}
+
+			} else {
+				for (int v = 0; v < vecOutputDataMean.size(); v++) {
+					for (int i = 0; i < vecOutputDataMean[v].GetRows(); i++) {
+						vecOutputDataMean[v][i] /=
+							static_cast<float>(sPathCount);
+					}
 				}
 			}
 		} else {
-			for (int v = 0; v < vecOutputDataMean.size(); v++) {
-				for (int i = 0; i < vecOutputDataMean[v].GetRows(); i++) {
-					vecOutputDataMean[v][i] /=
-						static_cast<float>(sSnapshotCount);
+			if (fMissingData) {
+				for (int v = 0; v < vecOutputDataMean.size(); v++) {
+					for (int i = 0; i < vecOutputDataMean[v].GetRows(); i++) {
+						if (vecPathCountNonMissing[v][i] == 0) {
+							vecOutputDataMean[v][i] = vecFillValueFloat[v];
+						} else {
+							vecOutputDataMean[v][i] /=
+								static_cast<float>(vecPathCountNonMissing[v][i]);
+						}
+					}
+				}
+			
+			} else {
+				for (int v = 0; v < vecOutputDataMean.size(); v++) {
+					for (int i = 0; i < vecOutputDataMean[v].GetRows(); i++) {
+						vecOutputDataMean[v][i] /=
+							static_cast<float>(sSnapshotCount);
+					}
 				}
 			}
 		}
@@ -1350,6 +1411,13 @@ try {
 					lSize[d] = vecOutputNcDim[v][d]->size();
 				}
 
+				// Snapshots
+				if (fSnapshots) {
+					if (fMissingData) {
+						vecvarSnapshots[v]->add_att("_FillValue", vecFillValueFloat[v]);
+					}
+				}
+
 				// Mean of composite
 				if (fCompositeMean) {
 					Announce("mean");
@@ -1365,6 +1433,10 @@ try {
 					if (pvar == NULL) {
 						_EXCEPTION1("Unable to add variable \"%s\" to output file",
 							strVarNameMean.c_str());
+					}
+
+					if (fMissingData) {
+						pvar->add_att("_FillValue", vecFillValueFloat[v]);
 					}
 
 					pvar->put(&(vecOutputDataMean[v][0]), &(lSize[0]));
@@ -1387,6 +1459,10 @@ try {
 							strVarNameMin.c_str());
 					}
 
+					if (fMissingData) {
+						pvar->add_att("_FillValue", vecFillValueFloat[v]);
+					}
+
 					pvar->put(&(vecOutputDataMin[v][0]), &(lSize[0]));
 				}
 
@@ -1405,6 +1481,10 @@ try {
 					if (pvar == NULL) {
 						_EXCEPTION1("Unable to add variable \"%s\" to output file",
 							strVarNameMax.c_str());
+					}
+
+					if (fMissingData) {
+						pvar->add_att("_FillValue", vecFillValueFloat[v]);
 					}
 
 					pvar->put(&(vecOutputDataMax[v][0]), &(lSize[0]));

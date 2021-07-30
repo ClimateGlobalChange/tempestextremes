@@ -921,6 +921,12 @@ NcVar * Variable::GetNcVarFromNcFileVector(
 		_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
 	}
 
+	// Get _FillValue
+	NcAtt * attFillValue = var->get_att("_FillValue");
+	if (attFillValue != NULL) {
+		m_dFillValueFloat = attFillValue->as_float(0);
+	}
+
 	return var;
 }
 
