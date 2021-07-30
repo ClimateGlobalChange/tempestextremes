@@ -199,20 +199,20 @@ try {
 
 	// Check input
 	if ((strInputFile == "") && (strInputFileList == "")) {
-		_EXCEPTIONT("No input file (--in) or (--inlist) specified");
+		_EXCEPTIONT("No input file (--in) or (--in_list) specified");
 	}
 	if ((strInputFile != "") && (strInputFileList != "")) {
-		_EXCEPTIONT("Only one input file (--in) or (--inlist) allowed");
+		_EXCEPTIONT("Only one input file (--in) or (--in_list) allowed");
 	}
 
 	// Check output
 	if (strOutputFile == "") {
-		_EXCEPTIONT("No output file (--outfile) specified");
+		_EXCEPTIONT("No output file (--out_file) specified");
 	}
 
 	// Check variable
 	if (strInputVariable == "") {
-		_EXCEPTIONT("No variable name (--invar) specified");
+		_EXCEPTIONT("No variable name (--var) specified");
 	}
 
 	// Check output variable
@@ -337,7 +337,7 @@ try {
 			int iLast = varreg.FindOrRegisterSubStr(strSumVariablesTemp, &varixSum) + 1;
 
 			if (varixSum == varixBlobTag) {
-				_EXCEPTIONT("--var and --varsum cannot contain the same variables");
+				_EXCEPTIONT("--var and --sumvar cannot contain the same variables");
 			}
 
 			vecSumVarIx.push_back(varixSum);
@@ -428,6 +428,8 @@ try {
 */
 		// Loop through all times
 		for (int t = 0; t < nLocalTimes; t++, iTime++) {
+
+			Announce("Time %s", vecFileTimes[t].ToString().c_str());
 
 			// Set the time index
 			vecInFiles.SetConstantTimeIx(t);
@@ -574,6 +576,8 @@ try {
 
 		// Output all BlobQuantities
 		{
+			Announce("Writing blob data");
+
 			AllTimedBlobQuantitiesMap::iterator iterBlobs =
 				mapAllQuantities.begin();
 
