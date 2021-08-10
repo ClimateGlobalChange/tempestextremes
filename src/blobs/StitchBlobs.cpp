@@ -1031,17 +1031,11 @@ try {
 
 			// Insert all detected locations into set
 			// (accounting for points out of range)
-			if ((dMinLatDeg != -90.0) ||
-				(dMaxLatDeg != 90.0) ||
-			    (dMinLonDeg != 0.0) ||
-				(dMaxLonDeg != 360.0)
+			if ((dMinLatDeg != -90.0) || (dMaxLatDeg != 90.0) ||
+			    (dMinLonDeg != 0.0) || (dMaxLonDeg != 360.0)
 			) {
-				std::cout << dMinLatDeg << std::endl;
-				std::cout << dMaxLatDeg << std::endl;
-				std::cout << dMinLonDeg << std::endl;
-				std::cout << dMaxLonDeg << std::endl;
-
 				LatLonBox<double> boxBoundsDeg(fRegional);
+
 				boxBoundsDeg.lon[0] = dMinLonDeg;
 				boxBoundsDeg.lon[1] = dMaxLonDeg;
 				boxBoundsDeg.lat[0] = dMinLatDeg;
@@ -1068,7 +1062,7 @@ try {
 			// (no bounds checking)
 			} else {
 				for (int i = 0; i < grid.GetSize(); i++) {
-					if (dataIndicator[i] != 0.f) {
+					if (dataIndicator[i] != 0.0f) {
 						setIndicators.insert(i);
 					}
 				}
@@ -1076,9 +1070,16 @@ try {
 
 			Announce("Finding blobs (%i tagged points)", setIndicators.size());
 
+			// Backup of original indicator set
+			IndicatorSet setIndicatorsBackup;
+			if (dMergeDistDeg > 0.0) {
+				setIndicatorsBackup = setIndicators;
+			}
+
 			// Rejections due to insufficient node count
 			int nRejectedMinSize = 0;
 
+			// Rejections due to a given threshold
 			DataArray1D<int> nRejectedThreshold(vecThresholdOp.size());
 
 			// Find all contiguous patches
@@ -1105,6 +1106,7 @@ try {
 				boxDeg.lon[0] = LonDegToStandardRange(RadToDeg(grid.m_dLon[ixNode]));
 				boxDeg.lon[1] = LonDegToStandardRange(RadToDeg(grid.m_dLon[ixNode]));
 
+				//printf("=================================== BLOB %i\n", ixBlob);
 				// Find all connecting nodes in patch
 				IndicatorSet setNeighbors;
 				setNeighbors.insert(ixNode);
@@ -1114,12 +1116,14 @@ try {
 
 					// This node is already included in the blob
 					if (vecBlobs[ixBlob].find(ixNode) != vecBlobs[ixBlob].end()) {
+						//printf("..%i already in set\n", ixNode);
 						continue;
 					}
 
 					// This node has not been tagged
 					IndicatorSetIterator iterIndicator = setIndicators.find(ixNode);
 					if (iterIndicator == setIndicators.end()) {
+						//printf("..%i has not been tagged\n", ixNode);
 						continue;
 					}
 
@@ -1136,15 +1140,21 @@ try {
 
 					// Insert neighbors
 					bool fPerimeter = false;
+					//printf("..%i has %lu neighbors\n", ixNode, grid.m_vecConnectivity[ixNode].size());
 					for (int i = 0; i < grid.m_vecConnectivity[ixNode].size(); i++) {
 						int ixNeighbor = grid.m_vecConnectivity[ixNode][i];
+						//printf("....neighbor %i %1.5f ", ixNeighbor, dataIndicator[ixNeighbor]);
+						//if (setIndicatorsBackup.find(ixNeighbor) != setIndicatorsBackup.end()) {
+						//	printf("IN INDICATORSET\n");
+						//} else {
+						//	printf("\n");
+						//}
 
 						// Perimeter point
-						if (dataIndicator[ixNeighbor] == 0) {
+						if (setIndicatorsBackup.find(ixNeighbor) == setIndicatorsBackup.end()) {
 							fPerimeter = true;
 						} else {
-							setNeighbors.insert(
-								grid.m_vecConnectivity[ixNode][i]);
+							setNeighbors.insert(ixNeighbor);
 						}
 					}
 					if (fPerimeter && (vecBlobPerimeters.size() != 0)) {
@@ -1159,10 +1169,17 @@ try {
 				}
 			}
 
+			// setIndicatorsBackup no longer needed
+			if (setIndicatorsBackup.size() != 0) {
+				setIndicatorsBackup.clear();
+			}
+
 			// Merge blobs
 			if (vecBlobTrees.size() != 0) {
 
-				Announce("Merging blobs (from %lu blobs)", vecBlobs.size());
+				AnnounceStartBlock("Merging blobs (from %lu blobs)", vecBlobs.size());
+
+				Announce("Building merge graph");
 
 				// Use squared Cartesian distance for comparisons
 				double dMergeDistChordLength2 = ChordLengthFromGreatCircleDistance_Deg(dMergeDistDeg);
@@ -1170,12 +1187,12 @@ try {
 
 				// Build a set of all pairs that need to be merged
 				std::vector< std::set<int> > vecMergeGraph(vecBlobs.size());
-				for (int ixBlob = 0; ixBlob < vecBlobs.size(); ixBlob++) {
-/*
-					printf("%lu total points, %lu perimeter points\n",
-						vecBlobs[ixBlob].size(),
-						vecBlobPerimeters[ixBlob].size());
-*/
+                                for (int ixBlob = 0; ixBlob < vecBlobs.size(); ixBlob++) {
+					//Announce("Blob %i has %lu total points, %lu perimeter points",
+					//	ixBlob,
+					//	vecBlobs[ixBlob].size(),
+					//	vecBlobPerimeters[ixBlob].size());
+
 					// Convert perimeter points to xyz
 					std::vector<Node3> vecPerimeterXYZ;
 					vecPerimeterXYZ.reserve(vecBlobPerimeters[ixBlob].size());
@@ -1205,6 +1222,14 @@ try {
 
 							const Node3 & xyzPerim = vecPerimeterXYZ[i];
 							kdres * kdr = kd_nearest3(vecBlobTrees[ixBlobNext], xyzPerim.dX, xyzPerim.dY, xyzPerim.dZ);
+							if (kdr == NULL) {
+								_EXCEPTION4("Logic error: Cannot find nearest point to blob %i from (%1.5e %1.5e %1.5e)",
+									ixBlobNext, xyzPerim.dX, xyzPerim.dY, xyzPerim.dZ);
+							}
+							if (kd_res_size(kdr) == 0) {
+								_EXCEPTION4("Logic error: Cannot find nearest point to blob %i from (%1.5e %1.5e %1.5e)",
+									ixBlobNext, xyzPerim.dX, xyzPerim.dY, xyzPerim.dZ);
+							}
 							double dX1, dY1, dZ1;
 							kd_res_item3(kdr, &dX1, &dY1, &dZ1);
 							kd_res_free(kdr);
@@ -1230,7 +1255,9 @@ try {
 					}
 				}
 
-				// Merge blobs
+				// Actually merge the blobs
+				Announce("Retagging merged blobs");
+
 				for (int ixBlob = 0; ixBlob < vecBlobs.size(); ixBlob++) {
 
 					// Find the ultimate blob id of each blob via graph search for minimum id
@@ -1271,8 +1298,6 @@ try {
 						vecBlobs[ixBlob].clear();
 					}
 				}
-				//std::cout << std::endl;
-				//_EXCEPTION();
 
 				// Clean up
 				for (int ixBlob = 0; ixBlob < vecBlobs.size(); ixBlob++) {
@@ -1287,6 +1312,8 @@ try {
 				}
 				vecBlobTrees.clear();
 				vecBlobPerimeters.clear();
+
+				AnnounceEndBlock(NULL);
 			}
 
 			// Filter blobs
@@ -1332,7 +1359,7 @@ try {
 				AnnounceEndBlock(NULL);
 			}
 
-			Announce("Blobs detected: %i", vecBlobs.size());
+			AnnounceStartBlock("Blobs detected: %i", vecBlobs.size());
 
 			if (fVerbose) {
 				for (int p = 0; p < vecBlobBoxesDeg.size(); p++) {
@@ -1344,6 +1371,8 @@ try {
 						vecBlobBoxesDeg[p].lon[1]);
 				}
 			}
+
+			AnnounceEndBlock(NULL);
 
 			AnnounceEndBlock("Done");
 		}
