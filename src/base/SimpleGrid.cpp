@@ -858,6 +858,12 @@ void SimpleGrid::FromMeshFV(
 			dYc /= static_cast<double>(nNodes);
 			dZc /= static_cast<double>(nNodes);
 
+			double dMag = sqrt(dXc * dXc + dYc * dYc + dZc * dZc);
+
+			dXc /= dMag;
+			dYc /= dMag;
+			dZc /= dMag;
+
 			XYZtoRLL_Deg(dXc, dYc, dZc, m_dLon[i], m_dLat[i]);
 		}
 	}
