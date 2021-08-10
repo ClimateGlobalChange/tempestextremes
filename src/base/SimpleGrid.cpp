@@ -1103,7 +1103,15 @@ void SimpleGrid::FromFile(
 			if (n != sNeighbors-1) {
 				fsGrid >> cComma;
 			}
+			if (m_vecConnectivity[f][n] == 0) {
+				_EXCEPTION2("Zero index found in connectivity file \"%s\" for node %lu",
+					strConnectivityFile.c_str(), f);
+			}
 			m_vecConnectivity[f][n]--;
+			if (m_vecConnectivity[f][n] == f) {
+				_EXCEPTION2("Self-connected node found in connectivity file \"%s\" for node %lu",
+					strConnectivityFile.c_str(), f);
+			}
 		}
 		if (fsGrid.eof()) {
 			if (f != sFaces-1) {
@@ -1154,7 +1162,7 @@ void SimpleGrid::ToFile(
 		fsOutput << m_dLon[i] << "," << m_dLat[i] << ","
 			<< m_dArea[i] << "," << m_vecConnectivity[i].size();
 		for (size_t j = 0; j < m_vecConnectivity[i].size(); j++) {
-			fsOutput << "," << m_vecConnectivity[i][j];
+			fsOutput << "," << (m_vecConnectivity[i][j]+1);
 		}
 		fsOutput << std::endl;
 	}
