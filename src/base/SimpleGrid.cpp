@@ -988,21 +988,22 @@ void SimpleGrid::FromMeshFE(
 					vecConnectivitySet[dataGLLnodes[q][p][f]-1];
 
 				// Connect in all directions
+				// Note that dataGLLnodes is 1-indexed, whereas we need 0-indexing for connectivity
 				if (p != 0) {
 					setLocalConnectivity.insert(
-						dataGLLnodes[q][p-1][f]);
+						dataGLLnodes[q][p-1][f]-1);
 				}
 				if (p != (nP-1)) {
 					setLocalConnectivity.insert(
-						dataGLLnodes[q][p+1][f]);
+						dataGLLnodes[q][p+1][f]-1);
 				}
 				if (q != 0) {
 					setLocalConnectivity.insert(
-						dataGLLnodes[q-1][p][f]);
+						dataGLLnodes[q-1][p][f]-1);
 				}
 				if (q != (nP-1)) {
 					setLocalConnectivity.insert(
-						dataGLLnodes[q+1][p][f]);
+						dataGLLnodes[q+1][p][f]-1);
 				}
 			}
 			}
