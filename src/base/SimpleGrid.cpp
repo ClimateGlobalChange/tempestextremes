@@ -1119,6 +1119,10 @@ void SimpleGrid::FromFile(
 				_EXCEPTION2("Self-connected node found in connectivity file \"%s\" for node %lu",
 					strConnectivityFile.c_str(), f);
 			}
+			if (m_vecConnectivity[f][n] >= sFaces) {
+				_EXCEPTION2("Out-of-range index found in connectivity file \"%s\" for node %lu",
+					strConnectivityFile.c_str(), f);
+			}
 		}
 		if (fsGrid.eof()) {
 			if (f != sFaces-1) {
