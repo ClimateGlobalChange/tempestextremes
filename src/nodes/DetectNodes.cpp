@@ -548,11 +548,21 @@ void DetectCyclonesUnstructured(
 	for (int t = 0; t < vecTimes.size(); t += param.nTimeStride) {
 
 		// Announce
-		AnnounceStartBlock("Time %s", vecTimes[t].ToString().c_str());
+		Time timeRounded = vecTimes[t];
+		timeRounded.RoundToNearestMinute();
+
+		if (timeRounded != vecTimes[t]) {
+			AnnounceStartBlock("Time %s (rounded to %s)",
+				vecTimes[t].ToString().c_str(),
+				timeRounded.ToString().c_str());
+		} else {
+			AnnounceStartBlock("Time %s",
+				timeRounded.ToString().c_str());
+		}
 
 #ifndef TEMPEST_NOREGEX
 		if (param.strTimeFilter != "") {
-			std::string strTime = vecTimes[t].ToString();
+			std::string strTime = timeRounded.ToString();
 			std::smatch match;
 			if (!std::regex_search(strTime, match, reTimeSubset)) {
 				AnnounceEndBlock("(skipping)");
@@ -906,11 +916,11 @@ void DetectCyclonesUnstructured(
 		{
 			// Write time information
 			fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
-				vecTimes[t].GetYear(),
-				vecTimes[t].GetMonth(),
-				vecTimes[t].GetDay(),
+				timeRounded.GetYear(),
+				timeRounded.GetMonth(),
+				timeRounded.GetDay(),
 				static_cast<int>(setCandidates.size()),
-				vecTimes[t].GetSecond() / 3600);
+				timeRounded.GetSecond() / 3600);
 /*
 			if (param.fOutputInfileInfo) {
 				fprintf(fpOutput, "\t\"%s\"\t%i\n", strInputFiles.c_str(), t);
@@ -1051,9 +1061,7 @@ try {
 		CommandLineString(strOutputFileList, "out_file_list", "");
 		CommandLineStringD(strSearchByMin, "searchbymin", "", "(default PSL)");
 		CommandLineString(strSearchByMax, "searchbymax", "");
-		//CommandLineInt(dcuparam.nInitialSearchDist, "searchbydist", 1);
 		CommandLineString(dcuparam.strSearchByThreshold, "searchbythreshold", "");
-		//CommandLineInt(dcuparam.nInitialSearchDistSafe, "searchbydistsafe", 1);
 		CommandLineDoubleD(dcuparam.dMinLongitude, "minlon", 0.0, "(degrees)");
 		CommandLineDoubleD(dcuparam.dMaxLongitude, "maxlon", 0.0, "(degrees)");
 		CommandLineDoubleD(dcuparam.dMinLatitude, "minlat", 0.0, "(degrees)");

@@ -336,6 +336,67 @@ void Time::SubtractTime(const Time & timeDelta) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void Time::RoundToNearestSecond() {
+
+	if (m_eTimeType != TypeFixed) {
+		_EXCEPTIONT("RoundToNearestMinute() only implemented for fixed times");
+	}
+
+	if (m_iMicroSecond < 500000) {
+		m_iMicroSecond = 0;
+	} else {
+		m_iSecond++;
+		m_iMicroSecond = 0;
+		NormalizeTime();
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Time::RoundToNearestMinute() {
+
+	if (m_eTimeType != TypeFixed) {
+		_EXCEPTIONT("RoundToNearestMinute() only implemented for fixed times");
+	}
+
+	int iMinute = m_iSecond / 60;
+	int iSecond0to59 = m_iSecond % 60;
+
+	if (iSecond0to59 < 30) {
+		m_iSecond = iMinute * 60;
+		m_iMicroSecond = 0;
+
+	} else if (m_iSecond >= 30) {
+		m_iSecond = (iMinute + 1) * 60;
+		m_iMicroSecond = 0;
+		NormalizeTime();
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Time::RoundToNearestHour() {
+
+	if (m_eTimeType != TypeFixed) {
+		_EXCEPTIONT("RoundToNearestMinute() only implemented for fixed times");
+	}
+
+	int iHour = m_iSecond / 3600;
+	int iSecond0to3599 = m_iSecond % 3600;
+
+	if (iSecond0to3599 < 1800) {
+		m_iSecond = iHour * 3600;
+		m_iMicroSecond = 0;
+
+	} else if (m_iSecond >= 1800) {
+		m_iSecond = (iHour + 1) * 3600;
+		m_iMicroSecond = 0;
+		NormalizeTime();
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int Time::DayNumber() const {
 
 	// Based on https://alcor.concordia.ca/~gpkatch/gdate-algorithm.html

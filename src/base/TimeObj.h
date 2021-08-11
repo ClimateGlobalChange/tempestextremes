@@ -303,6 +303,22 @@ public:
 	}
 
 public:
+	///	<summary>
+	///		Round to the nearest second.
+	///	</summary>
+	void RoundToNearestSecond();
+
+	///	<summary>
+	///		Round to the nearest minute.
+	///	</summary>
+	void RoundToNearestMinute();
+
+	///	<summary>
+	///		Round to the nearest hour.
+	///	</summary>
+	void RoundToNearestHour();
+
+public:
 /*
 	///	<summary>
 	///		Add a number of seconds to the Time to produce a new Time value.
