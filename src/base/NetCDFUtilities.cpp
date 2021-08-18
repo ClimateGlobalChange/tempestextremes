@@ -14,6 +14,7 @@
 ///		or implied warranty.
 ///	</remarks>
 
+#include "Defines.h"
 #include "NetCDFUtilities.h"
 #include "Exception.h"
 #include "Announce.h"
@@ -672,6 +673,10 @@ void ReadCFTimeDataFromNcFile(
 				(int)(vecTimeInt64[t]));
 
 		}
+
+#if defined(ROUND_TIMES_TO_NEAREST_MINUTE)
+		time.RoundToNearestMinute();
+#endif
 
 		vecTimes.push_back(time);
 	}

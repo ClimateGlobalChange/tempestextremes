@@ -56,6 +56,14 @@ static const Real ReferenceTolerance = 1.0e-12;
 #define OVERLAPMESH_BIN_WIDTH 1.0e-1
 
 ///////////////////////////////////////////////////////////////////////////////
+//
+// Round input time vector to nearest minute when loaded from a file.
+// This is to prevent issues with "rounding down" that may occur when times
+// are specified with a floating point type.
+//
+#define ROUND_TIMES_TO_NEAREST_MINUTE
+
+///////////////////////////////////////////////////////////////////////////////
 
 #endif
 

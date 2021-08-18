@@ -548,21 +548,12 @@ void DetectCyclonesUnstructured(
 	for (int t = 0; t < vecTimes.size(); t += param.nTimeStride) {
 
 		// Announce
-		Time timeRounded = vecTimes[t];
-		timeRounded.RoundToNearestMinute();
-
-		if (timeRounded != vecTimes[t]) {
-			AnnounceStartBlock("Time %s (rounded to %s)",
-				vecTimes[t].ToString().c_str(),
-				timeRounded.ToString().c_str());
-		} else {
-			AnnounceStartBlock("Time %s",
-				timeRounded.ToString().c_str());
-		}
+		AnnounceStartBlock("Time %s",
+			vecTimes[t].ToString().c_str());
 
 #ifndef TEMPEST_NOREGEX
 		if (param.strTimeFilter != "") {
-			std::string strTime = timeRounded.ToString();
+			std::string strTime = vecTimes[t].ToString();
 			std::smatch match;
 			if (!std::regex_search(strTime, match, reTimeSubset)) {
 				AnnounceEndBlock("(skipping)");
@@ -916,11 +907,11 @@ void DetectCyclonesUnstructured(
 		{
 			// Write time information
 			fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
-				timeRounded.GetYear(),
-				timeRounded.GetMonth(),
-				timeRounded.GetDay(),
+				vecTimes[t].GetYear(),
+				vecTimes[t].GetMonth(),
+				vecTimes[t].GetDay(),
 				static_cast<int>(setCandidates.size()),
-				timeRounded.GetSecond() / 3600);
+				vecTimes[t].GetSecond() / 3600);
 /*
 			if (param.fOutputInfileInfo) {
 				fprintf(fpOutput, "\t\"%s\"\t%i\n", strInputFiles.c_str(), t);
