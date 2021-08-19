@@ -238,6 +238,10 @@ void AutoCurator::IndexFiles(
 					vecTimeDouble[t]);
 			}
 
+#if defined(ROUND_TIMES_TO_NEAREST_MINUTE)
+			time.RoundToNearestMinute();
+#endif
+
 			pacd->InsertTimeToFileTimeIx(time, iFileIx, t);
 		}
 	}
