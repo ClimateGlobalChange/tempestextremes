@@ -14,6 +14,7 @@
 ///		or implied warranty.
 ///	</remarks>
 
+#include "Defines.h"
 #include "AutoCurator.h"
 #include "Exception.h"
 #include "DataArray1D.h"
