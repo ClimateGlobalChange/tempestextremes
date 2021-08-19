@@ -1207,7 +1207,10 @@ try {
 									gridNode.m_dLon[i],
 									gridNode.m_dLat[i]);
 
-							if (fMissingData && (dataState[ixGridIn] != vecFillValueFloat[v])) {
+							if (fMissingData &&
+							    (dataState[ixGridIn] != vecFillValueFloat[v]) &&
+							    (!isnan(dataState[ixGridIn]))
+							) {
 								vecPathCountNonMissing[v][sOffset+i]++;
 							}
 
@@ -1216,7 +1219,9 @@ try {
 									dataState[ixGridIn];
 							}
 
-							if (fMissingData && (dataState[ixGridIn] == vecFillValueFloat[v])) {
+							if (fMissingData &&
+							    ((dataState[ixGridIn] == vecFillValueFloat[v]) || isnan(dataState[ixGridIn]))
+							) {
 								continue;
 							}
 
