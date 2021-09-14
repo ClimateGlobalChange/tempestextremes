@@ -1071,10 +1071,7 @@ try {
 			Announce("Finding blobs (%i tagged points)", setIndicators.size());
 
 			// Backup of original indicator set
-			IndicatorSet setIndicatorsBackup;
-			if (dMergeDistDeg > 0.0) {
-				setIndicatorsBackup = setIndicators;
-			}
+			IndicatorSet setIndicatorsBackup = setIndicators;
 
 			// Rejections due to insufficient node count
 			int nRejectedMinSize = 0;
@@ -1170,9 +1167,7 @@ try {
 			}
 
 			// setIndicatorsBackup no longer needed
-			if (setIndicatorsBackup.size() != 0) {
-				setIndicatorsBackup.clear();
-			}
+			setIndicatorsBackup.clear();
 
 			// Merge blobs
 			if (vecBlobTrees.size() != 0) {
