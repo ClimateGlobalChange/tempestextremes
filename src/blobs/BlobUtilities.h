@@ -138,16 +138,23 @@ void PrepareBlobOutputVar(
 	// Allocate tag variable (latitude-longitude grids)
 	} else if (grid.m_nGridDim.size() == 2) {
 
-		// Copy over latitude and longitude variable
-		dim0 = ncOutput.get_dim(strLatitudeName.c_str());
-		if (dim0 == NULL) {
-			_EXCEPTION1("Error copying variable \"%s\" to output file",
-				strLatitudeName.c_str());
-		}
-		dim1 = ncOutput.get_dim(strLongitudeName.c_str());
-		if (dim1 == NULL) {
-			_EXCEPTION1("Error copying variable \"%s\" to output file",
-				strLongitudeName.c_str());
+		// Get output dimensions
+		NcVar * varLat = ncOutput.get_var(strLatitudeName.c_str());
+		if ((varLat != NULL) && (varLat->num_dims() == 2)) {
+			dim0 = varLat->get_dim(0);
+			dim1 = varLat->get_dim(1);
+
+		} else {
+			dim0 = ncOutput.get_dim(strLatitudeName.c_str());
+			if (dim0 == NULL) {
+				_EXCEPTION1("Unable to copy variable \"%s\" to output file",
+					strLatitudeName.c_str());
+			}
+			dim1 = ncOutput.get_dim(strLongitudeName.c_str());
+			if (dim1 == NULL) {
+				_EXCEPTION1("Unable to copy variable \"%s\" to output file",
+					strLongitudeName.c_str());
+			}
 		}
 
 		// Create output tag
