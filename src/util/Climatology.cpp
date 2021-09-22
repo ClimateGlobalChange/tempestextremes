@@ -293,7 +293,7 @@ long long NcGetPutSpecifiedDataSize(
 			_EXCEPTIONT("Logic error");
 		}
 		if (err.get_err() != NC_NOERR) {
-			_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
+			_EXCEPTION2("NetCDF Fatal Error (%i: %s)", err.get_err(), err.get_errmsg());
 		}
 
 		llTotalReadWriteSize += lReadWriteSize;
@@ -530,7 +530,6 @@ void Climatology(
 		}
 
 		{
-
 			NcAtt * attCalendar = varInTime->get_att("calendar");
 			if (attCalendar == NULL) {
 				Announce("Dataset \"time\" does not specify \"calendar\" attribute.  Assuming \"standard\".");

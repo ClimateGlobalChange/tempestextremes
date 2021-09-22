@@ -310,6 +310,10 @@ void CopyNcVar(
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
 		}
 
+		if (fCopyAttributes) {
+			CopyNcVarAttributes(var, varOut);
+		}
+
 		var->get(&(data[0]), &(counts[0]));
 		varOut->put(&(data[0]), &(counts[0]));
 	}
@@ -323,6 +327,10 @@ void CopyNcVar(
 
 		if (varOut == NULL) {
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
+		}
+
+		if (fCopyAttributes) {
+			CopyNcVarAttributes(var, varOut);
 		}
 
 		if (fCopyData) {
@@ -343,6 +351,10 @@ void CopyNcVar(
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
 		}
 
+		if (fCopyAttributes) {
+			CopyNcVarAttributes(var, varOut);
+		}
+
 		if (fCopyData) {
 			DataArray1D<int> data(nDataSize);
 			var->get(&(data[0]), &(counts[0]));
@@ -359,6 +371,10 @@ void CopyNcVar(
 
 		if (varOut == NULL) {
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
+		}
+
+		if (fCopyAttributes) {
+			CopyNcVarAttributes(var, varOut);
 		}
 
 		if (fCopyData) {
@@ -379,6 +395,10 @@ void CopyNcVar(
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
 		}
 
+		if (fCopyAttributes) {
+			CopyNcVarAttributes(var, varOut);
+		}
+
 		if (fCopyData) {
 			DataArray1D<double> data(nDataSize);
 			var->get(&(data[0]), &(counts[0]));
@@ -397,6 +417,10 @@ void CopyNcVar(
 			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
 		}
 
+		if (fCopyAttributes) {
+			CopyNcVarAttributes(var, varOut);
+		}
+
 		if (fCopyData) {
 			DataArray1D<ncint64> data(nDataSize);
 			var->get(&(data[0]), &(counts[0]));
@@ -408,11 +432,6 @@ void CopyNcVar(
 	if (varOut == NULL) {
 		_EXCEPTION1("Unable to create output variable \"%s\"",
 			var->name());
-	}
-
-	// Copy attributes
-	if (fCopyAttributes) {
-		CopyNcVarAttributes(var, varOut);
 	}
 }
 
@@ -716,8 +735,9 @@ void WriteCFTimeDataToNcFile(
 
 	NcVar * varTime = ncfile->add_var("time", vecTimes.nctype(), dimTime);
 	if (varTime == NULL) {
-		_EXCEPTION1("Unable to create variable \"time\" in file \"%s\"",
-			strFilename.c_str());
+		NcError ncerr;
+		_EXCEPTION3("Unable to create variable \"time\" in file \"%s\" (%i: %s)",
+			strFilename.c_str(), ncerr.get_err(), ncerr.get_errmsg());
 	}
 
 	if (vecTimes.nctype() == ncInt) {
