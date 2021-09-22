@@ -1209,7 +1209,7 @@ try {
 
 							if (fMissingData &&
 							    (dataState[ixGridIn] != vecFillValueFloat[v]) &&
-							    (!isnan(dataState[ixGridIn]))
+							    (!std::isnan(dataState[ixGridIn]))
 							) {
 								vecPathCountNonMissing[v][sOffset+i]++;
 							}
@@ -1220,7 +1220,7 @@ try {
 							}
 
 							if (fMissingData &&
-							    ((dataState[ixGridIn] == vecFillValueFloat[v]) || isnan(dataState[ixGridIn]))
+							    ((dataState[ixGridIn] == vecFillValueFloat[v]) || std::isnan(dataState[ixGridIn]))
 							) {
 								continue;
 							}
