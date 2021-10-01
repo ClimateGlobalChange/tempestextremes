@@ -703,7 +703,7 @@ try {
 		}
 
 		DataArray1D<double> dR(nResolutionX);
-		for (int i = 0; i < nResolutionA; i++) {
+		for (int i = 0; i < nResolutionX; i++) {
 			dR[i] = dDeltaXDeg * (static_cast<double>(i) + 0.5);
 		}
 
@@ -717,8 +717,8 @@ try {
 		varR->add_att("name", "stereographic great circle distance");
 		varR->add_att("units", "degrees");
 
-		lOutputDimSize0 = nResolutionA;
-		lOutputDimSize1 = nResolutionX;
+		lOutputDimSize0 = nResolutionX;
+		lOutputDimSize1 = nResolutionA;
 
 	} else if (strOutputGrid == "rll") {
 		NcDim * dimX = ncoutfile.add_dim("lon", nResolutionX);
