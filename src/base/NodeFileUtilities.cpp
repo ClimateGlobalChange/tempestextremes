@@ -202,7 +202,7 @@ void NodeFile::ReadCSV(
 		int iDay = stoi(vecValues[iColDay]);
 		int iHour = stoi(vecValues[iColHour]);
 
-		Time time(iYear, iMonth, iDay, iHour * 3600, caltype);
+		Time time(iYear, iMonth-1, iDay-1, iHour * 3600, caltype);
 
 		pathnode.m_time = time;
 
