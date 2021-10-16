@@ -44,7 +44,9 @@ bool Time::operator<(const Time & time) const {
 		_EXCEPTIONT("Cannot compare Time objects with different types");
 	}
 	if (m_eCalendarType != time.m_eCalendarType) {
-		_EXCEPTIONT("Cannot compare Time objects with different calendars");
+		_EXCEPTION2("Cannot compare Time objects with different calendars (%s/%s)",
+			GetCalendarName().c_str(),
+			time.GetCalendarName().c_str());
 	}
 
 	if (m_iYear < time.m_iYear) {
