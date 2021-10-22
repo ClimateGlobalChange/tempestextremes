@@ -94,6 +94,8 @@ void NodeFile::ReadCSV(
 	int iColHour = (-1);
 	int iColLon = (-1);
 	int iColLat = (-1);
+	int iColI = (-1);
+	int iColJ = (-1);
 
 	{
 		for (int iCol = 0; iCol < m_cdh.size(); iCol++) {
@@ -117,6 +119,12 @@ void NodeFile::ReadCSV(
 			}
 			if ((m_cdh[iCol] == "lat") || (m_cdh[iCol] == "latitude")) {
 				iColLat = iCol;
+			}
+			if (m_cdh[iCol] == "i") {
+				iColI = iCol;
+			}
+			if (m_cdh[iCol] == "j") {
+				iColJ = iCol;
 			}
 		}
 
@@ -206,6 +214,24 @@ void NodeFile::ReadCSV(
 
 		pathnode.m_time = time;
 
+		// Store file position
+		pathnode.m_fileix = iLine-1;
+
+		// Store coordinate
+		if (iColI != (-1)) {
+			if (iColJ == (-1)) {
+				pathnode.m_gridix = stoi(vecValues[iColI]);
+			} else {
+				pathnode.m_gridix = stoi(vecValues[iColI]) + nGridDim[1] * stoi(vecValues[iColJ]);
+			}
+
+			if (pathnode.m_gridix < 0) {
+				_EXCEPTION2("Negative coordinate index on line %i of \"%s\"",
+					iLine, strNodeFile.c_str());
+			}
+		}
+
+		// Store all other data
 		for (int v = 0; v < vecValues.size(); v++) {
 			pathnode.m_vecColumnData.push_back(new ColumnDataString(vecValues[v]));
 		}

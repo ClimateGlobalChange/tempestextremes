@@ -265,7 +265,7 @@ try {
 		CommandLineString(strInputNodeFile, "in_nodefile", "");
 		//CommandLineString(strInputNodeFileList, "in_file_list", "");
 		CommandLineStringD(strInputNodeFileType, "in_nodefile_type", "SN", "[DN|SN]");
-		CommandLineString(strInputFormat, "in_fmt", "");
+		CommandLineString(strInputFormat, "in_fmt", "(auto)");
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
