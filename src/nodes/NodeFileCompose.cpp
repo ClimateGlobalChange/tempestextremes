@@ -405,19 +405,6 @@ try {
 	int iLonColIx = (-1);
 	int iLatColIx = (-1);
 
-	for (int i = 0; i < cdhInput.size(); i++) {
-		if ((cdhInput[i] == "lon") || (cdhInput[i] == "longitude")) {
-			iLonColIx = i;
-		}
-		if ((cdhInput[i] == "lat") || (cdhInput[i] == "latitude")) {
-			iLatColIx = i;
-		}
-	}
-
-	if ((iLonColIx == (-1)) || (iLatColIx == (-1))) {
-		_EXCEPTIONT("--in_fmt must contain \"lon\" and \"lat\" columns");
-	}
-
 	// Parse --var argument
 	std::vector<std::string> vecVariableNamesIn;
 	VariableIndexVector vecVarIxIn;
@@ -806,6 +793,19 @@ try {
 			cdhInput,
 			grid,
 			autocurator.GetCalendarType());
+
+		for (int i = 0; i < nodefile.m_cdh.size(); i++) {
+			if ((nodefile.m_cdh[i] == "lon") || (nodefile.m_cdh[i] == "longitude")) {
+				iLonColIx = i;
+			}
+			if ((nodefile.m_cdh[i] == "lat") || (nodefile.m_cdh[i] == "latitude")) {
+				iLatColIx = i;
+			}
+		}
+
+		if ((iLonColIx == (-1)) || (iLatColIx == (-1))) {
+			_EXCEPTIONT("--in_fmt or CSV header must contain \"lon\" and \"lat\" columns");
+		}
 
 		if (strApplyTimeDelta != "") {
 			nodefile.ApplyTimeDelta(timeDelta, fAddTimeDelta);
