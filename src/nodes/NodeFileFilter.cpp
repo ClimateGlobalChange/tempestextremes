@@ -336,27 +336,29 @@ void BuildMask_ByContour(
 ) {
 	// Get the variable
 	double dDeltaAmt = op.m_dDeltaAmount;
-	double dDeltaDist = op.m_dDistance;
-	double dMinMaxDist = op.m_dMinMaxDist;
+	double dDeltaDistDeg = op.m_dDistance;
+	double dMinMaxDistDeg = op.m_dMinMaxDist;
+
+	double dDeltaDistRad = DegToRad(dDeltaDistDeg);
 
 	_ASSERT(vecLonRad.size() == vecLatRad.size());
 	_ASSERT(dDeltaAmt != 0.0);
-	_ASSERT(dDeltaDist > 0.0);
+	_ASSERT(dDeltaDistDeg > 0.0);
 
 	// Loop through all PathNodes
 	for (int j = 0; j < vecLonRad.size(); j++) {
 
-		double dLon0 = vecLonRad[j];
-		double dLat0 = vecLatRad[j];
+		double dLon0Rad = vecLonRad[j];
+		double dLat0Rad = vecLatRad[j];
 
 		int ix0 = static_cast<int>(
-			grid.NearestNode(dLon0, dLat0));
+			grid.NearestNode(dLon0Rad, dLat0Rad));
 		_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
 
 		// Find min/max near point
 		int ixOrigin;
 
-		if (dMinMaxDist == 0.0) {
+		if (dMinMaxDistDeg == 0.0) {
 			ixOrigin = ix0;
 
 		// Find a local minimum / maximum
@@ -369,7 +371,7 @@ void BuildMask_ByContour(
 				(dDeltaAmt > 0.0),
 				dataState,
 				ix0,
-				dMinMaxDist,
+				dMinMaxDistDeg,
 				ixOrigin,
 				dValue,
 				dR);
@@ -397,16 +399,16 @@ void BuildMask_ByContour(
 			setNodesVisited.insert(ix);
 
 			// Great circle distance to this element
-			double dLatThis = grid.m_dLat[ix];
-			double dLonThis = grid.m_dLon[ix];
+			double dLatThisRad = grid.m_dLat[ix];
+			double dLonThisRad = grid.m_dLon[ix];
 
-			double dR =
+			double dRRad =
 				GreatCircleDistance_Rad(
-					dLon0, dLat0,
-					dLonThis, dLatThis);
+					dLon0Rad, dLat0Rad,
+					dLonThisRad, dLatThisRad);
 
 			// Check great circle distance
-			if (dR > dDeltaDist) {
+			if (dRRad > dDeltaDistRad) {
 				continue;
 			}
 
@@ -953,7 +955,7 @@ void NodeFileFilter(
 			AnnounceEndBlock("Done");
 		}
 		if (vecClosedContourOp.size() != 0) {
-			AnnounceStartBlock("Building mask (byclosedcontourop)");
+			AnnounceStartBlock("Building mask (bycontour)");
 			Variable & varOp = varreg.Get(vecClosedContourOp[0].m_varix);
 			vecInFiles.SetConstantTimeIx(t);
 			varOp.LoadGridData(varreg, vecInFiles, grid);
