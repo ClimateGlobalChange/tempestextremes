@@ -268,7 +268,7 @@ public:
 
 public:
 	///	<summary>
-	///		Area of the grid cell (in m^2) (optionally initialized).
+	///		Area of the grid cell (in sr) (optionally initialized).
 	///	</summary>
 	DataArray1D<double> m_dArea;
 
