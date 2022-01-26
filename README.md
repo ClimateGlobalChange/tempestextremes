@@ -22,7 +22,7 @@ https://anaconda.org/conda-forge/tempest-extremes
 
 To install from conda use the command line:
 
-conda install -c conda-forge tempest-extremes
+```conda install -c conda-forge tempest-extremes```
 
 Installation via make
 =====================
