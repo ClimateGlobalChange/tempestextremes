@@ -150,12 +150,22 @@ void CopyNcVarAttributes(
 		NcAtt * att = varIn->get_att(a);
 		long num_vals = att->num_vals();
 
+		_ASSERT(num_vals > 0);
+
 		NcValues * pValues = att->values();
 		if (pValues == NULL) {
 			_EXCEPTION2("Invalid attribute type \"%s::%s\"",
 				varIn->name(), att->name());
 		}
 
+		// Do not copy over _FillValue if input/output variable types are different
+		if (std::string(att->name()) == "_FillValue") {
+			if (varIn->type() != varOut->type()) {
+				continue;
+			}
+		}
+
+		// Otherwise copy over attributes
 		if (att->type() == ncByte) {
 			varOut->add_att(att->name(), num_vals,
 				(const ncbyte*)(pValues->base()));
