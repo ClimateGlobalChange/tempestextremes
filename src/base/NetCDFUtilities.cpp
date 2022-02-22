@@ -150,7 +150,10 @@ void CopyNcVarAttributes(
 		NcAtt * att = varIn->get_att(a);
 		long num_vals = att->num_vals();
 
-		_ASSERT(num_vals > 0);
+		// Sometimes we can have strings of length zero.  It seems that this
+		// check isn't actually necessary to prevent segfaults, so it's
+		// commented out for now.
+		//_ASSERT(num_vals > 0);
 
 		NcValues * pValues = att->values();
 		if (pValues == NULL) {
