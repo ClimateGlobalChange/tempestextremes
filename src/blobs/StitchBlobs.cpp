@@ -109,6 +109,29 @@ struct Tag {
 	}
 };
 
+
+//Define MPI_Datatype for Tag
+//#if defined(TEMPEST_MPIOMP)//[Commented out for auto-complete, need to uncomment later]
+	
+	{
+		struct Tag sampleTag();// designated initilization for calculating displacement
+		MPI_Datatype Tag_type;
+
+		int tagFieldsCount = 3;	
+		MPI_Datatype Tag_typesig[3] = {MPI_INT,MPI_INT,MPI_INT};
+		int Tag_block_lengths[3] = {1,1,1};
+		MPI_Aint Tag_displacements[3];
+		MPI_Get_address(&sampleTag.id, &Tag_displacements[0]);
+		MPI_Get_address(&sampleTag.time, &Tag_displacements[1]);
+		MPI_Get_address(&sampleTag.global_id, &Tag_displacements[2]);
+		MPI_Type_create_struct(tagFieldsCount, Tag_block_lengths, Tag_displacements, Tag_typesig, &Tag_type);
+		MPI_Type_commit(&Tag_type);
+	}
+
+
+
+//#endif //[Commented out for auto-complete, need to uncomment later]
+
 ///////////////////////////////////////////////////////////////////////////////
 
 // Set of indicator locations stored as grid indices
@@ -116,6 +139,178 @@ typedef std::set<int> IndicatorSet;
 typedef IndicatorSet::iterator IndicatorSetIterator;
 typedef IndicatorSet::const_iterator IndicatorSetConstIterator;
 
+//Define A Class for Exchanging Blobs across processors
+//#if defined(TEMPEST_MPIOMP) //[Commented out for auto-complete, need to uncomment later]
+
+typedef enum { DIR_LEFT = 0, DIR_RIGHT = 1} CommDirection;
+
+class BlobsExchangeOp {
+	private:
+		int exchange_tag = 101;
+		MPI_Comm _comm; // the communicator for this vecAllBlobs
+	protected:
+
+		///	<summary>
+		///		The vecAllBlobs that need to be exchanged
+		///	</summary>
+		std::vector<std::vector<IndicatorSet>> _vecAllBlobs;
+
+		///	<summary>
+		///		The buffer for vecBlobs that is serialized and will be sent
+		///		sendBlobs[0] is the left vector and sendBlobs[1] is the right vector
+		///	</summary>
+		std::vector<IndicatorSet> sendBlobs;
+
+
+		///	<summary>
+		///		The Array recording the starting index for each set that is serialized
+		///		sendBlobsIndx[0] is for the left vector and sendBlobsIndx[1] is for the right vector
+		///	</summary>
+		std::vector<std::vector<int>> sendBlobsIndx;
+
+		///	<summary>
+		///		The buffer for the received serailized blobs array and need to be unserialized
+		///		recvBlobs[0] is for the left vector and recvBlobs[1] is for the right vector
+		///	</summary>
+		std::vector<std::vector<int>> recvBlobs;
+
+		///	<summary>
+		///		The array recording the unserialize recvBlobs
+		///		recvBlobsUnserial[0] is for the left vector and recvBlobsUnserial[1] is for the right vector	
+		///	</summary>
+		std::vector<std::vector<IndicatorSet>> recvBlobsUnserial;
+
+		///	<summary>
+		///		An array of MPI_Request.	
+		///	</summary>
+		std::vector<MPI_Request> MPIrequests;
+
+		///	<summary>
+		///		An array of MPI_Status.	
+		///	</summary>
+  		std::vector<MPI_Status> MPIstatuses;
+
+
+
+	public:
+
+  		const MPI_Comm &comm() const { return _comm; }// accessors
+
+		///	<summary>
+		///		Construct the Operator with vecAllBlobs
+		///	</summary>
+		VecBlobsSerializeOp(std::vector< std::vector<IndicatorSet>> vecAllBlobs){
+			this->_vecAllBlobs = vecAllBlobs;
+		}
+
+
+		///	<summary>
+		///		Default destructor for VecBlobsSerializeOp
+		///	</summary>
+		~VecBlobsSerializeOp();
+
+		///	<summary>
+		///		Serialize the vector<IndicatorSet> and generate the sendBlobsIndx array
+		///	</summary>
+		Void Serialize(){
+
+			sendBlobs.clear();sendBlobsIndx.clear();
+			
+			sendBlobs.resize(2);sendBlobsIndx.resize(2);
+
+			for (auto dir : {DIR_LEFT, DIR_RIGHT}) {
+				int curIndx = 0;//Point to the next empty slot for inserting a new set
+				std::vector<IndicatorSet> sendVecBlobs = (dir == DIR_LEFT)? _vecAllBlobs[0]:_vecAllBlobs[_vecAllBlobs.size()-1];//the vector of set that needs to be serialized
+				sendBlobsIndx[dir].push_back(curIndx);
+
+				for (int i = 0; i < sendVecBlobs.size(); i++) {
+					IndicatorSet curSet = sendVecBlobs[i];
+					for (auto it = curSet.begin(); it != curSet.end(); it++) {
+						sendBlobs[dir].push_back(*it);
+						curIndx++;
+					}
+					sendBlobsIndx[dir].push_back(curIndx);//Now it records the starting position of the next IndicatorSet
+				}
+			}
+		}
+
+		///	<summary>
+		///		Unserialize the received vector<int>recvBlobs into vector<IndicatorSet> and clear the sendBlobsIndx array
+		///	</summary>
+		Void Deserialize(){
+			recvBlobsUnserial.clear();
+			recvBlobsUnserial.resize(2);
+
+
+			for (auto dir : {DIR_LEFT, DIR_RIGHT}) {
+				for (int i = 0; i < sendBlobsIndx[dir].size()-1; i++){
+					IndicatorSet curSet;
+					int startIndx = sendBlobsIndx[dir][i];
+					int endIndx = std::min(sendBlobsIndx[dir][i+1],recvBlobs[dir].size());
+
+					//Deserialize each set
+					for (int i = startIndx; i < endIndx; i++){
+						curSet.insert(recvBlobs[dir][i]);
+					}
+
+					//push each set into the vector
+					recvBlobsUnserial[dir].push_back(curSet);
+			}
+
+			sendBlobsIndx.clear();
+			}
+		}
+
+
+		///	<summary>
+		///		Start the exchange process.
+		/// 	this function is non-blocking and the data values in the VecBlobsSerializeOp should not be modified
+		/// 	The exchange values are not guaranteed to be current when this function returns and need to be used with the EndExchange()
+		///	</summary>
+		Void StartExchange(MPI_Comm _comm) {
+
+			//First Serialize the Sending Buffer.
+			this.Serialize();
+
+			//Receive Data First Since we're using MPI_Isend and MPI_Irecv
+			for (auto dir : {DIR_LEFT, DIR_RIGHT}) {
+				int source
+				MPI_Request request;
+				MPI_Irecv(recvBlobs[dir].data(), recvBlobs[dir].size(), MPI_INT,
+						source_rank, exchange_tag, _comm, &request);
+				MPIrequests.emplace_back(std::move(request));
+				MPIstatuses.push_back(MPI_Status());
+
+
+			}
+
+
+		}
+
+		///	<summary>
+		///		End the exchange process.
+		// 		this function is blocking until:
+		// 		- it is safe to modify the values in the GridFunction data without
+		//   		affecting the exchange values for other processes
+		// 		- the exchange values can be read: they contain to up-to-date values
+		//   		from other processes
+		///	</summary>
+		Void EndExchange() {
+
+		}
+
+
+
+
+
+
+
+}
+
+
+
+
+//#endif //[Commented out for auto-complete, need to uncomment later]
 ///////////////////////////////////////////////////////////////////////////////
 
 class BlobThresholdOp {
@@ -543,25 +738,42 @@ struct Node3 {
 
 int main(int argc, char** argv) {
 
-#if defined(TEMPEST_MPIOMP)
-	// Initialize MPI
-	MPI_Init(&argc, &argv);
-#endif
+	#if defined(TEMPEST_MPIOMP)
+		// Initialize MPI
+		MPI_Init(&argc, &argv);
+		
+		//########################### HPC Notes (Hongyu Chen) ############################################################################ 
+		//Each Processor will read in the commandline information.
+		//1. Each processor will have the information of the entire input file lists
+		//2. Then each processor will read in part of these input files seperately in time dimension. e.g.: P1 get time 0~1, P2 get time 2~3
+		//   But each processor will have the entire spatial dimension. In other words, the input files is a 4*6 Matrix, it means time * spatial Matrix. 
+		//   each processor has a n_time/p*6 local matrix.
+		//3. When read in the benchmark file, each processor will still read in the vecInputfiles[0](the global input file array)
+		//4. Then generate the local vecAllBlobs from local input files. And do the halo exchange for the vecAllBlobs: sending vecAllBlobs[0] to left, vecAllBlobs[size-1] to the right.
+		//5. Need to think about how to recalculate the Time index after the Halo Exchange
+		//6. Currently only the StitchBlob process is paralleled.
+	#endif
 
 	NcError error(NcError::silent_nonfatal);
+	// Enable output only on rank zero
+	AnnounceOnlyOutputOnRankZero();
 
 try {
 
-#if defined(TEMPEST_MPIOMP)
-	// Throw an error if this executable is being run in parallel
-	int nMPISize;
-	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+//[Clean up this block later]
 
-	if (nMPISize != 1) {
-		_EXCEPTIONT("StitchBlobs does not support parallel MPI operation: "
-			"Rerun with one thread.");
-	}
-#endif
+// #if defined(TEMPEST_MPIOMP)
+// 	// Throw an error if this executable is being run in parallel
+// 	int nMPISize;
+// 	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+
+// 	if (nMPISize != 1) {
+// 		_EXCEPTIONT("StitchBlobs does not support parallel MPI operation: "
+// 			"Rerun with one thread.");
+// 	}
+// #endif
+
+//[Clean up this block later ###### end]
 
 	// Input file
 	std::string strInputFile;
@@ -840,6 +1052,17 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
+//#if defined(TEMPEST_MPIOMP) //[Commented out for auto-complete, need to uncomment later]
+	// Spread files across nodes
+	int nMPIRank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &nMPIRank);
+
+	int nMPISize;
+	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+
+//#endif //[Commented out for auto-complete, need to uncomment later]
+
+
 	// Define the SimpleGrid
 	SimpleGrid grid;
 
@@ -888,10 +1111,29 @@ try {
 	std::vector< std::vector<Time> > vecGlobalTimes;
 	vecGlobalTimes.resize(vecOutputFiles.size());
 
-	for (int f = 0; f < vecInputFiles.size(); f++){
+	
+	#if defined(TEMPEST_MPIOMP)
+		//Calculate how many files each processor should process
+		int avgNumFiles = vecInputFiles.size() / nMPISize; //Every processor (except the P0) will have floor(n/p) files
+		int rootNumFiles = vecInputFiles.size() - (avgNumFiles * nMPISize);
+	#endif
 
-		// Load in the benchmark file
-		NcFileVector vecNcFiles;
+
+	for (int f = 0; f < vecInputFiles.size(); f++){
+	
+		//#if defined(TEMPEST_MPIOMP) //[Commented out for auto-complete, need to uncomment later]
+
+			//Asign each processor with their responsible chunks of files
+			int processorResponsibalForFile = (f <= rootNumFiles)? 0 : f/nMPISize;//Calculate which processor should read in this file
+			//When the MPI option is on, if f doesn't fall into the current P_rank responsible range, then all the below readin commands will not be run.
+			if (processorResponsibalForFile != nMPIRank) {
+				continue;
+			}
+
+		//#endif //[Commented out for auto-complete, need to uncomment later]
+
+		// Load in the time variable from all files
+		NcFileVector vecNcFiles;//also known as the local vecNcFiles when MPI is enabled.
 		vecNcFiles.ParseFromString(vecInputFiles[f]);
 		_ASSERT(vecNcFiles.size() > 0);
 
@@ -960,17 +1202,23 @@ try {
 	AnnounceStartBlock("Building blob set at each time level");
 
 	// Set of nodes at each time contained in each blob
-	std::vector< std::vector<IndicatorSet> > vecAllBlobs;
+	std::vector< std::vector<IndicatorSet> > vecAllBlobs;//Sending and Receiving Blobs to nearby processors [Halo Var]
 	vecAllBlobs.resize(nGlobalTimes);
 
 	// Bounding boxes at each time for each blob
-	std::vector< std::vector< LatLonBox<double> > > vecAllBlobBoxesDeg;
+	std::vector< std::vector< LatLonBox<double> > > vecAllBlobBoxesDeg;//[Halo Var]
 	vecAllBlobBoxesDeg.resize(nGlobalTimes);
 
 	// Time index across all files
 	int iTime = 0;
 
 	// Loop through all files
+
+	//#if defined(TEMPEST_MPIOMP) //[Commented out for auto-complete, need to uncomment later]
+		//If MPI is enabled, then modify the nFiles to the local file numbers
+		nFiles = (nMPIRank == 0)? rootNumFiles : avgNumFiles;
+	//#endif //[Commented out for auto-complete, need to uncomment later]
+
 	for (int f = 0; f < nFiles; f++) {
 
 		// Clear existing data in the register
@@ -1182,7 +1430,7 @@ try {
 
 				// Build a set of all pairs that need to be merged
 				std::vector< std::set<int> > vecMergeGraph(vecBlobs.size());
-                                for (int ixBlob = 0; ixBlob < vecBlobs.size(); ixBlob++) {
+				for (int ixBlob = 0; ixBlob < vecBlobs.size(); ixBlob++) {
 					//Announce("Blob %i has %lu total points, %lu perimeter points",
 					//	ixBlob,
 					//	vecBlobs[ixBlob].size(),
@@ -1379,6 +1627,9 @@ try {
 	// Stitch blobs together in time using graph search
 	///////////////////////////////////////////////////////////////////////////
 
+
+
+
 	AnnounceStartBlock("Assign local tags to each blob");
 
 	// Tags for each blob at each time slice
@@ -1390,6 +1641,60 @@ try {
 
 	// Give blob tags to the initial set of blobs
 	std::set<Tag> setAllTags;
+
+
+	//================================Actual Parallization Starts===================================
+	//1. Exchang the vecAllBlobs; vecAllBlobTags
+	//nMPIRank;nMPISize
+	//==============================================================================================
+
+	//#if defined(TEMPEST_MPIOMP)//[Commented out for auto-complete, need to uncomment later]
+		
+		//Send Data first
+		if (vecAllBlobs[0].size() != vecAllBlobTags[0].size()) {
+				_EXCEPTION2("Mismatch in number of Blobs number (%lu) and Blobs' tags number (%lu) at single time slice",
+				vecAllBlobs[0].size(), vecAllBlobTags[0].size());
+		}
+
+		//Data Process: Serialize the vecAllBlobs
+		VecBlobsSerializeOp sendVecBlobs_left(vecAllBlobs[0]);
+		VecBlobsSerializeOp sendVecBlobs_right(vecAllBlobs[vecAllBlobs.size()-1]);
+
+		sendVecBlobs_left.Serialize();sendVecBlobs_right.Serialize();
+
+		std::vector<int> sendVecBlobsBuf_left = sendVecBlobs_left.getSerialVector();
+		std::vector<int> sendVecBlobsBufIndx_left = sendVecBlobs_left.getSerialVectorIndex();
+
+		std::vector<int> sendVecBlobsBuf_right = sendVecBlobs_right.getSerialVector();
+		std::vector<int> sendVecBlobsBufIndx_right = sendVecBlobs_right.getSerialVectorIndex();
+
+		//size info for (serialVectorSize, serialVectorIndxSize) for MPI Recv.
+		std::vector<int> sizeInfo_left(sendVecBlobsBuf_left.size(),sendVecBlobsBufIndx_left.size());
+		std::vector<int> sizeInfo_right(sendVecBlobsBuf_right.size(),sendVecBlobsBufIndx_right.size());
+		
+
+		if (nMPIRank == 0) {
+		//P0 will only exhange with the P1
+
+		//First send out the size info:
+		MPI_Send(sizeInfo_left, 1, MPI_INT, 1, 0, MPI_COMM_WORLD);
+
+			
+
+		} else if (nMPIRank == nMPISize - 1) {
+		//Pn-1 will only exhange with the Pn-2
+
+		} else {
+		//Pn will exchange with Pn-1 and Pn+1
+
+		}
+
+		//Receive Data
+
+
+	//#endif //[Commented out for auto-complete, need to uncomment later]
+
+
 
 	for (int t = 0; t < nGlobalTimes; t++) {
 		vecAllBlobTags[t].resize(vecAllBlobs[t].size());
@@ -1579,7 +1884,7 @@ try {
 
 	AnnounceEndBlock("Done");
 
-	AnnounceStartBlock("Identify components in connectivity graph");
+	AnnounceStartBlock("Identify components in connectivity graph");//Only In processor 0;
 
 	// Total number of blobs
 	int nTotalBlobCount = 0;
