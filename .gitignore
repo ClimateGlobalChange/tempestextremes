@@ -38,3 +38,11 @@ test/*.eps
 test/*.png
 
 test/statfigs/*
+
+.vscode/
+
+TempestExtremes v2.1.pdf
+
+mk/
+
+mk/system/

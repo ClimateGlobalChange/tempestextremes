@@ -146,7 +146,8 @@ typedef enum { DIR_LEFT = 0, DIR_RIGHT = 1} CommDirection;
 
 class BlobsExchangeOp {
 	private:
-		int exchange_tag = 101;
+		int blob_tag = 101;
+		int indx_tag = 102;
 		MPI_Comm _comm; // the communicator for this vecAllBlobs
 	protected:
 
@@ -159,7 +160,7 @@ class BlobsExchangeOp {
 		///		The buffer for vecBlobs that is serialized and will be sent
 		///		sendBlobs[0] is the left vector and sendBlobs[1] is the right vector
 		///	</summary>
-		std::vector<IndicatorSet> sendBlobs;
+		std::vector<std::vector<IndicatorSet>> sendBlobs;
 
 
 		///	<summary>
@@ -173,6 +174,12 @@ class BlobsExchangeOp {
 		///		recvBlobs[0] is for the left vector and recvBlobs[1] is for the right vector
 		///	</summary>
 		std::vector<std::vector<int>> recvBlobs;
+
+		///	<summary>
+		///		The Buffer  recording the starting index for each set that is in the recvBlobs
+		///		recvBlobsIndx[0] is for the left vector and recvBlobsIndx[1] is for the right vector
+		///	</summary>
+		std::vector<std::vector<int>> recvBlobsIndx;
 
 		///	<summary>
 		///		The array recording the unserialize recvBlobs
@@ -194,13 +201,13 @@ class BlobsExchangeOp {
 
 	public:
 
-  		const MPI_Comm &comm() const { return _comm; }// accessors
-
+  		
 		///	<summary>
 		///		Construct the Operator with vecAllBlobs
 		///	</summary>
-		VecBlobsSerializeOp(std::vector< std::vector<IndicatorSet>> vecAllBlobs){
+		VecBlobsSerializeOp(MPI_Comm communicator, std::vector< std::vector<IndicatorSet>> vecAllBlobs){
 			this->_vecAllBlobs = vecAllBlobs;
+			this->_comm = communicator;
 		}
 
 
@@ -208,6 +215,9 @@ class BlobsExchangeOp {
 		///		Default destructor for VecBlobsSerializeOp
 		///	</summary>
 		~VecBlobsSerializeOp();
+
+		const MPI_Comm &comm() const { return _comm; }// accessors
+
 
 		///	<summary>
 		///		Serialize the vector<IndicatorSet> and generate the sendBlobsIndx array
@@ -235,7 +245,7 @@ class BlobsExchangeOp {
 		}
 
 		///	<summary>
-		///		Unserialize the received vector<int>recvBlobs into vector<IndicatorSet> and clear the sendBlobsIndx array
+		///		Unserialize the received vector<int>recvBlobs into vector<IndicatorSet> and clear the recvBlobsIndx array
 		///	</summary>
 		Void Deserialize(){
 			recvBlobsUnserial.clear();
@@ -243,10 +253,10 @@ class BlobsExchangeOp {
 
 
 			for (auto dir : {DIR_LEFT, DIR_RIGHT}) {
-				for (int i = 0; i < sendBlobsIndx[dir].size()-1; i++){
+				for (int i = 0; i < recvBlobsIndx[dir].size()-1; i++){
 					IndicatorSet curSet;
-					int startIndx = sendBlobsIndx[dir][i];
-					int endIndx = std::min(sendBlobsIndx[dir][i+1],recvBlobs[dir].size());
+					int startIndx = recvBlobsIndx[dir][i];
+					int endIndx = std::min(recvBlobsIndx[dir][i+1],recvBlobs[dir].size());
 
 					//Deserialize each set
 					for (int i = startIndx; i < endIndx; i++){
@@ -257,7 +267,7 @@ class BlobsExchangeOp {
 					recvBlobsUnserial[dir].push_back(curSet);
 			}
 
-			sendBlobsIndx.clear();
+			recvBlobsIndx.clear();
 			}
 		}
 
@@ -267,21 +277,113 @@ class BlobsExchangeOp {
 		/// 	this function is non-blocking and the data values in the VecBlobsSerializeOp should not be modified
 		/// 	The exchange values are not guaranteed to be current when this function returns and need to be used with the EndExchange()
 		///	</summary>
-		Void StartExchange(MPI_Comm _comm) {
+		Void StartExchange() {
 
 			//First Serialize the Sending Buffer.
 			this.Serialize();
+			int err, rank, size;
+			err = MPI_Comm_size(_comm, &size);
+			MPI_ECHK(err);
+			err = MPI_Comm_rank(_comm, &rank);
+			MPI_ECHK(err);
 
-			//Receive Data First Since we're using MPI_Isend and MPI_Irecv
-			for (auto dir : {DIR_LEFT, DIR_RIGHT}) {
-				int source
+			//----------------------Send sendBlobs/sendBlobsIndx data----------------------
+			for (auto dir: {DIR_LEFT, DIR_RIGHT}) {
+				int destRank;//Destination Rank
+				if (dir == DIR_LEFT) {
+					//Sending Data to the left
+					if (rank == 0) {
+						//Rank 0 Do Nothing
+						continue;
+					} else {
+						destRank = rank - 1;
+					}
+
+				} else {
+					//Sending  Data to the right
+					if (rank == size - 1) {
+						//Rank n-1 Do Nothing
+						continue;
+					} else {
+						destRank = rank + 1;
+					}
+				}
+
+				//----------------------Send sendBlobs----------------------
 				MPI_Request request;
+        		MPI_Isend(sendBlobs[dir].data(), sendBlobs[dir].size(), MPI_INT,
+                destRank, blob_tag, _comm, &request);
+
+				//----------------------Send sendBlobsIndx----------------------
+				MPI_Request indx_Request;
+				MPI_Isend(sendBlobsIndx[dir].data(), sendBlobsIndx[dir].size(), MPI_INT,
+                destRank, indx_tag, _comm, &indx_Request);
+
+			}
+
+			//----------------------Receive sendBlobs/recvBlobsIndx Data----------------------
+			for (auto dir : {DIR_LEFT, DIR_RIGHT}) {
+				int sourceRank;
+
+				
+				if (dir == DIR_LEFT) {
+					//Receive Data From the left.
+					if (rank == 0) {//Rank 0 will not receive from the left
+						std::vector<int> defaultVec(sendBlobs[dir].size(),-1);
+						recvBlobs[dir] = defaultVec;
+						continue;
+					} else {
+						sourceRank = rank - 1;
+					}
+
+				} else {
+					//Receive Data From the right.
+					if (rank = size - 1;) {//rank n-1 will not receive from the right
+						std::vector<int> defaultVec(sendBlobs[dir].size(),-1);
+						recvBlobs[dir] = defaultVec;
+						continue;
+
+					} else {
+						sourceRank = rank + 1;
+					}
+
+				}
+
+				//----------------------Receive the serialized Blobs----------------------
+				MPI_Status status;
+				MPI_Request request;
+				int recvCount;
+
+				//Use a non-blocking probe to know the incoming data size
+				int flag = 0;
+				while(!flag)
+				{
+					MPI_Iprobe( sourceRank, blob_tag, _comm, &flag, &status );
+				}
+				MPI_Get_count( &status, MPI_INT, &recvCount );
+				recvBlobs[dir].resize(recvCount);
 				MPI_Irecv(recvBlobs[dir].data(), recvBlobs[dir].size(), MPI_INT,
-						source_rank, exchange_tag, _comm, &request);
+						sourceRank, blob_tag, _comm, &request);
 				MPIrequests.emplace_back(std::move(request));
 				MPIstatuses.push_back(MPI_Status());
 
+				//----------------------Receive the index info for the Blobs----------------------
+				MPI_Status indxStatus;
+				MPI_Request indxRequest;
+				int indxRecvCount;
 
+				//Use a non-blocking probe to know the incoming data size
+				int indxFlag = 0;
+				while(!indxFlag)
+				{
+					MPI_Iprobe( sourceRank, indx_tag, _comm, &indxFlag, &indxStatus);
+				}
+				MPI_Get_count( &indxStatus, MPI_INT, &indxRecvCount);
+				recvBlobsIndx[dir].resize(indxRecvCount);
+				MPI_Irecv(recvBlobsIndx[dir].data(), recvBlobsIndx[dir].size(), MPI_INT,
+						sourceRank, indx_tag, _comm, &indxRequest);
+				MPIrequests.emplace_back(std::move(indxRequest));
+				MPIstatuses.push_back(MPI_Status());
 			}
 
 
@@ -1677,7 +1779,7 @@ try {
 		//P0 will only exhange with the P1
 
 		//First send out the size info:
-		MPI_Send(sizeInfo_left, 1, MPI_INT, 1, 0, MPI_COMM_WORLD);
+
 
 			
 
