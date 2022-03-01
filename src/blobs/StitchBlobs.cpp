@@ -112,6 +112,7 @@ struct Tag {
 
 //Define MPI_Datatype for Tag
 //#if defined(TEMPEST_MPIOMP)//[Commented out for auto-complete, need to uncomment later]
+typedef enum { DIR_LEFT = 0, DIR_RIGHT = 1} CommDirection;
 	
 	{
 		struct Tag sampleTag();// designated initilization for calculating displacement
@@ -128,6 +129,13 @@ struct Tag {
 		MPI_Type_commit(&Tag_type);
 	}
 
+class TagExchangeOP {
+	private:
+		std::vector<std::vector<Tag>> sendTags;
+		std::vector<std::vector<Tag>> recvTags;
+
+}
+
 
 
 //#endif //[Commented out for auto-complete, need to uncomment later]
@@ -142,7 +150,7 @@ typedef IndicatorSet::const_iterator IndicatorSetConstIterator;
 //Define A Class for Exchanging Blobs across processors
 //#if defined(TEMPEST_MPIOMP) //[Commented out for auto-complete, need to uncomment later]
 
-typedef enum { DIR_LEFT = 0, DIR_RIGHT = 1} CommDirection;
+
 
 class BlobsExchangeOp {
 	private:
@@ -155,6 +163,11 @@ class BlobsExchangeOp {
 		///		The vecAllBlobs that need to be exchanged
 		///	</summary>
 		std::vector<std::vector<IndicatorSet>> _vecAllBlobs;
+
+		///	<summary>
+		///		The vecAllBlobs that is after the exchange. it's column number is _vecAllBlobs' column number plus 2. (left and right)
+		///	</summary>
+		std::vector<std::vector<IndicatorSet>> exchangedVecAllBlobs;
 
 		///	<summary>
 		///		The buffer for vecBlobs that is serialized and will be sent
@@ -207,6 +220,7 @@ class BlobsExchangeOp {
 		///	</summary>
 		VecBlobsSerializeOp(MPI_Comm communicator, std::vector< std::vector<IndicatorSet>> vecAllBlobs){
 			this->_vecAllBlobs = vecAllBlobs;
+			this->exchangedVecAllBlobs.resize(vecAllBlobs.size() + 2);
 			this->_comm = communicator;
 		}
 
@@ -214,7 +228,12 @@ class BlobsExchangeOp {
 		///	<summary>
 		///		Default destructor for VecBlobsSerializeOp
 		///	</summary>
-		~VecBlobsSerializeOp();
+		~VecBlobsSerializeOp(){
+			MPI_Comm_free(&_comm);
+			MPIrequests.clear();
+			MPIstatuses.clear();
+			
+		}
 
 		const MPI_Comm &comm() const { return _comm; }// accessors
 
@@ -268,6 +287,7 @@ class BlobsExchangeOp {
 			}
 
 			recvBlobsIndx.clear();
+			sendBlobsIndx.clear();
 			}
 		}
 
@@ -280,7 +300,7 @@ class BlobsExchangeOp {
 		Void StartExchange() {
 
 			//First Serialize the Sending Buffer.
-			this.Serialize();
+			this->Serialize();
 			int err, rank, size;
 			err = MPI_Comm_size(_comm, &size);
 			MPI_ECHK(err);
@@ -398,8 +418,28 @@ class BlobsExchangeOp {
 		//   		from other processes
 		///	</summary>
 		Void EndExchange() {
+			//Wait for all Irecv to complete
+			MPI_Waitall(MPIrequests.size(), &MPIrequests[0], &MPIstatuses[0]);
+			MPIrequests.clear();
+			MPIstatuses.clear();
+			this->Deserialize();
 
+			//Merge the received vecBlobs into the new vecAllBlobs
+			exchangedVecAllBlobs[0] = recvBlobsUnserial[0];
+			exchangedVecAllBlobs[exchangedVecAllBlobs.size() - 1] = recvBlobsUnserial[1];
+			for (int i = 1; i < exchangedVecAllBlobs.size() - 1; i++) {
+				exchangedVecAllBlobs[i] = _vecAllBlobs[i-1];
+			}
 		}
+
+		///	<summary>
+		///		Return the exchanged VecAllBlobs
+		///	</summary>
+		std::vector<std::vector<IndicatorSet>> GetExchangedVecAllBlobs(){
+			return this->exchangedVecAllBlobs;
+		}
+
+
 
 
 
