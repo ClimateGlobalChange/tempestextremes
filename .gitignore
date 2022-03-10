@@ -40,6 +40,7 @@ test/*.png
 test/statfigs/*
 
 !test/
+!test/ERA5_AR
 !test/ERA5_AR/*
 !test/ERA5_AR_test
 !test/ERA5_AR_test/*
