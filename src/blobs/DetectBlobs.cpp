@@ -398,6 +398,10 @@ public:
 		if ((m_eProperty == Area) ||
 		    (m_eProperty == ArealFraction)
 		) {
+			if (grid.m_dArea.GetRows() == 0) {
+				_EXCEPTIONT("Face area, which is needed for GeoFilter operation, is not defined for this grid.");
+			}
+
 			// Calculate the area of each blob
 			double dBlobArea = 0.0;
 			auto iterBlob = setBlobPoints.begin();

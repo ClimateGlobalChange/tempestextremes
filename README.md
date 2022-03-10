@@ -4,7 +4,7 @@ TempestExtremes
 Author:  Paul Ullrich
 Email:   paullrich@ucdavis.edu
 
-Copyright 2020 Paul Ullrich
+Copyright 2022 Paul Ullrich
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
@@ -14,8 +14,18 @@ Redistribution and use in source and binary forms, with or without modification,
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Installation
-============
+Installation via conda
+======================
+TempestExtremes can be found on conda-forge here:
+
+https://anaconda.org/conda-forge/tempest-extremes
+
+To install from conda use the command line:
+
+```conda install -c conda-forge tempest-extremes```
+
+Installation via make
+=====================
 TempestExtremes uses a basic make-based build system that has been tested in multiple Unix and Linux based environments.  TempestExtremes currently only requires the NetCDF C library provided as an external dependency.  Linker commands needed to include -lnetcdf must be specified in a system makefile found in mk/system/.  Once the compiler executable and flags have been set, executing "make" in the tempestextremes directory will perform the build, storing binaries in the "bin" directory.
 
 To compile on NERSC Cori:
@@ -42,6 +52,8 @@ https://climate.ucdavis.edu/tempestextremes.php
 Publications
 ============
 If you use the TempestExtremes software please cite our publications:
+
+[https://dx.doi.org/10.5194/gmd-14-5023-2021] Ullrich, P.A., C.M. Zarzycki, E.E. McClenny, M.C. Pinheiro, A.M. Stansfield and K.A. Reed (2021) "TempestExtremes v2.1: A community framework for feature detection, tracking and analysis in large datasets" Geosci. Model. Dev. 14, pp. 5023–5048, doi: 10.5194/gmd-14-5023-2021.
 
 [http://dx.doi.org/10.5194/gmd-2016-217] Ullrich, P.A. and C.M. Zarzycki (2017) "TempestExtremes v1.0: A framework for scale-insensitive pointwise feature tracking on unstructured grids" Geosci. Model. Dev. 10, pp. 1069-1090, doi: 10.5194/gmd-10-1069-2017. 
 

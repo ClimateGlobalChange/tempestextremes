@@ -22,6 +22,7 @@
 #include "FilenameList.h"
 #include "Variable.h"
 #include "TimeObj.h"
+#include "TimeMatch.h"
 #include "DataArray2D.h"
 #include "FourierTransforms.h"
 #include "Units.h"
@@ -452,6 +453,7 @@ void Climatology(
 	int nFourierModes,
 	bool fMissingData,
 	const std::string & strFillValueOverride,
+	const std::string & strTimeFilter,
 	bool fOutputSliceCounts,
 	bool fVerbose
 ) {
@@ -484,6 +486,39 @@ void Climatology(
 		_EXCEPTION1("Unable to open output datafile \"%s\"",
 			strOutputFile.c_str());
 	}
+
+	// Parse timefilter
+#ifdef TEMPEST_NOREGEX
+	if (strTimeFilter != "") {
+		_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
+	}
+#endif
+#ifndef TEMPEST_NOREGEX
+	std::regex reTimeSubset;
+	if (strTimeFilter != "") {
+
+		// Test regex support
+		TestRegex();
+
+		std::string strTimeFilterTemp = strTimeFilter;
+		if (strTimeFilterTemp == "3hr") {
+			strTimeFilterTemp = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
+		}
+		if (strTimeFilterTemp == "6hr") {
+			strTimeFilterTemp = "....-..-.. (00|06|12|18):00:00";
+		}
+		if (strTimeFilterTemp == "daily") {
+			strTimeFilterTemp = "....-..-.. 00:00:00";
+		}
+
+		try {
+			reTimeSubset.assign(strTimeFilterTemp);
+		} catch(std::regex_error & reerr) {
+			_EXCEPTION2("Parse error in --timefilter regular expression \"%s\" (code %i)",
+				strTimeFilterTemp.c_str(), reerr.code());
+		}
+	}
+#endif
 
 	// Determine dimensionality of each variable
 	std::vector< std::vector<long> > vecVariableSpecifiedDimIxs;
@@ -996,6 +1031,19 @@ void Climatology(
 
 				// Daily mean
 				for (int t = 0; t < vecTimes.size(); t++) {
+
+#ifndef TEMPEST_NOREGEX
+					if (strTimeFilter != "") {
+						std::string strTime = vecTimes[t].ToString();
+						std::smatch match;
+						if (!std::regex_search(strTime, match, reTimeSubset)) {
+							Announce("Time %s (filtered; skipping)",
+								vecTimes[t].ToString().c_str());
+							continue;
+						}
+					}
+#endif
+
 					if (vecTimes[t].IsLeapDay()) {
 						if (fVerbose) {
 							Announce("Time %s (leap day; skipping)",
@@ -1772,6 +1820,9 @@ try {
 	// Override the fillvalue
 	std::string strFillValueOverride;
 
+	// Time filter
+	std::string strTimeFilter;
+
 	// Do not delete temp files after completing climatology
 	bool fKeepTempFiles;
 
@@ -1792,6 +1843,7 @@ try {
 		CommandLineBool(fMissingData, "missingdata");
 		CommandLineString(strTempFilePath, "temp_file_path", "/tmp");
 		CommandLineString(strFillValueOverride, "*fillvalue", "");
+		CommandLineString(strTimeFilter, "timefilter", "");
 		CommandLineBool(fKeepTempFiles, "keep_temp_files");
 		CommandLineBool(fVerbose, "verbose");
 
@@ -1965,6 +2017,7 @@ try {
 		nFourierModes,
 		fMissingData,
 		strFillValueOverride,
+		strTimeFilter,
 		fOutputSliceCounts,
 		fVerbose
 	);

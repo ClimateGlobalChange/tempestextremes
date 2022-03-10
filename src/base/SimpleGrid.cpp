@@ -19,6 +19,7 @@
 #include "FiniteElementTools.h"
 #include "GaussLobattoQuadrature.h"
 #include "Announce.h"
+#include "Constants.h"
 #include "CoordTransforms.h"
 #include "NetCDFUtilities.h"
 #include "kdtree.h"
@@ -307,7 +308,7 @@ void SimpleGrid::GenerateLatitudeLongitude(
 			dTotalArea += m_dArea[i];
 		}
 		if (fVerbose) {
-			Announce("Total calculated grid area: %1.15e", dTotalArea);
+			Announce("Total calculated grid area: %1.15e sr", dTotalArea);
 		}
 	}
 
@@ -458,7 +459,53 @@ void SimpleGrid::GenerateLatitudeLongitude(
 			m_dLon[s] = DegToRad(m_dLon[s]);
 			m_dLat[s] = DegToRad(m_dLat[s]);
 		}
- 
+
+		// Approximate cell areas
+		if ((lX > 1) && (lY > 1)) {
+			m_dArea.Allocate(lX * lY);
+
+			double dTotalArea = 0.0;
+			size_t s = 0;
+			for (size_t j = 0; j < static_cast<size_t>(lY); j++) {
+			for (size_t i = 0; i < static_cast<size_t>(lX); i++) {
+				double dLonRad0;
+				double dLonRad1;
+				double dLatRad0;
+				double dLatRad1;
+				if (i == 0) {
+					dLonRad0 = 1.5 * m_dLon[s] - 0.5 * m_dLon[s+1];
+				} else {
+					dLonRad0 = AverageLongitude_Rad(m_dLon[s-1], m_dLon[s]);
+				}
+				if (i == static_cast<size_t>(lX)-1) {
+					dLonRad1 = 1.5 * m_dLon[s] - 0.5 * m_dLon[s-1];
+				} else {
+					dLonRad1 = AverageLongitude_Rad(m_dLon[s], m_dLon[s+1]);
+				}
+				if (j == 0) {
+					dLatRad0 = 1.5 * m_dLat[s] - 0.5 * m_dLat[s+static_cast<size_t>(lX)];
+				} else {
+					dLatRad0 = 0.5 * m_dLat[s-static_cast<size_t>(lX)] + 0.5 * m_dLat[s];
+				}
+				if (j == static_cast<size_t>(lY)-1) {
+					dLatRad1 = 1.5 * m_dLat[s] - 0.5 * m_dLat[s-static_cast<size_t>(lX)];
+				} else {
+					dLatRad1 = 0.5 * m_dLat[s] + 0.5 * m_dLat[s+static_cast<size_t>(lX)];
+				}
+
+				m_dArea[s] =
+					fabs(sin(dLatRad1) - sin(dLatRad0))
+					* fabs(dLonRad1 - dLonRad0);
+
+				dTotalArea += m_dArea[s];
+
+				s++;
+			}
+			}
+
+			Announce("Approximate domain area: %1.15e sr", dTotalArea);
+ 		}
+
 		GenerateRectilinearConnectivity(lY, lX, fRegional, fDiagonalConnectivity);
 	}
 }
@@ -874,7 +921,7 @@ void SimpleGrid::FromMeshFV(
 		for (size_t i = 0; i < sFaces; i++) {
 			dTotalArea += m_dArea[i];
 		}
-		Announce("Total calculated area: %1.15e", dTotalArea);
+		Announce("Total calculated area: %1.15e sr", dTotalArea);
 	}
 }
 
