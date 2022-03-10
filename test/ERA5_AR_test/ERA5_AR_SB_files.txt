@@ -1,0 +1,12 @@
+ERA5_AR/e5.oper.an.vinteg.ar_tag_stitch.ll025sc.1979010100_1979013123.nc
+ERA5_AR/e5.oper.an.vinteg.ar_tag_stitch.ll025sc.1979020100_1979022823.nc
+ERA5_AR/e5.oper.an.vinteg.ar_tag_stitch.ll025sc.1979030100_1979033123.nc
+ERA5_AR/e5.oper.an.vinteg.ar_tag_stitch.ll025sc.1979040100_1979043023.nc
+ERA5_AR/e5.oper.an.vinteg.ar_tag_stitch.ll025sc.1979050100_1979053123.nc
+ERA5_AR/e5.oper.an.vinteg.ar_tag_stitch.ll025sc.1979060100_1979063023.nc
+ERA5_AR/e5.oper.an.vinteg.ar_tag_stitch.ll025sc.1979070100_1979073123.nc
+ERA5_AR/e5.oper.an.vinteg.ar_tag_stitch.ll025sc.1979080100_1979083123.nc
+ERA5_AR/e5.oper.an.vinteg.ar_tag_stitch.ll025sc.1979090100_1979093023.nc
+ERA5_AR/e5.oper.an.vinteg.ar_tag_stitch.ll025sc.1979100100_1979103123.nc
+ERA5_AR/e5.oper.an.vinteg.ar_tag_stitch.ll025sc.1979110100_1979113023.nc
+ERA5_AR/e5.oper.an.vinteg.ar_tag_stitch.ll025sc.1979120100_1979123123.nc
