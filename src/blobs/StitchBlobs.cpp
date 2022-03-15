@@ -174,7 +174,7 @@ class TagExchangeOP {
 			this->_comm = communicator;
 
 			//Create an MPI datatype for the Tag:
-			struct Tag sampleTag();// designated initilization for calculating displacement
+			struct Tag sampleTag;// designated initilization for calculating displacement
 			int tagFieldsCount = 3;	
 			MPI_Datatype Tag_typesig[3] = {MPI_INT,MPI_INT,MPI_INT};
 			int Tag_block_lengths[3] = {1,1,1};
@@ -201,10 +201,8 @@ class TagExchangeOP {
 		///	</summary>
 		void StartExchange() {
 			int err, rank, size;
-			err = MPI_Comm_size(_comm, &size);
-			MPI_ECHK(err);
-			err = MPI_Comm_rank(_comm, &rank);
-			MPI_ECHK(err);
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
 
 			//----------------------Receive data first----------------------
 			for (auto dir : {DIR_LEFT, DIR_RIGHT}) {
@@ -212,7 +210,7 @@ class TagExchangeOP {
 				if (dir == DIR_LEFT) {
 					//Receive Data From the left.
 					if (rank == 0) {//Rank 0 will not receive from the left
-						std::vector<int> defaultVec(sendTags[dir].size(),-1);
+						std::vector<Tag> defaultVec(sendTags[dir].size(),Tag(-1,-1));
 						recvTags[dir] = defaultVec;
 						continue;
 					} else {
@@ -221,8 +219,8 @@ class TagExchangeOP {
 
 				} else {
 					//Receive Data From the right.
-					if (rank = size - 1;) {//rank n-1 will not receive from the right
-						std::vector<int> defaultVec(sendTags[dir].size(),-1);
+					if (rank == size - 1) {//rank n-1 will not receive from the right
+						std::vector<Tag> defaultVec(sendTags[dir].size(),Tag(-1,-1));
 						recvTags[dir] = defaultVec;
 						continue;
 
@@ -317,7 +315,7 @@ class TagExchangeOP {
 
 
 
-}
+};
 
 class BlobBoxesDegExchangeOP {
 	private:
@@ -380,11 +378,11 @@ class BlobBoxesDegExchangeOP {
 			//First create the datatype for double[2]
 			MPI_Datatype MPI_doubleArray;
 			MPI_Type_contiguous	(2,	MPI_DOUBLE,&MPI_doubleArray);	
-			MPI_Type_commit	(&doubleArray);
+			MPI_Type_commit	(&MPI_doubleArray);
 			//Then use this doubleArray to construct LatlonBox<double>
 			LatLonBox<double> sampleBox;
-			int LatlonBox = 5;
-			MPI_Datatype LatlonBox_typesig[5] = {MPI_C_BOOL, MPI_C_BOOL, MPI_DOUBLE, MPI_doubleArray, MPI_doubleArray}
+			int LatlonBoxFieldCount = 5;
+			MPI_Datatype LatlonBox_typesig[5] = {MPI_C_BOOL, MPI_C_BOOL, MPI_DOUBLE, MPI_doubleArray, MPI_doubleArray};
 			int LatlonBox_block_lengths[5] = {1,1,1,1,1};
 			MPI_Aint LatlongBox_displacements[5];
 			MPI_Get_address(&sampleBox.is_null, &LatlongBox_displacements[0]);
@@ -410,10 +408,8 @@ class BlobBoxesDegExchangeOP {
 		///	</summary>
 		void StartExchange() {
 			int err, rank, size;
-			err = MPI_Comm_size(_comm, &size);
-			MPI_ECHK(err);
-			err = MPI_Comm_rank(_comm, &rank);
-			MPI_ECHK(err);
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
 
 			//----------------------Receive data first----------------------
 			for (auto dir : {DIR_LEFT, DIR_RIGHT}) {
@@ -421,7 +417,7 @@ class BlobBoxesDegExchangeOP {
 				if (dir == DIR_LEFT) {
 					//Receive Data From the left.
 					if (rank == 0) {//Rank 0 will not receive from the left
-						std::vector<int> defaultVec(sendBlobBoxesDeg[dir].size(),-1);
+						std::vector<LatLonBox<double>> defaultVec(sendBlobBoxesDeg[dir].size());
 						recvBlobBoxesDeg[dir] = defaultVec;
 						continue;
 					} else {
@@ -430,8 +426,8 @@ class BlobBoxesDegExchangeOP {
 
 				} else {
 					//Receive Data From the right.
-					if (rank = size - 1;) {//rank n-1 will not receive from the right
-						std::vector<int> defaultVec(sendBlobBoxesDeg[dir].size(),-1);
+					if (rank == size - 1) {//rank n-1 will not receive from the right
+						std::vector<LatLonBox<double>> defaultVec(sendBlobBoxesDeg[dir].size());
 						recvBlobBoxesDeg[dir] = defaultVec;
 						continue;
 
@@ -526,7 +522,7 @@ class BlobBoxesDegExchangeOP {
 
 
 
-}
+};
 
 
 
@@ -575,7 +571,7 @@ class BlobsExchangeOp {
 		///		The buffer for vecBlobs that is serialized and will be sent
 		///		sendBlobs[0] is the left vector and sendBlobs[1] is the right vector
 		///	</summary>
-		std::vector<std::vector<IndicatorSet>> sendBlobs;
+		std::vector<std::vector<int>> sendBlobs;
 
 
 		///	<summary>
@@ -608,9 +604,9 @@ class BlobsExchangeOp {
 
   		
 		///	<summary>
-		///		Construct the Operator with vecAllBlobs
+		///		Construct the Operator with BlobsExchangeOp
 		///	</summary>
-		VecBlobsSerializeOp(MPI_Comm communicator, std::vector< std::vector<IndicatorSet>> vecAllBlobs){
+		BlobsExchangeOp(MPI_Comm communicator, std::vector< std::vector<IndicatorSet>> vecAllBlobs){
 			this->_vecAllBlobs = vecAllBlobs;
 			this->exchangedVecAllBlobs.resize(vecAllBlobs.size() + 2);
 			this->_comm = communicator;
@@ -618,9 +614,9 @@ class BlobsExchangeOp {
 
 
 		///	<summary>
-		///		Default destructor for VecBlobsSerializeOp
+		///		Default destructor for BlobsExchangeOp
 		///	</summary>
-		~VecBlobsSerializeOp(){
+		~BlobsExchangeOp(){
 			MPI_Comm_free(&_comm);
 			MPIrequests.clear();
 			MPIstatuses.clear();
@@ -667,7 +663,7 @@ class BlobsExchangeOp {
 				for (int i = 0; i < recvBlobsIndx[dir].size()-1; i++){
 					IndicatorSet curSet;
 					int startIndx = recvBlobsIndx[dir][i];
-					int endIndx = std::min(recvBlobsIndx[dir][i+1],recvBlobs[dir].size());
+					int endIndx = std::min(recvBlobsIndx[dir][i+1],int(recvBlobs[dir].size()));
 
 					//Deserialize each set
 					for (int i = startIndx; i < endIndx; i++){
@@ -695,9 +691,7 @@ class BlobsExchangeOp {
 			this->Serialize();
 			int err, rank, size;
 			err = MPI_Comm_size(_comm, &size);
-			MPI_ECHK(err);
 			err = MPI_Comm_rank(_comm, &rank);
-			MPI_ECHK(err);
 
 			//----------------------Send sendBlobs/sendBlobsIndx data----------------------
 			for (auto dir: {DIR_LEFT, DIR_RIGHT}) {
@@ -750,7 +744,7 @@ class BlobsExchangeOp {
 
 				} else {
 					//Receive Data From the right.
-					if (rank = size - 1;) {//rank n-1 will not receive from the right
+					if (rank == size - 1) {//rank n-1 will not receive from the right
 						std::vector<int> defaultVec(sendBlobs[dir].size(),-1);
 						recvBlobs[dir] = defaultVec;
 						continue;
@@ -839,7 +833,7 @@ class BlobsExchangeOp {
 
 
 
-}
+};
 
 
 
@@ -2197,17 +2191,17 @@ try {
 	//==============================================================================================
 
 #if defined(TEMPEST_MPIOMP)//[Commented out for auto-complete, need to uncomment later]
-		TagExchangeOP MPI_exchangedTags(vecAllBlobTags);
+		TagExchangeOP MPI_exchangedTags(MPI_COMM_WORLD, vecAllBlobTags);
 		MPI_exchangedTags.StartExchange();
 		MPI_exchangedTags.EndExchange();
 		vecAllBlobTags = MPI_exchangedTags.GetExchangedVecAllBlobTags();
 
-		BlobsExchangeOp MPI_exchangedBlobs(vecAllBlobs);
+		BlobsExchangeOp MPI_exchangedBlobs(MPI_COMM_WORLD, vecAllBlobs);
 		MPI_exchangedBlobs.StartExchange();
 		MPI_exchangedBlobs.EndExchange();
 		vecAllBlobs = MPI_exchangedBlobs.GetExchangedVecAllBlobs();
 
-		BlobBoxesDegExchangeOP MPI_exchangedBlobBoxesDeg(vecAllBlobBoxesDeg);
+		BlobBoxesDegExchangeOP MPI_exchangedBlobBoxesDeg(MPI_COMM_WORLD, vecAllBlobBoxesDeg);
 		MPI_exchangedBlobBoxesDeg.StartExchange();
 		MPI_exchangedBlobBoxesDeg.EndExchange();
 		vecAllBlobBoxesDeg = MPI_exchangedBlobBoxesDeg.GetExchangedVecAllBlobBoxesDeg();
