@@ -784,9 +784,14 @@ void SimpleGrid::FromMeshFV(
 	std::vector< std::set<int> > m_vecConnectivitySet;
 	m_vecConnectivitySet.resize(sFaces);
 
+	size_t sOneSidedEdges = 0;
 	EdgeMapConstIterator iterEdgeMap = mesh.edgemap.begin();
 	for (; iterEdgeMap != mesh.edgemap.end(); iterEdgeMap++) {
 		const FacePair & facepr = iterEdgeMap->second;
+		if ((facepr[0] == InvalidFace) || (facepr[1] == InvalidFace)) {
+			sOneSidedEdges++;
+			continue;
+		}
 		if ((facepr[0] < 0) || (facepr[0] >= sFaces)) {
 			_EXCEPTION1("EdgeMap FacePair out of range (%i)", facepr[0]);
 		}
@@ -795,6 +800,10 @@ void SimpleGrid::FromMeshFV(
 		}
 		m_vecConnectivitySet[facepr[0]].insert(facepr[1]);
 		m_vecConnectivitySet[facepr[1]].insert(facepr[0]);
+	}
+
+	if (sOneSidedEdges != 0) {
+		Announce("One-sided edges: %lu", sOneSidedEdges);
 	}
 
 	m_vecConnectivity.resize(sFaces);

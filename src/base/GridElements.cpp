@@ -301,6 +301,96 @@ void Mesh::RemoveCoincidentNodes() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/*
+void Mesh::RemoveCoincidentNodes_Fixed() {
+	if (nodes.size() == 0) {
+		return;
+	}
+
+	class NodeXYZ {
+		public:
+			double x;
+			double y;
+			double z;
+			int ix;
+	
+		public:
+			bool operator<(const NodeXYZ & node) const {
+				if (x < node.x) {
+					return true;
+				} else if (x > node.x) {
+					return false;
+				}
+
+				if (y < node.y) {
+					return true;
+				} else if (y > node.y) {
+					return false;
+				}
+
+				if (z < node.z) {
+					return true;
+				} else if (z > node.z) {
+					return false;
+				}
+
+				return false;
+			}
+	};
+
+	std::vector<NodeXYZ> vecNodeXI(nodes.size());
+
+	for (int i = 0; i < nodes.size(); i++) {
+		vecNodeXI[i].x = nodes[i].x;
+		vecNodeXI[i].y = nodes[i].y;
+		vecNodeXI[i].z = nodes[i].z;
+		vecNodeXI[i].ix = i;
+	}
+
+	std::sort(vecNodeXI.begin(), vecNodeXI.end());
+
+	auto itRef = vecNodeXI.begin();
+
+	//auto itBeginX = vecNodeXI.begin();
+	auto itEndX = vecNodeXI.begin();
+
+	for (int i = 0; i < vecNodeXI.size(); i++) {
+		if (itRef->ix != i) {
+			continue;
+		}
+		//while(itRef->x - itBeginX->x > ReferenceTolerance) {
+		//	itBeginX++;
+		//}
+		while((itEndX != vecNodeXI.end()) && (itEndX->x - itRef->x <= ReferenceTolerance)) {
+			itEndX++;
+		}
+
+		for (auto itY = itRef; itY != itEndX; itY++) {
+			if ((fabs(itRef->y - itY->y) <= ReferenceTolerance) &&
+			    (fabs(itRef->z - itY->z) <= ReferenceTolerance)
+			) {
+				itY->ix = i;
+			}
+		}
+
+		itRef++;
+	}
+
+	int nRemoved = 0;
+	for (int i = 0; i < vecNodeXI.size(); i++) {
+		if (vecNodeXI[i].ix != i) {
+			printf("%1.5e %1.5e %1.5e\n",
+				fabs(vecNodeXI[i].x - vecNodeXI[vecNodeXI[i].ix].x),
+				fabs(vecNodeXI[i].y - vecNodeXI[vecNodeXI[i].ix].y),
+				fabs(vecNodeXI[i].z - vecNodeXI[vecNodeXI[i].ix].z));
+			nRemoved++;
+		}
+	}
+
+	Announce("%i duplicate nodes detected", nRemoved);
+}
+*/
+///////////////////////////////////////////////////////////////////////////////
 
 void Mesh::Write(
 	const std::string & strFile,
@@ -1374,8 +1464,8 @@ void Mesh::Read(const std::string & strFile) {
 			}
 		}
 
-	 // Remove coincident nodes.
-	 RemoveCoincidentNodes();
+		// Remove coincident nodes.
+		RemoveCoincidentNodes();
 	}
 }
 

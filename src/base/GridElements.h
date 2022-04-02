@@ -117,23 +117,28 @@ public:
 	///		Comparator operator using floating point tolerance.
 	///	</summary>
 	bool operator< (const Node & node) const {
-		static const Real Tolerance = ReferenceTolerance;
 
-		if (x - node.x <= -Tolerance) {
+		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		// !!!! NOTE: Removed Tolerance from the comparator because there are
+		// !!!!       some cases where nodes with exactly equal coordinates
+		// !!!!       are not sorted properly in a std::map.
+		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+		if (x < node.x) {
 			return true;
-		} else if (x - node.x >= Tolerance) {
+		} else if (x > node.x) {
 			return false;
 		}
 
-		if (y - node.y <= -Tolerance) {
+		if (y < node.y) {
 			return true;
-		} else if (y - node.y >= Tolerance) {
+		} else if (y > node.y) {
 			return false;
 		}
 
-		if (z - node.z <= -Tolerance) {
+		if (z < node.z) {
 			return true;
-		} else if (z - node.z >= Tolerance) {
+		} else if (z > node.z) {
 			return false;
 		}
 
@@ -807,7 +812,12 @@ public:
 	///		Remove coincident nodes from the Mesh and adjust indices in faces.
 	///	</summary>
 	void RemoveCoincidentNodes();
-
+/*
+	///	<summary>
+	///		Remove coincident nodes from the Mesh and adjust indices in faces.
+	///	</summary>
+	void RemoveCoincidentNodes_Fixed();
+*/
 	///	<summary>
 	///		Write the mesh to a NetCDF file in Exodus format.
 	///	</summary>
