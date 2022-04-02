@@ -15,6 +15,7 @@
 ///	</remarks>
 
 #include "SimpleGridUtilities.h"
+#include "CoordTransforms.h"
 #include "ThresholdOp.h"
 
 #include <queue>
@@ -468,6 +469,117 @@ void FindLocalAverage(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+template <typename real>
+void FindMaxClosedContourDelta(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & dataState,
+	int ix0,
+	double dMaxDistDeg,
+	bool fMaxClosedContourDeltaSign,
+	real & dMaxClosedContourDelta
+) {
+	_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
+
+	// Verify that dMaxDistDeg is less than 180.0
+	if ((dMaxDistDeg <= 0.0) || (dMaxDistDeg > 180.0)) {
+		_EXCEPTIONT("MaxDistDeg must be between 0.0 and 180.0");
+	}
+
+	if ((grid.m_vecConnectivity.size() != grid.m_dLon.GetRows()) ||
+		(grid.m_vecConnectivity.size() != grid.m_dLat.GetRows())
+	) {
+		_EXCEPTION3("Inconsistent SimpleGrid (%i %i %i); connectivity information mismatch",
+			grid.m_vecConnectivity.size(),
+			grid.m_dLon.GetRows(),
+			grid.m_dLat.GetRows());
+	}
+
+	// Convert fMaxClosedContourDeltaSign to double
+	double dMCCDSign = 1.0;
+	if (!fMaxClosedContourDeltaSign) {
+		dMCCDSign = -1.0;
+	}
+
+	// Value of the field at the index point
+	double dValue0 = dataState[ix0];
+
+	// Central lat/lon and Cartesian coord
+	double dLon0 = grid.m_dLon[ix0];
+	double dLat0 = grid.m_dLat[ix0];
+
+	// Initial max closed contour delta
+	dMaxClosedContourDelta = 0.0;
+
+	// Priority queue mapping deltas to indices
+	std::map<double, int> mapPriorityQueue;
+	mapPriorityQueue.insert(
+		std::pair<double, int>(0.0, ix0));
+
+	// Queue of nodes that remain to be visited
+	std::queue<int> queueNodes;
+	for (int n = 0; n < grid.m_vecConnectivity[ix0].size(); n++) {
+		queueNodes.push(grid.m_vecConnectivity[ix0][n]);
+	}
+
+	// Set of nodes that have already been visited
+	std::set<int> setNodesVisited;
+
+	// Loop through all elements
+	while (mapPriorityQueue.size() != 0) {
+		std::map<double, int>::iterator iter = mapPriorityQueue.begin();
+
+		const double dDelta = iter->first;
+		const int ix = iter->second;
+
+		if ((ix < 0) || (ix >= grid.m_vecConnectivity.size())) {
+			_EXCEPTION2("Out of range index in connectivity matrix (%i/%i)",
+				ix, grid.m_vecConnectivity.size());
+		}
+
+		mapPriorityQueue.erase(iter);
+
+		setNodesVisited.insert(ix);
+
+		// Add all neighbors of this point
+		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+			int ixNeighbor = grid.m_vecConnectivity[ix][n];
+			if (setNodesVisited.find(ixNeighbor) != setNodesVisited.end()) {
+				continue;
+			}
+
+			double dValue = dataState[ixNeighbor];
+			mapPriorityQueue.insert(
+				std::pair<double, int>(
+					dMCCDSign * (dValue - dValue0), ixNeighbor));
+		}
+
+		// Don't perform calculation on central node
+		if (ix == ix0) {
+			continue;
+		}
+
+		// lat/lon and Cartesian coords of this point
+		double dLat = grid.m_dLat[ix];
+		double dLon = grid.m_dLon[ix];
+
+		// Great circle distance to this element (in degrees)
+		double dR = GreatCircleDistance_Deg(dLon0, dLat0, dLon, dLat);
+
+		if (dR >= dMaxDistDeg) {
+			break;
+		}
+
+		// Store new maximum delta
+		if (dDelta > dMaxClosedContourDelta) {
+			dMaxClosedContourDelta = dDelta;
+		}
+	}
+
+	dMaxClosedContourDelta *= dMCCDSign;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // Explicit template instantiation
 
 template void FindLocalMinMax<float>(
@@ -562,6 +674,24 @@ template void FindLocalAverage<double>(
 	int ix0,
 	double dMaxDist,
 	double & dAverage
+);
+
+template void FindMaxClosedContourDelta<float>(
+	const SimpleGrid & grid,
+	const DataArray1D<float> & data,
+	int ix0,
+	double dMaxDist,
+	bool fMaxClosedContourDeltaSign,
+	float & dMaxClosedContourDelta
+);
+
+template void FindMaxClosedContourDelta<double>(
+	const SimpleGrid & grid,
+	const DataArray1D<double> & data,
+	int ix0,
+	double dMaxDist,
+	bool fMaxClosedContourDeltaSign,
+	double & dMaxClosedContourDelta
 );
 
 ///////////////////////////////////////////////////////////////////////////////

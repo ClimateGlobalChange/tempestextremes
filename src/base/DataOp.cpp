@@ -334,6 +334,40 @@ DataOp * DataOpManager::Add(
 
 		return Add(new DataOp_VECDOTGRAD(strName, nPoints, dDist));
 
+	// Mean operator
+	} else if (strName.substr(0,5) == "_MEAN") {
+		double dDist = 0.0;
+
+		int iMode = 0;
+		int iLast = 0;
+		for (int i = 0; i < strName.length(); i++) {
+			if (iMode == 0) {
+				if (strName[i] == '{') {
+					iLast = i;
+					iMode = 1;
+				}
+				continue;
+
+			} else if (iMode == 1) {
+				if (strName[i] == '}') {
+					if ((i-iLast-1) < 1) {
+						_EXCEPTIONT("Malformed _MEAN{dist} name");
+					}
+					dDist = atof(strName.substr(iLast+1, i-iLast-1).c_str());
+					iLast = i;
+					iMode = 2;
+				}
+
+			} else if (iMode == 2) {
+				_EXCEPTIONT("Malformed _MEAN{dist} name");
+			}
+		}
+		if (iMode != 2) {
+			_EXCEPTIONT("Malformed _MEAN{dist} name");
+		}
+
+		return Add(new DataOp_MEAN(strName, dDist));
+
 	} else {
 		_EXCEPTION1("Invalid DataOp \"%s\"", strName.c_str());
 	}
@@ -2377,6 +2411,158 @@ bool DataOp_VECDOTGRAD::Apply(
 	for (int i = 0; i < dataout.GetRows(); i++) {
 		dataout[i] = dataU[i] * dataout[i] + dataV[i] * datatemp[i];
 	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_DIVERGENCE
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Build a sparse Mean operator on an unstructured SimpleGrid.
+///	</summary>
+///	<param name="dMeanDist">
+///		Great circle radius of the Mean operator, in degrees.
+///	</param>
+void BuildMeanOperator(
+	const SimpleGrid & grid,
+	double dMeanDistDeg,
+	SparseMatrix<float> & opMean
+) {
+	opMean.Clear();
+
+	int iRef = 0;
+
+	if (dMeanDistDeg <= 0.0) {
+		_EXCEPTION1("dist (%1.2f) in _MEAN{dist} must be positive", dMeanDistDeg);
+	}
+	if (grid.m_dArea.GetRows() != grid.GetSize()) {
+		_EXCEPTIONT("SimpleGrid must have precomputed areas to call _MEAN{}");
+	}
+
+	// Convert great circle dist to chord dist
+	double dMeanDistXYZ = ChordLengthFromGreatCircleDistance_Deg(dMeanDistDeg);
+
+	// TODO: Use SimpleGrid's built-in functionality
+	// Create a kdtree with all nodes in grid
+	kdtree * kdGrid = kd_create(3);
+	if (kdGrid == NULL) {
+		_EXCEPTIONT("Error creating kdtree");
+	}
+
+	DataArray1D<double> dXi(grid.GetSize());
+	DataArray1D<double> dYi(grid.GetSize());
+	DataArray1D<double> dZi(grid.GetSize());
+	for (int i = 0; i < grid.GetSize(); i++) {
+		double dLat = grid.m_dLat[i];
+		double dLon = grid.m_dLon[i];
+
+		dXi[i] = cos(dLon) * cos(dLat);
+		dYi[i] = sin(dLon) * cos(dLat);
+		dZi[i] = sin(dLat);
+
+		kd_insert3(kdGrid, dXi[i], dYi[i], dZi[i], (void*)((&iRef)+i));
+	}
+
+	// Area of accumulated nodes
+	std::vector<int> vecNodeIx;
+	double dAccumulatedArea;
+	std::vector<double> vecNodeArea;
+
+	// Construct the Mean operator
+	for (int i = 0; i < grid.GetSize(); i++) {
+
+		vecNodeIx.clear();
+		vecNodeArea.clear();
+		dAccumulatedArea = 0.0;
+
+		// Query kd-tree
+		kdres * kdr = kd_nearest_range3(kdGrid, dXi[i], dYi[i], dZi[i], dMeanDistXYZ);
+		if (kdr == NULL) {
+			_EXCEPTIONT("Error in kd_nearest_range3");
+		}
+		int nNodes = kd_res_size(kdr);
+
+		//if (i % 1000 == 0) {
+		//	std::cout << dMeanDistXYZ << " : " << nNodes << std::endl;
+		//}
+
+		// Loop through kd-tree
+		while (!kd_res_end(kdr)) {
+
+			// Get data index
+			void* pData = kd_res_item_data(kdr);
+			if (pData == NULL) {
+				_EXCEPTIONT("NULL data index");
+			}
+			int k = ((int*)(pData)) - (&iRef);
+			_ASSERT((k >= 0) && (k < grid.GetSize()));
+
+			// Insert this node
+			vecNodeIx.push_back(k);
+			vecNodeArea.push_back(grid.m_dArea[k]);
+			dAccumulatedArea += grid.m_dArea[k];
+
+			kd_res_next(kdr);
+		}
+
+		_ASSERT(dAccumulatedArea > 0.0);
+
+		// Delete the kdres
+		kd_res_free(kdr);
+
+		// Insert new row into sparse matrix
+		for (int k = 0; k < vecNodeIx.size(); k++) {
+			opMean(i,vecNodeIx[k]) = static_cast<float>(vecNodeArea[k] / dAccumulatedArea);
+		}
+	}
+
+	// Cleanup kd-tree
+	kd_free(kdGrid);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+DataOp_MEAN::DataOp_MEAN(
+	const std::string & strName,
+	double dMeanDist
+) :
+	DataOp(strName),
+	m_dMeanDist(dMeanDist),
+	m_fInitialized(false)
+{ }
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_MEAN::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 1) {
+		_EXCEPTION2("%s expects one argument: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	if (vecArgData[0] == NULL) {
+		_EXCEPTION1("Argument to %s must be data variable",
+			m_strName.c_str());
+	}
+
+	if (!m_fInitialized) {
+		Announce("Building MEAN operator %s (%1.2f)",
+			m_strName.c_str(), m_dMeanDist);
+
+		BuildMeanOperator(
+			grid,
+			m_dMeanDist,
+			m_opMean);
+
+		m_fInitialized = true;
+	}
+
+	m_opMean.Apply(*(vecArgData[0]), dataout, true);
 
 	return true;
 }

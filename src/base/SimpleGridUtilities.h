@@ -113,6 +113,20 @@ void FindLocalAverage(
 	real & dAverage
 );
 
+///	<summary>
+///		Find the largest positive or negative value of the closed contour
+///		delta in the given field at the given grid point.
+///	</summary>
+template <typename real>
+void FindMaxClosedContourDelta(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & data,
+	int ix0,
+	double dMaxDist,
+	bool fMaxClosedContourDeltaSign,
+	real & dMaxClosedContourDelta
+);
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #endif // _SIMPLEGRIDUTILITIES_H_

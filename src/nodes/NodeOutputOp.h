@@ -39,7 +39,9 @@ public:
 		MaxCoordinate,
 		MinCoordinate,
 		MaxIndex,
-		MinIndex
+		MinIndex,
+		PosClosedContour,
+		NegClosedContour
 	};
 
 public:
@@ -90,6 +92,10 @@ public:
 						m_eOp = MaxIndex;
 					} else if (strSubStr == "minix") {
 						m_eOp = MinIndex;
+					} else if (strSubStr == "posclosedcontour") {
+						m_eOp = PosClosedContour;
+					} else if (strSubStr == "negclosedcontour") {
+						m_eOp = NegClosedContour;
 
 					} else {
 						_EXCEPTION1("Output invalid operation \"%s\"",
@@ -154,6 +160,10 @@ public:
 			strDescription += "Coordinates of maximum of ";
 		} else if (m_eOp == MinCoordinate) {
 			strDescription += "Coordinates of minimum of ";
+		} else if (m_eOp == PosClosedContour) {
+			strDescription += "Greatest positive closed contour delta of ";
+		} else if (m_eOp == NegClosedContour) {
+			strDescription += "Greatest negative closed contour delta of ";
 		}
 
 		strDescription += m_strVariableString;
@@ -302,6 +312,32 @@ void ApplyNodeOutputOp(
 			dataState,
 			ixCandidate,
 			op.m_dDistance,
+			dValue);
+
+		sprintf(buf, szFormat, dValue);
+		strResult = buf;
+
+	// Positive closed contour deltas
+	} else if (op.m_eOp == NodeOutputOp::PosClosedContour) {
+		FindMaxClosedContourDelta<float>(
+			grid,
+			dataState,
+			ixCandidate,
+			op.m_dDistance,
+			true,
+			dValue);
+
+		sprintf(buf, szFormat, dValue);
+		strResult = buf;
+
+	// Negative closed contour deltas
+	} else if (op.m_eOp == NodeOutputOp::NegClosedContour) {
+		FindMaxClosedContourDelta<float>(
+			grid,
+			dataState,
+			ixCandidate,
+			op.m_dDistance,
+			false,
 			dValue);
 
 		sprintf(buf, szFormat, dValue);

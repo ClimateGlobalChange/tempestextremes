@@ -878,5 +878,46 @@ protected:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class DataOp_MEAN : public DataOp {
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_MEAN(
+		const std::string & strName,
+		double dMeanDist
+	);
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
+
+protected:
+	///	<summary>
+	///		Evaluation distance for the mean operator.
+	///	</summary>
+	double m_dMeanDist;
+
+	///	<summary>
+	///		Flag indicating the sparse matrix operator is initialized.
+	///	</summary>
+	bool m_fInitialized;
+
+	///	<summary>
+	///		Sparse matrix operator.
+	///	</summary>
+	SparseMatrix<float> m_opMean;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 #endif
 
