@@ -229,10 +229,11 @@ public:
 		bool a_lon_periodic = true,
 		Type a_lon_width = static_cast<Type>(360)
 	) :
-		is_null(true),
+		is_null(),//is_null(1) [Use this expression instead if errors occur in StitchBlobs.cpp/BlobBoxesDegExchangeOP]
 		lon_periodic(a_lon_periodic),
 		lon_width(a_lon_width)
 	{
+		//lon_periodic = (a_lon_periodic)?(1): (0);// [Uncomment this line if errors occur in StitchBlobs.cpp/BlobBoxesDegExchangeOP]
 		lon[0] = static_cast<Type>(0);
 		lon[1] = static_cast<Type>(0);
 		lat[0] = static_cast<Type>(0);

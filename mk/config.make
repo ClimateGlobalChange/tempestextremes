@@ -11,8 +11,8 @@
 # PARALLEL: Parallel programming framework (options: MPIOMP, NONE)
 # NETCDF:   If TRUE, use NETCDF
 
-DEBUG=    FALSE
-OPT=      TRUE
+DEBUG=    TRUE
+OPT=      FALSE
 PARALLEL= MPIOMP
 NETCDF=   TRUE
 
