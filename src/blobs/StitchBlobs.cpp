@@ -21,6 +21,7 @@
 #include "Constants.h"
 #include "CoordTransforms.h"
 #include "BlobUtilities.h"
+#include <math.h>
 
 #include "CommandLine.h"
 #include "Exception.h"
@@ -111,12 +112,404 @@ struct Tag {
 };
 
 
-//Define MPI_Datatype for Tag
+
 #if defined(TEMPEST_MPIOMP)
+
+//A class used for MPI collective communication for vecAllBlobTags (reduce and scatter) between processors
+class TagCollectiveOP {
+	private:
+		///	<summary>
+		///		Tag for MPI communication for sending/receiving Tag
+		///	</summary>
+		int reduce_tag = 107;
+
+		///	<summary>
+		///		Tag for MPI communication for sending/receiving Tag index
+		///	</summary>
+		int reduce_Index = 108;
+
+		///	<summary>
+		///		The MPI Communicator
+		///	</summary>
+		MPI_Comm _comm; 
+
+		///	<summary>
+		///		The MPI Datatype for Tag
+		///	</summary>
+		MPI_Datatype MPI_Tag_type;
+
+		///	<summary>
+		///		An array of MPI_Request.	
+		///	</summary>
+		std::vector<MPI_Request> MPIrequests;
+
+		///	<summary>
+		///		An array of MPI_Status.	
+		///	</summary>
+		std::vector<MPI_Status> MPIstatuses;
+
+		///	<summary>
+		///		The Flag that marks whether the vecAllTags are in serialized state. (1 after calling Serialize(); False after calling Deserailize()).	
+		///	</summary>
+		int serializedFlag;
+		
+
+
+	protected:
+		///	<summary>
+		///		the unexchanged vecAllBlobTags that need to be reduced.	
+		///	</summary>
+		std::vector< std::vector<Tag>> _vecAllBlobTags;
+
+		///	<summary>
+		///		the serialized 1D vecAllBlobTags that needs to be sent.	
+		///	</summary>
+		std::vector<Tag> serialVecAllBlobTags;
+
+		///	<summary>
+		///		the serialized 1D vecAllBlobTags index array that needs to be sent.	
+		///	</summary>
+		std::vector<int> serialVecAllBlobTags_index;
+
+		///	<summary>
+		///		Output setAllTags. (Only used for processor 0)	
+		///	</summary>	
+		std::set<Tag> deserialSetAllTags;
+
+		///	<summary>
+		///		the deserial vecAllBlobTags (Only used for processor 0)	
+		///	</summary>
+		std::vector< std::vector<Tag>> desirialVecAllBlobTags;
+
+		///	<summary>
+		///		vector that records the size information of vecAllBlobTags on each processors	
+		///	</summary>
+		std::vector<int> vecScatterCounts;
+
+		///	<summary>
+		///		vector that records the index information of the serial vecAllBlobTags on each processors	
+		///	</summary>
+		std::vector<int> vecScatterCounts_index;
+
+	public:
+
+		///	<summary>
+		///		Constructor that will read in std::vector< std::vector<Tag>> vecAllBlobTags
+		///	</summary>	
+		TagCollectiveOP(MPI_Comm communicator, std::vector< std::vector<Tag>> vecAllBlobTags){
+			this->_vecAllBlobTags = vecAllBlobTags;
+			this->_comm = communicator;
+			this->serializedFlag = 0;
+			int rank, size;
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
+
+			//Create an MPI datatype for the Tag:
+			struct Tag sampleTag;
+			int tagFieldsCount = 3;	
+			MPI_Datatype Tag_typesig[3] = {MPI_INT,MPI_INT,MPI_INT};
+			int Tag_block_lengths[3] = {1,1,1};
+			MPI_Aint Tag_displacements[3];
+	
+			MPI_Aint base_address;
+			MPI_Get_address(&sampleTag, &base_address);
+			MPI_Get_address(&sampleTag.id, &Tag_displacements[0]);
+			MPI_Get_address(&sampleTag.time, &Tag_displacements[1]);
+			MPI_Get_address(&sampleTag.global_id, &Tag_displacements[2]);
+			Tag_displacements[0] = MPI_Aint_diff(Tag_displacements[0], base_address);
+			Tag_displacements[1] = MPI_Aint_diff(Tag_displacements[1], base_address);
+			Tag_displacements[2] = MPI_Aint_diff(Tag_displacements[2], base_address);
+			MPI_Type_create_struct(tagFieldsCount, Tag_block_lengths, Tag_displacements, Tag_typesig, &MPI_Tag_type);
+			try{				
+				MPI_Type_commit(&MPI_Tag_type);
+			} catch (MPI::Exception failure) {
+				_EXCEPTION1("The MPI routine MPI_Type_commit(&MPI_Tag_type) failed: %s.\n", failure.Get_error_string());
+				MPI::COMM_WORLD.Abort(1);	
+			}
+		}
+
+		~TagCollectiveOP(){
+			MPI_Type_free(&MPI_Tag_type);
+			
+		}
+
+		///	<summary>
+		///		Serialize the std::vector< std::vector<Tag>> vecAllBlobTags into a 1-D array and generate the index array for deserialization
+		///	</summary>
+		void Serialize() {
+			serialVecAllBlobTags.clear();
+			serialVecAllBlobTags_index.clear();
+			int curIndx = 0;//Point to the next empty slot for inserting a new vector<Tag>
+			serialVecAllBlobTags_index.push_back(curIndx);
+			for (int i = 0; i < _vecAllBlobTags.size(); i++) {
+				for (int j = 0; j < _vecAllBlobTags[i].size(); j++) {
+					serialVecAllBlobTags.push_back(_vecAllBlobTags[i][j]);
+					curIndx++;
+				}
+				serialVecAllBlobTags_index.push_back(curIndx);
+			}
+			serializedFlag = 1;
+
+
+		}
+
+		///	<summary>
+		///		Deserialize the the local std::vector<Tag> serialVecAllBlobTags array and generate the deserialSetAllTags and desirialVecAllBlobTags
+		///	</summary>
+		void Deserialize() {
+			for (int i = 0; i < serialVecAllBlobTags_index.size() - 1; i++) {
+				int startIndx = serialVecAllBlobTags_index[i];
+				int endIndx = std::min(serialVecAllBlobTags_index[i+1],int(serialVecAllBlobTags.size()));
+				std::vector<Tag> curVecBlobTags;
+				for (int i = startIndx; i < endIndx; i++) {
+					curVecBlobTags.push_back(serialVecAllBlobTags[i]);
+					deserialSetAllTags.insert(serialVecAllBlobTags[i]);
+				}
+				desirialVecAllBlobTags.push_back(curVecBlobTags);
+			}
+			serialVecAllBlobTags.clear();
+			serialVecAllBlobTags_index.clear();
+			serializedFlag = 0;
+
+
+
+		}
+
+		///	<summary>
+		///		The MPI reduce that will reduce each local setAllTags to the processor 0.
+		///	</summary>
+		void Reduce() {
+			int rank, size;
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
+
+			this->Serialize();
+			int d = std::floor(std::log2(size));//here we use floor.
+
+			
+			for (int j = 0; j < d; j++) {
+				//First send/recv the serialVecAllBlobTags
+				if ((rank & (int)std::round(std::pow(2,j))) != 0) {
+					
+					//send to (world_rank ^ pow(2,j)
+					int destRank = rank ^ (int)round(std::pow(2,j));
+
+					MPI_Send (serialVecAllBlobTags.data(), serialVecAllBlobTags.size(), MPI_Tag_type, destRank, reduce_tag, _comm);
+					MPI_Send (serialVecAllBlobTags_index.data(), serialVecAllBlobTags_index.size(), MPI_INT, destRank, reduce_Index, _comm);
+					//  We just simply need to break the algorithm here (juest return, not Finalize())
+					return;
+
+
+				} else {
+					//receive from (world_rank ^ pow(2,j))
+					MPI_Status status;
+					int recvCount;
+					int sourceRank = rank ^ (int)std::round(std::pow(2,j));
+
+
+					MPI_Probe(sourceRank, reduce_tag,  _comm, &status);
+
+					MPI_Get_count( &status, MPI_Tag_type, &recvCount);					 
+					std::vector<Tag> recvTags;
+					recvTags.resize(recvCount);
+					MPI_Recv(recvTags.data(), recvCount, MPI_Tag_type, sourceRank, reduce_tag, _comm, &status);
+
+					//Pack the receive Tag into the localTags.
+					for (auto recvTag : recvTags) {
+						serialVecAllBlobTags.push_back(recvTag);
+					}
+
+					MPI_Status status_index;
+					int recvCount_index;
+					MPI_Probe(sourceRank, reduce_Index,  _comm, &status_index);
+
+					MPI_Get_count( &status_index, MPI_INT, &recvCount_index);					 
+					std::vector<int> recvTagsIndx;
+					recvTagsIndx.resize(recvCount_index);
+					MPI_Recv(recvTagsIndx.data(), recvCount_index, MPI_INT, sourceRank, reduce_Index, _comm, &status_index);
+
+					//Pack the receive Tag index into the localTags.
+					int serialVecAllBlobTags_index_size = serialVecAllBlobTags_index.size();
+					int curLocalTagSize = serialVecAllBlobTags_index[serialVecAllBlobTags_index_size - 1];
+					for (int i = 1; i < recvTagsIndx.size(); i++) {
+						//Update the index from local to global
+						int index = recvTagsIndx[i];
+						index += curLocalTagSize;
+						serialVecAllBlobTags_index.push_back(index);
+					}
+				}
+
+			}
+		}
+
+		///	<summary>
+		///		return the reduced setAllTags (only called by the processor 0)
+		///	</summary>
+		std::set<Tag> GetReducedSetAllTags() {
+			int rank, size;
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
+			if (rank == 0) {
+				if (serializedFlag == 1) {
+					this->Deserialize();
+				}
+
+				return deserialSetAllTags;
+			} else {
+				_EXCEPTIONT("Only processor 0 should call GetReducedTagGraph().");
+			}
+			
+
+		}
+
+		///	<summary>
+		///		return the reduced/scattered vecAllTags (only called by the processor 0)
+		///	</summary>
+		std::vector< std::vector<Tag>> GetUnserialVecAllTags(int ReduceFlag) {
+			int rank, size;
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
+			if ((ReduceFlag == 1 && rank == 0) || ReduceFlag == 0) {
+				if (serializedFlag == 1) {
+					this->Deserialize();
+				}
+				return desirialVecAllBlobTags;
+			} else {
+				_EXCEPTIONT("Only processor 0 should call GetReducedTagGraph().");
+			}
+			
+
+		}
+
+		///	<summary>
+		///		Gather the size info of the original unexchanged vecAllBlobTags to processor 0
+		///		On processor 0, the _vecAllBlobTags will be the reduced global vecAllBlobTags;
+		///		On other processors, the _vecAllBlobTags will be updated to the input vecAllBlobTags
+		///	</summary>
+		void GatherTagCounts(std::vector< std::vector<Tag> > vecAllBlobTags) {
+			int rank, size;
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
+			int curSize = 0;		
+			for ( auto vecBlobTags : vecAllBlobTags) {
+				curSize += vecBlobTags.size();			
+			}
+			int localSize = vecAllBlobTags.size();
+			vecScatterCounts.resize(size);
+			vecScatterCounts_index.resize(size);
+
+			if (rank == 0) {
+				
+				
+				MPI_Gather(&curSize, 1, MPI_INT, vecScatterCounts.data(), 1, MPI_INT, 0, _comm);
+				MPI_Gather(&localSize, 1, MPI_INT, vecScatterCounts_index.data(), 1, MPI_INT, 0, _comm);
+
+			} else {
+				this->_vecAllBlobTags = vecAllBlobTags;
+				MPI_Gather(&curSize, 1, MPI_INT, NULL, 0, MPI_INT, 0,_comm);
+				MPI_Gather(&localSize, 1, MPI_INT, NULL, 0, MPI_INT, 0,_comm);
+
+			}
+			
+
+		}
+
+
+		///	<summary>
+		///		scatter the vecAllBlobs to each processor
+		///		The displacement is calculated based on the vecGlobalTimes
+		///		On processor 0, the _vecAllBlobTags will be the reduced global vecAllBlobTags;
+		///		On other processors, the _vecAllBlobTags will be the original unreduced _vecAllBlobTags
+		///	</summary>
+		void Scatter(){
+			int rank, size;
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
+
+			this->Serialize();
+
+			if (rank == 0) {
+				//For Tags
+				int arrayScatterCounts[size];
+				int arrayScatterDisplacements[size];
+				_ASSERT(vecScatterCounts.size() > 1);
+				arrayScatterCounts[0] = vecScatterCounts[0];
+				arrayScatterDisplacements[0] = 0;		
+				for (int i = 1; i < vecScatterCounts.size(); i++) {
+					arrayScatterCounts[i] = vecScatterCounts[i];				
+					arrayScatterDisplacements[i] = vecScatterCounts[i - 1] + arrayScatterDisplacements[i - 1];
+				}
+
+				//For Tags Index
+				int arrayScatterCounts_index[size];
+				int arrayScatterDisplacements_index[size];
+				_ASSERT(vecScatterCounts_index.size() > 1);
+				arrayScatterCounts_index[0] = vecScatterCounts_index[0];
+				arrayScatterDisplacements_index[0] = 0;		
+				for (int i = 1; i < vecScatterCounts.size(); i++) {
+					arrayScatterCounts_index[i] = vecScatterCounts_index[i];				
+					arrayScatterDisplacements_index[i] = vecScatterCounts_index[i - 1] + arrayScatterDisplacements_index[i - 1];
+				}
+				
+				//-------------------Scatter---------------------------
+				//For Tags
+				auto scatterBuffer = this->serialVecAllBlobTags;
+				this->serialVecAllBlobTags.clear();
+				this->serialVecAllBlobTags.resize(arrayScatterCounts[rank]);
+				MPI_Scatterv(scatterBuffer.data(), arrayScatterCounts, arrayScatterDisplacements, MPI_Tag_type, serialVecAllBlobTags.data(), arrayScatterCounts[rank], MPI_Tag_type, 0, _comm);
+
+				//For index
+				auto scatterBuffer_index = this->serialVecAllBlobTags_index;
+				this->serialVecAllBlobTags_index.clear();
+				this->serialVecAllBlobTags_index.resize(arrayScatterCounts_index[rank]);
+				MPI_Scatterv(scatterBuffer_index.data(), arrayScatterCounts_index, arrayScatterDisplacements_index, MPI_INT, serialVecAllBlobTags_index.data(), arrayScatterCounts_index[rank], MPI_INT, 0, _comm);
+	
+			} else {
+				int localTagSize = serialVecAllBlobTags.size();
+				this->serialVecAllBlobTags.clear();
+				this->serialVecAllBlobTags.resize(localTagSize);
+				MPI_Scatterv(NULL, NULL, NULL, MPI_Tag_type, serialVecAllBlobTags.data(), localTagSize, MPI_Tag_type, 0, _comm);
+
+				int localTagSize_index = serialVecAllBlobTags_index.size();
+				this->serialVecAllBlobTags_index.clear();
+				this->serialVecAllBlobTags_index.resize(localTagSize_index);
+				MPI_Scatterv(NULL, NULL, NULL, MPI_INT, serialVecAllBlobTags_index.data(), localTagSize_index, MPI_INT, 0, _comm);
+			}
+
+
+
+			//Now modify the received serialVecAllBlobTags_index for deserailization call
+			int prevCount = serialVecAllBlobTags_index[0];
+			serialVecAllBlobTags_index[0] = 0;				
+			for (int i = 1; i < serialVecAllBlobTags_index.size() - 1; i++ ) {
+				serialVecAllBlobTags_index[i] = serialVecAllBlobTags_index[i] - prevCount;
+			}
+			if (rank == 0) {
+				serialVecAllBlobTags_index.push_back(serialVecAllBlobTags.size());
+
+			} else {
+				serialVecAllBlobTags_index[serialVecAllBlobTags_index.size() - 1] = serialVecAllBlobTags.size();
+			}
+			
+
+			
+
+
+
+
+
+		}
+
+
+
+};
+
+
+
 
 typedef enum { DIR_LEFT = 0, DIR_RIGHT = 1} CommDirection;
 	
-
+//A Class used for exchanging vecAllBlobsTag between processors
 class TagExchangeOP {
 	private:
 
@@ -168,6 +561,13 @@ class TagExchangeOP {
 		///	</summary>
 		std::vector<std::vector<Tag>> recvTags;
 
+		///	<summary>
+		///		The array (size is nMPISize) records the start(inclusice) and end (exclusice) global time index in each processor
+		///		start: gloablTimeIndx[p_i][0]
+		///		end: gloablTimeIndx[p_i][1]
+		///	</summary>	
+		std::vector<std::vector<int>> gloablTimeIndx;	
+
 	public:
 
 		///	<summary>
@@ -186,27 +586,6 @@ class TagExchangeOP {
 			//Initialize the size for the recvTags:
 			recvTags.resize(2);
 
-
-
-		}
-
-		~TagExchangeOP(){
-			MPI_Type_free(&MPI_Tag_type);
-			MPIrequests.clear();
-			MPIstatuses.clear();
-		}
-
-		///	<summary>
-		///		Start the exchange process.
-		/// 	this function is non-blocking and the data values in the TagExchangeOP should not be modified
-		/// 	The exchange values are not guaranteed to be current when this function returns and need to be used with the EndExchange()
-		///	</summary>
-		void StartExchange() {
-			
-			int err, rank, size;
-			MPI_Comm_size(_comm, &size);
-			MPI_Comm_rank(_comm, &rank);
-
 			//Create an MPI datatype for the Tag:
 			struct Tag sampleTag;
 			int tagFieldsCount = 3;	
@@ -224,11 +603,69 @@ class TagExchangeOP {
 			Tag_displacements[2] = MPI_Aint_diff(Tag_displacements[2], base_address);
 			MPI_Type_create_struct(tagFieldsCount, Tag_block_lengths, Tag_displacements, Tag_typesig, &MPI_Tag_type);
 			try{				
-				MPI_Type_commit(&MPI_Tag_type)
+				MPI_Type_commit(&MPI_Tag_type);
 			} catch (MPI::Exception failure) {
 				_EXCEPTION1("The MPI routine MPI_Type_commit(&MPI_Tag_type) failed: %s.\n", failure.Get_error_string());
 				MPI::COMM_WORLD.Abort(1);	
 			}
+
+
+
+		}
+
+		~TagExchangeOP(){
+			MPI_Type_free(&MPI_Tag_type);
+			MPIrequests.clear();
+			MPIstatuses.clear();
+		}
+
+		std::vector< std::vector<Tag> > GetOriginalVecAllBlobTags(){
+			return _vecAllBlobTags;
+		}
+
+
+		//Use the prefix sum algorithmn to assign global time for each Tag
+		void UpdateTime(){
+			int err, rank, size;
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
+			this->gloablTimeIndx.resize(size);
+			int localEndTime = _vecAllBlobTags.size();
+			int preFixTime;
+			
+			MPI_Scan(&localEndTime, &preFixTime, 1, MPI_INT, MPI_SUM, _comm);
+			this->gloablTimeIndx[rank].resize(2);
+			this->gloablTimeIndx[rank][0] = preFixTime - localEndTime;
+			this->gloablTimeIndx[rank][1] = preFixTime;
+
+			//Update Tag.time
+			int globalTime = this->gloablTimeIndx[rank][0];
+			for (int i = 0; i < _vecAllBlobTags.size(); i++) {
+				_ASSERT(globalTime < gloablTimeIndx[rank][1]);
+				
+				for (int j = 0; j < _vecAllBlobTags[i].size(); j++) {
+					_vecAllBlobTags[i][j].time = globalTime;
+				}
+				globalTime++;
+
+			}
+		}
+
+
+
+		///	<summary>
+		///		Start the exchange process.
+		/// 	this function is non-blocking and the data values in the TagExchangeOP should not be modified
+		/// 	The exchange values are not guaranteed to be current when this function returns and need to be used with the EndExchange()
+		///	</summary>
+		void StartExchange() {
+			
+			int err, rank, size;
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
+
+			this->UpdateTime();
+
 
 
 			//----------------------Send sendTags data first----------------------
@@ -262,15 +699,17 @@ class TagExchangeOP {
 
 				//----------------------Send sendBlobs----------------------
 
-				try{
-					MPI_Request request;
-					MPI_Isend(sendTags[dir].data(), sendTags[dir].size(), MPI_Tag_type,
-					destRank,tag , _comm, &request);
-				} catch (MPI::Exception failure) {
-					_EXCEPTION1("The MPI routine MPI_Type_commit(&MPI_Tag_type) failed: %s.\n", failure.Get_error_string());
-					MPI::COMM_WORLD.Abort(1);	
-				}	
-
+				//Only the odd number processors would send out the data
+				if (rank % 2 != 0) {
+					try{
+						MPI_Request request;
+						MPI_Isend(sendTags[dir].data(), sendTags[dir].size(), MPI_Tag_type,
+						destRank,tag , _comm, &request);
+					} catch (MPI::Exception failure) {
+						_EXCEPTION1("The MPI routine MPI_Isend failed: %s.\n", failure.Get_error_string());
+						MPI::COMM_WORLD.Abort(1);	
+					}	
+				}
 
 			}
 
@@ -301,29 +740,34 @@ class TagExchangeOP {
 
 
 				//----------------------Receive----------------------	
-				MPI_Status status;
-				MPI_Request request;
-				int recvCount;
+				//Only the prime number processors would receive data
+				if (rank % 2 == 0) {
+					MPI_Status status;
+					MPI_Request request;
+					int recvCount;
 
-				//Use a non-blocking probe to know the incoming data size
-				int flag = 0;
-				while(!flag)
-				{
-					MPI_Iprobe( sourceRank, tag, _comm, &flag, &status );
-				}
-				MPI_Get_count( &status, MPI_Tag_type, &recvCount );
-				recvTags[dir].resize(recvCount);
-		
-				try{
-					
-					MPI_Irecv(recvTags[dir].data(), recvTags[dir].size(), MPI_Tag_type,
-							sourceRank, tag, _comm, &request);
-					MPIrequests.emplace_back(std::move(request));
-					MPIstatuses.push_back(MPI_Status());
-				} catch (MPI::Exception failure) {
-					_EXCEPTION1("The MPI routine MPI_Type_commit(&MPI_Tag_type) failed: %s.\n", failure.Get_error_string());
-					MPI::COMM_WORLD.Abort(1);	
-				}				
+					//Use a non-blocking probe to know the incoming data size
+					int flag = 0;
+					while(!flag)
+					{
+						MPI_Iprobe( sourceRank, tag, _comm, &flag, &status );
+					}
+					MPI_Get_count( &status, MPI_Tag_type, &recvCount );
+					recvTags[dir].resize(recvCount);
+			
+					try{
+						
+						MPI_Irecv(recvTags[dir].data(), recvTags[dir].size(), MPI_Tag_type,
+								sourceRank, tag, _comm, &request);
+						MPIrequests.emplace_back(std::move(request));
+						MPIstatuses.push_back(MPI_Status());
+					} catch (MPI::Exception failure) {
+						_EXCEPTION1("The MPI routine MPI_Type_commit(&MPI_Tag_type) failed: %s.\n", failure.Get_error_string());
+						MPI::COMM_WORLD.Abort(1);	
+					}
+
+					}
+				
 			}
 
 
@@ -357,30 +801,84 @@ class TagExchangeOP {
 			MPIstatuses.clear();
 
 			//Pack the data into the vecAllBlobTags
-			if (rank == 0) {
-				exchangedvecAllBlobTags.resize(_vecAllBlobTags.size() + 1);
-				
-				for (int i = 0; i < exchangedvecAllBlobTags.size() - 1; i++) {
-					exchangedvecAllBlobTags[i] = _vecAllBlobTags[i];
-				}
-				exchangedvecAllBlobTags[exchangedvecAllBlobTags.size() - 1] = recvTags[1];
+			//Only need to pack data for the prime number processors 
+			
+			if (rank %2 == 0) {
+				if (rank == 0) {
+					exchangedvecAllBlobTags.resize(_vecAllBlobTags.size() + 1);
+					
+					for (int i = 0; i < exchangedvecAllBlobTags.size() - 1; i++) {
+						exchangedvecAllBlobTags[i] = _vecAllBlobTags[i];
+					}
 
-			}else if (rank == size - 1) {
-				exchangedvecAllBlobTags.resize(_vecAllBlobTags.size() + 1);
-				exchangedvecAllBlobTags[0] = recvTags[0];				
-				for (int i = 1; i < exchangedvecAllBlobTags.size(); i++) {
-					exchangedvecAllBlobTags[i] = _vecAllBlobTags[i -1 ];
+					// //The receivedTags[1] will have a time as _vecAllBlobTags.size();
+					// int newTime = exchangedvecAllBlobTags[exchangedvecAllBlobTags.size() - 2][0].time + 1;
+					// for (int i = 0; i < recvTags[1].size(); i++) {						
+					// 	recvTags[1][i].time = newTime;
+					// }
+					exchangedvecAllBlobTags[exchangedvecAllBlobTags.size() - 1] = recvTags[1];
+
+				}else if (rank == size - 1) {
+					exchangedvecAllBlobTags.resize(_vecAllBlobTags.size() + 1);
+
+					// //All the other Tag will have new Tag.time = Tag.time + 1;
+
+					// for (int i = 0; i <  _vecAllBlobTags.size(); i++) {
+					// 	for (int j = 0; j < _vecAllBlobTags[i].size(); j++) {
+					// 		_vecAllBlobTags[i][j].time += 1;
+					// 	}
+
+					// }	
+
+					// //The receivedTags[0] will have a time as 0;
+					// for (int i = 0; i < recvTags[0].size(); i++) {
+					// 	recvTags[0][i].time = 0;
+					// }
+
+					exchangedvecAllBlobTags[0] = recvTags[0];
+
+
+
+					for (int i = 1; i < exchangedvecAllBlobTags.size(); i++) {
+						exchangedvecAllBlobTags[i] = _vecAllBlobTags[i -1 ];
+					}
+
+				} else {
+					// //All the other Tag will have new Tag.time = Tag.time + 1;
+					// for (int i = 0; i <  _vecAllBlobTags.size(); i++) {
+					// 	for (int j = 0; j < _vecAllBlobTags[i].size(); j++) {
+					// 		_vecAllBlobTags[i][j].time += 1;
+					// 	}
+
+					// }	
+
+					exchangedvecAllBlobTags.resize(_vecAllBlobTags.size() + 2);
+					// //The receivedTags[0] will have a time as 0;
+					// for (int i = 0; i < recvTags[0].size(); i++) {
+					// 	recvTags[0][i].time = 0;
+					// }
+
+					exchangedvecAllBlobTags[0] = recvTags[0];
+
+
+
+					for (int i = 1; i < exchangedvecAllBlobTags.size() - 1; i++) {
+						exchangedvecAllBlobTags[i] = _vecAllBlobTags[i-1];
+					}
+
+					// //The receivedTags[1] will have a time as _vecAllBlobTags.size();
+					// int newTime = exchangedvecAllBlobTags[exchangedvecAllBlobTags.size() - 2][0].time + 1;
+					// for (int i = 0; i < recvTags[1].size(); i++) {						
+					// 	recvTags[1][i].time = newTime;
+					// }
+					exchangedvecAllBlobTags[exchangedvecAllBlobTags.size() - 1] = recvTags[1];
+
 				}
 
-			} else {
-				exchangedvecAllBlobTags.resize(_vecAllBlobTags.size() + 2);
-				exchangedvecAllBlobTags[0] = recvTags[0];
-				for (int i = 1; i < exchangedvecAllBlobTags.size() - 1; i++) {
-					exchangedvecAllBlobTags[i] = _vecAllBlobTags[i-1];
-				}
-				exchangedvecAllBlobTags[exchangedvecAllBlobTags.size() - 1] = recvTags[1];
-
+			} else{
+				exchangedvecAllBlobTags = _vecAllBlobTags;
 			}
+
 
 
 		}
@@ -544,9 +1042,13 @@ class BlobBoxesDegExchangeOP {
 				}
 
 				//----------------------Send sendBlobs----------------------
-				MPI_Request request;
-        		MPI_Isend(sendBlobBoxesDeg[dir].data(), sendBlobBoxesDeg[dir].size() * sizeof(LatLonBox<double>), MPI_BYTE,
-                destRank,tag , _comm, &request);
+				//Only the odd number processors will send out data
+				if (rank % 2 != 0) {
+					MPI_Request request;
+					MPI_Isend(sendBlobBoxesDeg[dir].data(), sendBlobBoxesDeg[dir].size() * sizeof(LatLonBox<double>), MPI_BYTE,
+					destRank,tag , _comm, &request);
+				}
+
 
 			}
 
@@ -572,22 +1074,27 @@ class BlobBoxesDegExchangeOP {
 
 				}
 
-				MPI_Status status;
-				MPI_Request request;
-				int recvCount;
-				//Use a non-blocking probe to know the incoming data size
-				int flag = 0;
-				while(!flag)
-				{
-					MPI_Iprobe( sourceRank, tag, _comm, &flag, &status );
+				//Only the prime number processors will receive data 
+				if (rank % 2 == 0) {
+					MPI_Status status;
+					MPI_Request request;
+					int recvCount;
+					//Use a non-blocking probe to know the incoming data size
+					int flag = 0;
+					while(!flag)
+					{
+						MPI_Iprobe( sourceRank, tag, _comm, &flag, &status );
+					}
+					MPI_Get_count( &status, MPI_BYTE, &recvCount );	
+					_ASSERT(recvCount % sizeof(LatLonBox<double>) == 0);			
+					recvBlobBoxesDeg[dir].resize(recvCount / sizeof(LatLonBox<double>));			
+					MPI_Irecv(recvBlobBoxesDeg[dir].data(), recvCount,MPI_BYTE,
+							sourceRank, tag, _comm, &request);
+					MPIrequests.emplace_back(std::move(request));
+					MPIstatuses.push_back(MPI_Status());
 				}
-				MPI_Get_count( &status, MPI_BYTE, &recvCount );	
-				_ASSERT(recvCount % sizeof(LatLonBox<double>) == 0);			
-				recvBlobBoxesDeg[dir].resize(recvCount / sizeof(LatLonBox<double>));			
-				MPI_Irecv(recvBlobBoxesDeg[dir].data(), recvCount,MPI_BYTE,
-						sourceRank, tag, _comm, &request);
-				MPIrequests.emplace_back(std::move(request));
-				MPIstatuses.push_back(MPI_Status());
+
+
 
 			}
 
@@ -617,29 +1124,35 @@ class BlobBoxesDegExchangeOP {
 
 			//Pack the data into the vecAllBlobBoxesDeg
 			// The std::move() here is to avoid the possible errors in LatLonBox<double> default copy constructor
-			if (rank == 0) {
-				for (int i = 0; i < _vecAllBlobBoxesDeg.size();i++) {
-					exchangedvecAllBlobBoxesDeg.emplace_back(std::move(_vecAllBlobBoxesDeg[i]));
+			//Only the prime number processors need to pack the data
+			if (rank % 2 == 0) {
+				if (rank == 0) {
+					for (int i = 0; i < _vecAllBlobBoxesDeg.size();i++) {
+						exchangedvecAllBlobBoxesDeg.emplace_back(std::move(_vecAllBlobBoxesDeg[i]));
+					}
+					exchangedvecAllBlobBoxesDeg.emplace_back(std::move(recvBlobBoxesDeg[1]));
+
+				}else if (rank == size - 1) {
+					exchangedvecAllBlobBoxesDeg.emplace_back(std::move(recvBlobBoxesDeg[0]));
+					for (int i = 0; i < _vecAllBlobBoxesDeg.size(); i++) {
+						exchangedvecAllBlobBoxesDeg.emplace_back(std::move(_vecAllBlobBoxesDeg[i]));
+
+					}
+		
+
+				} else {
+					exchangedvecAllBlobBoxesDeg.emplace_back(std::move(recvBlobBoxesDeg[0]));
+					for (int i = 0; i < _vecAllBlobBoxesDeg.size(); i++) {
+						exchangedvecAllBlobBoxesDeg.emplace_back(std::move(_vecAllBlobBoxesDeg[i]));
+					}
+					exchangedvecAllBlobBoxesDeg.emplace_back(std::move(recvBlobBoxesDeg[1]));
+					
+
 				}
-				exchangedvecAllBlobBoxesDeg.emplace_back(std::move(recvBlobBoxesDeg[1]));
-
-			}else if (rank == size - 1) {
-				exchangedvecAllBlobBoxesDeg.emplace_back(std::move(recvBlobBoxesDeg[0]));
-				for (int i = 0; i < _vecAllBlobBoxesDeg.size(); i++) {
-					exchangedvecAllBlobBoxesDeg.emplace_back(std::move(_vecAllBlobBoxesDeg[i]));
-
-				}
-	
-
 			} else {
-				exchangedvecAllBlobBoxesDeg.emplace_back(std::move(recvBlobBoxesDeg[0]));
-				for (int i = 0; i < _vecAllBlobBoxesDeg.size(); i++) {
-					exchangedvecAllBlobBoxesDeg.emplace_back(std::move(_vecAllBlobBoxesDeg[i]));
-				}
-				exchangedvecAllBlobBoxesDeg.emplace_back(std::move(recvBlobBoxesDeg[1]));
-				
-
+				exchangedvecAllBlobBoxesDeg = _vecAllBlobBoxesDeg;
 			}
+
 
 		}
 
@@ -659,6 +1172,7 @@ class BlobBoxesDegExchangeOP {
 
 
 
+
 #endif 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -668,10 +1182,11 @@ typedef std::set<int> IndicatorSet;
 typedef IndicatorSet::iterator IndicatorSetIterator;
 typedef IndicatorSet::const_iterator IndicatorSetConstIterator;
 
-//Define A Class for Exchanging Blobs across processors
+
 #if defined(TEMPEST_MPIOMP) 
 
 
+//Define A Class for Exchanging Blobs across processors
 
 class BlobsExchangeOp {
 	private:
@@ -813,6 +1328,9 @@ class BlobsExchangeOp {
 		///		Unserialize the received vector<int>recvBlobs into vector<IndicatorSet> and clear the recvBlobsIndx array
 		///	</summary>
 		void Deserialize(){
+			// if ((recvBlobsIndx[0].size() == 0 && recvBlobsIndx[1].size())|| (recvBlobsIndx[0].size() == 0 && recvBlobsIndx[1].size())) {
+			// 	return;
+			// }
 			recvBlobsUnserial.clear();
 			recvBlobsUnserial.resize(2);
 			int err, rank, size;
@@ -854,12 +1372,11 @@ class BlobsExchangeOp {
 		/// 	this function is non-blocking and the data values in the VecBlobsSerializeOp should not be modified
 		/// 	The exchange values are not guaranteed to be current when this function returns and need to be used with the EndExchange()
 		///	</summary>
-		void StartExchange() {
-			//First Serialize the Sending Buffer.
-			this->Serialize();
+		void StartExchange() {			
 			int err, rank, size;
 			err = MPI_Comm_size(_comm, &size);
 			err = MPI_Comm_rank(_comm, &rank);
+
 
 			//----------------------Send sendBlobs/sendBlobsIndx data----------------------
 			for (auto dir: {DIR_LEFT, DIR_RIGHT}) {
@@ -883,15 +1400,25 @@ class BlobsExchangeOp {
 					}
 				}
 
-				//----------------------Send sendBlobs----------------------
-				MPI_Request request;
-        		MPI_Isend(sendBlobs[dir].data(), sendBlobs[dir].size(), MPI_INT,
-                destRank, blob_tag, _comm, &request);
+				//only the odd number processors will send out data
+				if (rank % 2 != 0) {
+					//First Serialize the Sending Buffer.
+					this->Serialize();
 
-				//----------------------Send sendBlobsIndx----------------------
-				MPI_Request indx_Request;
-				MPI_Isend(sendBlobsIndx[dir].data(), sendBlobsIndx[dir].size(), MPI_INT,
-                destRank, indx_tag, _comm, &indx_Request);
+					
+					//----------------------Send sendBlobs----------------------
+					MPI_Request request;
+					MPI_Isend(sendBlobs[dir].data(), sendBlobs[dir].size(), MPI_INT,
+					destRank, blob_tag, _comm, &request);
+
+					//----------------------Send sendBlobsIndx----------------------
+					MPI_Request indx_Request;
+					MPI_Isend(sendBlobsIndx[dir].data(), sendBlobsIndx[dir].size(), MPI_INT,
+					destRank, indx_tag, _comm, &indx_Request);
+
+				}
+
+
 
 			}
 
@@ -903,8 +1430,8 @@ class BlobsExchangeOp {
 				if (dir == DIR_LEFT) {
 					//Receive Data From the left.
 					if (rank == 0) {//Rank 0 will not receive from the left
-						std::vector<int> defaultVec(sendBlobs[dir].size(),0);
-						recvBlobs[dir] = defaultVec;
+						// std::vector<int> defaultVec(sendBlobs[dir].size(),0);
+						// recvBlobs[dir] = defaultVec;
 						continue;
 					} else {
 						sourceRank = rank - 1;
@@ -913,8 +1440,8 @@ class BlobsExchangeOp {
 				} else {
 					//Receive Data From the right.
 					if (rank == size - 1) {//rank n-1 will not receive from the right
-						std::vector<int> defaultVec(sendBlobs[dir].size(),0);
-						recvBlobs[dir] = defaultVec;
+						// std::vector<int> defaultVec(sendBlobs[dir].size(),0);
+						// recvBlobs[dir] = defaultVec;
 						continue;
 
 					} else {
@@ -924,40 +1451,46 @@ class BlobsExchangeOp {
 				}
 
 				//----------------------Receive the serialized Blobs----------------------
-				MPI_Status status;
-				MPI_Request request;
-				int recvCount;
 
-				//Use a non-blocking probe to know the incoming data size
-				int flag = 0;
-				while(!flag)
-				{
-					MPI_Iprobe( sourceRank, blob_tag, _comm, &flag, &status );
+				//only the prime number processor will receive the blobs
+				if (rank % 2 == 0) {
+					MPI_Status status;
+					MPI_Request request;
+					int recvCount;
+
+					//Use a non-blocking probe to know the incoming data size
+					int flag = 0;
+					while(!flag)
+					{
+						MPI_Iprobe( sourceRank, blob_tag, _comm, &flag, &status );
+					}
+					MPI_Get_count( &status, MPI_INT, &recvCount );
+					recvBlobs[dir].resize(recvCount);
+					MPI_Irecv(recvBlobs[dir].data(), recvBlobs[dir].size(), MPI_INT,
+							sourceRank, blob_tag, _comm, &request);
+					MPIrequests.emplace_back(std::move(request));
+					MPIstatuses.push_back(MPI_Status());
+
+					//----------------------Receive the index info for the Blobs----------------------
+					MPI_Status indxStatus;
+					MPI_Request indxRequest;
+					int indxRecvCount;
+
+					//Use a non-blocking probe to know the incoming data size
+					int indxFlag = 0;
+					while(!indxFlag)
+					{
+						MPI_Iprobe( sourceRank, indx_tag, _comm, &indxFlag, &indxStatus);
+					}
+					MPI_Get_count( &indxStatus, MPI_INT, &indxRecvCount);
+					recvBlobsIndx[dir].resize(indxRecvCount);
+					MPI_Irecv(recvBlobsIndx[dir].data(), recvBlobsIndx[dir].size(), MPI_INT,
+							sourceRank, indx_tag, _comm, &indxRequest);
+					MPIrequests.emplace_back(std::move(indxRequest));
+					MPIstatuses.push_back(MPI_Status());
+
 				}
-				MPI_Get_count( &status, MPI_INT, &recvCount );
-				recvBlobs[dir].resize(recvCount);
-				MPI_Irecv(recvBlobs[dir].data(), recvBlobs[dir].size(), MPI_INT,
-						sourceRank, blob_tag, _comm, &request);
-				MPIrequests.emplace_back(std::move(request));
-				MPIstatuses.push_back(MPI_Status());
 
-				//----------------------Receive the index info for the Blobs----------------------
-				MPI_Status indxStatus;
-				MPI_Request indxRequest;
-				int indxRecvCount;
-
-				//Use a non-blocking probe to know the incoming data size
-				int indxFlag = 0;
-				while(!indxFlag)
-				{
-					MPI_Iprobe( sourceRank, indx_tag, _comm, &indxFlag, &indxStatus);
-				}
-				MPI_Get_count( &indxStatus, MPI_INT, &indxRecvCount);
-				recvBlobsIndx[dir].resize(indxRecvCount);
-				MPI_Irecv(recvBlobsIndx[dir].data(), recvBlobsIndx[dir].size(), MPI_INT,
-						sourceRank, indx_tag, _comm, &indxRequest);
-				MPIrequests.emplace_back(std::move(indxRequest));
-				MPIstatuses.push_back(MPI_Status());
 			}
 
 
@@ -976,29 +1509,40 @@ class BlobsExchangeOp {
 			MPI_Waitall(MPIrequests.size(), &MPIrequests[0], &MPIstatuses[0]);
 			MPIrequests.clear();
 			MPIstatuses.clear();
-			this->Deserialize();
 			int err, rank, size;
 			err = MPI_Comm_size(_comm, &size);
 			err = MPI_Comm_rank(_comm, &rank);
+			//only the prime number processors need deserialize
+			if (rank % 2 == 0) {
+				this->Deserialize();
+				int err, rank, size;
+				err = MPI_Comm_size(_comm, &size);
+				err = MPI_Comm_rank(_comm, &rank);
 
-			if (rank == 0) {
-				for (int i = 0; i < exchangedVecAllBlobs.size() - 1; i++) {
-					exchangedVecAllBlobs[i] = _vecAllBlobs[i];
-				}
-				exchangedVecAllBlobs[exchangedVecAllBlobs.size() - 1] = recvBlobsUnserial[1];
+				if (rank == 0) {
+					for (int i = 0; i < exchangedVecAllBlobs.size() - 1; i++) {
+						exchangedVecAllBlobs[i] = _vecAllBlobs[i];
+					}
+					exchangedVecAllBlobs[exchangedVecAllBlobs.size() - 1] = recvBlobsUnserial[1];
 
-			} else if (rank == size - 1) {
-				exchangedVecAllBlobs[0] = recvBlobsUnserial[0];
-				for (int i = 1; i < exchangedVecAllBlobs.size(); i++) {
-					exchangedVecAllBlobs[i] = _vecAllBlobs[i-1];
+				} else if (rank == size - 1) {
+					exchangedVecAllBlobs[0] = recvBlobsUnserial[0];
+					for (int i = 1; i < exchangedVecAllBlobs.size(); i++) {
+						exchangedVecAllBlobs[i] = _vecAllBlobs[i-1];
+					}
+				} else {
+					exchangedVecAllBlobs[0] = recvBlobsUnserial[0];				
+					for (int i = 1; i < exchangedVecAllBlobs.size() - 1; i++) {
+						exchangedVecAllBlobs[i] = _vecAllBlobs[i-1];
+					}
+					exchangedVecAllBlobs[exchangedVecAllBlobs.size() - 1] = recvBlobsUnserial[1];
 				}
 			} else {
-				exchangedVecAllBlobs[0] = recvBlobsUnserial[0];				
-				for (int i = 1; i < exchangedVecAllBlobs.size() - 1; i++) {
-					exchangedVecAllBlobs[i] = _vecAllBlobs[i-1];
-				}
-				exchangedVecAllBlobs[exchangedVecAllBlobs.size() - 1] = recvBlobsUnserial[1];
+				//for odd number processors, nothing is modified.
+				exchangedVecAllBlobs = _vecAllBlobs;
 			}
+			
+
 
 
 		}
@@ -1010,10 +1554,405 @@ class BlobsExchangeOp {
 			return this->exchangedVecAllBlobs;
 		}
 
+		///	<summary>
+		///		Return the unexchanged VecAllBlobs
+		///	</summary>
+		std::vector<std::vector<IndicatorSet>> GetOriginalVecAllBlobs(){
+			return this->_vecAllBlobs;
+		}
+
+};
+
+//Define A Class for Exchanging vecGlobalTimes for building the connectivity graph
+
+class GlobalTimesExchangeOp {
+	private:
+		///	<summary>
+		///		Tag for MPI communication for vecGlobalTimes
+		///	</summary>
+		int tag = 104;
+
+		///	<summary>
+		///		The MPI Communicator
+		///	</summary>
+		MPI_Comm _comm; 
+
+		///	<summary>
+		///		An array of MPI_Request.	
+		///	</summary>
+		std::vector<MPI_Request> MPIrequests;
+
+		///	<summary>
+		///		An array of MPI_Status.	
+		///	</summary>
+  		std::vector<MPI_Status> MPIstatuses;
+
+	protected:
+	///	<summary>
+	///		The initial vecGlobalTimes before exchange
+	///	</summary>
+	std::vector< std::vector<Time> > _vecGlobalTimes;
+
+	///	<summary>
+	///		The vecGlobalTimes that is after the exchange. it's column number is _vecGlobalTimes's column number plus 2. (left and right)
+	///	</summary>
+	std::vector< std::vector<Time> > exchangedvecGlobalTimes;
+
+	///	<summary>
+	///		The buffer for vecGlobalTimes that will be sent
+	///		sendTimes[0] is the left vector and sendBlobBoxesDeg[1] is the right vector
+	///	</summary>
+	std::vector<Time> sendTimes;
+
+	///	<summary>
+	///		The buffer for vecGlobalTimes that will be received
+	///		recvTimes[0] is the left vector and sendBlobBoxesDeg[1] is the right vector
+	///	</summary>
+	std::vector<Time> recvTimes;	
+
+	///	<summary>
+	///		Lowerbound of the file number that this processor is reading (starts with index 0 and inclusice)
+	///	</summary>	
+	int fileLowerBound;
+
+	///	<summary>
+	///		Upperbound of the file number that this processor is reading (starts with index 0 and exclusice)
+	///	</summary>
+	int fileUpperBound;		
+
+	public:
+
+		///	<summary>
+		///		Construct the Operator with vecGlobalTimes
+		///	</summary>
+		GlobalTimesExchangeOp(MPI_Comm communicator, std::vector< std::vector<Time> > vecGlobalTimes, int processorResponsibalForFile_LB, int processorResponsibalForFile_UB){
+			this->_vecGlobalTimes = vecGlobalTimes;
+			this->_comm = communicator;
+			this->fileLowerBound = processorResponsibalForFile_LB;
+			this->fileUpperBound = processorResponsibalForFile_UB;
+			sendTimes.resize(2);
+			recvTimes.resize(2);
+		}
+
+		~GlobalTimesExchangeOp(){
+			MPIrequests.clear();
+			MPIstatuses.clear();
+		}
+
+		///	<summary>
+		///		Start the exchange process.
+		/// 	this function is non-blocking and the data values in the GlobalTimesExchangeOp should not be modified
+		/// 	The exchange values are not guaranteed to be current when this function returns and need to be used with the EndExchange()
+		///	</summary>
+		void StartExchange() {
+			int err, rank, size;
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
+
+
+			//----------------------Send Data----------------------
+			for (auto dir: {DIR_LEFT, DIR_RIGHT}) {
+				int destRank;//Destination Rank
+				if (dir == DIR_LEFT) {
+					//Sending Data to the left
+					if (rank == 0) {
+						//Rank 0 Do Nothing
+						continue;
+					} else {
+						destRank = rank - 1;
+					}
+
+				} else {
+					//Sending  Data to the right
+					if (rank == size - 1) {
+						//Rank n-1 Do Nothing
+						continue;
+					} else {
+						destRank = rank + 1;
+					}
+				}
+
+
+				//Only the odd number processors will send out data
+				if (rank % 2 != 0) {
+					//Pack data into the send buffer
+					sendTimes[0] = _vecGlobalTimes[fileLowerBound][0];
+					sendTimes[1] = _vecGlobalTimes[fileUpperBound-1][_vecGlobalTimes[fileUpperBound-1].size()-1];
+					MPI_Request request;
+					MPI_Isend(&sendTimes[dir], sizeof(Time), MPI_BYTE,
+					destRank,tag , _comm, &request);
+				}
+			}
+
+			//----------------------Then Receive data----------------------
+			for (auto dir : {DIR_LEFT, DIR_RIGHT}) {
+				int sourceRank;				
+				if (dir == DIR_LEFT) {
+					//Receive Data From the left.
+					if (rank == 0) {//Rank 0 will not receive from the left
+						continue;
+					} else {
+						sourceRank = rank - 1;
+					}
+
+				} else {
+					//Receive Data From the right.
+					if (rank == size - 1) {//rank n-1 will not receive from the right
+						continue;
+
+					} else {
+						sourceRank = rank + 1;
+					}
+
+				}
+
+				//Only the prime number processors will receive data 
+				if (rank % 2 == 0) {
+					MPI_Status status;
+					MPI_Request request;
+					int recvCount;
+					//Use a non-blocking probe to know the incoming data size
+					int flag = 0;
+					while(!flag)
+					{
+						MPI_Iprobe( sourceRank, tag, _comm, &flag, &status );
+					}
+					MPI_Get_count( &status, MPI_BYTE, &recvCount );						
+					MPI_Irecv(&recvTimes[dir], recvCount, MPI_BYTE,
+							sourceRank, tag, _comm, &request);
+					MPIrequests.emplace_back(std::move(request));
+					MPIstatuses.push_back(MPI_Status());
+				}
+
+
+
+			}
+
+		}
+
+		///	<summary>
+		///		End the exchange process.
+		// 		this function is blocking until:
+		// 		- it is safe to modify the values in the GlobalTimesExchangeOp data without
+		//   		affecting the exchange values for other processes
+		// 		- the exchange values can be read: they contain to up-to-date values
+		//   		from other processes
+		///	</summary>
+		void EndExchange() {
+			//Wait for all Irecv to complete
+			MPI_Waitall(MPIrequests.size(), &MPIrequests[0], &MPIstatuses[0]);
+			MPIrequests.clear();
+			MPIstatuses.clear();
+			int rank, size;
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
+			exchangedvecGlobalTimes.resize(_vecGlobalTimes.size());
+
+			//Pack the data into the vecGlobalTimes 
+			//Only the prime number processors need to pack the data
+			if (rank % 2 == 0) {
+								
+				if (rank == 0) {
+					//Put the Time received from the left at the [fileUpperBound,end] position
+					exchangedvecGlobalTimes = _vecGlobalTimes;					
+					exchangedvecGlobalTimes[fileUpperBound - 1].push_back(recvTimes[1]);;
+
+				} else if (rank == size - 1) {
+					//Put the Time received from the left at the [0,0] position
+					exchangedvecGlobalTimes[fileLowerBound].push_back(recvTimes[0]);
+					for (int i = 0; i < _vecGlobalTimes[fileLowerBound].size(); i++) {
+						exchangedvecGlobalTimes[fileLowerBound].push_back(_vecGlobalTimes[fileLowerBound][i]);
+					}
+
+				} else {
+					//Put the Time received from the left at the [0,0] position
+					exchangedvecGlobalTimes[fileLowerBound].push_back(recvTimes[0]);
+					for (int i = 0; i < _vecGlobalTimes[fileLowerBound].size(); i++) {
+						exchangedvecGlobalTimes[fileLowerBound].push_back(_vecGlobalTimes[fileLowerBound][i]);
+					}
+					//Put the Time received from the left at the [fileUpperBound,end] position
+					exchangedvecGlobalTimes[fileUpperBound - 1].push_back(recvTimes[1]);;
+				}
+			} else {
+				//for odd number processors, nothing is modified.
+				exchangedvecGlobalTimes = _vecGlobalTimes;
+			}
+
+		}
+
+
+		///	<summary>
+		///		Return the exchanged vecGlobalTimes
+		///	</summary>
+		std::vector< std::vector<Time> >  GetExchangedVecGlobalTimes(){
+			return this->exchangedvecGlobalTimes;
+		}
+
+		///	<summary>
+		///		Return the unexchanged vecGlobalTimes
+		///	</summary>
+		std::vector< std::vector<Time> >  GetUnExchangedVecGlobalTimes(){
+			return this->_vecGlobalTimes;
+		}
+
+
+
+
 };
 
 
 
+
+#endif 
+
+// Array of equivalent tags
+typedef std::multimap<Tag, Tag> MapGraph;
+typedef MapGraph::const_iterator MapGraphConstIterator;
+typedef MapGraph::iterator MapGraphIterator;
+
+
+#if defined(TEMPEST_MPIOMP) 
+
+
+//Define A Class for  reducing MapGraph
+class MapGraphReduceOp {
+	private:
+		///	<summary>
+		///		Tag for MPI communication for sending/receiving Tag pairs
+		///	</summary>
+		int reduce_tag = 106;
+
+		///	<summary>
+		///		The MPI Communicator
+		///	</summary>
+		MPI_Comm _comm; 
+
+		///	<summary>
+		///		An array of MPI_Request.	
+		///	</summary>
+		std::vector<MPI_Request> MPIrequests;
+
+		///	<summary>
+		///		An array of MPI_Status.	
+		///	</summary>
+		std::vector<MPI_Status> MPIstatuses;
+
+	protected:
+		///	<summary>
+		///		Original multimapTagGraph.	
+		///	</summary>
+		MapGraph _multimapTagGraph;
+
+
+		///	<summary>
+		///		Serialized local multimapTagGraph.	
+		///	</summary>
+		std::vector<std::pair<Tag, Tag>> localPairs;
+
+		///	<summary>
+		///		Output multimapTagGraph. (Only used for processor 0)	
+		///	</summary>	
+		MapGraph outputTagGraph;
+	
+	public:
+		MapGraphReduceOp(MPI_Comm communicator, MapGraph multimapTagGraph) {
+			this->_multimapTagGraph = multimapTagGraph;
+			this->_comm = communicator;
+		}
+
+		~MapGraphReduceOp(){
+			MPIrequests.clear();
+			MPIstatuses.clear();
+		}
+
+		///	<summary>
+		///		Serialize the MapGraph and generate the local std::pair<Tag, Tag> array
+		///	</summary>
+		void Serialize(){
+			localPairs.clear();
+			for (auto it = _multimapTagGraph.begin(); it != _multimapTagGraph.end(); ++it) {
+				localPairs.push_back(std::pair<Tag, Tag>(it->first, it->second));
+			}
+
+		}
+
+		///	<summary>
+		///		Deserialize the local std::pair<Tag, Tag> array and generate back the MapGraph (Only Processor 0 will call it)
+		///	</summary>
+		void Deserialize() {
+			for (std::pair<Tag, Tag> tagPair : localPairs) {
+				outputTagGraph.insert(tagPair);
+			}
+
+		}
+
+
+		///	<summary>
+		///		The MPI reduce that will reduce each local MapGraph to the processor 0.
+		///	</summary>
+		void Reduce() {
+			int rank, size;
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
+
+			this->Serialize();
+			int d = std::floor(std::log2(size));//here we use floor.
+			for (int j = 0; j < d; j++) {
+				if ((rank & (int)std::round(std::pow(2,j))) != 0) {
+					
+					//send to (world_rank ^ pow(2,j)
+					int destRank = rank ^ (int)round(std::pow(2,j));
+
+					MPI_Send (localPairs.data(), localPairs.size() * sizeof(std::pair<Tag, Tag>), MPI_BYTE, destRank, reduce_tag, _comm);
+					//  We just simply need to break the algorithm here (juest return, not Finalize())
+					return;
+
+
+				} else {
+					//receive from (world_rank ^ pow(2,j))
+					MPI_Status status;
+					int byteCount;
+					int sourceRank = rank ^ (int)std::round(std::pow(2,j));
+
+
+					MPI_Probe(sourceRank, reduce_tag,  _comm, &status);
+
+					MPI_Get_count( &status, MPI_BYTE, &byteCount);					 
+					std::vector<std::pair<Tag, Tag>> recvTagPairs;
+					recvTagPairs.resize(byteCount / sizeof(std::pair<Tag, Tag>));
+					MPI_Recv(recvTagPairs.data(), byteCount, MPI_BYTE, sourceRank, reduce_tag, _comm, &status);
+
+					//Pack the receive Pairs into the localPairs.
+					for (auto recvPair : recvTagPairs) {
+						localPairs.push_back(recvPair);
+					}
+
+
+
+				}
+
+			}
+
+		}
+
+		///	<summary>
+		///		return the reduced tagGraph (only called by the processor 0)
+		///	</summary>
+		MapGraph GetReducedTagGraph() {
+			int rank, size;
+			MPI_Comm_size(_comm, &size);
+			MPI_Comm_rank(_comm, &rank);
+			if (rank == 0) {
+				this->Deserialize();
+				return outputTagGraph;
+			} else {
+				_EXCEPTIONT("Only processor 0 should call GetReducedTagGraph().");
+			}
+			
+
+		}
+
+};
 
 #endif 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1762,8 +2701,7 @@ try {
 
 		//Each processor should at least read in one file. Otherwise, an exception will be thrown
 		if (vecInputFiles.size() < nMPISize) {
-			_EXCEPTIONT("The input file number is: %d, please only use at most %d processors for parallelization."
-			, vecInputFiles.size(), vecInputFiles.size());
+			_EXCEPTIONT("The input files number is less than the required processors number");
 		}
 
 	} catch (MPI::Exception failure) {
@@ -1828,26 +2766,33 @@ try {
 	#if defined(TEMPEST_MPIOMP)
 		//Calculate how many files each processor should process
 		_ASSERT(vecInputFiles.size() >= nMPISize);
-
-		//Every processor (except the P0) will have floor(n/p) files
-		int avgNumFiles = vecInputFiles.size() / nMPISize; 
-		int rootNumFiles =avgNumFiles + (vecInputFiles.size() - (avgNumFiles * nMPISize)) ;
-
 		int processorResponsibalForFile_UB;
 		int processorResponsibalForFile_LB;
+		if (nMPISize > 1) {
+			//Every processor (except the P0) will have floor(n/p) files
+			int avgNumFiles = vecInputFiles.size() / nMPISize; 
+			int rootNumFiles =avgNumFiles + (vecInputFiles.size() - (avgNumFiles * nMPISize)) ;
 
-		//Asign each processor with their responsible chunks of files
-		if (nMPIRank == 0) {
-			processorResponsibalForFile_UB = rootNumFiles;
-			processorResponsibalForFile_LB = 0;
+
+
+			//Asign each processor with their responsible chunks of files
+			if (nMPIRank == 0) {
+				processorResponsibalForFile_UB = rootNumFiles;
+				processorResponsibalForFile_LB = 0;
+			} else {
+				//Record the upper bound of the responsible file number for this processor (exclusive)
+				processorResponsibalForFile_UB = rootNumFiles + avgNumFiles * nMPIRank;
+
+				//Record the lower bound of the responsible file number for this processor (conclusive)
+				processorResponsibalForFile_LB = rootNumFiles + avgNumFiles * nMPIRank - avgNumFiles;
+
+			}		
+
 		} else {
-			//Record the upper bound of the responsible file number for this processor (exclusive)
-			processorResponsibalForFile_UB = rootNumFiles + avgNumFiles * nMPIRank;
+			processorResponsibalForFile_LB = 0;
+			processorResponsibalForFile_UB = vecInputFiles.size();
 
-			//Record the lower bound of the responsible file number for this processor (conclusive)
-			processorResponsibalForFile_LB = rootNumFiles + avgNumFiles * nMPIRank - avgNumFiles;
-
-		}		
+		}
 	#endif
 
 
@@ -2394,20 +3339,31 @@ try {
 	AnnounceEndBlock("Done");
 
 	//================================Actual Parallization Starts===================================
-	//1. Exchang the vecAllBlobs; vecAllBlobTags; vecPrevBlobBoxesDeg
-	//nMPIRank;nMPISize
+	//1. Exchang the vecAllBlobs; vecAllBlobTags; vecPrevBlobBoxesDeg; vecGlobalTimes
 	//==============================================================================================
 
 #if defined(TEMPEST_MPIOMP)
 
-		//Exchange vecAllBlobTags
-		TagExchangeOP MPI_exchangedTags(MPI_COMM_WORLD, vecAllBlobTags);
+	//We still need the original unexchanged data for these two variables later
+	GlobalTimesExchangeOp MPI_exchangedGlobalTimes(MPI_COMM_WORLD,vecGlobalTimes, processorResponsibalForFile_LB, processorResponsibalForFile_UB);//Declare here since it needs to be reverted later
+	TagExchangeOP MPI_exchangedTags(MPI_COMM_WORLD, vecAllBlobTags);
+	BlobsExchangeOp MPI_exchangedBlobs(MPI_COMM_WORLD, vecAllBlobs);
+	if (nMPISize > 1) {
+
+		//Exchange vecGlobalTimes (will be reverted after the connectivity graph is built)
+		
+		MPI_exchangedGlobalTimes.StartExchange();
+		MPI_exchangedGlobalTimes.EndExchange();
+		vecGlobalTimes = MPI_exchangedGlobalTimes.GetExchangedVecGlobalTimes();
+
+		//Exchange vecAllBlobTags	
+		
 		MPI_exchangedTags.StartExchange();
 		MPI_exchangedTags.EndExchange();
 		vecAllBlobTags = MPI_exchangedTags.GetExchangedVecAllBlobTags();
 
 		//Exchange vecAllBlobs
-		BlobsExchangeOp MPI_exchangedBlobs(MPI_COMM_WORLD, vecAllBlobs);
+
 		MPI_exchangedBlobs.StartExchange();
 		MPI_exchangedBlobs.EndExchange();
 		vecAllBlobs = MPI_exchangedBlobs.GetExchangedVecAllBlobs();
@@ -2417,16 +3373,14 @@ try {
 		MPI_exchangedBlobBoxesDeg.StartExchange();
 		MPI_exchangedBlobBoxesDeg.EndExchange();
 		vecAllBlobBoxesDeg = MPI_exchangedBlobBoxesDeg.GetExchangedVecAllBlobBoxesDeg();
-
+		
 		//Make sure all processors finish the exchange
 		MPI_Barrier(MPI_COMM_WORLD);
 
+	}
 #endif
 
-	// Array of equivalent tags
-	typedef std::multimap<Tag, Tag> MapGraph;
-	typedef MapGraph::const_iterator MapGraphConstIterator;
-	typedef MapGraph::iterator MapGraphIterator;
+
 
 	MapGraph multimapTagGraph;
 
@@ -2438,24 +3392,43 @@ try {
 	// Loop through all remaining time steps
 	int iFileLocal = 0;
 	int iTimeLocal = 0;
+	#if defined(TEMPEST_MPIOMP)
+			//recalculate the nGlobalTimes here based on the updated vecGlobalTimes file (will be inverted after the connectivity graph is built)	
+			int original_nGlobalTimes = nGlobalTimes;
+			nGlobalTimes = 0;
+		if (nMPISize > 1) {
+			iFileLocal = processorResponsibalForFile_LB;
+
+
+			for (int f = processorResponsibalForFile_LB; f < processorResponsibalForFile_UB; f++) {
+				nGlobalTimes += vecGlobalTimes[f].size();
+			}
+		}
+	
+	#endif
 	for (int t = 1; t < nGlobalTimes; t++) {
 
 		// New announcement block for timestep
 		if (vecGlobalTimes.size() == 1) {
 			_ASSERT((t >= 0) && (t < vecGlobalTimes[0].size()));
-			// Announce("Time %i (%s)", t,
-			// 	vecGlobalTimes[0][t].ToString().c_str());//[Commented out, need to uncomment later]
+			Announce("Time %i (%s)", t,
+				vecGlobalTimes[0][t].ToString().c_str());
 		} else {
 			iTimeLocal++;
 			_ASSERT(iFileLocal < vecGlobalTimes.size());
 			if (iTimeLocal >= vecGlobalTimes[iFileLocal].size()) {
 				iTimeLocal = 0;
 				iFileLocal++;
-				_ASSERT(iFileLocal < vecGlobalTimes.size());
+				#if defined(TEMPEST_MPIOMP)
+					_ASSERT(iFileLocal < processorResponsibalForFile_UB);
+				#else
+					_ASSERT(iFileLocal < vecGlobalTimes.size());
+				#endif
+				
 			}
-			_ASSERT(iTimeLocal < vecGlobalTimes[iFileLocal].size());//[Commented out, need to uncomment later]
-			// Announce("Time %i (%s)", t,
-			// 	vecGlobalTimes[iFileLocal][iTimeLocal].ToString().c_str());//[Commented out, need to uncomment later]
+			_ASSERT(iTimeLocal < vecGlobalTimes[iFileLocal].size());
+			Announce("Time %i (%s)", t,
+				vecGlobalTimes[iFileLocal][iTimeLocal].ToString().c_str());
 		}
 
 		// Get the current blob vector
@@ -2507,6 +3480,8 @@ try {
 						continue;
 					}
 				}
+
+				
 
 				// Verify that blobs meet percentage overlap criteria
 				// (as a percentage of the current blob)
@@ -2582,6 +3557,8 @@ try {
 					}
 				}
 
+				// printf("Time:{%d} rank [%d] p:%d, q:%d is a pair \n",t, nMPIRank, p, q);
+
 				// Insert bidirectional edge in graph
 				multimapTagGraph.insert(
 					std::pair<Tag, Tag>(
@@ -2595,6 +3572,58 @@ try {
 	}
 
 	AnnounceEndBlock("Done");
+	
+
+
+	
+	#if defined(TEMPEST_MPIOMP)
+		if (nMPISize > 1) {
+			//Reduce the connectivity graph (multimapTagGraph) to P0
+			MapGraphReduceOp MPI_MapGraph(MPI_COMM_WORLD,multimapTagGraph);
+			MPI_MapGraph.Reduce();
+			if (nMPIRank == 0){
+				multimapTagGraph = MPI_MapGraph.GetReducedTagGraph();
+				printf("multimapTagGraph size is: %d \n",multimapTagGraph.size());
+			}
+
+			//Reduce the setAllTags to P0
+			TagCollectiveOP MPI_TagsReduce(MPI_COMM_WORLD, MPI_exchangedTags.GetOriginalVecAllBlobTags());
+			MPI_TagsReduce.Reduce();
+			MPI_Barrier(MPI_COMM_WORLD);
+			if (nMPIRank == 0){
+				setAllTags = MPI_TagsReduce.GetReducedSetAllTags();
+				vecAllBlobTags = MPI_TagsReduce.GetUnserialVecAllTags(1);
+				printf("setAllTags size is: %d \n",setAllTags.size());
+				printf("vecAllTags size is: %d \n",vecAllBlobTags.size());
+			}
+
+			//And then reduced the original global time to P0 for next step:
+			int reducedNGlobalTimes = 0;
+			MPI_Reduce(&original_nGlobalTimes, &reducedNGlobalTimes, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+			if (nMPIRank == 0) {
+				nGlobalTimes = reducedNGlobalTimes;
+			}
+
+
+			
+		} else {
+			printf("1 P setAllTags size is: %d \n",setAllTags.size());
+			printf("1 P multimapTagGraph size is: %d \n",multimapTagGraph.size());
+			printf("1 P vecAllTags size is: %d \n",vecAllBlobTags.size());
+
+		}
+	#else
+		printf("serial setAllTags size is: %d \n",setAllTags.size());
+		printf("serial multimapTagGraph size is: %d \n",multimapTagGraph.size());
+		printf("serial vecAllTags size is: %d \n",vecAllBlobTags.size());
+
+	#endif
+
+	
+
+	
+
+
 
 	AnnounceStartBlock("Identify components in connectivity graph");//Only In processor 0;
 
@@ -2607,6 +3636,14 @@ try {
 	std::set<Tag>::const_iterator iterTag = setAllTags.begin();
 
 	for (; iterTag != setAllTags.end(); iterTag++) {
+		#if defined(TEMPEST_MPIOMP)
+			if (nMPIRank != 0) {
+				continue;
+			}
+
+		#endif
+
+
 
 		std::set<Tag> setTagsVisited;
 
@@ -2739,6 +3776,9 @@ try {
 	Announce("Unique tags found: %i", nTotalBlobCount);
 
 	AnnounceEndBlock("Done");
+
+
+
 /*
 	// Apply post-hoc threshold operators
 	std::vector<bool> fRejectedBlob;
@@ -2841,10 +3881,39 @@ try {
 	///////////////////////////////////////////////////////////////////////////
 	// Output results
 	///////////////////////////////////////////////////////////////////////////
+	
 
 	AnnounceStartBlock("Output blobs");
 
-	{
+	{	
+		#if defined(TEMPEST_MPIOMP)
+			//revert the exchanged vecGlobalTimes and nGlobalTimes for output:
+			vecGlobalTimes = MPI_exchangedGlobalTimes.GetUnExchangedVecGlobalTimes();
+			nGlobalTimes = original_nGlobalTimes;
+
+			//Processor 0 scatter the updated vecAllBlobsTag to other processors
+			if (nMPISize > 1) {
+
+
+
+				//The vecAllBlobTags on processor 0 need to be scatter. And it only has valid meaning on P0 for this constructor.
+				TagCollectiveOP MPI_TagScatter(MPI_COMM_WORLD, vecAllBlobTags);
+
+				//Then every processor will gather their original vecAllGlobsTags information to P0
+				//Calling the GatherTagCounts() will update the _vecAlllBlobTags inside the TagCollectiveOP to the input one for all processors except P0
+				MPI_TagScatter.GatherTagCounts(MPI_exchangedTags.GetOriginalVecAllBlobTags());
+				MPI_Barrier(MPI_COMM_WORLD);
+
+				MPI_TagScatter.Scatter();
+				MPI_Barrier(MPI_COMM_WORLD);
+				vecAllBlobTags = MPI_TagScatter.GetUnserialVecAllTags(0);
+				vecAllBlobs = MPI_exchangedBlobs.GetOriginalVecAllBlobs();
+
+			}
+
+			
+			
+		#endif
 		// Load in the benchmark file
 		NcFileVector vecNcFiles;
 		vecNcFiles.ParseFromString(vecInputFiles[0]);
@@ -2857,11 +3926,17 @@ try {
 
 		for (int f = 0; f < vecOutputFiles.size(); f++) {
 			#if defined(TEMPEST_MPIOMP) //[Commented out for auto-complete, need to uncomment later]
+				if (nMPISize > 1) {
+					
 
-				//Asign each processor with their responsible chunks of files
-				if ((f >= processorResponsibalForFile_UB) || f < processorResponsibalForFile_LB) {
-					continue;
+					//Asign each processor with their responsible chunks of files
+					if ((f >= processorResponsibalForFile_UB) || f < processorResponsibalForFile_LB) {
+						continue;
+					}
+
+					printf("Rank: %d writing to file: %d \n",nMPIRank, f);
 				}
+
 
 			#endif //[Commented out for auto-complete, need to uncomment later]
 
