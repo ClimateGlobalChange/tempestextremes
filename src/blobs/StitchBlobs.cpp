@@ -1034,10 +1034,20 @@ try {
 			if ((dMinLatDeg != -90.0) || (dMaxLatDeg != 90.0) ||
 			    (dMinLonDeg != 0.0) || (dMaxLonDeg != 360.0)
 			) {
-				LatLonBox<double> boxBoundsDeg(fRegional);
+				LatLonBox<double> boxBoundsDeg(!fRegional);
 
-				boxBoundsDeg.lon[0] = dMinLonDeg;
-				boxBoundsDeg.lon[1] = dMaxLonDeg;
+				if (fRegional) {
+					boxBoundsDeg.lon[0] = dMinLonDeg;
+					boxBoundsDeg.lon[1] = dMaxLonDeg;
+
+					if (dMinLonDeg > dMaxLonDeg) {
+						_EXCEPTIONT("On regional grids, --minlon must be less than --maxlon");
+					}
+
+				} else {
+					boxBoundsDeg.lon[0] = LonDegToStandardRange(dMinLonDeg);
+					boxBoundsDeg.lon[1] = LonDegToStandardRange(dMaxLonDeg);
+				}
 				boxBoundsDeg.lat[0] = dMinLatDeg;
 				boxBoundsDeg.lat[1] = dMaxLatDeg;
 
