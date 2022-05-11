@@ -1079,6 +1079,128 @@ void Mesh::Read(const std::string & strFile) {
 			strFile.c_str());
 	}
 
+	// Check for global attribute title = "ICON grid description" 
+	NcAtt * attICON = ncFile.get_att("title");
+	if (attICON != NULL) {
+		std::string strAttTitle = attICON->as_string(0);
+		if (strAttTitle == "ICON grid description") {
+			NcDim * dimVertex = ncFile.get_dim("vertex");
+			if (dimVertex == NULL) {
+				_EXCEPTION1("ICON grid file \"%s\" missing dimension \"vertex\"",
+					strFile.c_str());
+			}
+			NcDim * dimCell = ncFile.get_dim("cell");
+			if (dimVertex == NULL) {
+				_EXCEPTION1("ICON grid file \"%s\" missing dimension \"cell\"",
+					strFile.c_str());
+			}
+
+			nodes.resize(dimVertex->size());
+
+			DataArray1D<double> dNodeBuffer(dimVertex->size());
+
+			// Load in x coordinates of vertices
+			NcVar * varICONX = ncFile.get_var("cartesian_x_vertices");
+			if (varICONX == NULL) {
+				_EXCEPTION1("ICON grid file \"%s\" missing variable \"cartesian_x_vertices\"",
+					strFile.c_str());
+			}
+			if (varICONX->num_dims() != 1) {
+				_EXCEPTION1("ICON grid file \"%s\" variable \"cartesian_x_vertices\" must have dimension 1",
+					strFile.c_str());
+			}
+			if (std::string(varICONX->get_dim(0)->name()) != "vertex") {
+				_EXCEPTION1("ICON grid file \"%s\" variable \"cartesian_x_vertices\" dimension 0 must have name \"vertex\"",
+					strFile.c_str());
+			}
+			varICONX->set_cur((long)0);
+			varICONX->get(&(dNodeBuffer[0]), dimVertex->size());
+			for (long i = 0; i < dimVertex->size(); i++) {
+				nodes[i].x = dNodeBuffer[i];
+			}
+
+			// Load in y coordinates of vertices
+			NcVar * varICONY = ncFile.get_var("cartesian_y_vertices");
+			if (varICONY == NULL) {
+				_EXCEPTION1("ICON grid file \"%s\" missing variable \"cartesian_y_vertices\"",
+					strFile.c_str());
+			}
+			if (varICONY->num_dims() != 1) {
+				_EXCEPTION1("ICON grid file \"%s\" variable \"cartesian_y_vertices\" must have dimension 1",
+					strFile.c_str());
+			}
+			if (std::string(varICONY->get_dim(0)->name()) != "vertex") {
+				_EXCEPTION1("ICON grid file \"%s\" variable \"cartesian_y_vertices\" dimension 0 must have name \"vertex\"",
+					strFile.c_str());
+			}
+			varICONY->set_cur((long)0);
+			varICONY->get(&(dNodeBuffer[0]), dimVertex->size());
+			for (long i = 0; i < dimVertex->size(); i++) {
+				nodes[i].y = dNodeBuffer[i];
+			}
+
+			// Load in z coordinates of vertices
+			NcVar * varICONZ = ncFile.get_var("cartesian_z_vertices");
+			if (varICONZ == NULL) {
+				_EXCEPTION1("ICON grid file \"%s\" missing variable \"cartesian_z_vertices\"",
+					strFile.c_str());
+			}
+			if (varICONZ->num_dims() != 1) {
+				_EXCEPTION1("ICON grid file \"%s\" variable \"cartesian_z_vertices\" must have dimension 1",
+					strFile.c_str());
+			}
+			if (std::string(varICONZ->get_dim(0)->name()) != "vertex") {
+				_EXCEPTION1("ICON grid file \"%s\" variable \"cartesian_z_vertices\" dimension 0 must have name \"vertex\"",
+					strFile.c_str());
+			}
+			varICONZ->set_cur((long)0);
+			varICONZ->get(&(dNodeBuffer[0]), dimVertex->size());
+			for (long i = 0; i < dimVertex->size(); i++) {
+				nodes[i].z = dNodeBuffer[i];
+			}
+
+			dNodeBuffer.Detach();
+
+			// Load in face vertex indices
+			NcVar * varVertexOfCell = ncFile.get_var("vertex_of_cell");
+			if (varVertexOfCell == NULL) {
+				_EXCEPTION1("ICON grid file \"%s\" missing variable \"vertex_of_cell\"",
+					strFile.c_str());
+			}
+			if (varVertexOfCell->num_dims() != 2) {
+				_EXCEPTION1("ICON grid file \"%s\" variable \"vertex_of_cell\" must have dimension 2",
+					strFile.c_str());
+			}
+			if (std::string(varVertexOfCell->get_dim(1)->name()) != "cell") {
+				_EXCEPTION1("ICON grid file \"%s\" variable \"vertex_of_cell\" dimension 1 must have name \"cell\"",
+					strFile.c_str());
+			}
+
+			long lVerticesPerCell = varVertexOfCell->get_dim(0)->size();
+
+			faces.resize(dimCell->size(), Face(lVerticesPerCell));
+
+			DataArray2D<int> dVertexOfCellBuf(
+				lVerticesPerCell,
+				dimCell->size());
+			varVertexOfCell->get(
+				&(dVertexOfCellBuf(0,0)), 
+				lVerticesPerCell,
+				dimCell->size());
+
+			for (long i = 0; i < dimCell->size(); i++) {
+				for (long j = 0; j < lVerticesPerCell; j++) {
+					if ((dVertexOfCellBuf(j,i) < 1) || (dVertexOfCellBuf(j,i) > nodes.size())) {
+						_EXCEPTION4("ICON grid file \"%s\" vertex %li cell %li out of range (%li)",
+							strFile.c_str(), j, i, dVertexOfCellBuf(j,i));
+					}
+					faces[i].SetNode(j, dVertexOfCellBuf(j,i)-1);
+				}
+			}
+		}
+		return;
+	}
+
 	// Check for dimension names "grid_size", "grid_rank" and "grid_corners"
 	int iSCRIPFormat = 0;
 	for (int i = 0; i < ncFile.num_dims(); i++) {

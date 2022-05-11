@@ -1099,6 +1099,23 @@ void Time::FromCFCompliantUnitsOffsetDouble(
 		int nSeconds = static_cast<int>(fmod(dOffset, 1.0) * 60.0);
 		AddSeconds(nSeconds);
 
+	// Time format is "day as %Y%m%d.%f"
+	} else if (
+	    (strFormattedTime.length() >= 16) &&
+	    (strncmp(strFormattedTime.c_str(), "day as \%Y\%m\%d.\%f", 16) == 0)
+	) {
+		m_iSecond = static_cast<int>(fmod(dOffset, 1.0) * 86400.0);
+
+		int nRem = static_cast<int>(dOffset);
+
+		m_iDay = (nRem % 100) - 1;
+
+		m_iMonth = ((nRem / 100) % 100) - 1;
+
+		m_iYear = (nRem / 10000);
+
+		NormalizeTime();
+
 	} else {
 		_EXCEPTIONT("Unknown \"time::units\" format");
 	}
@@ -1140,6 +1157,19 @@ double Time::GetCFCompliantUnitsOffsetDouble(
 		timeBuf.FromFormattedString(strSubStr);
 
 		return timeBuf.DeltaMinutes(*this);
+
+	// Time format is "day as %Y%m%d.%f"
+	} else if (
+	    (strFormattedTime.length() >= 16) &&
+	    (strncmp(strFormattedTime.c_str(), "day as \%Y\%m\%d.\%f", 16) == 0)
+	) {
+		double dOffset =
+			static_cast<double>(m_iYear * 10000)
+			+ static_cast<double>((m_iMonth+1) * 100)
+			+ static_cast<double>(m_iDay+1)
+			+ (static_cast<double>(m_iSecond) / 86400.0);
+
+		return dOffset;
 
 	} else {
 		_EXCEPTIONT("Unknown \"time::units\" format");
