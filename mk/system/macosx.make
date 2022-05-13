@@ -12,7 +12,7 @@ MPICXX=            mpicxx
 # Additional C++ command line flags
 
 # NetCDF C library arguments
-NETCDF_ROOT=       /usr/local
+NETCDF_ROOT=       /opt/local
 NETCDF_CXXFLAGS=   -I$(NETCDF_ROOT)/include
 NETCDF_LIBRARIES=  -lnetcdf -lnetcdf_c++
 NETCDF_LDFLAGS=    -L$(NETCDF_ROOT)/lib -Wl,-rpath,$(NETCDF_CXX_ROOT)/lib
