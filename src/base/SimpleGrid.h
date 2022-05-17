@@ -204,6 +204,16 @@ public:
 	) const;
 
 	///	<summary>
+	///		Read the coordinate information from a data file (note that connectivity
+	///		information won't be available in this case).
+	///	</summary>
+	void FromUnstructuredDataFile(
+		const std::string & strDataFile,
+		const std::string & strLatitudeName,
+		const std::string & strLongitudeName
+	);
+
+	///	<summary>
 	///		Get the number of dimensions of the SimpleGrid.
 	///	</summary>
 	size_t DimCount() const {

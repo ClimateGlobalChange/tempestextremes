@@ -17,6 +17,7 @@ FILES= Announce.cpp \
        Variable.cpp \
 	   DataOp.cpp \
        kdtree.cpp \
+	   lodepng.cpp \
 	   SimpleGridUtilities.cpp \
 	   AutoCurator.cpp \
 	   ArgumentTree.cpp \

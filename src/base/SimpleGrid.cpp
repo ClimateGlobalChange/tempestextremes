@@ -1237,6 +1237,54 @@ void SimpleGrid::ToFile(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void SimpleGrid::FromUnstructuredDataFile(
+	const std::string & strDataFile,
+	const std::string & strLatitudeName,
+	const std::string & strLongitudeName
+) {
+	NcFile ncfile(strDataFile.c_str());
+	if (!ncfile.is_valid()) {
+		_EXCEPTION1("Unable to open data file \"%s\"", strDataFile.c_str());
+	}
+
+	NcVar * varLon = ncfile.get_var(strLongitudeName.c_str());
+	if (varLon == NULL) {
+		_EXCEPTION2("Unable to read longitude variable \"%s\" from data file \"%s\"",
+			strLongitudeName.c_str(), strDataFile.c_str());
+	}
+	if (varLon->num_dims() != 1) {
+		_EXCEPTION2("Longitude variable \"%s\" in data file \"%s\" must have dimension 1",
+			strLongitudeName.c_str(), strDataFile.c_str());
+	}
+
+	NcVar * varLat = ncfile.get_var(strLatitudeName.c_str());
+	if (varLon == NULL) {
+		_EXCEPTION2("Unable to read latitude variable \"%s\" from data file \"%s\"",
+			strLatitudeName.c_str(), strDataFile.c_str());
+	}
+	if (varLat->num_dims() != 1) {
+		_EXCEPTION2("Latitude variable \"%s\" in data file \"%s\" must have dimension 1",
+			strLatitudeName.c_str(), strDataFile.c_str());
+	}
+
+	if (varLon->get_dim(0)->size() != varLat->get_dim(0)->size()) {
+		_EXCEPTION4("Longitude variable \"%s\" (size %li) and latitude variable \"%s\" (size %li) must have same size",
+			varLon->name(), varLon->get_dim(0)->size(),
+			varLat->name(), varLat->get_dim(0)->size());
+	}
+
+	m_dLon.Allocate(varLon->get_dim(0)->size());
+	m_dLat.Allocate(varLat->get_dim(0)->size());
+
+	varLon->get(&(m_dLon[0]), varLon->get_dim(0)->size());
+	varLat->get(&(m_dLat[0]), varLat->get_dim(0)->size());
+
+	m_nGridDim.resize(1);
+	m_nGridDim[0] = varLon->get_dim(0)->size();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int SimpleGrid::CoordinateVectorToIndex(
 	const std::vector<int> & coordvec
 ) const {
