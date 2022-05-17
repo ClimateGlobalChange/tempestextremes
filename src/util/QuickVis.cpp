@@ -143,7 +143,7 @@ void GenerateMap(
 
 			kd_insert3(kd, dX, dY, dZ, (void*)(&iRef + i));
 
-			if (i % iReportSize == 0) {
+			if ((i+1) % iReportSize == 0) {
 				Announce("%li%% complete", i / iReportSize);
 			}
 		}
@@ -185,6 +185,116 @@ void GenerateMap(
 
 	// Clean up
 	kd_free(kd);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A data structure specifying a colormap.
+///	</summary>
+class ColorMap : public std::vector< std::vector<unsigned char> > {
+
+public:
+	///	<summary>
+	///		Sample the colormap.
+	///	</summary>
+	inline void Sample(
+		double dValue,
+		double dMinValue,
+		double dMaxValue,
+		unsigned char & cR,
+		unsigned char & cG,
+		unsigned char & cB,
+		unsigned char & cA
+	) {
+		int ixColor = static_cast<int>((dValue - dMinValue) / (dMaxValue - dMinValue) * size());
+
+		if (ixColor < 0) {
+			ixColor = 0;
+		} else if (ixColor >= size()) {
+			ixColor = size()-1;
+		}
+
+		cR = (*this)[ixColor][0];
+		cG = (*this)[ixColor][1];
+		cB = (*this)[ixColor][2];
+		cA = (*this)[ixColor][3];
+	}
+};
+
+///	<summary>
+///		Generate the colormap specified by strColorMap.
+///	</summary>
+void GenerateColorMap(
+	const std::string & strColorMap,
+	ColorMap & colormap
+) {
+	colormap.resize(256, std::vector<unsigned char>(4, 0) );
+
+	// "gray" color map
+	if (strColorMap == "gray") {
+		for (int i = 0; i < 256; i++) {
+			colormap[i][0] = i;
+			colormap[i][1] = i;
+			colormap[i][2] = i;
+			colormap[i][3] = 255;
+		}
+
+	// "jet" color map
+	} else if (strColorMap == "jet") {
+		for (int i = 0; i <= 32; i++) {
+			colormap[i][0] = 0;
+			colormap[i][1] = 0;
+			colormap[i][2] = (i+32)*4-1;
+			colormap[i][3] = 255;
+		}
+		for (int i = 33; i <= 96; i++) {
+			colormap[i][0] = 0;
+			colormap[i][1] = (i-32)*4-1;
+			colormap[i][2] = 255;
+			colormap[i][3] = 255;
+		}
+		for (int i = 97; i < 160; i++) {
+			colormap[i][0] = (i-96)*4-1;
+			colormap[i][1] = 255;
+			colormap[i][2] = (160-i)*4-1;
+			colormap[i][3] = 255;
+		}
+		for (int i = 160; i <= 224; i++) {
+			colormap[i][0] = 255;
+			colormap[i][1] = (224-i)*4-1;
+			colormap[i][2] = 0;
+			colormap[i][3] = 255;
+		}
+		for (int i = 224; i < 256; i++) {
+			colormap[i][0] = (288-i)*4-1;
+			colormap[i][1] = 0;
+			colormap[i][2] = 0;
+			colormap[i][3] = 255;
+		}
+
+	// "bluered" colormap
+	} else if (strColorMap == "bluered") {
+		for (int i = 0; i < 128; i++) {
+			colormap[i][0] = i*2;
+			colormap[i][1] = i*2;
+			colormap[i][2] = 127+i;
+			colormap[i][3] = 255;
+		}
+		for (int i = 128; i < 256; i++) {
+			colormap[i][0] = 382-i;
+			colormap[i][1] = (255-i)*2;
+			colormap[i][2] = (255-i)*2;
+			colormap[i][3] = 255;
+		}
+/*
+		for (int i = 0; i < 256; i++) {
+			printf("%i %i %i %i\n", i, colormap[i][0], colormap[i][1], colormap[i][2]);
+		}
+*/
+	} else {
+		_EXCEPTION1("Invalid colormap \"%s\"", strColorMap.c_str());
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -250,6 +360,9 @@ try {
 	// Name of latitude variable
 	std::string strLatName;
 
+	// Color map
+	std::string strColorMap;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputGrid, "in_grid", "");
@@ -270,6 +383,7 @@ try {
 		CommandLineString(strMaxRange, "maxrange", "");
 		CommandLineString(strLonName, "lonname", "lon");
 		CommandLineString(strLatName, "latname", "lat");
+		CommandLineString(strColorMap, "colormap", "gray");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -288,6 +402,10 @@ try {
 	if ((strInputMap.length() != 0) && (strOutputMap.length() != 0)) {
 		_EXCEPTIONT("Only one of --in_map or --out_map can be specified");
 	}
+
+	// Generate the color map
+	ColorMap colormap;
+	GenerateColorMap(strColorMap, colormap);
 
 	// Variable registry
 	VariableRegistry varreg;
@@ -514,11 +632,22 @@ try {
 		for (int j = 0; j < nResY; j++) {
 		for (int i = 0; i < nResX; i++) {
 			int jx = nResY - j - 1;
+
+			colormap.Sample(
+				data[dImageMap[j][i]],
+				dMinRange,
+				dMaxRange,
+				image[4 * nResX * jx + 4 * i + 0],
+				image[4 * nResX * jx + 4 * i + 1],
+				image[4 * nResX * jx + 4 * i + 2],
+				image[4 * nResX * jx + 4 * i + 3]);
+/*
 			double dFrac = 255.0 * (data[dImageMap[j][i]] - dMinRange) / (dMaxRange - dMinRange);
 			image[4 * nResX * jx + 4 * i + 0] = static_cast<unsigned char>(dFrac);
 			image[4 * nResX * jx + 4 * i + 1] = static_cast<unsigned char>(dFrac);
 			image[4 * nResX * jx + 4 * i + 2] = static_cast<unsigned char>(dFrac);
 			image[4 * nResX * jx + 4 * i + 3] = 255;
+*/
 		}
 		}
 
