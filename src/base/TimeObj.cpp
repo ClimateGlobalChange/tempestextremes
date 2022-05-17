@@ -1102,7 +1102,7 @@ void Time::FromCFCompliantUnitsOffsetDouble(
 	// Time format is "day as %Y%m%d.%f"
 	} else if (
 	    (strFormattedTime.length() >= 16) &&
-	    (strncmp(strFormattedTime.c_str(), "day as \%Y\%m\%d.\%f", 16) == 0)
+	    (strncmp(strFormattedTime.c_str(), "day as %%Y%%m%%d.%%f", 16) == 0)
 	) {
 		m_iSecond = static_cast<int>(fmod(dOffset, 1.0) * 86400.0);
 
@@ -1161,7 +1161,7 @@ double Time::GetCFCompliantUnitsOffsetDouble(
 	// Time format is "day as %Y%m%d.%f"
 	} else if (
 	    (strFormattedTime.length() >= 16) &&
-	    (strncmp(strFormattedTime.c_str(), "day as \%Y\%m\%d.\%f", 16) == 0)
+	    (strncmp(strFormattedTime.c_str(), "day as %%Y%%m%%d.%%f", 16) == 0)
 	) {
 		double dOffset =
 			static_cast<double>(m_iYear * 10000)
