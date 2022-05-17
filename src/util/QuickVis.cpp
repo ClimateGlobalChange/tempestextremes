@@ -503,6 +503,8 @@ try {
 				}
 			}
 		}
+		
+		Announce("Colorbar spans range [%f, %f]", dMinRange, dMaxRange);
 
 		// Build image
 		std::vector<unsigned char> image;
@@ -518,7 +520,7 @@ try {
 		}
 		}
 
-		AnnounceEndBlock("Done");
+		AnnounceEndBlock(NULL);
 
 		AnnounceStartBlock("Encoding PNG");
 
