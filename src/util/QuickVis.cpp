@@ -295,7 +295,6 @@ try {
 
 	// Load in the benchmark file
 	NcFileVector vecFiles;
-	vecFiles.ParseFromString(strInputData);
 
 	// Define the SimpleGrid for the input data
 	SimpleGrid grid;
@@ -442,6 +441,9 @@ try {
 	// Compose image
 	if (strOutputPNG != "") {
 		AnnounceStartBlock("Producing image");
+
+		// Archive input data filename
+		vecFiles.ParseFromString(strInputData);
 
 		// Get time information
 		const NcTimeDimension & vecTimes = vecFiles.GetNcTimeDimension(0);
