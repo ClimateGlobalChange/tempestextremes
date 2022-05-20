@@ -38,20 +38,3 @@ test/*.eps
 test/*.png
 
 test/statfigs/*
-
-!test/
-!test/ERA5_AR
-!test/ERA5_AR/*
-!test/ERA5_AR_test
-!test/ERA5_AR_test/*
-
-connect_ddt.sh
-generateNCdiff.sh
-
-.vscode/
-
-TempestExtremes v2.1.pdf
-
-mk/
-
-mk/system/

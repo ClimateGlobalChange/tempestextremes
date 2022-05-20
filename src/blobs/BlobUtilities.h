@@ -347,12 +347,6 @@ public:
 		const Type & lat_pt,
 		const Type & lon_pt
 	) {
-		// Sanity check
-		if (!lon_periodic && (lon[0] > lon[1])) {
-			_EXCEPTION2("Maximum longitude (%1.5f) is smaller than minimum longitude (%1.5f) in non-periodic LatLonBox",
-				lon[0], lon[1]);
-		}
-
 		// Check latitudes
 		if (lat[0] > lat_pt) {
 			return false;
@@ -396,11 +390,6 @@ public:
 	bool overlaps(
 		const LatLonBox<Type> & box
 	) const {
-		// Sanity check
-		if (!lon_periodic && (lon[0] > lon[1])) {
-			_EXCEPTION2("Maximum longitude (%1.5f) is smaller than minimum longitude (%1.5f) in non-periodic LatLonBox",
-				lon[0], lon[1]);
-		}
 
 		// Check flags
 		if ((is_null) || (box.is_null)) {
