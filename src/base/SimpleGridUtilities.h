@@ -122,7 +122,8 @@ void FindMaxClosedContourDelta(
 	const SimpleGrid & grid,
 	const DataArray1D<real> & data,
 	int ix0,
-	double dMaxDist,
+	double dDistDeg,
+	double dMinMaxDistDeg,
 	bool fMaxClosedContourDeltaSign,
 	real & dMaxClosedContourDelta
 );

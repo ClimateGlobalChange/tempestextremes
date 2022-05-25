@@ -147,12 +147,12 @@ public:
 	double m_dDeltaAmount;
 
 	///	<summary>
-	///		Threshold distance.
+	///		Threshold distance (in degrees).
 	///	</summary>
 	double m_dDistance;
 
 	///	<summary>
-	///		Distance to search for min or max.
+	///		Distance to search for min or max (in degrees).
 	///	</summary>
 	double m_dMinMaxDist;
 };

@@ -475,15 +475,19 @@ void FindMaxClosedContourDelta(
 	const SimpleGrid & grid,
 	const DataArray1D<real> & dataState,
 	int ix0,
-	double dMaxDistDeg,
+	double dDistDeg,
+	double dMinMaxDistDeg,
 	bool fMaxClosedContourDeltaSign,
 	real & dMaxClosedContourDelta
 ) {
 	_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
 
-	// Verify that dMaxDistDeg is less than 180.0
-	if ((dMaxDistDeg <= 0.0) || (dMaxDistDeg > 180.0)) {
-		_EXCEPTIONT("MaxDistDeg must be between 0.0 and 180.0");
+	// Verify that dDistDeg is less than 180.0
+	if ((dDistDeg <= 0.0) || (dDistDeg > 180.0)) {
+		_EXCEPTIONT("DistDeg must be positive, between 0.0 and 180.0");
+	}
+	if ((dMinMaxDistDeg < 0.0) || (dMinMaxDistDeg > 180.0)) {
+		_EXCEPTIONT("MinMaxDistDeg must be nonnegative, between 0.0 and 180.0");
 	}
 
 	if ((grid.m_vecConnectivity.size() != grid.m_dLon.GetRows()) ||
@@ -499,6 +503,26 @@ void FindMaxClosedContourDelta(
 	double dMCCDSign = 1.0;
 	if (!fMaxClosedContourDeltaSign) {
 		dMCCDSign = -1.0;
+	}
+
+	// Find new minimum (if using positive closed contour delta)
+	// or maximum (if using negative closed contour delta)
+	if (dMinMaxDistDeg != 0.0) {
+		int ixExtremum;
+		real dMaxValue;
+		float dRMax;
+
+		FindLocalMinMax<real>(
+			grid,
+			fMaxClosedContourDeltaSign,
+			dataState,
+			ix0,
+			dMinMaxDistDeg,
+			ixExtremum,
+			dMaxValue,
+			dRMax);
+
+		ix0 = ixExtremum;
 	}
 
 	// Value of the field at the index point
@@ -566,7 +590,7 @@ void FindMaxClosedContourDelta(
 		// Great circle distance to this element (in degrees)
 		double dR = GreatCircleDistance_Deg(dLon0, dLat0, dLon, dLat);
 
-		if (dR >= dMaxDistDeg) {
+		if (dR >= dDistDeg) {
 			break;
 		}
 
@@ -680,7 +704,8 @@ template void FindMaxClosedContourDelta<float>(
 	const SimpleGrid & grid,
 	const DataArray1D<float> & data,
 	int ix0,
-	double dMaxDist,
+	double dDist,
+	double dMinMaxDist,
 	bool fMaxClosedContourDeltaSign,
 	float & dMaxClosedContourDelta
 );
@@ -689,7 +714,8 @@ template void FindMaxClosedContourDelta<double>(
 	const SimpleGrid & grid,
 	const DataArray1D<double> & data,
 	int ix0,
-	double dMaxDist,
+	double dDist,
+	double dMinMaxDist,
 	bool fMaxClosedContourDeltaSign,
 	double & dMaxClosedContourDelta
 );

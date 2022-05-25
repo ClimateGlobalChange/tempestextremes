@@ -31,6 +31,7 @@ public:
 	///		Possible operations.
 	///	</summary>
 	enum Operation {
+		InvalidOperation,
 		Max,
 		Min,
 		Avg,
@@ -46,6 +47,18 @@ public:
 
 public:
 	///	<summary>
+	///		Constructor.
+	///	</summary>
+	NodeOutputOp() :
+		m_varix(InvalidVariableIndex),
+		m_strVariableString(""),
+		m_eOp(InvalidOperation),
+		m_dDistance(0.0),
+		m_dMinMaxDist(0.0)
+	{ }
+
+public:
+	///	<summary>
 	///		Parse a output operator string.
 	///	</summary>
 	void Parse(
@@ -57,8 +70,11 @@ public:
 		enum {
 			ReadMode_Op,
 			ReadMode_Distance,
+			ReadMode_MinMaxDist,
 			ReadMode_Invalid
 		} eReadMode = ReadMode_Op;
+
+		std::string strOpCommand;
 
 		// Get variable information
 		int iLast = varreg.FindOrRegisterSubStr(strOp, &m_varix) + 1;
@@ -74,6 +90,8 @@ public:
 
 				// Read in operation
 				if (eReadMode == ReadMode_Op) {
+					strOpCommand = strSubStr;
+
 					if (strSubStr == "max") {
 						m_eOp = Max;
 					} else if (strSubStr == "min") {
@@ -105,30 +123,62 @@ public:
 					iLast = i + 1;
 					eReadMode = ReadMode_Distance;
 
-				// Read in minimum count
+				// Read in distance
 				} else if (eReadMode == ReadMode_Distance) {
 					m_dDistance = atof(strSubStr.c_str());
+
+					iLast = i + 1;
+					if ((m_eOp == PosClosedContour) || (m_eOp == NegClosedContour)) {
+						eReadMode = ReadMode_MinMaxDist;
+					} else {
+						eReadMode = ReadMode_Invalid;
+					}
+
+				// Read in min-max distance
+				} else if (eReadMode == ReadMode_MinMaxDist) {
+					m_dMinMaxDist = atof(strSubStr.c_str());
 
 					iLast = i + 1;
 					eReadMode = ReadMode_Invalid;
 
 				// Invalid
 				} else if (eReadMode == ReadMode_Invalid) {
-					_EXCEPTION1("\nInsufficient entries in output op \"%s\""
-							"\nRequired: \"<name>,<operation>,<distance>\"",
-							strOp.c_str());
+					if ((m_eOp == PosClosedContour) || (m_eOp == NegClosedContour)) {
+						_EXCEPTION1("\nToo many arguments in output op \"%s\""
+								"\nRequired: \"<name>,<operation>,<distance>[,<minmaxdist>]\"",
+								strOp.c_str());
+					} else {
+						_EXCEPTION1("\nToo many arguments in output op \"%s\""
+								"\nRequired: \"<name>,<operation>,<distance>\"",
+								strOp.c_str());
+					}
 				}
 			}
 		}
 
+		// Min-max distance is an optional argument
+		if (eReadMode == ReadMode_MinMaxDist) {
+			eReadMode = ReadMode_Invalid;
+		}
+
 		if (eReadMode != ReadMode_Invalid) {
-			_EXCEPTION1("\nInsufficient entries in output op \"%s\""
+			_EXCEPTION1("\nInsufficient arguments in output op \"%s\""
 					"\nRequired: \"<name>,<operation>,<distance>\"",
 					strOp.c_str());
 		}
 
-		if (m_dDistance < 0.0) {
-			_EXCEPTIONT("For output op, distance must be nonnegative");
+		if ((m_eOp == PosClosedContour) || (m_eOp == NegClosedContour)) {
+			if (m_dDistance <= 0.0) {
+				_EXCEPTION1("For output op \"%s\", distance must be nonnegative", strOpCommand.c_str());
+			}
+			if (m_dMinMaxDist < 0.0) {
+				_EXCEPTION1("For output op \"%s\", min-max distance must be nonnegative", strOpCommand.c_str());
+			}
+
+		} else{
+			if (m_dDistance < 0.0) {
+				_EXCEPTION1("For output op \"%s\", distance must be nonnegative", strOpCommand.c_str());
+			}
 		}
 
 		// Store variable string
@@ -195,6 +245,11 @@ public:
 	///		Distance to use when applying operation.
 	///	</summary>
 	double m_dDistance;
+
+	///	<summary>
+	///		MinMax distance.
+	///	</summary>
+	double m_dMinMaxDist;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -317,26 +372,28 @@ void ApplyNodeOutputOp(
 		sprintf(buf, szFormat, dValue);
 		strResult = buf;
 
-	// Positive closed contour deltas
+	// Positive closed contour deltas (valleys)
 	} else if (op.m_eOp == NodeOutputOp::PosClosedContour) {
 		FindMaxClosedContourDelta<float>(
 			grid,
 			dataState,
 			ixCandidate,
 			op.m_dDistance,
+			op.m_dMinMaxDist,
 			true,
 			dValue);
 
 		sprintf(buf, szFormat, dValue);
 		strResult = buf;
 
-	// Negative closed contour deltas
+	// Negative closed contour deltas (hills)
 	} else if (op.m_eOp == NodeOutputOp::NegClosedContour) {
 		FindMaxClosedContourDelta<float>(
 			grid,
 			dataState,
 			ixCandidate,
 			op.m_dDistance,
+			op.m_dMinMaxDist,
 			false,
 			dValue);
 
