@@ -25,11 +25,13 @@
 #include "Variable.h"
 #include "NcFileVector.h"
 #include "STLStringHelper.h"
+#include "ShpFile.h"
 
 #include "netcdfcpp.h"
 #include "kdtree.h"
 #include "lodepng.h"
 
+#include <cmath>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -363,6 +365,12 @@ try {
 	// Color map
 	std::string strColorMap;
 
+	// Grid lines
+	std::string strGridLines;
+
+	// Outline Shp file
+	std::string strOutlineShpFile;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputGrid, "in_grid", "");
@@ -384,6 +392,8 @@ try {
 		CommandLineString(strLonName, "lonname", "lon");
 		CommandLineString(strLatName, "latname", "lat");
 		CommandLineString(strColorMap, "colormap", "gray");
+		CommandLineString(strGridLines, "grid", "on");
+		CommandLineString(strOutlineShpFile, "outlineshp", "");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -397,6 +407,13 @@ try {
 		+ ((strInputMap.length() != 0)?(1):(0));
 	if (nInputArguments > 1) {
 		_EXCEPTIONT("Only one of --in_grid, --in_connect, or --in_map can be specified");
+	}
+
+	if (dMaxLon < dMinLon) {
+		_EXCEPTIONT("--maxlon must be greater than --minlon");
+	}
+	if (dMaxLat < dMinLat) {
+		_EXCEPTIONT("--maxlat must be greater than --minlat");
 	}
 
 	if ((strInputMap.length() != 0) && (strOutputMap.length() != 0)) {
@@ -472,6 +489,7 @@ try {
 		}
 		nResX = varLon->get_dim(0)->size();
 		dSampleLon.Allocate(nResX);
+		varLon->get(&(dSampleLon[0]), nResX);
 
 		NcVar * varLat = ncMapFile.get_var("lat");
 		if (varLat == NULL) {
@@ -484,6 +502,7 @@ try {
 		}
 		nResY = varLat->get_dim(0)->size();
 		dSampleLat.Allocate(nResY);
+		varLat->get(&(dSampleLat[0]), nResY);
 
 		NcVar * varMap = ncMapFile.get_var("image_map");
 		if (varMap == NULL) {
@@ -651,8 +670,48 @@ try {
 		}
 		}
 
+		// Grid lines
+		double dMajorDeltaLon = dMaxLon - dMinLon;
+		if (dMajorDeltaLon >= 90.0) {
+			dMajorDeltaLon = 30.0;
+		} else {
+			_ASSERT(dMajorDeltaLon > 0.0);
+			int iDeltaLonMag10 = static_cast<int>(std::log10(dMajorDeltaLon));
+			dMajorDeltaLon = pow(10.0, static_cast<double>(iDeltaLonMag10));
+		}
+
+		if (strGridLines == "on") {
+			Announce("Drawing grid lines");
+			static const int nGridThickness = 2;
+			for (int i = nGridThickness; i < nResX-nGridThickness; i++) {
+				if (std::floor(dSampleLon[i] / dMajorDeltaLon) !=
+				    std::floor(dSampleLon[i+nGridThickness] / dMajorDeltaLon)
+				) {
+					for (int j = 0; j < nResY; j+=2) {
+						image[4 * nResX * j + 4 * i + 0] = 0;
+						image[4 * nResX * j + 4 * i + 1] = 0;
+						image[4 * nResX * j + 4 * i + 2] = 0;
+						image[4 * nResX * j + 4 * i + 3] = 255;
+					}
+				}
+			}
+			for (int j = nGridThickness; j < nResY-nGridThickness; j++) {
+				if (std::floor(dSampleLat[j] / dMajorDeltaLon) !=
+				    std::floor(dSampleLat[j+nGridThickness] / dMajorDeltaLon)
+				) {
+					for (int i = 0; i < nResX; i+=2) {
+						image[4 * nResX * j + 4 * i + 0] = 0;
+						image[4 * nResX * j + 4 * i + 1] = 0;
+						image[4 * nResX * j + 4 * i + 2] = 0;
+						image[4 * nResX * j + 4 * i + 3] = 255;
+					}
+				}
+			}
+		}
+
 		AnnounceEndBlock(NULL);
 
+		// Encode PNG and output
 		AnnounceStartBlock("Encoding PNG");
 
 		unsigned error = lodepng::encode(strOutputPNG, image, nResX, nResY);

@@ -32,7 +32,8 @@ FILES= Announce.cpp \
 	   MeshUtilitiesFuzzy.cpp \
 	   PolynomialInterp.cpp \
 	   LegendrePolynomial.cpp \
-	   FunctionTimer.cpp
+	   FunctionTimer.cpp \
+	   ShpFile.cpp
 
 LIB_TARGET= libextremesbase.a
 
