@@ -994,6 +994,7 @@ public:
 		dMaxAbsLat(90.0),
 		dMinLat(-90.0),
 		dMaxLat(90.0),
+		fOutFloat(false),
 		fRegional(false),
 		fDiagonalConnectivity(false),
 		iVerbosityLevel(0),
@@ -1019,6 +1020,9 @@ public:
 
 	// Maximum latitude (in degrees)
 	double dMaxLat;
+
+	// Write output as float
+	bool fOutFloat;
 
 	// Regional (do not wrap longitudinal boundaries)
 	bool fRegional;
@@ -1343,7 +1347,7 @@ void DetectBlobs(
 		param.strTagVar,
 		param.strLatitudeName,
 		param.strLongitudeName,
-		ncByte,
+		(param.fOutFloat)?(ncFloat):(ncByte),
 		dimTimeOut,
 		&dim0,
 		&dim1,
@@ -1709,6 +1713,7 @@ try {
 		CommandLineDouble(dbparam.dMinLat, "minlat", -90.0);
 		CommandLineDouble(dbparam.dMaxLat, "maxlat", 90.0);
 		CommandLineBool(dbparam.fRegional, "regional");
+		CommandLineBool(dbparam.fOutFloat, "out_float");
 		CommandLineString(dbparam.strTagVar, "tagvar", "binary_tag");
 		CommandLineString(dbparam.strLongitudeName, "lonname", "lon");
 		CommandLineString(dbparam.strLatitudeName, "latname", "lat");
