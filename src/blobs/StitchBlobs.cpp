@@ -1565,8 +1565,8 @@ try {
 					for (; iter != vecBlobs[p].end(); iter++) {
 						bool fInRestrictRegion =
 							opRestrictRegion.ContainsPoint(
-								grid.m_dLat[*iter],
-								grid.m_dLon[*iter]);
+								RadToDeg(grid.m_dLat[*iter]),
+								RadToDeg(grid.m_dLon[*iter]));
 
 						if (fInRestrictRegion) {
 							setRestrictRegion.insert(vecBlobTags[p]);
