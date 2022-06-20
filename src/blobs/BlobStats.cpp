@@ -226,7 +226,7 @@ try {
 	if (strInputFile != "") {
 		vecInputFiles.push_back(strInputFile);
 	} else {
-		vecInputFiles.FromFile(strInputFileList, false);
+		vecInputFiles.FromFile(strInputFileList);
 	}
 
 	int nFiles = vecInputFiles.size();
@@ -421,6 +421,7 @@ try {
 		}
 */
 		// Loop through all times
+		int iFirstFileTime = iTime;
 		for (int t = 0; t < nLocalTimes; t++, iTime++) {
 
 			Announce("Time %s", vecFileTimes[t].ToString().c_str());
@@ -587,7 +588,8 @@ try {
 				for (; iterTimes != iterBlobs->second.end(); iterTimes++) {
 
 					if (fOutputFullTimes) {
-						fprintf(fpout, "%s", vecFileTimes[iterTimes->first].ToShortString().c_str());
+						_ASSERT(iterTimes->first-iFirstFileTime < vecFileTimes.size());
+						fprintf(fpout, "%s", vecFileTimes[iterTimes->first-iFirstFileTime].ToShortString().c_str());
 					} else {
 						fprintf(fpout, "%i", iterTimes->first);
 					}
