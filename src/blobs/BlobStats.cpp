@@ -365,6 +365,9 @@ try {
 	// Loop through all files
 	int iBlobIndex = 0;
 
+	int iBlobOutputIndex = 0;
+	int iBlobOutputTime = 0;
+
 	for (int f = 0; f < nFiles; f++) {
 		NcFileVector vecInFiles;
 		vecInFiles.ParseFromString(vecInputFiles[f].c_str());
@@ -578,14 +581,22 @@ try {
 
 			for (; iterBlobs != mapAllQuantities.end(); iterBlobs++) {
 
-				fprintf(fpout, "Blob %i (%lu)\n",
-					iterBlobs->first,
-					iterBlobs->second.size());
+				//fprintf(fpout, "Blob %i (%lu)\n",
+				//	iterBlobs->first,
+				//	iterBlobs->second.size());
 
 				TimedBlobQuantitiesMap::iterator iterTimes =
 					iterBlobs->second.begin();
 
+				if (iterBlobs->first != iBlobOutputIndex) {
+					iBlobOutputTime = 0;
+					iBlobOutputIndex = iterBlobs->first;
+				}
+
 				for (; iterTimes != iterBlobs->second.end(); iterTimes++) {
+
+					fprintf(fpout, "%i\t%i\t", iterBlobs->first, iBlobOutputTime);
+					iBlobOutputTime++;
 
 					if (fOutputFullTimes) {
 						_ASSERT(iterTimes->first-iFirstFileTime < vecFileTimes.size());
