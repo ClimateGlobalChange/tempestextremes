@@ -994,6 +994,8 @@ public:
 		dMaxAbsLat(90.0),
 		dMinLat(-90.0),
 		dMaxLat(90.0),
+		dMinLon(0.0),
+		dMaxLon(0.0),
 		fOutFloat(false),
 		fRegional(false),
 		fDiagonalConnectivity(false),
@@ -1020,6 +1022,12 @@ public:
 
 	// Maximum latitude (in degrees)
 	double dMaxLat;
+
+	// Minimum longitude (in degrees)
+	double dMinLon;
+
+	// Maximum latitude (in degrees)
+	double dMaxLon;
 
 	// Write output as float
 	bool fOutFloat;
@@ -1451,7 +1459,7 @@ void DetectBlobs(
 		AnnounceStartBlock("Build tagged cell array");
 		bTag.Zero();
 
-		// Set all points within the specified latitude bounds to 1
+		// Set all points within the specified latitude/longitude bounds to 1
 		for (int i = 0; i < grid.GetSize(); i++) {
 			if (fabs(grid.m_dLat[i]) < DegToRad(param.dMinAbsLat)) {
 				continue;
@@ -1464,6 +1472,22 @@ void DetectBlobs(
 			}
 			if (grid.m_dLat[i] > DegToRad(param.dMaxLat)) {
 				continue;
+			}
+			if (param.dMinLon != param.dMaxLon) {
+				double dLon = LonRadToStandardRange(grid.m_dLon[i]);
+				double dMinLon = LonDegToStandardRange(param.dMinLon);
+				double dMaxLon = LonDegToStandardRange(param.dMaxLon);
+
+				if (dMinLon > dMaxLon) {
+					if ((dLon < dMinLon) && (dLon > dMaxLon)) {
+						continue;
+					}
+
+				} else {
+					if ((dLon < dMinLon) || (dLon > dMaxLon)) {
+						continue;
+					}
+				}
 			}
 
 			bTag[i] = 1;
@@ -1712,6 +1736,8 @@ try {
 		CommandLineDouble(dbparam.dMaxAbsLat, "maxabslat", 90.0);
 		CommandLineDouble(dbparam.dMinLat, "minlat", -90.0);
 		CommandLineDouble(dbparam.dMaxLat, "maxlat", 90.0);
+		CommandLineDouble(dbparam.dMinLon, "minlon", 0.0);
+		CommandLineDouble(dbparam.dMaxLon, "maxlon", 0.0);
 		CommandLineBool(dbparam.fRegional, "regional");
 		CommandLineBool(dbparam.fOutFloat, "out_float");
 		CommandLineString(dbparam.strTagVar, "tagvar", "binary_tag");
