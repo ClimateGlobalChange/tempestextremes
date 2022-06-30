@@ -1474,7 +1474,7 @@ void DetectBlobs(
 				continue;
 			}
 			if (param.dMinLon != param.dMaxLon) {
-				double dLon = LonRadToStandardRange(grid.m_dLon[i]);
+				double dLon = LonDegToStandardRange(RadToDeg(grid.m_dLon[i]));
 				double dMinLon = LonDegToStandardRange(param.dMinLon);
 				double dMaxLon = LonDegToStandardRange(param.dMaxLon);
 
