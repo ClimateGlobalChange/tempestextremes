@@ -305,6 +305,7 @@ try {
 		varTimeOut->add_att("short_name", "time");
 		varTimeOut->add_att("units", strTimeUnits.c_str());
 		varTimeOut->add_att("calendar", strTimeCalendar.c_str());
+		varTimeOut->add_att("bounds", "time_bnds");
 
 		NcDim * dimTimeBnds = ncfileout.add_dim("bounds", 2);
 		if (dimTimeBnds == NULL) {
