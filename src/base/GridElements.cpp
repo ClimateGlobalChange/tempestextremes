@@ -129,6 +129,10 @@ Real Mesh::CalculateFaceAreas(
 	int nCount = 0;
 	vecFaceArea.Allocate(faces.size());
 
+	if (faces.size() == 0) {
+		return 0.0;
+	}
+
 	// Calculate the area of each Face
 	if (fContainsConcaveFaces) {
 
@@ -1197,8 +1201,8 @@ void Mesh::Read(const std::string & strFile) {
 					faces[i].SetNode(j, dVertexOfCellBuf(j,i)-1);
 				}
 			}
+			return;
 		}
-		return;
 	}
 
 	// Check for dimension names "grid_size", "grid_rank" and "grid_corners"
