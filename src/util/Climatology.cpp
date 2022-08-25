@@ -448,6 +448,8 @@ void Climatology(
 	const std::vector< std::vector<std::string> > & vecVariableSpecifiedDims,
 	size_t sMemoryMax,
 	bool fIncludeLeapDays,
+	const std::string & strStartTime,
+	const std::string & strEndTime,
 	ClimatologyPeriod eClimoPeriod,
 	ClimatologyType eClimoType,
 	int nFourierModes,
@@ -533,8 +535,12 @@ void Climatology(
 	std::vector<NcVar*> vecNcVarCount;
 	vecNcVarCount.resize(vecVariableNames.size());
 
+	Time::CalendarType caltype;
 	std::string strTimeCalendar;
 	size_t sOutputTimes = 0;
+
+	Time timeStartTime;
+	Time timeEndTime;
 
 	std::vector<size_t> vecOutputAuxSize;
 	vecOutputAuxSize.resize(vecVariableNames.size(), 0);
@@ -573,8 +579,7 @@ void Climatology(
 				strTimeCalendar = attCalendar->as_string(0);
 			}
 
-			Time::CalendarType caltype =
-				Time::CalendarTypeFromString(strTimeCalendar);
+			caltype = Time::CalendarTypeFromString(strTimeCalendar);
 			if (caltype == Time::CalendarUnknown) {
 				_EXCEPTION1("Unknown calendar name \"%s\"; cannot determine number of days per year", strTimeCalendar.c_str());
 
@@ -584,9 +589,19 @@ void Climatology(
 				sOutputTimes = 360;
 
 			} else {
-				Announce("Calendar contains 365 days per year",
+				Announce("Calendar \"%s\" contains 365 days per year",
 					strTimeCalendar.c_str());
 				sOutputTimes = 365;
+			}
+
+			// Start and end time
+			if (strStartTime != "") {
+				timeStartTime = Time(caltype);
+				timeStartTime.FromFormattedString(strStartTime);
+			}
+			if (strEndTime != "") {
+				timeEndTime = Time(caltype);
+				timeEndTime.FromFormattedString(strEndTime);
 			}
 
 			// Other climatologies
@@ -1043,6 +1058,22 @@ void Climatology(
 						}
 					}
 #endif
+					if (strStartTime != "") {
+						double dDeltaSeconds = timeStartTime - vecTimes[t];
+						if (dDeltaSeconds > 0.0) {
+							Announce("Time %s (before start time; skipping)",
+								vecTimes[t].ToString().c_str());
+							continue;
+						}
+					}
+					if (strEndTime != "") {
+						double dDeltaSeconds = vecTimes[t] - timeEndTime;
+						if (dDeltaSeconds > 0.0) {
+							Announce("Time %s (after end time; skipping)",
+								vecTimes[t].ToString().c_str());
+							continue;
+						}
+					}
 
 					if (vecTimes[t].IsLeapDay()) {
 						if (fVerbose) {
@@ -1808,6 +1839,12 @@ try {
 	// Include leap days
 	bool fIncludeLeapDays;
 
+	// Start time
+	std::string strStartTime;
+
+	// End time
+	std::string strEndTime;
+
 	// Number of Fourier modes to retain
 	int nFourierModes;
 
@@ -1839,6 +1876,8 @@ try {
 		CommandLineStringD(strClimoPeriod, "period", "daily", "[daily|monthly|seasonal|annual]");
 		CommandLineStringD(strClimoType, "type", "mean", "[mean|meansq]");
 		CommandLineBool(fIncludeLeapDays, "include_leap_days");
+		CommandLineString(strStartTime, "time_start", "");
+		CommandLineString(strEndTime, "time_end", "");
 		//CommandLineInt(nFourierModes, "time_modes", 0);
 		CommandLineBool(fMissingData, "missingdata");
 		CommandLineString(strTempFilePath, "temp_file_path", "/tmp");
@@ -2012,6 +2051,8 @@ try {
 		vecVariableSpecifiedDims,
 		sMemoryMax,
 		fIncludeLeapDays,
+		strStartTime,
+		strEndTime,
 		eClimoPeriod,
 		eClimoType,
 		nFourierModes,
