@@ -274,11 +274,6 @@ void NodeFile::Read(
 		_EXCEPTIONT("--in_fmt \"(auto)\" cannot be used for GFDL formatted nodefiles");
 	}
 
-	// Not implemented
-	if (ePathType == PathTypeDN) {
-		_EXCEPTIONT("Not implemented");
-	}
-
 	// Check that this NodeFile is uninitialized
 	if ((m_cdh.size() != 0) || (m_pathvec.size() != 0)) {
 		_EXCEPTIONT("Attempting to Read() on an initialized NodeFile");
@@ -304,11 +299,6 @@ void NodeFile::Read(
 
 	// Clear the PathVector
 	m_pathvec.clear();
-
-	// DetectNodes has a single Path
-	if (ePathType == PathTypeDN) {
-		m_pathvec.resize(1);
-	}
 
 	// Clear the TimeToPathNodeMap
 	m_mapTimeToPathNode.clear();
@@ -362,13 +352,28 @@ void NodeFile::Read(
 						iLine, strNodeFile.c_str());
 				}
 
-				time = Time(
-					iYear,
-					iMonth-1,
-					iDay-1,
-					3600 * iHour,
-					0,
-					caltype);
+				if (m_pathvec.empty()) {
+					m_pathvec.resize(1);
+					m_pathvec[0].m_timeStart =
+						Time(
+							iYear,
+							iMonth-1,
+							iDay-1,
+							3600 * iHour,
+							0,
+							caltype);
+				}
+
+				m_pathvec[0].resize(m_pathvec[0].size() + nCount);
+
+				m_pathvec[0].m_timeEnd =
+					Time(
+						iYear,
+						iMonth-1,
+						iDay-1,
+						3600 * iHour,
+						0,
+						caltype);
 
 			// StitchNodes type
 			} else if (ePathType == PathTypeSN) {
@@ -472,18 +477,62 @@ void NodeFile::Read(
 
 			int nOutputSize = vecDelimitedOutput.size();
 
-			if (cdh.size() != nOutputSize-4) {
-				_EXCEPTION3("Mismatch between column header size specified in format (%i)"
-					" and node file columns on line %i of \"%s\"",
-					static_cast<int>(cdh.size()), iLine, strNodeFile.c_str());
-			}
-
 			// DetectNodes format output
 			if (ePathType == PathTypeDN) {
-				_EXCEPTIONT("Not implemented");
+
+				_ASSERT(m_pathvec.size() > 0);
+
+				if (cdh.size() != nOutputSize) {
+					_EXCEPTION3("Mismatch between column header size specified in format (%i)"
+						" and node file columns on line %i of \"%s\"",
+						static_cast<int>(cdh.size()), iLine, strNodeFile.c_str());
+				}
+
+				Path & path = m_pathvec[0];
+
+				if (ixpathnode >= path.size()) {
+					_EXCEPTION3("Mismatch between node list size (%i) and number of entries on line %i of \"%s\"",
+						nCount, iLine, strNodeFile.c_str());
+				}
+
+				PathNode & pathnode = path[ixpathnode];
+
+				// Store time and fileix
+				pathnode.m_time = path.m_timeEnd;
+
+				pathnode.m_fileix = ixpathnode;
+
+				// Store coordinate
+				if (coord.size() == 1) {
+					pathnode.m_gridix = coord[0];
+				} else if (coord.size() == 2) {
+					pathnode.m_gridix = coord[0] + nGridDim[1] * coord[1];
+				} else {
+					_EXCEPTIONT("Undefined behavior for SimpleGrid dimensionality > 2");
+				}
+
+				if (pathnode.m_gridix < 0) {
+					_EXCEPTION2("Negative coordinate index on line %i of \"%s\"",
+						iLine, strNodeFile.c_str());
+				}
+
+				// Store all other data as strings
+				for (int j = 0; j < nOutputSize; j++) {
+					pathnode.PushColumnDataString(
+						vecDelimitedOutput[j]);
+				}
+
+				ixpathnode++;
 
 			// StitchNodes format input
 			} else if (ePathType == PathTypeSN) {
+
+				if (cdh.size() != nOutputSize-4) {
+					_EXCEPTION3("Mismatch between column header size specified in format (%i)"
+						" and node file columns on line %i of \"%s\"",
+						static_cast<int>(cdh.size()), iLine, strNodeFile.c_str());
+				}
+
 				Path & path = m_pathvec[m_pathvec.size()-1];
 				PathNode & pathnode = path[i];
 
