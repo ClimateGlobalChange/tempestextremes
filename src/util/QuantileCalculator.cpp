@@ -23,6 +23,7 @@
 #include "DataArray2D.h"
 #include "Variable.h"
 #include "FilenameList.h"
+#include "TimeMatch.h"
 
 #include "netcdfcpp.h"
 
@@ -87,6 +88,9 @@ try {
 	// Data is regional
 	bool fRegional;
 
+	// Time filter
+	std::string strTimeFilter;
+
 	// Dimension to use for quantile calculation (currently can only be "time")
 	std::string strDimensionName = "time";
 
@@ -118,6 +122,7 @@ try {
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineBool(fRegional, "regional");
+		CommandLineString(strTimeFilter, "timefilter", "");
 		//CommandLineString(strDimensionName, "dimname", "time");
 		CommandLineString(strVariableName, "var", "");
 		CommandLineString(strVariableOutName, "varout", "");
@@ -149,6 +154,7 @@ try {
 		_EXCEPTIONT("--bins must be a power of 2");
 	}
 */
+
 	if (nQuantileBins < 2) {
 		_EXCEPTIONT("--bins must be at least 2");
 	}
@@ -163,6 +169,39 @@ try {
 	if (strVariableOutName == "") {
 		strVariableOutName = strVariableName;
 	}
+
+	bool fTimeFilterSpecified = (strTimeFilter != "");
+#ifdef TEMPEST_NOREGEX
+	if (strTimeFilter != "") {
+		_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
+	}
+#endif
+#ifndef TEMPEST_NOREGEX
+	// Parse --timefilter
+	std::regex reTimeSubset;
+	if (strTimeFilter != "") {
+		
+		// Test regex support
+		TestRegex();
+
+		if (strTimeFilter == "3hr") {
+			strTimeFilter = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
+		}
+		if (strTimeFilter == "6hr") {
+			strTimeFilter = "....-..-.. (00|06|12|18):00:00";
+		}
+		if (strTimeFilter == "daily") {
+			strTimeFilter = "....-..-.. 00:00:00";
+		}
+
+		try {
+			reTimeSubset.assign(strTimeFilter);
+		} catch(std::regex_error & reerr) {
+			_EXCEPTION2("Parse error in --timefilter regular expression \"%s\" (code %i)",
+				strTimeFilter.c_str(), reerr.code());
+		}
+	}
+#endif
 
 	// Create Variable registry
 	VariableRegistry varreg;
@@ -277,10 +316,32 @@ try {
 
 		// Get minimum and maximum at each point
 		//printf("[");
+
+		int nRetainedTimeSlices = dimTime->size();
+		if (fTimeFilterSpecified) {
+			nRetainedTimeSlices = 0;
+		}
+
 		for (long t = 0; t < dimTime->size(); t++) {
 			//Announce("Time %li/%li", t+1, dimTime->size());
 			ncfilevec.SetConstantTimeIx(t);
 			varQuantile.LoadGridData(varreg, ncfilevec, grid);
+
+#ifndef TEMPEST_NOREGEX
+			// Time filter
+			if (fTimeFilterSpecified) {
+				const NcTimeDimension & vecTimes = ncfilevec.GetNcTimeDimension(0);
+				_ASSERT(vecTimes.size() == dimTime->size());
+				std::string strTime = vecTimes[t].ToString();
+				std::smatch match;
+				
+				if (!std::regex_search(strTime, match, reTimeSubset)) {
+					continue;
+				}
+
+				nRetainedTimeSlices++;
+			}
+#endif
 
 			const DataArray1D<float> & data = varQuantile.GetData();
 
@@ -306,6 +367,10 @@ try {
 			}
 		}
 		//printf("]\n");
+
+		if (nRetainedTimeSlices < 2) {
+			_EXCEPTIONT("At present, at least 2 time slices must be available in the first file provided");
+		}
 
 		// Use a linear fit for bin edges
 		for (int i = 0; i < grid.GetSize(); i++) {
@@ -333,7 +398,7 @@ try {
 		nBinCounts.Zero();
 
 		for (size_t f = 0; f < vecInputFiles.size(); f++) {
-			Announce("File \"%s\"", vecInputFiles[f].c_str());
+			AnnounceStartBlock("File \"%s\"", vecInputFiles[f].c_str());
 
 			NcFileVector ncfilevec;
 			ncfilevec.ParseFromString(vecInputFiles[f]);
@@ -348,9 +413,28 @@ try {
 					ncfilevec.GetFilename(0).c_str());
 			}
 
-			nTotalPointCount += dimTime->size();
+			int nRetainedTimeSlices = dimTime->size();
+			if (fTimeFilterSpecified) {
+				nRetainedTimeSlices = 0;
+			}
 
 			for (long t = 0; t < dimTime->size(); t++) {
+
+#ifndef TEMPEST_NOREGEX
+				// Time filter
+				if (fTimeFilterSpecified) {
+					const NcTimeDimension & vecTimes = ncfilevec.GetNcTimeDimension(0);
+					_ASSERT(vecTimes.size() == dimTime->size());
+					std::string strTime = vecTimes[t].ToString();
+					std::smatch match;
+				
+					if (!std::regex_search(strTime, match, reTimeSubset)) {
+						continue;
+					}
+
+					nRetainedTimeSlices++;
+				}
+#endif
 
 				//Announce("File %lu/%lu Time %li/%li", f+1, vecInputFiles.size(), t+1, dimTime->size());
 				ncfilevec.SetConstantTimeIx(t);
@@ -400,6 +484,14 @@ try {
 					}
 				}
 			}
+
+			nTotalPointCount += nRetainedTimeSlices;
+
+			if (fTimeFilterSpecified) {
+				Announce("%i/%li time slices retained after time filtering", nRetainedTimeSlices, dimTime->size());
+			}
+
+			AnnounceEndBlock(NULL);
 		}
 /*
 		{
