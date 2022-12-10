@@ -16,7 +16,7 @@ TEMPESTEXTREMESBASELIB= $(TEMPESTEXTREMESBASEDIR)/libextremesbase.a
 TEMPESTEXTREMESNETCDFDIR= $(TEMPESTEXTREMESDIR)/src/netcdf-cxx-4.2
 TEMPESTEXTREMESNETCDFLIB= $(TEMPESTEXTREMESNETCDFDIR)/libnetcdf_c++.a
 
-EXEC_FILES= StitchBlobs.cpp BlobStats.cpp DetectBlobs.cpp
+EXEC_FILES= StitchBlobs.cpp BlobStats.cpp DetectBlobs.cpp PersistentBlobs.cpp
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 

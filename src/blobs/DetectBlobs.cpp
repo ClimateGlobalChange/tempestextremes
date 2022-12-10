@@ -1304,7 +1304,7 @@ void DetectBlobs(
 			strOutputFile.c_str());
 	}
 
-	// Copy over latitude, longitude and time variables to output file
+	// Copy over time variables to output file
 	NcDim * dimTimeOut = NULL;
 	if ((dimTime != NULL) && (varTime != NULL)) {
 		if (param.strTimeFilter != "") {
