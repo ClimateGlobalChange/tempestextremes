@@ -540,6 +540,7 @@ void PersistentBlobs(
 				}
 
 				// Write tag array
+				_ASSERT(iCurrentOutputFile < vecpncOutputFiles.size());
 				NcVar * varTag = vecpncOutputFiles[iCurrentOutputFile]->get_var(param.strTagVar.c_str());
 				_ASSERT(varTag != NULL);
 
@@ -556,14 +557,11 @@ void PersistentBlobs(
 				}
 
 				// Advance to next timestep or file
+				iOutputTimestep++;
 				if (iOutputTimestep == varTag->get_dim(0)->size()) {
 					iCurrentOutputFile++;
 					iOutputTimestep = 0;
-				} else {
-					iOutputTimestep++;
 				}
-
-				_ASSERT(iCurrentOutputFile < vecpncOutputFiles.size());
 
 				AnnounceEndBlock("Done");
 
@@ -588,6 +586,7 @@ void PersistentBlobs(
 				}
 
 				// Write tag array
+				_ASSERT(iCurrentOutputFile < vecpncOutputFiles.size());
 				NcVar * varTag = vecpncOutputFiles[iCurrentOutputFile]->get_var(param.strTagVar.c_str());
 				_ASSERT(varTag != NULL);
 
@@ -604,14 +603,11 @@ void PersistentBlobs(
 				}
 
 				// Advance to next timestep or file
+				iOutputTimestep++;
 				if (iOutputTimestep == varTag->get_dim(0)->size()) {
 					iCurrentOutputFile++;
 					iOutputTimestep = 0;
-				} else {
-					iOutputTimestep++;
 				}
-
-				_ASSERT(iCurrentOutputFile < vecpncOutputFiles.size());
 
 				AnnounceEndBlock("Done");
 			}
@@ -793,109 +789,14 @@ try {
 	if (vecPersistenceThresholdOp.size() != 1) {
 		_EXCEPTIONT("At present exactly one --thresholdcmd must be specified");
 	}
-/*
-#if defined(TEMPEST_MPIOMP)
-	// Spread files across nodes
-	int nMPIRank;
-	MPI_Comm_rank(MPI_COMM_WORLD, &nMPIRank);
 
-	int nMPISize;
-	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
-#endif
-
-	AnnounceStartBlock("Begin search operation");
-	if (vecInputFiles.size() != 1) {
-		if (vecOutputFiles.size() != 0) {
-			Announce("Output will be written following --out_list");
-		} else if (strOutputFile == "") {
-			Announce("Output will be written to outXXXXXX.dat");
-		} else {
-			Announce("Output will be written to %sXXXXXX.dat",
-				strOutputFile.c_str());
-		}
-#if defined(TEMPEST_MPIOMP)
-		if (vecInputFiles.size() != 1) {
-			Announce("Logs will be written to logXXXXXX.txt");
-		}
-#endif
-	}
-*/
-	// Loop over all files to be processed
-	for (int f = 0; f < vecInputFiles.size(); f++) {
-/*
-#if defined(TEMPEST_MPIOMP)
-		if (f % nMPISize != nMPIRank) {
-			continue;
-		}
-
-		FILE * fpLog = NULL;
-#endif
-*/
-		// Output file for this file
-		std::string strOutputFileCurrent;
-
-		// Log file needs closing
-		bool fCloseLogFile = false;
-
-		// Generate output file name
-		if (vecInputFiles.size() == 1) {
-			if (strOutputFile == "") {
-				strOutputFileCurrent = "out.nc";
-			} else {
-				strOutputFileCurrent = strOutputFile;
-			}
-
-		} else {
-			char szFileIndex[32];
-			sprintf(szFileIndex, "%06i", f);
-
-			if (vecOutputFiles.size() != 0) {
-				strOutputFileCurrent = vecOutputFiles[f];
-			} else {
-				if (strOutputFile == "") {
-					strOutputFileCurrent =
-						"out" + std::string(szFileIndex) + ".nc";
-				} else {
-					strOutputFileCurrent =
-						strOutputFile + std::string(szFileIndex) + ".nc";
-				}
-			}
-
-			std::string strLogFile = "log" + std::string(szFileIndex) + ".txt";
-
-/*
-#if defined(TEMPEST_MPIOMP)
-			fpLog = fopen(strLogFile.c_str(), "w");
-			if (fpLog == NULL) {
-				_EXCEPTION1("Unable to open log file \"%s\" for writing",
-					strLogFile.c_str());
-			}
-
-			AnnounceSetOutputBuffer(fpLog);
-			AnnounceOutputOnAllRanks();
-#endif
-*/
-		}
-
-		// Perform PersistentBlobs
-		PersistentBlobs(
-			vecInputFiles,
-			vecOutputFiles,
-			strConnectivity,
-			varreg,
-			pbparam);
-
-/*
-#if defined(TEMPEST_MPIOMP)
-		// Close the log file
-		if (fpLog != NULL) {
-			AnnounceSetOutputBuffer(stdout);
-			AnnounceOnlyOutputOnRankZero();
-			fclose(fpLog);
-		}
-#endif
-*/
-	}
+	// Perform PersistentBlobs
+	PersistentBlobs(
+		vecInputFiles,
+		vecOutputFiles,
+		strConnectivity,
+		varreg,
+		pbparam);
 
 	AnnounceEndBlock("Done");
 
