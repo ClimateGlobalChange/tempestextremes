@@ -30,6 +30,7 @@ public:
 	HeatWaveMetricsParam() :
 		iVerbosityLevel(0),
 		fRegional(false),
+		fSplitYears(false),
 		strTagVar("binary_tag"),
 		strTempVar("t2m"),
 		strLongitudeName("lon"),
@@ -42,6 +43,9 @@ public:
 
 	// Regional (do not wrap longitudinal boundaries)
 	bool fRegional;
+
+	// Split years
+	bool fSplitYears;
 
 	// Variable name for tags
 	std::string strTagVar;
@@ -144,6 +148,9 @@ void HeatWaveMetrics(
 	// Create accumulated intensity array
 	DataArray1D<double> dAccumIntensity(grid.GetSize());
 
+	// Current year
+	int nCurrentYear = (-1);
+
 	// Loop through all files
 	AnnounceStartBlock("Performing HeatWaveMetrics");
 	for (size_t f = 0; f < vecInputFiles.size(); f++) {
@@ -169,6 +176,25 @@ void HeatWaveMetrics(
 		// Read the time data
 		const NcTimeDimension & vecTimes = vecFiles.GetNcTimeDimension(0);
 
+		// Stop accumulating statistics if there is a change of year
+		if ((nCurrentYear != vecTimes[0].GetYear()) && (param.fSplitYears)) {
+			if (nCurrentYear == (-1)) {
+				nCurrentYear = vecTimes[0].GetYear();
+			} else {
+				for (size_t i = 0; i < dCount.GetRows(); i++) {
+					if (dAccumDuration[i] != 0) {
+						dCount[i] += 1.0;
+
+						dDuration[i] += dAccumDuration[i];
+						dIntensity[i] += dAccumIntensity[i];
+
+						dAccumDuration[i] = 0.0;
+						dAccumIntensity[i] = 0.0;
+					}
+				}
+			}
+		}
+
 		// Loop through all times
 		for (int t = 0; t < vecTimes.size(); t++) {
 
@@ -188,8 +214,10 @@ void HeatWaveMetrics(
 				if (dataTag[i] == 0) {
 					if (dAccumDuration[i] != 0) {
 						dCount[i] += 1.0;
+
 						dDuration[i] += dAccumDuration[i];
 						dIntensity[i] += dAccumIntensity[i];
+
 						dAccumDuration[i] = 0.0;
 						dAccumIntensity[i] = 0.0;
 					}
@@ -208,10 +236,10 @@ void HeatWaveMetrics(
 
 			dDuration[i] += dAccumDuration[i];
 			dIntensity[i] += dAccumIntensity[i];
-
-			dDuration[i] /= dCount[i];
-			dIntensity[i] /= dCount[i];
 		}
+
+		dDuration[i] /= dCount[i];
+		dIntensity[i] /= dCount[i];
 	}
 
 	AnnounceEndBlock("Done");
@@ -342,6 +370,7 @@ try {
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineString(strOutputFile, "out", "");
 		CommandLineBool(hwparam.fRegional, "regional");
+		CommandLineBool(hwparam.fSplitYears, "split_years");
 		CommandLineString(hwparam.strTagVar, "tagvar", "binary_tag");
 		CommandLineString(hwparam.strTempVar, "t2var", "t2");
 		CommandLineString(hwparam.strLongitudeName, "lonname", "lon");
