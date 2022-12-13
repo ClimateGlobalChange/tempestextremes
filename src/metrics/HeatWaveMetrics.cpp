@@ -125,14 +125,6 @@ void HeatWaveMetrics(
 			strOutputFile.c_str());
 	}
 
-	// Copy over latitude, longitude to output file
-	{
-		NcFile ncInput(vecInputFiles[0].c_str());
-
-		CopyNcVarIfExists(ncInput, ncOutput, param.strLatitudeName, true);
-		CopyNcVarIfExists(ncInput, ncOutput, param.strLongitudeName, true);
-	}
-
 	// Create count array
 	DataArray1D<double> dCount(grid.GetSize());
 
@@ -155,6 +147,8 @@ void HeatWaveMetrics(
 	AnnounceStartBlock("Performing HeatWaveMetrics");
 	for (size_t f = 0; f < vecInputFiles.size(); f++) {
 
+		Announce("Processing %s", vecInputFiles[f].c_str());
+
 		// Open the input file(s)
 		NcFileVector vecFiles;
 		vecFiles.ParseFromString(vecInputFiles[f]);
@@ -173,6 +167,12 @@ void HeatWaveMetrics(
 			}
 		}
 
+		// Copy over latitude and longitude
+		if (f == 0) {
+			CopyNcVarIfExists(*(vecFiles[0]), ncOutput, param.strLatitudeName, true);
+			CopyNcVarIfExists(*(vecFiles[0]), ncOutput, param.strLongitudeName, true);
+		}
+
 		// Read the time data
 		const NcTimeDimension & vecTimes = vecFiles.GetNcTimeDimension(0);
 
@@ -186,7 +186,7 @@ void HeatWaveMetrics(
 						dCount[i] += 1.0;
 
 						dDuration[i] += dAccumDuration[i];
-						dIntensity[i] += dAccumIntensity[i];
+						dIntensity[i] += dAccumIntensity[i] / dAccumDuration[i];
 
 						dAccumDuration[i] = 0.0;
 						dAccumIntensity[i] = 0.0;
@@ -216,7 +216,7 @@ void HeatWaveMetrics(
 						dCount[i] += 1.0;
 
 						dDuration[i] += dAccumDuration[i];
-						dIntensity[i] += dAccumIntensity[i];
+						dIntensity[i] += dAccumIntensity[i] / dAccumDuration[i];
 
 						dAccumDuration[i] = 0.0;
 						dAccumIntensity[i] = 0.0;
@@ -235,7 +235,7 @@ void HeatWaveMetrics(
 			dCount[i] += 1.0;
 
 			dDuration[i] += dAccumDuration[i];
-			dIntensity[i] += dAccumIntensity[i];
+			dIntensity[i] += dAccumIntensity[i] / dAccumDuration[i];
 		}
 
 		dDuration[i] /= dCount[i];
