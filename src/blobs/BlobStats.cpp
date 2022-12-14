@@ -60,7 +60,12 @@ public:
 		MeanLon,
 		CentroidLat,
 		CentroidLon,
-		Area
+		Area,
+		WtCentroidLat,
+		WtCentroidLon,
+		WtArea,
+		WtPCALength,
+		WtPCAWidth
 	};
 
 public:
@@ -74,8 +79,18 @@ public:
 		dAreaY(0.0),
 		dAreaZ(0.0),
 		dArea(0.0),
+		dWtAreaX(0.0),
+		dWtAreaY(0.0),
+		dWtAreaZ(0.0),
+		dWtArea(0.0),
+		dWtCentLonDeg(0.0),
+		dWtCentLatDeg(0.0),
 		dSumVars(sSumVarCount)
-	{ }
+	{
+		dCorrComp[0] = 0.0;
+		dCorrComp[1] = 0.0;
+		dCorrComp[2] = 0.0;
+	}
 
 public:
 	///	<summary>
@@ -102,6 +117,41 @@ public:
 	///		Total area of blob.
 	///	</summary>
 	double dArea;
+
+	///	<summary>
+	///		Area and variable-weighted 3D X coordinate.
+	///	</summary>
+	double dWtAreaX;
+
+	///	<summary>
+	///		Area and variable-weighted 3D Y coordinate.
+	///	</summary>
+	double dWtAreaY;
+
+	///	<summary>
+	///		Area and variable-weighted 3D Z coordinate.
+	///	</summary>
+	double dWtAreaZ;
+
+	///	<summary>
+	///		Variable-weighted area of blob.
+	///	</summary>
+	double dWtArea;
+
+	///	<summary>
+	///		Blob centroid longitude.
+	///	</summary>
+	double dWtCentLonDeg;
+
+	///	<summary>
+	///		Blob centroid latitude.
+	///	</summary>
+	double dWtCentLatDeg;
+
+	///	<summary>
+	///		Correlation matrix components.
+	///	</summary>
+	double dCorrComp[3];
 
 	///	<summary>
 	///		Array of sums associated with blob.
@@ -154,6 +204,9 @@ try {
 	// Variables to sum over
 	std::string strSumVariables;
 
+	// Variables to use in weighting
+	std::string strWeightVariable;
+
 	// Summary quantities
 	std::string strOutputQuantities;
 
@@ -183,6 +236,7 @@ try {
 		CommandLineString(strOutputFile, "out_file", "");
 		CommandLineString(strInputVariable, "var", "");
 		CommandLineString(strSumVariables, "sumvar", "");
+		CommandLineString(strWeightVariable, "wtvar", "");
 		CommandLineString(strOutputQuantities, "out", "");
 		CommandLineBool(fOutputHeaders, "out_headers");
 		CommandLineBool(fOutputFullTimes, "out_fulltime");
@@ -265,8 +319,8 @@ try {
 	}
 
 	// Parse the list of output quantities
+	bool fTwoPassCalculation = false;
 	std::vector<BlobQuantities::OutputQuantity> vecOutputVars;
-
 	{
 		// Parse output quantities and store in vecOutputVars
 		AnnounceStartBlock("Parsing output quantities");
@@ -302,10 +356,23 @@ try {
 					vecOutputVars[iNextOp] = BlobQuantities::CentroidLon;
 				} else if (strSubStr == "area") {
 					vecOutputVars[iNextOp] = BlobQuantities::Area;
+				} else if (strSubStr == "wtcentlat") {
+					vecOutputVars[iNextOp] = BlobQuantities::WtCentroidLat;
+				} else if (strSubStr == "wtcentlon") {
+					vecOutputVars[iNextOp] = BlobQuantities::WtCentroidLon;
+				} else if (strSubStr == "wtarea") {
+					vecOutputVars[iNextOp] = BlobQuantities::WtArea;
+				} else if (strSubStr == "wtpcawidth") {
+					vecOutputVars[iNextOp] = BlobQuantities::WtPCAWidth;
+					fTwoPassCalculation = true;
+				} else if (strSubStr == "wtpcalength") {
+					vecOutputVars[iNextOp] = BlobQuantities::WtPCALength;
+					fTwoPassCalculation = true;
 				} else {
 					_EXCEPTIONT("Invalid output quantity:  Expected\n"
 						"[minlat, maxlat, minlon, maxlon, meanlat, meanlon,"
-						"centlat, centlon, area]");
+						" centlat, centlon, wtarea, wtcentlat, wtcentlon,"
+						" wtpcawidth, wtpcalength, area]");
 				}
 
 				iLast = i + 1;
@@ -343,6 +410,12 @@ try {
 		}
 	}
 	_ASSERT(vecSumVarNames.size() == vecSumVarIx.size());
+
+	// Parse --wtvar argument
+	VariableIndex varixWeight = InvalidVariableIndex;
+	if (strWeightVariable != "") {
+		varixWeight = varreg.FindOrRegister(strWeightVariable);
+	}
 
 	// Time index across all files
 	int iTime = 0;
@@ -391,6 +464,12 @@ try {
 		// Load in indicator variable and validate
 		Variable & varBlobTag = varreg.Get(varixBlobTag);
 
+		// Load in indicator variable and validate
+		Variable * pvarWeight = NULL;
+		if (varixWeight != InvalidVariableIndex) {
+			pvarWeight = &(varreg.Get(varixWeight));
+		}
+
 		// Blob index data
 		DataArray1D<int> dataIndex(grid.GetSize());
 
@@ -436,6 +515,14 @@ try {
 			varBlobTag.LoadGridData(varreg, vecInFiles, grid);
 			DataArray1D<float> & dataIndex = varBlobTag.GetData();
 			_ASSERT(dataIndex.GetRows() == grid.GetSize());
+
+			// Load in the weight data (if specified)
+			DataArray1D<float> * pdataWeight = NULL;
+			if (pvarWeight != NULL) {
+				pvarWeight->LoadGridData(varreg, vecInFiles, grid);
+				pdataWeight = &(pvarWeight->GetData());
+				_ASSERT(pdataWeight->GetRows() == grid.GetSize());
+			}
 
 			// If --findblobs then assign blob indices
 			if (fFindBlobs) {
@@ -565,9 +652,105 @@ try {
 				bq.dAreaY += dY * grid.m_dArea[i];
 				bq.dAreaZ += dZ * grid.m_dArea[i];
 
+				// Add area and variable-weighted 3D coordinates
+				if (pdataWeight != NULL) {
+					double dWt = grid.m_dArea[i] * (*pdataWeight)[i];
+					bq.dWtArea += dWt;
+					bq.dWtAreaX += dX * dWt;
+					bq.dWtAreaY += dY * dWt;
+					bq.dWtAreaZ += dZ * dWt;
+				}
+
 				// Add sum variables
 				for (int v = 0; v < vecSumVarIx.size(); v++) {
 					bq.dSumVars[v] += static_cast<double>((*(vecSumVarData[v]))[i]) * grid.m_dArea[i] * EarthRadius * EarthRadius;
+				}
+			}
+
+			// Calculate weighted centroid
+			if (pdataWeight != NULL) {
+				for (auto & iterTimedBlobQuantities : mapAllQuantities) {
+					auto iterBlobQuantities = iterTimedBlobQuantities.second.find(iTime);
+
+					if (iterBlobQuantities != iterTimedBlobQuantities.second.end()) {
+						BlobQuantities & bq = iterBlobQuantities->second;
+
+						bq.dWtAreaX /= bq.dWtArea;
+						bq.dWtAreaY /= bq.dWtArea;
+						bq.dWtAreaZ /= bq.dWtArea;
+
+						double dMag = sqrt(
+							  bq.dWtAreaX * bq.dWtAreaX
+							+ bq.dWtAreaY * bq.dWtAreaY
+							+ bq.dWtAreaZ * bq.dWtAreaZ);
+
+						bq.dWtAreaX /= dMag;
+						bq.dWtAreaY /= dMag;
+						bq.dWtAreaZ /= dMag;
+
+						XYZtoRLL_Deg(bq.dWtAreaX, bq.dWtAreaY, bq.dWtAreaZ, bq.dWtCentLonDeg, bq.dWtCentLatDeg);
+						//printf("%i %i %1.5f %1.5f\n", iterTimedBlobQuantities.first, iTime, bq.dWtCentLonDeg, bq.dWtCentLatDeg);
+					}
+				}
+			}
+
+			// If a two-pass calculation is needed then loop through all locations again
+			if (fTwoPassCalculation) {
+				for (int i = 0; i < grid.GetSize(); i++) {
+
+					// Ignore non-blob data
+					if (dataIndex[i] == 0) {
+						continue;
+					}
+
+					// Check if iterator already points to correct data
+					if (dataIndex[i] != iLastDataIndex) {
+
+						// Iterator to TimedBlobQuantities with iLastDataIndex
+						AllTimedBlobQuantitiesMap::iterator
+							iterTimedBlobQuantities;
+
+						// Get new iterator for this dataIndex
+						iterTimedBlobQuantities =
+							mapAllQuantities.find(
+								dataIndex[i]);
+
+						_ASSERT(iterTimedBlobQuantities != mapAllQuantities.end());
+
+						// Get the BlobQuantities at the current time
+						TimedBlobQuantitiesMap & mapTimedBlobQuantities =
+							iterTimedBlobQuantities->second;
+
+						iterBlobQuantities =
+							mapTimedBlobQuantities.find(iTime);
+
+						_ASSERT(iterBlobQuantities != mapTimedBlobQuantities.end());
+
+						// Update last data index
+						iLastDataIndex = dataIndex[i];
+					}
+
+					// Associated BlobQuantities
+					BlobQuantities & bq = iterBlobQuantities->second;
+
+					// Correlation matrix components
+					//double dXs = DegToRad(bq.dWtCentLonDeg) - grid.m_dLon[i];
+					//double dYs = DegToRad(bq.dWtCentLatDeg) - grid.m_dLat[i];
+
+					double dXs;
+					double dYs;
+					StereographicProjection(
+						DegToRad(bq.dWtCentLonDeg), DegToRad(bq.dWtCentLatDeg),
+						grid.m_dLon[i], grid.m_dLat[i],
+						dXs, dYs);
+
+					//printf("%1.5f %1.5f\n", dXs, dYs);
+
+					double dWt = grid.m_dArea[i] * (*pdataWeight)[i];
+
+					bq.dCorrComp[0] += dWt * dXs * dXs;
+					bq.dCorrComp[1] += dWt * dXs * dYs;
+					bq.dCorrComp[2] += dWt * dYs * dYs;
 				}
 			}
 		}
@@ -605,36 +788,56 @@ try {
 						fprintf(fpout, "%i", iterTimes->first);
 					}
 
-					BlobQuantities & quants = iterTimes->second;
+					// BlobQuantities for this blob at this timestep
+					BlobQuantities & bq = iterTimes->second;
+
+					// Bounding box coordinates
+					double dLatDeg0 = RadToDeg(bq.box.lat[0]);
+					double dLatDeg1 = RadToDeg(bq.box.lat[1]);
+					double dLonDeg0 = RadToDeg(bq.box.lon[0]);
+					double dLonDeg1 = RadToDeg(bq.box.lon[1]);
+
+					// Calculate centroid
+					double dCentX = bq.dAreaX / bq.dArea;
+					double dCentY = bq.dAreaY / bq.dArea;
+					double dCentZ = bq.dAreaZ / bq.dArea;
+
+					double dCentMag =
+						sqrt(dCentX * dCentX + dCentY * dCentY + dCentZ * dCentZ);
+
+					if (dCentMag == 0.0) {
+						dCentX = 0.0;
+						dCentY = 0.0;
+						dCentZ = 1.0;
+					} else {
+						dCentX /= dCentMag;
+						dCentY /= dCentMag;
+						dCentZ /= dCentMag;
+					}
+
+					double dCentLonDeg;
+					double dCentLatDeg;
+					XYZtoRLL_Deg(dCentX, dCentY, dCentZ, dCentLonDeg, dCentLatDeg);
+
+					// Length and width using PCA method
+					double dWtPCAWidthDeg = 0.0;
+					double dWtPCALengthDeg = 0.0;
+					if (bq.dCorrComp[0] != 0.0) {
+						double dCorrComp0 = bq.dCorrComp[0] / bq.dWtArea;
+						double dCorrComp1 = bq.dCorrComp[1] / bq.dWtArea;
+						double dCorrComp2 = bq.dCorrComp[2] / bq.dWtArea;
+
+						double dDisc = dCorrComp0 - dCorrComp2;
+						dDisc = sqrt(4.0 * dCorrComp1 * dCorrComp1 + dDisc * dDisc);
+						dWtPCALengthDeg = sqrt(0.5 * (dCorrComp0 + dCorrComp2 + dDisc));
+						dWtPCAWidthDeg = sqrt(0.5 * (dCorrComp0 + dCorrComp2 - dDisc));
+
+						dWtPCALengthDeg = RadToDeg(2.0 * atan(dWtPCALengthDeg));
+						dWtPCAWidthDeg = RadToDeg(2.0 * atan(dWtPCAWidthDeg));
+					}
+
+					// Write standard outputs
 					for (int i = 0; i < vecOutputVars.size(); i++) {
-
-						// Bounding box coordinates
-						double dLatDeg0 = RadToDeg(quants.box.lat[0]);
-						double dLatDeg1 = RadToDeg(quants.box.lat[1]);
-						double dLonDeg0 = RadToDeg(quants.box.lon[0]);
-						double dLonDeg1 = RadToDeg(quants.box.lon[1]);
-
-						// Calculate centroid
-						double dCentX = quants.dAreaX / quants.dArea;
-						double dCentY = quants.dAreaY / quants.dArea;
-						double dCentZ = quants.dAreaZ / quants.dArea;
-
-						double dCentMag =
-							sqrt(dCentX * dCentX + dCentY * dCentY + dCentZ * dCentZ);
-
-						if (dCentMag == 0.0) {
-							dCentX = 0.0;
-							dCentY = 0.0;
-							dCentZ = 1.0;
-						} else {
-							dCentX /= dCentMag;
-							dCentY /= dCentMag;
-							dCentZ /= dCentMag;
-						}
-
-						double dCentLonDeg;
-						double dCentLatDeg;
-						XYZtoRLL_Deg(dCentX, dCentY, dCentZ, dCentLonDeg, dCentLatDeg);
 
 						// Minimum latitude
 						if (vecOutputVars[i] == BlobQuantities::MinLat) {
@@ -690,13 +893,38 @@ try {
 
 						// Area
 						if (vecOutputVars[i] == BlobQuantities::Area) {
-							fprintf(fpout, "\t%1.6e", quants.dArea * EarthRadius * EarthRadius);
+							fprintf(fpout, "\t%1.6e", bq.dArea * EarthRadius * EarthRadius);
+						}
+
+						// Weighted area
+						if (vecOutputVars[i] == BlobQuantities::WtArea) {
+							fprintf(fpout, "\t%1.6e", bq.dWtArea * EarthRadius * EarthRadius);
+						}
+
+						// Weighted centroid latitude
+						if (vecOutputVars[i] == BlobQuantities::WtCentroidLat) {
+							fprintf(fpout, "\t%1.6f", bq.dWtCentLatDeg);
+						}
+
+						// Weighted centroid longitude
+						if (vecOutputVars[i] == BlobQuantities::WtCentroidLon) {
+							fprintf(fpout, "\t%1.6f", bq.dWtCentLonDeg);
+						}
+
+						// Weighted Width
+						if (vecOutputVars[i] == BlobQuantities::WtPCAWidth) {
+							fprintf(fpout, "\t%1.6f", dWtPCAWidthDeg);
+						}
+
+						// Weighted Length
+						if (vecOutputVars[i] == BlobQuantities::WtPCALength) {
+							fprintf(fpout, "\t%1.6f", dWtPCALengthDeg);
 						}
 					}
 
 					// Sum variables
-					for (int v = 0; v < quants.dSumVars.size(); v++) {
-						fprintf(fpout,"\t%1.6e", quants.dSumVars[v]);
+					for (int v = 0; v < bq.dSumVars.size(); v++) {
+						fprintf(fpout,"\t%1.6e", bq.dSumVars[v]);
 					}
 
 					// Endline
