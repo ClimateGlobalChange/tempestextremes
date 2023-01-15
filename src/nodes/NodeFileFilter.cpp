@@ -912,6 +912,10 @@ void NodeFileFilter(
 				dimNcVarOut1
 			);
 		}
+
+		if (varMask == NULL) {
+			_EXCEPTION1("Unable to add variable \"%s\" to output file", strMaskVariable.c_str());
+		}
 	}
 
 	// Loop through all times

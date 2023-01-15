@@ -98,6 +98,26 @@ public:
 	);
 
 	///	<summary>
+	///		Get the latitude name, variable and dimension from a NcFile.
+	///	</summary>
+	void GetLatitudeFromNcFile(
+		NcFile * ncFile,
+		std::string & strLatitudeName,
+		NcVar ** pvarLat,
+		NcDim ** pdimLat
+	);
+
+	///	<summary>
+	///		Get the latitude name, variable and dimension from a NcFile.
+	///	</summary>
+	void GetLongitudeFromNcFile(
+		NcFile * ncFile,
+		std::string & strLongitudeName,
+		NcVar ** pvarLon,
+		NcDim ** pdimLon
+	);
+
+	///	<summary>
 	///		Generate the unstructured grid information for a
 	///		longitude-latitude grid.
 	///	</summary>
@@ -115,8 +135,8 @@ public:
 	///	</summary>
 	void GenerateLatitudeLongitude(
 		NcFile * ncFile,
-		const std::string & strLatitudeName,
-		const std::string & strLongitudeName,
+		std::string & strLatitudeName,
+		std::string & strLongitudeName,
 		bool fRegional,
 		bool fDiagonalConnectivity
 	);

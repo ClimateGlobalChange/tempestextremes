@@ -1134,6 +1134,10 @@ void DetectBlobs(
 	NcFileVector vecFiles;
 	vecFiles.ParseFromString(strInputFiles);
 
+	// Latitude/longitude names
+	std::string strLatitudeName(param.strLatitudeName);
+	std::string strLongitudeName(param.strLongitudeName);
+
 	// Check for connectivity file
 	if (strConnectivity != "") {
 		AnnounceStartBlock("Generating grid information from connectivity file");
@@ -1147,8 +1151,8 @@ void DetectBlobs(
 
 		grid.GenerateLatitudeLongitude(
 			vecFiles[0],
-			param.strLatitudeName,
-			param.strLongitudeName,
+			strLatitudeName,
+			strLongitudeName,
 			param.fRegional,
 			param.fDiagonalConnectivity);
 
@@ -1157,64 +1161,6 @@ void DetectBlobs(
 		}
 		AnnounceEndBlock("Done");
 	}
-/*
-	// Check for connectivity file
-	if (strConnectivity != "") {
-		grid.FromFile(strConnectivity);
-
-	// No connectivity file; check for latitude/longitude dimension
-	} else {
-
-		// Get the longitude dimension
-		NcDim * dimLon = vecFiles[0]->get_dim(param.strLongitudeName.c_str());
-		if (dimLon == NULL) {
-			_EXCEPTION1("Error accessing dimension \"%s\"", param.strLongitudeName.c_str());
-		}
-
-		// Get the longitude variable
-		NcVar * varLon = vecFiles[0]->get_var(param.strLongitudeName.c_str());
-		if (varLon == NULL) {
-			_EXCEPTION1("Error accessing variable \"%s\"", param.strLongitudeName.c_str());
-		}
-
-		// Get the latitude dimension
-		NcDim * dimLat = vecFiles[0]->get_dim(param.strLatitudeName.c_str());
-		if (dimLat == NULL) {
-			_EXCEPTION1("Error accessing dimension \"%s\"", param.strLatitudeName.c_str());
-		}
-
-		// Get the latitude variable
-		NcVar * varLat = vecFiles[0]->get_var(param.strLatitudeName.c_str());
-		if (varLat == NULL) {
-			_EXCEPTION1("Error accessing variable \"%s\"", param.strLatitudeName.c_str());
-		}
-
-		int nLat = dimLat->size();
-		int nLon = dimLon->size();
-
-		DataArray1D<double> vecLat(nLat);
-		varLat->get(vecLat, nLat);
-
-		for (int j = 0; j < nLat; j++) {
-			vecLat[j] *= M_PI / 180.0;
-		}
-
-		DataArray1D<double> vecLon(nLon);
-		varLon->get(vecLon, nLon);
-
-		for (int i = 0; i < nLon; i++) {
-			vecLon[i] *= M_PI / 180.0;
-		}
-
-		// Generate the SimpleGrid
-		grid.GenerateLatitudeLongitude(
-			vecLat,
-			vecLon,
-			param.fRegional,
-			param.fDiagonalConnectivity,
-			true);
-	}
-*/
 
 	// Get time dimension
 	NcVar * varTime = vecFiles[0]->get_var("time");
@@ -1229,45 +1175,7 @@ void DetectBlobs(
 				vecFiles.GetFilename(0).c_str());
 		}
 	}
-/*
-	int nTime = 1;
-	if (dimTime != NULL) {
-		nTime = dimTime->size();
-	}
 
-	DataArray1D<double> dTime(nTime);
-
-	if (varTime != NULL) {
-		if (varTime->type() == ncDouble) {
-			varTime->get(dTime, nTime);
-
-		} else if (varTime->type() == ncFloat) {
-			DataArray1D<float> dTimeFloat(nTime);
-
-			varTime->get(dTimeFloat, nTime);
-			for (int t = 0; t < nTime; t++) {
-				dTime[t] = static_cast<double>(dTimeFloat[t]);
-			}
-
-		} else if (varTime->type() == ncInt) {
-			DataArray1D<int> dTimeInt(nTime);
-
-			varTime->get(dTimeInt, nTime);
-			for (int t = 0; t < nTime; t++) {
-				dTime[t] = static_cast<double>(dTimeInt[t]);
-			}
-
-		} else {
-			_EXCEPTIONT("Variable \"time\" has an invalid type:\n"
-				"Expected \"float\", \"double\" or \"int\"");
-		}
-
-	} else {
-		for (int t = 0; t < nTime; t++) {
-			dTime[t] = static_cast<double>(t);
-		}
-	}
-*/
 	// Read the time data
 	const NcTimeDimension & vecTimes = vecFiles.GetNcTimeDimension(0);
 
@@ -1353,8 +1261,8 @@ void DetectBlobs(
 		strOutputFile,
 		grid,
 		param.strTagVar,
-		param.strLatitudeName,
-		param.strLongitudeName,
+		strLatitudeName,
+		strLongitudeName,
 		(param.fOutFloat)?(ncFloat):(ncByte),
 		dimTimeOut,
 		&dim0,

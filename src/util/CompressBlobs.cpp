@@ -32,8 +32,8 @@ void Compress(
 	const std::string & strBlobVar,
 	const std::string & strOutputData,
 	bool fRegional,
-	const std::string & strLatitudeName,
-	const std::string & strLongitudeName
+	std::string & strLatitudeName,
+	std::string & strLongitudeName
 ) {
 	AnnounceBanner();
 
@@ -241,8 +241,8 @@ void Compress2(
 	const std::string & strBlobVar,
 	const std::string & strOutputData,
 	bool fRegional,
-	const std::string & strLatitudeName,
-	const std::string & strLongitudeName
+	std::string & strLatitudeName,
+	std::string & strLongitudeName
 ) {
 	AnnounceBanner();
 

@@ -350,6 +350,9 @@ void PersistentBlobs(
 	// Define the SimpleGrid
 	SimpleGrid grid;
 
+	std::string strLatitudeName(param.strLatitudeName);
+	std::string strLongitudeName(param.strLongitudeName);
+
 	{
 		// Load in the benchmark file
 		NcFileVector vecFiles;
@@ -368,8 +371,8 @@ void PersistentBlobs(
 
 			grid.GenerateLatitudeLongitude(
 				vecFiles[0],
-				param.strLatitudeName,
-				param.strLongitudeName,
+				strLatitudeName,
+				strLongitudeName,
 				param.fRegional,
 				false);
 
@@ -483,8 +486,8 @@ void PersistentBlobs(
 			vecOutputFiles[f],
 			grid,
 			param.strTagVar,
-			param.strLatitudeName,
-			param.strLongitudeName,
+			strLatitudeName,
+			strLongitudeName,
 			(param.fOutFloat)?(ncFloat):(ncByte),
 			dimTimeOut,
 			&dim0,

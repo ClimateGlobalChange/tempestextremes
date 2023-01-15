@@ -494,6 +494,10 @@ void DetectCyclonesUnstructured(
 	NcFileVector vecFiles;
 	vecFiles.ParseFromString(strInputFiles);
 
+	// Latitude/longitude name
+	std::string strLatitudeName(param.strLatitudeName);
+	std::string strLongitudeName(param.strLongitudeName);
+
 	// Check for connectivity file
 	if (strConnectivity != "") {
 		AnnounceStartBlock("Loading grid data from connectivity file");
@@ -507,8 +511,8 @@ void DetectCyclonesUnstructured(
 		AnnounceStartBlock("Generating RLL grid data");
 		grid.GenerateLatitudeLongitude(
 			vecFiles[0],
-			param.strLatitudeName,
-			param.strLongitudeName,
+			strLatitudeName,
+			strLongitudeName,
 			param.fRegional,
 			param.fDiagonalConnectivity);
 		AnnounceEndBlock("Done");

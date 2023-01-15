@@ -150,6 +150,94 @@ void SimpleGrid::GenerateRectilinearConnectivity(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void SimpleGrid::GetLatitudeFromNcFile(
+	NcFile * ncFile,
+	std::string & strLatitudeName,
+	NcVar ** pvarLat,
+	NcDim ** pdimLat
+) {
+	_ASSERT(ncFile != NULL);
+	_ASSERT(pvarLat != NULL);
+	_ASSERT(pdimLat != NULL);
+
+	std::vector<std::string> vecLatitudeNames;
+	if (strLatitudeName == "[auto]") {
+		vecLatitudeNames.push_back("lat");
+		vecLatitudeNames.push_back("latitude");
+		vecLatitudeNames.push_back("LAT");
+		vecLatitudeNames.push_back("latitude0");
+		vecLatitudeNames.push_back("Latitude");
+		vecLatitudeNames.push_back("XLAT");
+	} else {
+		vecLatitudeNames.push_back(strLatitudeName);
+	}
+
+	size_t sLatIx = NcGetVarFromList(*ncFile, vecLatitudeNames, pvarLat, pdimLat);
+	if (sLatIx == vecLatitudeNames.size()) {
+		_EXCEPTION1("No variable %s found in input file",
+			STLStringHelper::ConcatenateStringVector(vecLatitudeNames, ", ").c_str());
+	}
+
+	if (((*pvarLat)->num_dims() < 1) || ((*pvarLat)->num_dims() > 2)) {
+		_EXCEPTION1("In NetCDF file latitude variable \"%s\" must have either one or two dimensions",
+			(*pvarLat)->name());
+
+	} else if ((*pvarLat)->num_dims() == 1) {
+		if ((*pdimLat) == NULL) {
+			_EXCEPTION1("In NetCDF file 1D latitude variable \"%s\" must have dimension with same name",
+				(*pvarLat)->name());
+		}
+	}
+
+	strLatitudeName = vecLatitudeNames[sLatIx];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void SimpleGrid::GetLongitudeFromNcFile(
+	NcFile * ncFile,
+	std::string & strLongitudeName,
+	NcVar ** pvarLon,
+	NcDim ** pdimLon
+) {
+	_ASSERT(ncFile != NULL);
+	_ASSERT(pvarLon != NULL);
+	_ASSERT(pdimLon != NULL);
+
+	std::vector<std::string> vecLongitudeNames;
+	if (strLongitudeName == "[auto]") {
+		vecLongitudeNames.push_back("lon");
+		vecLongitudeNames.push_back("longitude");
+		vecLongitudeNames.push_back("LON");
+		vecLongitudeNames.push_back("longitude0");
+		vecLongitudeNames.push_back("Longitude");
+		vecLongitudeNames.push_back("XLONG");
+	} else {
+		vecLongitudeNames.push_back(strLongitudeName);
+	}
+
+	size_t sLonIx = NcGetVarFromList(*ncFile, vecLongitudeNames, pvarLon, pdimLon);
+	if (sLonIx == vecLongitudeNames.size()) {
+		_EXCEPTION1("No variable %s found in input file",
+			STLStringHelper::ConcatenateStringVector(vecLongitudeNames, ", ").c_str());
+	}
+
+	if (((*pvarLon)->num_dims() < 1) || ((*pvarLon)->num_dims() > 2)) {
+		_EXCEPTION1("In NetCDF file longitude variable \"%s\" must have either one or two dimensions",
+			(*pvarLon)->name());
+
+	} else if ((*pvarLon)->num_dims() == 1) {
+		if ((*pdimLon) == NULL) {
+			_EXCEPTION1("In NetCDF file 1D longitude variable \"%s\" must have dimension with same name",
+				(*pvarLon)->name());
+		}
+	}
+
+	strLongitudeName = vecLongitudeNames[sLonIx];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void SimpleGrid::GenerateLatitudeLongitude(
 	const DataArray1D<double> & vecLat,
 	const DataArray1D<double> & vecLon,
@@ -318,8 +406,8 @@ void SimpleGrid::GenerateLatitudeLongitude(
 
 void SimpleGrid::GenerateLatitudeLongitude(
 	NcFile * ncFile,
-	const std::string & strLatitudeName,
-	const std::string & strLongitudeName,
+	std::string & strLatitudeName,
+	std::string & strLongitudeName,
 	bool fRegional,
 	bool fDiagonalConnectivity
 ) {
@@ -329,69 +417,14 @@ void SimpleGrid::GenerateLatitudeLongitude(
 		_EXCEPTIONT("Attempting to call GenerateLatitudeLongitude() on previously initialized grid");
 	}
 
-	// Load latitude variable
+	// Load latitude and longitude variables
 	NcVar * varLat;
 	NcDim * dimLat;
+	GetLatitudeFromNcFile(ncFile, strLatitudeName, &varLat, &dimLat);
 
-	std::vector<std::string> vecLatitudeNames;
-	if (strLatitudeName == std::string("[auto]")) {
-		vecLatitudeNames.push_back("lat");
-		vecLatitudeNames.push_back("latitude");
-		vecLatitudeNames.push_back("LAT");
-		vecLatitudeNames.push_back("latitude0");
-		vecLatitudeNames.push_back("Latitude");
-		vecLatitudeNames.push_back("XLAT");
-	} else {
-		vecLatitudeNames.push_back(strLatitudeName);
-	}
-
-	size_t sLatIx = NcGetVarFromList(*ncFile, vecLatitudeNames, &varLat, &dimLat);
-	if (sLatIx == vecLatitudeNames.size()) {
-		_EXCEPTION1("No variable %s found in input file",
-			STLStringHelper::ConcatenateStringVector(vecLatitudeNames, ", ").c_str());
-	}
-	if ((varLat->num_dims() < 1) || (varLat->num_dims() > 2)) {
-		_EXCEPTION1("In NetCDF file latitude variable \"%s\" must have either one or two dimensions",
-			varLat->name());
-
-	} else if (varLat->num_dims() == 1) {
-		if (dimLat == NULL) {
-			_EXCEPTION1("In NetCDF file latitude variable \"%s\" must have dimension with same name",
-				varLat->name());
-		}
-	}
-
-	// Load longitude variable
 	NcVar * varLon;
 	NcDim * dimLon;
-
-	std::vector<std::string> vecLongitudeNames;
-	if (strLatitudeName == std::string("[auto]")) {
-		vecLongitudeNames.push_back("lon");
-		vecLongitudeNames.push_back("longitude");
-		vecLongitudeNames.push_back("LON");
-		vecLongitudeNames.push_back("longitude0");
-		vecLongitudeNames.push_back("Longitude");
-		vecLongitudeNames.push_back("XLONG");
-	} else {
-		vecLongitudeNames.push_back(strLongitudeName);
-	}
-
-	size_t sLonIx = NcGetVarFromList(*ncFile, vecLongitudeNames, &varLon, &dimLon);
-	if (sLonIx == vecLatitudeNames.size()) {
-		_EXCEPTION1("No variable %s found in input file",
-			STLStringHelper::ConcatenateStringVector(vecLatitudeNames, ", ").c_str());
-	}
-	if ((varLon->num_dims() < 1) || (varLon->num_dims() > 2)) {
-		_EXCEPTION1("In NetCDF file longitude variable \"%s\" must have either one or two dimensions",
-			varLon->name());
-
-	} else if (varLon->num_dims() == 1) {
-		if (dimLon == NULL) {
-			_EXCEPTION1("In NetCDF file longitude variable \"%s\" must have dimension with same name",
-				varLon->name());
-		}
-	}
+	GetLongitudeFromNcFile(ncFile, strLongitudeName, &varLon, &dimLon);
 
 	if (varLat->num_dims() != varLon->num_dims()) {
 		_EXCEPTION2("Latitude variable \"%s\" and longitude variable \"%s\" must have same number of dimensions",
@@ -517,11 +550,14 @@ void SimpleGrid::GenerateLatitudeLongitude(
 	bool fRegional,
 	bool fDiagonalConnectivity
 ) {
+	std::string strLatitudeName("lat");
+	std::string strLongitudeName("lon");
+
 	return
 		GenerateLatitudeLongitude(
 			ncFile,
-			"lat",
-			"lon",
+			strLatitudeName,
+			strLongitudeName,
 			fRegional,
 			fDiagonalConnectivity);
 }

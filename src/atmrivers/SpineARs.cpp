@@ -686,11 +686,15 @@ void SpineARs(
 
 	// Define the SimpleGrid
 	SimpleGrid grid;
+
+	std::string strLatitudeName(param.strLatitudeName);
+	std::string strLongitudeName(param.strLongitudeName);
+
 	if (fVerbose) AnnounceStartBlock("Generating RLL grid data");
 	grid.GenerateLatitudeLongitude(
 		vecFiles[0],
-		param.strLatitudeName,
-		param.strLongitudeName,
+		strLatitudeName,
+		strLongitudeName,
 		param.fRegional,
 		false); // No diagonal connectivity
 	if (fVerbose) AnnounceEndBlock("Done");
@@ -722,15 +726,15 @@ void SpineARs(
 	}
 
 	// Get the latitude dimension
-	NcDim * dimLat = vecFiles[0]->get_dim(param.strLatitudeName.c_str());
+	NcDim * dimLat = vecFiles[0]->get_dim(strLatitudeName.c_str());
 	if (dimLat == NULL) {
-		_EXCEPTION1("Error accessing dimension \"%s\"", param.strLatitudeName.c_str());
+		_EXCEPTION1("Error accessing dimension \"%s\"", strLatitudeName.c_str());
 	}
 
 	// Get the latitude variable
-	NcVar * varLat = vecFiles[0]->get_var(param.strLatitudeName.c_str());
+	NcVar * varLat = vecFiles[0]->get_var(strLatitudeName.c_str());
 	if (varLat == NULL) {
-		_EXCEPTION1("Error accessing variable \"%s\"", param.strLatitudeName.c_str());
+		_EXCEPTION1("Error accessing variable \"%s\"", strLatitudeName.c_str());
 	}
 
 	DataArray1D<double> dLatDeg(dimLat->size());
@@ -790,18 +794,18 @@ void SpineARs(
 		varTimeOut->add_att("standard_name", "time");
 	}
 
-	CopyNcVar(*(vecFiles[0]), ncOutput, param.strLatitudeName.c_str(), true);
-	CopyNcVar(*(vecFiles[0]), ncOutput, param.strLongitudeName.c_str(), true);
+	CopyNcVar(*(vecFiles[0]), ncOutput, strLatitudeName.c_str(), true);
+	CopyNcVar(*(vecFiles[0]), ncOutput, strLongitudeName.c_str(), true);
 
-	NcDim * dimLonOut = ncOutput.get_dim(param.strLongitudeName.c_str());
+	NcDim * dimLonOut = ncOutput.get_dim(strLongitudeName.c_str());
 	if (dimLonOut == NULL) {
 		_EXCEPTION1("Error copying variable \"%s\" to output file",
-			param.strLongitudeName.c_str());
+			strLongitudeName.c_str());
 	}
-	NcDim * dimLatOut = ncOutput.get_dim(param.strLatitudeName.c_str());
+	NcDim * dimLatOut = ncOutput.get_dim(strLatitudeName.c_str());
 	if (dimLatOut == NULL) {
 		_EXCEPTION1("Error copying variable \"%s\" to output file",
-			param.strLatitudeName.c_str());
+			strLatitudeName.c_str());
 	}
 
 	// Tagged cell array
