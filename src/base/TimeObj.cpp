@@ -1047,6 +1047,16 @@ void Time::FromCFCompliantUnitsOffsetInt(
 
 		AddMinutes(nOffset);
 
+	// Time format is "seconds since ..."
+	} else if (
+	    (strFormattedTime.length() >= 14) &&
+	    (strncmp(strFormattedTime.c_str(), "seconds since ", 14) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(14);
+		FromFormattedString(strSubStr);
+
+		AddSeconds(nOffset);
+
 	} else {
 		_EXCEPTIONT("Unknown \"time::units\" format");
 	}
@@ -1097,6 +1107,20 @@ void Time::FromCFCompliantUnitsOffsetDouble(
 		AddMinutes(nMinutes);
 
 		int nSeconds = static_cast<int>(fmod(dOffset, 1.0) * 60.0);
+		AddSeconds(nSeconds);
+
+	// Time format is "seconds since ..."
+	} else if (
+	    (strFormattedTime.length() >= 14) &&
+	    (strncmp(strFormattedTime.c_str(), "seconds since ", 14) == 0)
+	) {
+		std::string strSubStr = strFormattedTime.substr(14);
+		FromFormattedString(strSubStr);
+
+		int nDays = static_cast<int>(dOffset / 86400.0);
+		AddDays(nDays);
+
+		int nSeconds = static_cast<int>(fmod(dOffset, 86400.0));
 		AddSeconds(nSeconds);
 
 	// Time format is "day as %Y%m%d.%f"
@@ -1157,6 +1181,17 @@ double Time::GetCFCompliantUnitsOffsetDouble(
 		timeBuf.FromFormattedString(strSubStr);
 
 		return timeBuf.DeltaMinutes(*this);
+
+	// Time format is "seconds since ..."
+	} else if (
+	    (strFormattedTime.length() >= 14) &&
+	    (strncmp(strFormattedTime.c_str(), "seconds since ", 14) == 0)
+	) {
+		Time timeBuf(m_eCalendarType);
+		std::string strSubStr = strFormattedTime.substr(14);
+		timeBuf.FromFormattedString(strSubStr);
+
+		return timeBuf.DeltaSeconds(*this);
 
 	// Time format is "day as %Y%m%d.%f"
 	} else if (
