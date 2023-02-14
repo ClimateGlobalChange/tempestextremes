@@ -990,6 +990,7 @@ public:
 	///		Constructor.
 	///	</summary>
 	DetectBlobsParam() :
+		strGridFile(),
 		dMinAbsLat(0.0),
 		dMaxAbsLat(90.0),
 		dMinLat(-90.0),
@@ -1011,6 +1012,9 @@ public:
 	{ }
 
 public:
+	// Grid file
+	std::string strGridFile;
+
 	// Minimum absolute latitude (in degrees)
 	double dMinAbsLat;
 
@@ -1138,13 +1142,31 @@ void DetectBlobs(
 	std::string strLatitudeName(param.strLatitudeName);
 	std::string strLongitudeName(param.strLongitudeName);
 
+	NcFile * pncGridFile = NULL;
+
 	// Check for connectivity file
 	if (strConnectivity != "") {
 		AnnounceStartBlock("Generating grid information from connectivity file");
 		grid.FromFile(strConnectivity);
 		AnnounceEndBlock("Done");
 
-	// No connectivity file; check for latitude/longitude dimension
+	// No connectivity file; check for grid file
+	} else if (param.strGridFile != "") {
+		AnnounceStartBlock("Generating grid information from grid file");
+		pncGridFile = new NcFile(param.strGridFile.c_str());
+		if ((pncGridFile == NULL) || (!pncGridFile->is_valid())) {
+			_EXCEPTION1("Unable to open grid file \"%s\"", param.strGridFile.c_str());
+		}
+
+		grid.GenerateLatitudeLongitude(
+			pncGridFile,
+			strLatitudeName,
+			strLongitudeName,
+			param.fRegional,
+			param.fDiagonalConnectivity);
+		AnnounceEndBlock("Done");
+
+	// Try generating grid information from data file
 	} else {
 		AnnounceStartBlock("No connectivity file specified");
 		Announce("Attempting to generate latitude-longitude grid from data file");
@@ -1256,7 +1278,7 @@ void DetectBlobs(
 	NcVar * varTag = NULL;
 
 	PrepareBlobOutputVar(
-		ncInput,
+		(pncGridFile == NULL)?(ncInput):(*pncGridFile),
 		ncOutput,
 		strOutputFile,
 		grid,
@@ -1270,7 +1292,10 @@ void DetectBlobs(
 		&varTag);
 
 	_ASSERT(varTag != NULL);
-	
+
+	if (pncGridFile != NULL) {
+		delete pncGridFile;
+	}
 
 /*
 	CopyNcVarIfExists(ncInput, ncOutput, param.strLatitudeName, true);
@@ -1633,6 +1658,7 @@ try {
 		CommandLineString(strInputFileList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineBool(dbparam.fDiagonalConnectivity, "diag_connect");
+		CommandLineString(dbparam.strGridFile, "grid_file", "");
 		CommandLineString(strOutputFile, "out", "");
 		CommandLineString(strOutputFileList, "out_list", "");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");
