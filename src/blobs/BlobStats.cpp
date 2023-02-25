@@ -25,6 +25,7 @@
 #include "DataArray1D.h"
 #include "DataArray2D.h"
 #include "TimeObj.h"
+#include "TimeMatch.h"
 
 #include "netcdfcpp.h"
 #include "NetCDFUtilities.h"
@@ -216,6 +217,9 @@ try {
 	// Output the full times rather than time indexes
 	bool fOutputFullTimes;
 
+	// Time filter
+	std::string strTimeFilter;
+
 	// Name of latitude dimension
 	std::string strLatitudeName;
 
@@ -240,6 +244,7 @@ try {
 		CommandLineString(strOutputQuantities, "out", "");
 		CommandLineBool(fOutputHeaders, "out_headers");
 		CommandLineBool(fOutputFullTimes, "out_fulltime");
+		CommandLineString(strTimeFilter, "timefilter", "");
 
 		CommandLineString(strLatitudeName, "latname", "lat");
 		CommandLineString(strLongitudeName, "lonname", "lon");
@@ -417,6 +422,38 @@ try {
 		varixWeight = varreg.FindOrRegister(strWeightVariable);
 	}
 
+	// Parse --timefilter
+#ifdef TEMPEST_NOREGEX
+	if (strTimeFilter != "") {
+		_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
+	}
+#endif
+#ifndef TEMPEST_NOREGEX
+	std::regex reTimeSubset;
+	if (strTimeFilter != "") {
+		
+		// Test regex support
+		TestRegex();
+
+		if (strTimeFilter == "3hr") {
+			strTimeFilter = "....-..-.. (00|03|06|09|12|15|18|21):00:00";
+		}
+		if (strTimeFilter == "6hr") {
+			strTimeFilter = "....-..-.. (00|06|12|18):00:00";
+		}
+		if (strTimeFilter == "daily") {
+			strTimeFilter = "....-..-.. 00:00:00";
+		}
+
+		try {
+			reTimeSubset.assign(strTimeFilter);
+		} catch(std::regex_error & reerr) {
+			_EXCEPTION2("Parse error in --timefilter regular expression \"%s\" (code %i)",
+				strTimeFilter.c_str(), reerr.code());
+		}
+	}
+#endif
+
 	// Time index across all files
 	int iTime = 0;
 
@@ -505,6 +542,17 @@ try {
 		// Loop through all times
 		int iFirstFileTime = iTime;
 		for (int t = 0; t < nLocalTimes; t++, iTime++) {
+
+#ifndef TEMPEST_NOREGEX
+			if (strTimeFilter != "") {
+				std::string strTime = vecFileTimes[t].ToString();
+				std::smatch match;
+				if (!std::regex_search(strTime, match, reTimeSubset)) {
+					Announce("Time %s (skipping)", vecFileTimes[t].ToString().c_str());
+					continue;
+				}
+			}
+#endif
 
 			Announce("Time %s", vecFileTimes[t].ToString().c_str());
 
