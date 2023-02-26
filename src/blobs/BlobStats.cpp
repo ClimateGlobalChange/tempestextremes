@@ -220,6 +220,12 @@ try {
 	// Time filter
 	std::string strTimeFilter;
 
+	// Start time
+	std::string strStartTime;
+
+	// End time
+	std::string strEndTime;
+
 	// Name of latitude dimension
 	std::string strLatitudeName;
 
@@ -245,6 +251,9 @@ try {
 		CommandLineBool(fOutputHeaders, "out_headers");
 		CommandLineBool(fOutputFullTimes, "out_fulltime");
 		CommandLineString(strTimeFilter, "timefilter", "");
+		CommandLineString(strStartTime, "time_start", "");
+		CommandLineString(strEndTime, "time_end", "");
+
 
 		CommandLineString(strLatitudeName, "latname", "lat");
 		CommandLineString(strLongitudeName, "lonname", "lon");
@@ -488,6 +497,41 @@ try {
 
 		AnnounceStartBlock("File \"%s\"", vecInputFiles[f].c_str());
 
+		// Parse --time_start and --time_end
+		Time timeStartTime;
+		Time timeEndTime;
+
+		if ((f == 0) && ((strStartTime != "") || (strEndTime != ""))) {
+			NcVar * varInTime = vecInFiles[0]->get_var("time");
+			if (varInTime == NULL) {
+				_EXCEPTION1("File \"%s\" does not contain variable \"time\"",
+					vecInFiles.GetFilename(0).c_str());
+			}
+
+			std::string strTimeCalendar;
+			NcAtt * attCalendar = varInTime->get_att("calendar");
+			if (attCalendar == NULL) {
+				Announce("Dataset \"time\" does not specify \"calendar\" attribute.  Assuming \"standard\".");
+				strTimeCalendar = "standard";
+			} else {
+				strTimeCalendar = attCalendar->as_string(0);
+			}
+
+			Time::CalendarType caltype = Time::CalendarTypeFromString(strTimeCalendar);
+			if (caltype == Time::CalendarUnknown) {
+				_EXCEPTION1("Unknown calendar name \"%s\"; cannot determine number of days per year", strTimeCalendar.c_str());
+			}
+
+			if (strStartTime != "") {
+				timeStartTime = Time(caltype);
+				timeStartTime.FromFormattedString(strStartTime);
+			}
+			if (strEndTime != "") {
+				timeEndTime = Time(caltype);
+				timeEndTime.FromFormattedString(strEndTime);
+			}
+		}
+
 		// Computed quantities associated with each blob
 		AllTimedBlobQuantitiesMap mapAllQuantities;
 
@@ -553,6 +597,22 @@ try {
 				}
 			}
 #endif
+			if (strStartTime != "") {
+				double dDeltaSeconds = timeStartTime - vecFileTimes[t];
+				if (dDeltaSeconds > 0.0) {
+					Announce("Time %s (before start time; skipping)",
+						vecFileTimes[t].ToString().c_str());
+					continue;
+				}
+			}
+			if (strEndTime != "") {
+				double dDeltaSeconds = vecFileTimes[t] - timeEndTime;
+				if (dDeltaSeconds > 0.0) {
+					Announce("Time %s (after end time; skipping)",
+						vecFileTimes[t].ToString().c_str());
+					continue;
+				}
+			}
 
 			Announce("Time %s", vecFileTimes[t].ToString().c_str());
 
