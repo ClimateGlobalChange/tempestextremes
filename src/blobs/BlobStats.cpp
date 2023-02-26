@@ -254,7 +254,6 @@ try {
 		CommandLineString(strStartTime, "time_start", "");
 		CommandLineString(strEndTime, "time_end", "");
 
-
 		CommandLineString(strLatitudeName, "latname", "lat");
 		CommandLineString(strLongitudeName, "lonname", "lon");
 
@@ -463,6 +462,10 @@ try {
 	}
 #endif
 
+	// Start time and end time for filtering
+	Time timeStartTime;
+	Time timeEndTime;
+
 	// Time index across all files
 	int iTime = 0;
 
@@ -498,9 +501,6 @@ try {
 		AnnounceStartBlock("File \"%s\"", vecInputFiles[f].c_str());
 
 		// Parse --time_start and --time_end
-		Time timeStartTime;
-		Time timeEndTime;
-
 		if ((f == 0) && ((strStartTime != "") || (strEndTime != ""))) {
 			NcVar * varInTime = vecInFiles[0]->get_var("time");
 			if (varInTime == NULL) {
