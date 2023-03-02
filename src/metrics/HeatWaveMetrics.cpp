@@ -85,6 +85,10 @@ void HeatWaveMetrics(
 		_EXCEPTION1("Unable to register variable \"%s\"", param.strTempVar.c_str());
 	}
 
+	// Latitude and longitude name
+	std::string strLatitudeName = param.strLatitudeName;
+	std::string strLongitudeName = param.strLongitudeName;
+
 	// Define the SimpleGrid
 	SimpleGrid grid;
 
@@ -106,8 +110,8 @@ void HeatWaveMetrics(
 
 			grid.GenerateLatitudeLongitude(
 				vecFiles[0],
-				param.strLatitudeName,
-				param.strLongitudeName,
+				strLatitudeName,
+				strLongitudeName,
 				param.fRegional,
 				false);
 
@@ -169,8 +173,8 @@ void HeatWaveMetrics(
 
 		// Copy over latitude and longitude
 		if (f == 0) {
-			CopyNcVarIfExists(*(vecFiles[0]), ncOutput, param.strLatitudeName, true);
-			CopyNcVarIfExists(*(vecFiles[0]), ncOutput, param.strLongitudeName, true);
+			CopyNcVarIfExists(*(vecFiles[0]), ncOutput, strLatitudeName, true);
+			CopyNcVarIfExists(*(vecFiles[0]), ncOutput, strLongitudeName, true);
 		}
 
 		// Read the time data
@@ -294,21 +298,21 @@ void HeatWaveMetrics(
 		} else {
 
 			// Get output dimensions
-			NcVar * varLat = ncOutput.get_var(param.strLatitudeName.c_str());
+			NcVar * varLat = ncOutput.get_var(strLatitudeName.c_str());
 			if ((varLat != NULL) && (varLat->num_dims() == 2)) {
 				dim0 = varLat->get_dim(0);
 				dim1 = varLat->get_dim(1);
 
 			} else {
-				dim0 = ncOutput.get_dim(param.strLatitudeName.c_str());
+				dim0 = ncOutput.get_dim(strLatitudeName.c_str());
 				if (dim0 == NULL) {
 					_EXCEPTION1("Unable to copy variable \"%s\" to output file",
-						param.strLatitudeName.c_str());
+						strLatitudeName.c_str());
 				}
-				dim1 = ncOutput.get_dim(param.strLongitudeName.c_str());
+				dim1 = ncOutput.get_dim(strLongitudeName.c_str());
 				if (dim1 == NULL) {
 					_EXCEPTION1("Unable to copy variable \"%s\" to output file",
-						param.strLongitudeName.c_str());
+						strLongitudeName.c_str());
 				}
 			}
 
