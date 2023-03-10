@@ -1,0 +1,332 @@
+///////////////////////////////////////////////////////////////////////////////
+///
+///	\file    AccumulateData.cpp
+///	\author  Paul Ullrich
+///	\version March 9, 2023
+///
+///	<remarks>
+///		Copyright 2023 Paul Ullrich
+///
+///		This file is distributed as part of the Tempest source code package.
+///		Permission is granted to use, copy, modify and distribute this
+///		source code and its documentation under the terms of the GNU General
+///		Public License.  This software is provided "as is" without express
+///		or implied warranty.
+///	</remarks>
+
+#include "CommandLine.h"
+#include "Exception.h"
+#include "Announce.h"
+#include "NetCDFUtilities.h"
+#include "Variable.h"
+#include "DataArray1D.h"
+#include "Variable.h"
+#include "FilenameList.h"
+#include "NetCDFUtilities.h"
+
+#include "netcdfcpp.h"
+
+#include <vector>
+#include <set>
+#include <map>
+
+#if defined(TEMPEST_MPIOMP)
+#include <mpi.h>
+#endif
+
+///////////////////////////////////////////////////////////////////////////////
+
+int main(int argc, char** argv) {
+
+#if defined(TEMPEST_MPIOMP)
+	// Initialize MPI
+	MPI_Init(&argc, &argv);
+#endif
+
+	// Turn off fatal errors in NetCDF
+	NcError error(NcError::silent_nonfatal);
+
+	// Enable output only on rank zero
+	AnnounceOnlyOutputOnRankZero();
+
+try {
+
+#if defined(TEMPEST_MPIOMP)
+	int nMPISize;
+	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+	if (nMPISize > 1) {
+		_EXCEPTIONT("At present AccumulateData only supports serial execution.");
+	}
+#endif
+
+	// Input data
+	std::string strInputData;
+
+	// Input data list
+	std::string strInputDataList;
+
+	// Output data
+	std::string strOutputData;
+
+	// Output data
+	std::string strOutputDataList;
+
+	// Accumulation frequency
+	std::string strAccumFrequency;
+
+	// Variable to use for quantile calculation
+	std::string strVariableName;
+
+	// Output variable
+	std::string strVariableOutName;
+
+	// Parse the command line
+	BeginCommandLine()
+		CommandLineString(strInputData, "in_data", "");
+		CommandLineString(strInputDataList, "in_data_list", "");
+		CommandLineString(strOutputData, "out_data", "");
+		CommandLineString(strOutputDataList, "out_data_list", "");
+		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|6h|daily]");
+		CommandLineString(strVariableName, "var", "");
+		CommandLineString(strVariableOutName, "varout", "");
+
+		ParseCommandLine(argc, argv);
+	EndCommandLine(argv)
+
+	AnnounceBanner();
+
+	// Check arguments
+	int nInputCount =
+		  ((strInputData.length() == 0)?(0):(1))
+		+ ((strInputDataList.length() == 0)?(0):(1));
+
+	if (nInputCount == 0) {
+		_EXCEPTIONT("No input file (--in_data) or (--in_data_list) specified");
+	}
+	if (nInputCount > 1) {
+		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list) may be specified");
+	}
+
+	if ((strInputData.length() != 0) && (strOutputData.length() == 0)) {
+		_EXCEPTIONT("No output file (--out_data) specified");
+	}
+	if ((strInputDataList.length() != 0) && (strOutputDataList.length() == 0)) {
+		_EXCEPTIONT("No output file (--out_data_list) specified");
+	}
+
+	// Get filename lists
+	FilenameList vecInputFiles;
+	if (strInputData != "") {
+		vecInputFiles.push_back(strInputData);
+	}
+	if (strInputDataList != "") {
+		vecInputFiles.FromFile(strInputDataList);
+	}
+
+	FilenameList vecOutputFiles;
+	if (strOutputData != "") {
+		vecOutputFiles.push_back(strOutputData);
+	}
+	if (strOutputDataList != "") {
+		vecOutputFiles.FromFile(strOutputDataList);
+	}
+
+	if (vecInputFiles.size() != vecOutputFiles.size()) {
+		_EXCEPTION2("Input file list must be same length as output file list (%lu vs %lu)",
+			vecInputFiles.size(), vecOutputFiles.size());
+	}
+
+	// Variable (--var) and output variable (--varout)
+	if (strVariableName == "") {
+		_EXCEPTIONT("No variable (--var) specified");
+	}
+	if (strVariableOutName == "") {
+		strVariableOutName = strVariableName;
+	}
+
+	// Accumulation frequency (--accumfreq)
+	double dAccumulationSeconds = 0;
+	if (strAccumFrequency == "1h") {
+		dAccumulationSeconds = 3600.0;
+	} else if (strAccumFrequency == "6h") {
+		dAccumulationSeconds = 3600.0 * 6.0;
+	} else if ((strAccumFrequency == "daily") || (strAccumFrequency == "24h")) {
+		dAccumulationSeconds = 3600.0 * 24.0;
+	} else {
+		_EXCEPTIONT("--accumfreq must be \"1h\", \"6h\" or \"daily\"");
+	}
+
+	// Current time
+	Time timeNext;
+
+	// Data
+	size_t sTotalSize = 1;
+	std::vector<long> vecPos;
+	std::vector<long> vecSize;
+
+	DataArray1D<float> dataIn;
+	DataArray1D<float> dataAccum;
+
+	// Loop through all files
+	AnnounceStartBlock("Start accumulation");
+
+	for (size_t f = 0; f < vecInputFiles.size(); f++) {
+
+		AnnounceStartBlock("%s", vecInputFiles[f].c_str());
+
+		// Open files
+		NcFile ncfilein(vecInputFiles[f].c_str(), NcFile::ReadOnly);
+		if (!ncfilein.is_valid()) {
+			_EXCEPTION1("Unable to open input file \"%s\"", vecInputFiles[f].c_str());
+		}
+
+		NcFile ncfileout(vecOutputFiles[f].c_str(), NcFile::Replace, NULL, 0, NcFile::Netcdf4);
+		if (!ncfileout.is_valid()) {
+			_EXCEPTION1("Unable to open output file \"%s\"", vecOutputFiles[f].c_str());
+		}
+
+		// Get variable
+		NcVar * var = ncfilein.get_var(strVariableName.c_str());
+		if (var == NULL) {
+			_EXCEPTION2("Unable to open variable \"%s\" in file \"%s\"",
+				strVariableName.c_str(), vecInputFiles[f].c_str());
+		}
+		if ((var->num_dims() == 0) || (std::string("time") != var->get_dim(0)->name())) {
+			_EXCEPTION2("First dimension of variable \"%s\" in file \"%s\" must be \"time\"",
+				strVariableName.c_str(), vecInputFiles[f].c_str());
+		}
+
+		// Allocate space for accumulation
+		if (f == 0) {
+			vecSize.resize(var->num_dims());
+			vecSize[0] = 1;
+			for (long d = 1; d < var->num_dims(); d++) {
+				vecSize[d] = var->get_dim(d)->size();
+				sTotalSize *= vecSize[d];
+			}
+			vecPos.resize(var->num_dims(), 0);
+			dataIn.Allocate(sTotalSize);
+			dataAccum.Allocate(sTotalSize);
+		}
+
+		// Get time
+		NcTimeDimension vecTimes;
+		ReadCFTimeDataFromNcFile(&ncfilein, vecInputFiles[f], vecTimes, false);
+
+		if (vecTimes.size() < 1) {
+			_EXCEPTION1("Time variable in file \"%s\" has zero length",
+				vecInputFiles[f].c_str());
+		}
+
+		// First file, set start of accumulation period
+		if (f == 0) {
+			timeNext = vecTimes[0];
+		}
+
+		// Write times
+		NcTimeDimension vecTimesOut;
+		vecTimesOut.m_nctype = vecTimes.m_nctype;
+		vecTimesOut.m_units = vecTimes.m_units;
+		vecTimesOut.m_dimtype = vecTimes.m_dimtype;
+
+		Time timeNextTemp = timeNext;
+		for (size_t t = 0; t < vecTimes.size(); ) {
+			if (timeNextTemp <= vecTimes[t]) {
+				vecTimesOut.push_back(timeNextTemp);
+				timeNextTemp.AddSeconds(dAccumulationSeconds);
+			} else {
+				t++;
+			}
+		}
+
+		if (vecTimesOut.size() != 0) {
+			WriteCFTimeDataToNcFile(&ncfileout, vecOutputFiles[f], vecTimesOut);
+		}
+
+		// Copy dimensions to output file
+		std::vector<NcDim *> vecVarDims;
+		vecVarDims.resize(var->num_dims());
+		vecVarDims[0] = ncfileout.get_dim("time");
+		if (vecVarDims[0] == NULL) {
+			_EXCEPTIONT("Error writing dimension \"time\" to output file");
+		}
+		for (long d = 1; d < var->num_dims(); d++) {
+			if (var->get_dim(d)->size() != vecSize[d]) {
+				_EXCEPTION4("Variable \"%s\" in file \"%s\" has mismatched dimension %li size: expected %li",
+					var->name(), vecInputFiles[f].c_str(), d, vecSize[d]);
+			}
+			vecVarDims[d] = ncfileout.add_dim(var->get_dim(d)->name(), var->get_dim(d)->size());
+			if (vecVarDims[d] == NULL) {
+				_EXCEPTION1("Error writing dimension \"%s\" to output file", var->get_dim(d)->name());
+			}
+			CopyNcVarIfExists(ncfilein, ncfileout, var->get_dim(d)->name());
+		}
+
+		// Create output variable
+		NcVar * varout = ncfileout.add_var(var->name(), ncFloat, vecVarDims.size(), const_cast<const NcDim**>(&(vecVarDims[0])));
+		if (varout == NULL) {
+			_EXCEPTION1("Error adding variable \"%s\" to output file", var->name());
+		}
+
+		CopyNcVarAttributes(var, varout);
+
+		// Loop through all input times
+		int tout = 0;
+		for (size_t t = 0; t < vecTimes.size();) {
+
+			// Accumulate data
+			if (timeNext >= vecTimes[t]) {
+				if (timeNext == vecTimes[t]) {
+					Announce("%s (accumulating & writing)", vecTimes[t].ToString().c_str());
+				} else {
+					Announce("%s %s (accumulating)", vecTimes[t].ToString().c_str(), timeNext.ToString().c_str());
+				}
+
+				vecPos[0] = t;
+				var->set_cur(&(vecPos[0]));
+				var->get(&(dataIn[0]), &(vecSize[0]));
+
+				for (size_t i = 0; i < sTotalSize; i++) {
+					dataAccum[i] += dataIn[i];
+				}
+			}
+
+			// Write to file
+			if (timeNext <= vecTimes[t]) {
+				if (timeNext != vecTimes[t]) {
+					Announce("%s (writing)", timeNext.ToString().c_str());
+				} else {
+					t++;
+				}
+
+				vecPos[0] = tout;
+				varout->set_cur(&(vecPos[0]));
+				varout->put(&(dataAccum[0]), &(vecSize[0]));
+				dataAccum.Zero();
+
+				timeNext.AddSeconds(dAccumulationSeconds);
+				tout++;
+
+			} else {
+				t++;
+			}
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	AnnounceEndBlock("Done");
+
+	AnnounceBanner();
+
+} catch(Exception & e) {
+	Announce(e.ToString().c_str());
+}
+
+#if defined(TEMPEST_MPIOMP)
+	// Deinitialize MPI
+	MPI_Finalize();
+#endif
+
+}
+

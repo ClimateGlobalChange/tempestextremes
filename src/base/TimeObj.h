@@ -42,6 +42,7 @@ public:
 		CalendarStandard,
 		CalendarGregorian,
 		Calendar360Day,
+		Calendar365Day,
 	};
 
 	///	<summary>
@@ -132,8 +133,6 @@ public:
 			return CalendarNone;
 		} else if (strCalendarTemp == "noleap") {
 			return CalendarNoLeap;
-		} else if (strCalendarTemp == "365_day"){
-			return CalendarNoLeap;
 		} else if (strCalendarTemp == "standard") {
 			return CalendarStandard;
 		} else if (strCalendarTemp == "gregorian") {
@@ -142,6 +141,8 @@ public:
 			return CalendarGregorian;
 		} else if (strCalendarTemp == "360_day") {
 			return Calendar360Day;
+		} else if (strCalendarTemp == "365_day") {
+			return Calendar365Day;
 		} else {
 			return CalendarUnknown;
 		}

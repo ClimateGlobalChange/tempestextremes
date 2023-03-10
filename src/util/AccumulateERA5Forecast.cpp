@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
-///	\file    AccumulatePrecipitationERA5.cpp
+///	\file    AccumulateERA5Forecast.cpp
 ///	\author  Paul Ullrich
 ///	\version June 20, 2021
 ///

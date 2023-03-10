@@ -134,7 +134,8 @@ void Time::VerifyTime() {
 	if ((m_eCalendarType == CalendarNoLeap) || 
 		(m_eCalendarType == CalendarStandard) ||
 		(m_eCalendarType == CalendarGregorian) ||
-		(m_eCalendarType == Calendar360Day)
+		(m_eCalendarType == Calendar360Day) ||
+		(m_eCalendarType == Calendar365Day)
 	) {
 		int nDaysPerMonth[]
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -186,7 +187,8 @@ void Time::NormalizeTime() {
 	if ((m_eCalendarType == CalendarNoLeap) || 
 		(m_eCalendarType == CalendarStandard) ||
 		(m_eCalendarType == CalendarGregorian) ||
-		(m_eCalendarType == Calendar360Day)
+		(m_eCalendarType == Calendar360Day) ||
+		(m_eCalendarType == Calendar365Day)
 	) {
 		int nDaysPerMonth[]
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -403,7 +405,9 @@ int Time::DayNumber() const {
 
 	// Based on https://alcor.concordia.ca/~gpkatch/gdate-algorithm.html
 	// but modified since m_iMonth and m_iDay are zero-indexed
-	if (m_eCalendarType == CalendarNoLeap) {
+	if ((m_eCalendarType == CalendarNoLeap) ||
+	    (m_eCalendarType == Calendar365Day)
+	) {
 		int nM = (m_iMonth + 10) % 12;
 		int nY = m_iYear - nM/10;
 		int nDay = 365 * nY + (nM * 306 + 5) / 10 + m_iDay;
@@ -435,7 +439,8 @@ bool Time::IsLeapDay() const {
 	if ((m_eCalendarType == CalendarUnknown) ||
 	    (m_eCalendarType == CalendarNone) ||
 	    (m_eCalendarType == CalendarNoLeap) ||
-	    (m_eCalendarType == Calendar360Day)
+	    (m_eCalendarType == Calendar360Day) ||
+	    (m_eCalendarType == Calendar365Day)
 	) {
 		return false;
 	}
@@ -453,7 +458,8 @@ bool Time::IsLeapYear() const {
 	if ((m_eCalendarType == CalendarUnknown) ||
 	    (m_eCalendarType == CalendarNone) ||
 	    (m_eCalendarType == CalendarNoLeap) ||
-	    (m_eCalendarType == Calendar360Day)
+	    (m_eCalendarType == Calendar360Day) ||
+	    (m_eCalendarType == Calendar365Day)
 	) {
 		return false;
 	}
@@ -1207,7 +1213,7 @@ double Time::GetCFCompliantUnitsOffsetDouble(
 		return dOffset;
 
 	} else {
-		_EXCEPTIONT("Unknown \"time::units\" format");
+		_EXCEPTION1("Unknown \"time::units\" format \"%s\"", strFormattedTime.c_str());
 	}
 }
 
@@ -1224,6 +1230,8 @@ std::string Time::GetCalendarName() const {
 		return std::string("gregorian");
 	} else if (m_eCalendarType == Calendar360Day) {
 		return std::string("360_day");
+	} else if (m_eCalendarType == Calendar365Day) {
+		return std::string("365_day");
 	} else {
 		_EXCEPTIONT("Invalid CalendarType");
 	}
