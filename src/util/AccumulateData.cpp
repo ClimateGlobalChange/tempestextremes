@@ -29,6 +29,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <limits>
 
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
@@ -38,26 +39,18 @@
 
 int main(int argc, char** argv) {
 
-#if defined(TEMPEST_MPIOMP)
-	// Initialize MPI
-	MPI_Init(&argc, &argv);
-#endif
-
 	// Turn off fatal errors in NetCDF
 	NcError error(NcError::silent_nonfatal);
 
-	// Enable output only on rank zero
-	AnnounceOnlyOutputOnRankZero();
-
 try {
 
-#if defined(TEMPEST_MPIOMP)
-	int nMPISize;
-	MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
-	if (nMPISize > 1) {
-		_EXCEPTIONT("At present AccumulateData only supports serial execution.");
-	}
-#endif
+	// Operators
+	enum AccumulateDataOp {
+		AccumulateDataOp_Sum,
+		AccumulateDataOp_Avg,
+		AccumulateDataOp_Min,
+		AccumulateDataOp_Max
+	};
 
 	// Input data
 	std::string strInputData;
@@ -70,6 +63,9 @@ try {
 
 	// Output data
 	std::string strOutputDataList;
+
+	// Operation
+	std::string strOp;
 
 	// Accumulation frequency
 	std::string strAccumFrequency;
@@ -86,6 +82,7 @@ try {
 		CommandLineString(strInputDataList, "in_data_list", "");
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineString(strOutputDataList, "out_data_list", "");
+		CommandLineStringD(strOp, "op", "sum", "[sum|avg|min|max]");
 		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|6h|daily]");
 		CommandLineString(strVariableName, "var", "");
 		CommandLineString(strVariableOutName, "varout", "");
@@ -136,6 +133,21 @@ try {
 			vecInputFiles.size(), vecOutputFiles.size());
 	}
 
+	// Operator (--op)
+	AccumulateDataOp m_eAccumOp;
+	STLStringHelper::ToLower(strOp);
+	if (strOp == "sum") {
+		m_eAccumOp = AccumulateDataOp_Sum;
+	} else if (strOp == "avg") {
+		m_eAccumOp = AccumulateDataOp_Avg;
+	} else if (strOp == "min") {
+		m_eAccumOp = AccumulateDataOp_Min;
+	} else if (strOp == "max") {
+		m_eAccumOp = AccumulateDataOp_Max;
+	} else {
+		_EXCEPTIONT("Invalid value for --op.  Expected \"sum\", \"avg\", \"min\", or \"max\"");
+	}
+
 	// Variable (--var) and output variable (--varout)
 	if (strVariableName == "") {
 		_EXCEPTIONT("No variable (--var) specified");
@@ -166,6 +178,9 @@ try {
 
 	DataArray1D<float> dataIn;
 	DataArray1D<float> dataAccum;
+
+	// Number of accumulated timesteps
+	int nAccumulatedTimesteps = 0;
 
 	// Loop through all files
 	AnnounceStartBlock("Start accumulation");
@@ -268,6 +283,12 @@ try {
 			_EXCEPTION1("Error adding variable \"%s\" to output file", var->name());
 		}
 
+		if (m_eAccumOp == AccumulateDataOp_Min) {
+			varout->add_att("_FillValue", std::numeric_limits<float>::max());
+		} else if (m_eAccumOp == AccumulateDataOp_Max) {
+			varout->add_att("_FillValue", -std::numeric_limits<float>::max());
+		}
+
 		CopyNcVarAttributes(var, varout);
 
 		// Loop through all input times
@@ -282,12 +303,32 @@ try {
 					Announce("%s %s (accumulating)", vecTimes[t].ToString().c_str(), timeNext.ToString().c_str());
 				}
 
+				nAccumulatedTimesteps++;
+
 				vecPos[0] = t;
 				var->set_cur(&(vecPos[0]));
 				var->get(&(dataIn[0]), &(vecSize[0]));
 
-				for (size_t i = 0; i < sTotalSize; i++) {
-					dataAccum[i] += dataIn[i];
+				if ((m_eAccumOp == AccumulateDataOp_Sum) ||
+				    (m_eAccumOp == AccumulateDataOp_Avg)
+				) {
+					for (size_t i = 0; i < sTotalSize; i++) {
+						dataAccum[i] += dataIn[i];
+					}
+
+				} else if (m_eAccumOp == AccumulateDataOp_Min) {
+					for (size_t i = 0; i < sTotalSize; i++) {
+						if (dataIn[i] < dataAccum[i]) {
+							dataAccum[i] = dataIn[i];
+						}
+					}
+
+				} else if (m_eAccumOp == AccumulateDataOp_Max) {
+					for (size_t i = 0; i < sTotalSize; i++) {
+						if (dataIn[i] > dataAccum[i]) {
+							dataAccum[i] = dataIn[i];
+						}
+					}
 				}
 			}
 
@@ -299,10 +340,31 @@ try {
 					t++;
 				}
 
+				if ((m_eAccumOp == AccumulateDataOp_Avg) && (nAccumulatedTimesteps != 0)) {
+					for (size_t i = 0; i < sTotalSize; i++) {
+						dataAccum[i] /= static_cast<float>(nAccumulatedTimesteps);
+					}
+				}
+
 				vecPos[0] = tout;
 				varout->set_cur(&(vecPos[0]));
 				varout->put(&(dataAccum[0]), &(vecSize[0]));
-				dataAccum.Zero();
+
+				if ((m_eAccumOp == AccumulateDataOp_Sum) ||
+				    (m_eAccumOp == AccumulateDataOp_Avg)
+				) {
+					dataAccum.Zero();
+
+				} else if (m_eAccumOp == AccumulateDataOp_Min) {
+					for (size_t i = 0; i < sTotalSize; i++) {
+						dataAccum[i] = std::numeric_limits<float>::max();
+					}
+
+				} else if (m_eAccumOp == AccumulateDataOp_Max) {
+					for (size_t i = 0; i < sTotalSize; i++) {
+						dataAccum[i] = -std::numeric_limits<float>::max();
+					}
+				}
 
 				timeNext.AddSeconds(dAccumulationSeconds);
 				tout++;
@@ -322,11 +384,5 @@ try {
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());
 }
-
-#if defined(TEMPEST_MPIOMP)
-	// Deinitialize MPI
-	MPI_Finalize();
-#endif
-
 }
 
