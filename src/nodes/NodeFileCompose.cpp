@@ -778,7 +778,7 @@ try {
 	DataArray1D<float> dOutputDataSnapshot;
 	
 	std::vector<float> vecFillValueFloat;
-	vecFillValueFloat.resize(vecVarIxIn.size());
+	vecFillValueFloat.resize(vecVarIxIn.size(), -FLT_MAX);
 
 	std::vector< DataArray1D<float> > vecOutputDataMean;
 	vecOutputDataMean.resize(vecVarIxIn.size());
@@ -1085,9 +1085,9 @@ try {
 								vecSnapshotDims.size(),
 								const_cast<const NcDim**>(&(vecSnapshotDims[0])));
 
-						if (fMissingData) {
-							varSnapshots->add_att("_FillValue", vecFillValueFloat[v]);
-						}
+						//if (fMissingData) {
+						//	varSnapshots->add_att("_FillValue", vecFillValueFloat[v]);
+						//}
 
 						if (varSnapshots == NULL) {
 							_EXCEPTION1("Unable to create variable \"%s\" in output file",
@@ -1464,9 +1464,7 @@ try {
 
 				// Snapshots
 				if (fSnapshots) {
-					if (fMissingData) {
-						vecvarSnapshots[v]->add_att("_FillValue", vecFillValueFloat[v]);
-					}
+					vecvarSnapshots[v]->add_att("_FillValue", vecFillValueFloat[v]);
 				}
 
 				// Mean of composite
@@ -1486,7 +1484,7 @@ try {
 							strVarNameMean.c_str());
 					}
 
-					if (fMissingData) {
+					if (fMissingData || fRegional) {
 						pvar->add_att("_FillValue", vecFillValueFloat[v]);
 					}
 
@@ -1510,7 +1508,7 @@ try {
 							strVarNameMin.c_str());
 					}
 
-					if (fMissingData) {
+					if (fMissingData || fRegional) {
 						pvar->add_att("_FillValue", vecFillValueFloat[v]);
 					}
 
@@ -1534,7 +1532,7 @@ try {
 							strVarNameMax.c_str());
 					}
 
-					if (fMissingData) {
+					if (fMissingData || fRegional) {
 						pvar->add_att("_FillValue", vecFillValueFloat[v]);
 					}
 
