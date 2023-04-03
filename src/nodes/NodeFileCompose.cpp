@@ -871,6 +871,9 @@ try {
 		std::vector<NcVar *> vecvarSnapshots;
 		vecvarSnapshots.resize(vecVarIxIn.size());
 
+		std::vector<bool> vecSnapshotsFillValue;
+		vecSnapshotsFillValue.resize(vecVarIxIn.size(), false);
+
 		if (fSnapshots) {
 			dimSnapshot = ncoutfile.add_dim("snapshot", sSnapshotCount);
 			if (dimSnapshot == NULL) {
@@ -1085,10 +1088,6 @@ try {
 								vecSnapshotDims.size(),
 								const_cast<const NcDim**>(&(vecSnapshotDims[0])));
 
-						//if (fMissingData) {
-						//	varSnapshots->add_att("_FillValue", vecFillValueFloat[v]);
-						//}
-
 						if (varSnapshots == NULL) {
 							_EXCEPTION1("Unable to create variable \"%s\" in output file",
 								strVarName.c_str());
@@ -1128,6 +1127,11 @@ try {
 				_ASSERT(dataState.GetRows() == grid.GetSize());
 
 				vecFillValueFloat[v] = var.GetFillValueFloat();
+
+				if ((fMissingData || fRegional) && !vecSnapshotsFillValue[v]) {
+					vecSnapshotsFillValue[v] = true;
+					vecvarSnapshots[v]->add_att("_FillValue", vecFillValueFloat[v]);
+				}
 
 				Announce("%s", var.ToString(varreg).c_str());
 
@@ -1460,11 +1464,6 @@ try {
 				std::vector<long> lSize(vecOutputNcDim[v].size());
 				for (size_t d = 0; d < vecOutputNcDim[v].size(); d++) {
 					lSize[d] = vecOutputNcDim[v][d]->size();
-				}
-
-				// Snapshots
-				if (fSnapshots) {
-					vecvarSnapshots[v]->add_att("_FillValue", vecFillValueFloat[v]);
 				}
 
 				// Mean of composite
