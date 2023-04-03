@@ -221,6 +221,9 @@ try {
 	// Data contains missing values
 	bool fMissingData;
 
+	// Scaling factor for max sample distance
+	double dMaxDistanceScale;
+
 	// List of operators
 	std::string strOperators;
 
@@ -277,6 +280,7 @@ try {
 
 		CommandLineString(strVariables, "var", "");
 		CommandLineString(strOutputVariables, "varout", "");
+		CommandLineDouble(dMaxDistanceScale, "maxdistscale", 0.9);
 		CommandLineBool(fMissingData, "missingdata");
 		CommandLineBool(fSnapshots, "snapshots");
 		CommandLineStringD(strOperators, "op", "mean", "[mean|min|max,...]");
@@ -608,6 +612,29 @@ try {
 			_EXCEPTIONT("Logic error when generating connectivity");
 		}
 		AnnounceEndBlock("Done");
+	}
+
+	// Maximum distance permitted at each grid node
+	DataArray1D<double> dMaxDistance;
+	if (fRegional) {
+		dMaxDistance.Allocate(grid.m_vecConnectivity.size());
+		for (int i = 0; i < grid.m_vecConnectivity.size(); i++) {
+			for (int j = 0; j < grid.m_vecConnectivity[i].size(); j++) {
+				double dDist =
+					GreatCircleDistance_Rad(
+						grid.m_dLon[i],
+						grid.m_dLat[i],
+						grid.m_dLon[grid.m_vecConnectivity[i][j]],
+						grid.m_dLat[grid.m_vecConnectivity[i][j]]);
+
+				if (dDist > dMaxDistance[i]) {
+					dMaxDistance[i] = dDist;
+				}
+			}
+		}
+		for (int i = 0; i < dMaxDistance.GetRows(); i++) {
+			dMaxDistance[i] *= dMaxDistanceScale;
+		}
 	}
 
 	// Build the KD tree for the grid
@@ -1180,7 +1207,7 @@ try {
 					}
 
 					// Only calculate the mean
-					if (fCompositeMean && !fCompositeMin && !fCompositeMax && !fSnapshots && !fMissingData && (vecHistogramOps.size() == 0)) {
+					if (fCompositeMean && !fCompositeMin && !fCompositeMax && !fSnapshots && !fRegional && !fMissingData && (vecHistogramOps.size() == 0)) {
 						for (size_t i = 0; i < gridNode.GetSize(); i++) {
 							int ixGridIn =
 								grid.NearestNode(
@@ -1207,6 +1234,25 @@ try {
 									gridNode.m_dLon[i],
 									gridNode.m_dLat[i]);
 
+							// Verify sample point isn't beyond sample range
+							if (fRegional) {
+								double dDist =
+									GreatCircleDistance_Rad(
+										gridNode.m_dLon[i],
+										gridNode.m_dLat[i],
+										grid.m_dLon[ixGridIn],
+										grid.m_dLat[ixGridIn]);
+
+								if (dDist > dMaxDistance[ixGridIn]) {
+									if (fSnapshots) {
+										dOutputDataSnapshot[i] = vecFillValueFloat[v];
+									}
+
+									continue;
+								}
+							}
+
+							// Check for non-missing data
 							if (fMissingData &&
 							    (dataState[ixGridIn] != vecFillValueFloat[v]) &&
 							    (!std::isnan(dataState[ixGridIn]))
