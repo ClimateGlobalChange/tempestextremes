@@ -248,8 +248,8 @@ try {
 		}
 
 		for (int i = 0; i < gridSource.m_nGridDim.size(); i++) {
-			varSrcGridDims->add_att("name0", strSourceLatitudeName.c_str());
-			varSrcGridDims->add_att("name1", strSourceLongitudeName.c_str());
+			varSrcGridDims->add_att("name0", strSourceLongitudeName.c_str());
+			varSrcGridDims->add_att("name1", strSourceLatitudeName.c_str());
 		}
 	}
 
@@ -265,8 +265,8 @@ try {
 		}
 
 		for (int i = 0; i < gridTarget.m_nGridDim.size(); i++) {
-			varDstGridDims->add_att("name0", strTargetLatitudeName.c_str());
-			varDstGridDims->add_att("name1", strTargetLongitudeName.c_str());
+			varDstGridDims->add_att("name0", strTargetLongitudeName.c_str());
+			varDstGridDims->add_att("name1", strTargetLatitudeName.c_str());
 		}
 	}
 
@@ -299,11 +299,20 @@ try {
 	varAreaA->put(&(dAreaA[0]), nA);
 	varAreaB->put(&(dAreaB[0]), nB);
 
+	varAreaA->add_att("units", "unitless");
+	varAreaB->add_att("units", "unitless");
+
 	std::vector<double> dFracA(nA, 1.0);
 	std::vector<double> dFracB(nA, 1.0);
 
 	NcVar * varFracA = ncmap.add_var("frac_a", ncDouble, dimNA);
 	NcVar * varFracB = ncmap.add_var("frac_b", ncDouble, dimNB);
+
+	varFracA->add_att("name", "fraction of target coverage of source dof");
+	varFracB->add_att("name", "fraction of target coverage of target dof");
+
+	varFracA->add_att("units", "unitless");
+	varFracB->add_att("units", "unitless");
 
 	varFracA->put(&(dFracA[0]), nA);
 	varFracB->put(&(dFracB[0]), nB);
@@ -313,6 +322,12 @@ try {
 
 	varXCA->add_att("units", "degrees");
 	varXCB->add_att("units", "degrees");
+
+	varYVA->add_att("units", "degrees");
+	varYVB->add_att("units", "degrees");
+
+	varXVA->add_att("units", "degrees");
+	varXVB->add_att("units", "degrees");
 
 	varYCA->put(&(vecSrcLatDeg[0]), vecSrcLatDeg.size());
 	varYCB->put(&(vecTgtLatDeg[0]), vecTgtLatDeg.size());
@@ -325,6 +340,32 @@ try {
 
 	varXVA->put(&(vecSrcLonDeg[0]), vecSrcLonDeg.size(), 1);
 	varXVB->put(&(vecTgtLonDeg[0]), vecTgtLonDeg.size(), 1);
+
+	// 1D longitude and latitude
+	if ((gridTarget.m_nGridDim.size() != 1) && (gridTarget.m_nGridDim[0] != gridTarget.GetSize())) {
+		NcDim * dimBnds = ncmap.add_dim("bnds", 2);
+
+		NcDim * dimLatB = ncmap.add_dim("lat_b", gridTarget.m_nGridDim[0]);
+		NcDim * dimLonB = ncmap.add_dim("lon_b", gridTarget.m_nGridDim[1]);
+
+		NcVar * varLatBnds = ncmap.add_var("lat_bnds", ncDouble, dimLatB, dimBnds);
+		NcVar * varLonBnds = ncmap.add_var("lon_bnds", ncDouble, dimLonB, dimBnds);
+
+		NcVar * varLatB = ncmap.add_var("latc_b", ncDouble, dimLatB);
+		NcVar * varLonB = ncmap.add_var("lonc_b", ncDouble, dimLonB);
+
+		std::vector<double> dLat1D(gridTarget.m_nGridDim[0]);
+		for (int i = 0; i < gridTarget.m_nGridDim[0]; i++) {
+			dLat1D[i] = RadToDeg(gridTarget.m_dLat[i * gridTarget.m_nGridDim[1]]);
+		}
+		std::vector<double> dLon1D(gridTarget.m_nGridDim[1]);
+		for (int i = 0; i < gridTarget.m_nGridDim[1]; i++) {
+			dLon1D[i] = RadToDeg(gridTarget.m_dLon[i]);
+		}
+
+		varLatB->put(&(dLat1D[0]), dLat1D.size());
+		varLonB->put(&(dLon1D[0]), dLon1D.size());
+	}
 
 	// Write out data
 	int nS = vecS.size();
