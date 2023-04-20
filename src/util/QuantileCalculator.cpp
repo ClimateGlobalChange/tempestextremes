@@ -30,24 +30,12 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <limits>
 
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
 #endif
 
-///////////////////////////////////////////////////////////////////////////////
-/*
-static unsigned int mylog2 (unsigned int val) {
-	if (val == 0) return UINT_MAX;
-	if (val == 1) return 0;
-	unsigned int ret = 0;
-	while (val > 1) {
-		val >>= 1;
-		ret++;
-	}
-	return ret;
-}
-*/
 ///////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char** argv) {
@@ -88,6 +76,9 @@ try {
 	// Data is regional
 	bool fRegional;
 
+	// Input includes missing data
+	bool fMissingData;
+
 	// Time filter
 	std::string strTimeFilter;
 
@@ -122,6 +113,7 @@ try {
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineBool(fRegional, "regional");
+		CommandLineBool(fMissingData, "missingdata");
 		CommandLineString(strTimeFilter, "timefilter", "");
 		//CommandLineString(strDimensionName, "dimname", "time");
 		CommandLineString(strVariableName, "var", "");
@@ -253,15 +245,20 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
+	size_t sGridSize = grid.GetSize();
+
 	// Output grid information
 	NcFile ncfileout(strOutputData.c_str(), NcFile::Replace, NULL, 0, NcFile::Netcdf4);
 	std::vector<NcDim *> vecOutputGridDim;
+	NcVar * varOutputQuantile = NULL;
+
+	// Fill value
+	float dFillValue = std::numeric_limits<float>::max();
 
 	// Allocate space for counts
 	DataArray1D<int> nBinCountPreHist(grid.GetSize());
 	DataArray2D<int> nBinCounts(grid.GetSize(), nQuantileBins);
 	DataArray2D<float> dBinEdges(grid.GetSize(), nQuantileBins+1);
-	//DataArray2D<float> dBinEdges(grid.GetSize(), 2);
 
 	// Initialize first pass bin sizes from first file
 	{
@@ -309,14 +306,40 @@ try {
 			} else {
 				_EXCEPTIONT("Only 1D or 2D spatial data supported");
 			}
-
 		}
 
+		// Variable for computing quantile
 		Variable & varQuantile = varreg.Get(varix);
 
-		// Get minimum and maximum at each point
-		//printf("[");
+		// Create output variable
+		{
+			// Open output file
+			varOutputQuantile =
+				ncfileout.add_var(
+					strVariableOutName.c_str(),
+					ncFloat,
+					vecOutputGridDim.size(),
+					const_cast<const NcDim**>(&(vecOutputGridDim[0])));
 
+			if (varOutputQuantile == NULL) {
+				_EXCEPTION2("Unable to create variable \"%s\" in output file \"%s\"",
+					strVariableOutName.c_str(), strOutputData.c_str());
+			}
+
+			// Copy attributes from input file for output variable
+			if (!varQuantile.IsOp()) {
+				NcVar * ncvarIn = ncfilevec[0]->get_var(strVariableName.c_str());
+				if (ncvarIn != NULL) {
+					CopyNcVarAttributes(ncvarIn, varOutputQuantile);
+				}
+			}
+
+			// Add attributes describing quantile
+			varOutputQuantile->add_att("quantile", dQuantile);
+			varOutputQuantile->add_att("quantile_info", "via TempestExtremes QuantileCalculator");
+		}
+
+		// Get minimum and maximum at each point
 		int nRetainedTimeSlices = dimTime->size();
 		if (fTimeFilterSpecified) {
 			nRetainedTimeSlices = 0;
@@ -342,34 +365,78 @@ try {
 				nRetainedTimeSlices++;
 			}
 #endif
+			// Get _FillValue if it exists
+			if (dFillValue == std::numeric_limits<float>::max()) {
+				dFillValue = varQuantile.GetFillValueFloat();
+			}
 
+			// Load data
 			const DataArray1D<float> & data = varQuantile.GetData();
 
-			//printf("%1.14f", data[0]);
-			//if (t != dimTime->size()-1) {
-			//	printf(",");
-			//}
-
-			if (t == 0) {
-				for (size_t i = 0; i < grid.GetSize(); i++) {
-					dBinEdges(i,0) = data[i];
-					dBinEdges(i,nQuantileBins) = data[i];
-				}
-			} else {
-				for (size_t i = 0; i < grid.GetSize(); i++) {
-					if (dBinEdges(i,0) > data[i]) {
-						dBinEdges(i,0) = data[i];
+			// Estimate first bin edges with missing data
+			if (fMissingData) {
+				if (t == 0) {
+					for (size_t i = 0; i < sGridSize; i++) {
+						if ((data[i] == dFillValue) || (data[i] != data[i])) {
+							dBinEdges(i,0) = dFillValue;
+						} else {
+							dBinEdges(i,0) = data[i];
+						}
+						dBinEdges(i,nQuantileBins) = dFillValue;
 					}
-					if (dBinEdges(i,nQuantileBins) < data[i]) {
+
+				} else {
+					for (size_t i = 0; i < sGridSize; i++) {
+						if ((data[i] == dFillValue) || (data[i] != data[i])) {
+							continue;
+						}
+						if ((dBinEdges(i,0) == dFillValue) || (dBinEdges(i,0) != dBinEdges(i,0))) {
+							dBinEdges(i,0) = data[i];
+							continue;
+						}
+						if ((dBinEdges(i,nQuantileBins) == dFillValue) ||
+						    (dBinEdges(i,nQuantileBins) != dBinEdges(i,nQuantileBins))
+						) {
+							if (data[i] < dBinEdges(i,0)) {
+								dBinEdges(i,nQuantileBins) = dBinEdges(i,0);
+								dBinEdges(i,0) = data[i];
+							} else {
+								dBinEdges(i,nQuantileBins) = data[i];
+							}
+							continue;
+						}
+						if (dBinEdges(i,0) > data[i]) {
+							dBinEdges(i,0) = data[i];
+						}
+						if (dBinEdges(i,nQuantileBins) < data[i]) {
+							dBinEdges(i,nQuantileBins) = data[i];
+						}
+					}
+				}
+
+			// Estimate first bin edges without missing data
+			} else {
+				if (t == 0) {
+					for (size_t i = 0; i < sGridSize; i++) {
+						dBinEdges(i,0) = data[i];
 						dBinEdges(i,nQuantileBins) = data[i];
+					}
+
+				} else {
+					for (size_t i = 0; i < sGridSize; i++) {
+						if (dBinEdges(i,0) > data[i]) {
+							dBinEdges(i,0) = data[i];
+						}
+						if (dBinEdges(i,nQuantileBins) < data[i]) {
+							dBinEdges(i,nQuantileBins) = data[i];
+						}
 					}
 				}
 			}
 		}
-		//printf("]\n");
 
-		if (nRetainedTimeSlices < 2) {
-			_EXCEPTIONT("At present, at least 2 time slices must be available in the first file provided");
+		if ((!fMissingData) && (nRetainedTimeSlices < 2)) {
+			_EXCEPTIONT("At present, at least 2 time slices must be available in the first file provided.  Reorganize file list or rerun with --missingdata.");
 		}
 
 		// Use a linear fit for bin edges
@@ -436,49 +503,142 @@ try {
 				}
 #endif
 
-				//Announce("File %lu/%lu Time %li/%li", f+1, vecInputFiles.size(), t+1, dimTime->size());
+				// Load data
 				ncfilevec.SetConstantTimeIx(t);
 				varQuantile.LoadGridData(varreg, ncfilevec, grid);
 
 				const DataArray1D<float> & data = varQuantile.GetData();
 
-				// On first iteration expand bins if needed
-				if (it == 0) {
-					for (size_t i = 0; i < grid.GetSize(); i++) {
-						if (dBinEdges(i,0) >= data[i]) {
-							dBinEdges(i,0) = data[i];
-							nBinCounts(i,0)++;
-							continue;
-						}
+				// Get _FillValue if it exists
+				float dLocalFillValue = varQuantile.GetFillValueFloat();
+				if (dLocalFillValue != dFillValue) {
+					_EXCEPTIONT("_FillValue attribute appears to change across files");
+				}
 
-						int b = 1;
-						for (; b < nQuantileBins; b++) {
-							if (dBinEdges(i,b) >= data[i]) {
+				// Build histograms with missing data
+				if (fMissingData) {
+
+					// On first iteration expand bins if needed
+					if (it == 0) {
+						for (size_t i = 0; i < sGridSize; i++) {
+							if ((data[i] == dFillValue) || (data[i] != data[i])) {
+								continue;
+							}
+							if ((dBinEdges(i,0) == dFillValue) || (dBinEdges(i,0) != dBinEdges(i,0))) {
+								dBinEdges(i,0) = data[i];
+								nBinCounts(i,0)++;
+								continue;
+							}
+							if ((dBinEdges(i,nQuantileBins) == dFillValue) ||
+							    (dBinEdges(i,nQuantileBins) != dBinEdges(i,nQuantileBins))
+							) {
+								if (data[i] == dBinEdges(i,0)) {
+									nBinCounts(i,0)++;
+									continue;
+
+								} else if (data[i] < dBinEdges(i,0)) {
+									dBinEdges(i,nQuantileBins) = dBinEdges(i,0);
+									dBinEdges(i,0) = data[i];
+									nBinCounts(i,nQuantileBins-1) = nBinCounts(i,0);
+									nBinCounts(i,0) = 0;
+
+								} else {
+									dBinEdges(i,nQuantileBins) = data[i];
+								}
+
+								for (int b = 1; b < nQuantileBins; b++) {
+									double dAlpha = static_cast<float>(b) / static_cast<float>(nQuantileBins);
+									dBinEdges(i,b) = (1.0 - dAlpha) * dBinEdges(i,0) + dAlpha * dBinEdges(i,nQuantileBins);
+								}
+							}
+
+							if (dBinEdges(i,0) >= data[i]) {
+								dBinEdges(i,0) = data[i];
+								nBinCounts(i,0)++;
+								continue;
+							}
+
+							int b = 1;
+							for (; b < nQuantileBins; b++) {
+								if (dBinEdges(i,b) >= data[i]) {
+									nBinCounts(i,b-1)++;
+									break;
+								}
+							}
+
+							if (b == nQuantileBins) {
+								if (data[i] > dBinEdges(i,b)) {
+									dBinEdges(i,b) = data[i];
+								}
 								nBinCounts(i,b-1)++;
-								break;
 							}
 						}
 
-						if (b == nQuantileBins) {
-							if (data[i] > dBinEdges(i,b)) {
-								dBinEdges(i,b) = data[i];
+					// ..otherwise discard values outside of histogram range
+					} else {
+						for (size_t i = 0; i < sGridSize; i++) {
+							if ((data[i] == dFillValue) || (data[i] != data[i])) {
+								continue;
 							}
-							nBinCounts(i,b-1)++;
+							if ((dBinEdges(i,nQuantileBins) == dFillValue) ||
+							    (dBinEdges(i,nQuantileBins) != dBinEdges(i,nQuantileBins))
+							) {
+								continue;
+							}
+
+							if (dBinEdges(i,0) > data[i]) {
+								nBinCountPreHist[i]++;
+								continue;
+							}
+
+							for (int b = 1; b <= nQuantileBins; b++) {
+								if (dBinEdges(i,b) >= data[i]) {
+									nBinCounts(i,b-1)++;
+									break;
+								}
+							}
 						}
 					}
 
-				// ..otherwise discard values outside of histogram range
+				// Build histograms without missing data
 				} else {
-					for (size_t i = 0; i < grid.GetSize(); i++) {
-						if (dBinEdges(i,0) > data[i]) {
-							nBinCountPreHist[i]++;
-							continue;
+					if (it == 0) {
+						for (size_t i = 0; i < grid.GetSize(); i++) {
+							if (dBinEdges(i,0) >= data[i]) {
+								dBinEdges(i,0) = data[i];
+								nBinCounts(i,0)++;
+								continue;
+							}
+
+							int b = 1;
+							for (; b < nQuantileBins; b++) {
+								if (dBinEdges(i,b) >= data[i]) {
+									nBinCounts(i,b-1)++;
+									break;
+								}
+							}
+
+							if (b == nQuantileBins) {
+								if (data[i] > dBinEdges(i,b)) {
+									dBinEdges(i,b) = data[i];
+								}
+								nBinCounts(i,b-1)++;
+							}
 						}
 
-						for (int b = 1; b <= nQuantileBins; b++) {
-							if (dBinEdges(i,b) >= data[i]) {
-								nBinCounts(i,b-1)++;
-								break;
+					// ..otherwise discard values outside of histogram range
+					} else {
+						for (size_t i = 0; i < grid.GetSize(); i++) {
+							if (dBinEdges(i,0) > data[i]) {
+								nBinCountPreHist[i]++;
+								continue;
+							}
+
+							for (int b = 1; b <= nQuantileBins; b++) {
+								if (dBinEdges(i,b) >= data[i]) {
+									nBinCounts(i,b-1)++;
+									break;
+								}
 							}
 						}
 					}
@@ -493,44 +653,46 @@ try {
 
 			AnnounceEndBlock(NULL);
 		}
-/*
-		{
-			printf("\n");
-			for (int b = 0; b < nQuantileBins; b++) {
-				printf("(%i %i) ", b, nBinCounts(27,b));
-			}
-			printf("\n");
-		}
-*/
+
 		// Determine which bin contains the correct quantile
 		Announce("Identifying correct bin for associated quantile");
-
-		int nQuantileIndex = static_cast<int>(static_cast<double>(nTotalPointCount-1) * dQuantile + 0.5);
-		_ASSERT((nQuantileIndex >= 0) && (nQuantileIndex < nTotalPointCount));
 
 		double dAverageBinWidth = 0.0;
 		double dMaximumBinWidth = 0.0;
 
-		for (size_t i = 0; i < grid.GetSize(); i++) {
+		int nQuantileIndex = static_cast<int>(static_cast<double>(nTotalPointCount-1) * dQuantile + 0.5);
+		_ASSERT((nQuantileIndex >= 0) && (nQuantileIndex < nTotalPointCount));
+
+		size_t sActiveGridPoints = sGridSize;
+
+		for (size_t i = 0; i < sGridSize; i++) {
+
+			// If there is missing data the number of samples may vary by grid point
+			if (fMissingData) {
+				if ((dBinEdges(i,nQuantileBins) == dFillValue) ||
+				    (dBinEdges(i,nQuantileBins) != dBinEdges(i,nQuantileBins))
+				) {
+					sActiveGridPoints--;
+					continue;
+				}
+
+				int nLocalPointCount = 0;
+				for (int b = 0; b < nQuantileBins; b++) {
+					nLocalPointCount += nBinCounts(i,b);
+				}
+
+				nQuantileIndex = static_cast<int>(static_cast<double>(nLocalPointCount-1) * dQuantile + 0.5);
+				_ASSERT((nQuantileIndex >= 0) && (nQuantileIndex < nTotalPointCount));
+			}
+
+			// Find the bin with the right sample number
 			int nAccumulatedCount = nBinCountPreHist[i];
 
 			int b = 0;
 			for (; b < nQuantileBins; b++) {
 				nAccumulatedCount += nBinCounts(i,b);
-/*
-				if (i == 0) {
-					printf("%i %i / %i\n", b, nAccumulatedCount, nQuantileIndex);
-				}
-*/
+
 				if (nAccumulatedCount > nQuantileIndex) {
-/*
-					if (i == 0) {
-						printf("Prev [%1.15f %1.15f] : New [%1.15f %1.15f] : Count %i\n",
-							dBinEdges(i,0), dBinEdges(i,nQuantileBins),
-							dBinEdges(i,b), dBinEdges(i,b+1),
-							nBinCounts(i,b));
-					}
-*/
 					dBinEdges(i,0) = dBinEdges(i,b);
 					dBinEdges(i,nQuantileBins) = dBinEdges(i,b+1);
 					break;
@@ -540,19 +702,21 @@ try {
 				_EXCEPTION1("Index %i", i);
 			}
 
+			// Calculate the average bin width
 			double dBinWidth = static_cast<double>(dBinEdges(i,nQuantileBins)) - static_cast<double>(dBinEdges(i,0));
 			dAverageBinWidth += dBinWidth;
 			if (dBinWidth > dMaximumBinWidth) {
 				dMaximumBinWidth = dBinWidth;
 			}
 
+			// Set new bin edges by subdividing this bin
 			for (b = 1; b < nQuantileBins; b++) {
 				double dAlpha = static_cast<float>(b) / static_cast<float>(nQuantileBins);
 				dBinEdges(i,b) = (1.0 - dAlpha) * dBinEdges(i,0) + dAlpha * dBinEdges(i,nQuantileBins);
 			}
 		}
 
-		Announce("Average bin width: %1.7e", dAverageBinWidth / static_cast<double>(grid.GetSize()));
+		Announce("Average bin width: %1.7e", dAverageBinWidth / static_cast<double>(sActiveGridPoints));
 		Announce("Maximum bin width: %1.7e", dMaximumBinWidth);
 		AnnounceEndBlock("Done");
 	}
@@ -565,28 +729,34 @@ try {
 	{
 		AnnounceStartBlock("Write quantiles");
 
-		// Open output file
-		NcVar * varQuantile =
-			ncfileout.add_var(
-				strVariableOutName.c_str(),
-				ncFloat,
-				vecOutputGridDim.size(),
-				const_cast<const NcDim**>(&(vecOutputGridDim[0])));
-
-		// Transpose quantiles
+		// Get quantiles
 		DataArray1D<float> dQuantile(grid.GetSize());
-		for (int i = 0; i < grid.GetSize(); i++) {
-			dQuantile[i] = 0.5 * (dBinEdges(i,0) + dBinEdges(i,nQuantileBins));
+
+		if (fMissingData) {
+			for (int i = 0; i < grid.GetSize(); i++) {
+				if ((dBinEdges(i,nQuantileBins) == dFillValue) ||
+				    (dBinEdges(i,nQuantileBins) != dBinEdges(i,nQuantileBins))
+				) {
+					dQuantile[i] = dFillValue;
+				} else {
+					dQuantile[i] = 0.5 * (dBinEdges(i,0) + dBinEdges(i,nQuantileBins));
+				}
+			}
+
+		} else {
+			for (int i = 0; i < grid.GetSize(); i++) {
+				dQuantile[i] = 0.5 * (dBinEdges(i,0) + dBinEdges(i,nQuantileBins));
+			}
 		}
 
 		// Write to file
 		if (vecOutputGridDim.size() == 1) {
-			varQuantile->set_cur((long)0);
-			varQuantile->put(&(dQuantile[0]), vecOutputGridDim[0]->size());
+			varOutputQuantile->set_cur((long)0);
+			varOutputQuantile->put(&(dQuantile[0]), vecOutputGridDim[0]->size());
 
 		} else if (vecOutputGridDim.size() == 2) {
-			varQuantile->set_cur(0, 0);
-			varQuantile->put(&(dQuantile[0]), vecOutputGridDim[0]->size(), vecOutputGridDim[1]->size());
+			varOutputQuantile->set_cur(0, 0);
+			varOutputQuantile->put(&(dQuantile[0]), vecOutputGridDim[0]->size(), vecOutputGridDim[1]->size());
 
 		} else {
 			_EXCEPTION();
