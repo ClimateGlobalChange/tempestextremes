@@ -1189,7 +1189,10 @@ void SimpleGrid::FromFile(
 		fsGrid >> m_dArea[f];
 		fsGrid >> cComma;
 		fsGrid >> sNeighbors;
-		fsGrid >> cComma;
+
+		if (sNeighbors != 0) {
+			fsGrid >> cComma;
+		}
 
 		// Convert to radians
 		m_dLon[f] *= M_PI / 180.0;
