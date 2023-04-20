@@ -573,6 +573,11 @@ try {
 	}
 	AnnounceEndBlock("Done");
 
+	// If --regional then also --missingdata
+	if (fRegional) {
+		fMissingData = true;
+	}
+
 	// Get the time units
 	NcType eNcTimeType = autocurator.GetNcTimeType();
 	std::string strNcTimeUnits = autocurator.GetNcTimeUnits();
@@ -1128,7 +1133,7 @@ try {
 
 				vecFillValueFloat[v] = var.GetFillValueFloat();
 
-				if ((fMissingData || fRegional) && !vecSnapshotsFillValue[v]) {
+				if (fMissingData && !vecSnapshotsFillValue[v]) {
 					vecSnapshotsFillValue[v] = true;
 					vecvarSnapshots[v]->add_att("_FillValue", vecFillValueFloat[v]);
 				}
@@ -1211,7 +1216,7 @@ try {
 					}
 
 					// Only calculate the mean
-					if (fCompositeMean && !fCompositeMin && !fCompositeMax && !fSnapshots && !fRegional && !fMissingData && (vecHistogramOps.size() == 0)) {
+					if (fCompositeMean && !fCompositeMin && !fCompositeMax && !fSnapshots && !fMissingData && (vecHistogramOps.size() == 0)) {
 						for (size_t i = 0; i < gridNode.GetSize(); i++) {
 							int ixGridIn =
 								grid.NearestNode(
@@ -1483,7 +1488,7 @@ try {
 							strVarNameMean.c_str());
 					}
 
-					if (fMissingData || fRegional) {
+					if (fMissingData) {
 						pvar->add_att("_FillValue", vecFillValueFloat[v]);
 					}
 
@@ -1507,7 +1512,7 @@ try {
 							strVarNameMin.c_str());
 					}
 
-					if (fMissingData || fRegional) {
+					if (fMissingData) {
 						pvar->add_att("_FillValue", vecFillValueFloat[v]);
 					}
 
@@ -1531,7 +1536,7 @@ try {
 							strVarNameMax.c_str());
 					}
 
-					if (fMissingData || fRegional) {
+					if (fMissingData) {
 						pvar->add_att("_FillValue", vecFillValueFloat[v]);
 					}
 
