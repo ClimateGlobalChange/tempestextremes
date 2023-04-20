@@ -260,6 +260,11 @@ try {
 	DataArray2D<int> nBinCounts(grid.GetSize(), nQuantileBins);
 	DataArray2D<float> dBinEdges(grid.GetSize(), nQuantileBins+1);
 
+	DataArray1D<int> nLocalPointCounts;
+	if (fMissingData) {
+		nLocalPointCounts.Allocate(grid.GetSize());
+	}
+
 	// Initialize first pass bin sizes from first file
 	{
 		AnnounceStartBlock("Using first file to set array bounds");
@@ -524,6 +529,9 @@ try {
 							if ((data[i] == dFillValue) || (data[i] != data[i])) {
 								continue;
 							}
+
+							nLocalPointCounts[i]++;
+
 							if ((dBinEdges(i,0) == dFillValue) || (dBinEdges(i,0) != dBinEdges(i,0))) {
 								dBinEdges(i,0) = data[i];
 								nBinCounts(i,0)++;
@@ -676,13 +684,8 @@ try {
 					continue;
 				}
 
-				int nLocalPointCount = 0;
-				for (int b = 0; b < nQuantileBins; b++) {
-					nLocalPointCount += nBinCounts(i,b);
-				}
-
-				nQuantileIndex = static_cast<int>(static_cast<double>(nLocalPointCount-1) * dQuantile + 0.5);
-				_ASSERT((nQuantileIndex >= 0) && (nQuantileIndex < nTotalPointCount));
+				nQuantileIndex = static_cast<int>(static_cast<double>(nLocalPointCounts[i]-1) * dQuantile + 0.5);
+				_ASSERT((nQuantileIndex >= 0) && (nQuantileIndex < nLocalPointCounts[i]));
 			}
 
 			// Find the bin with the right sample number
