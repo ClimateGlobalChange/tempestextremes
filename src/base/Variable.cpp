@@ -927,6 +927,11 @@ NcVar * Variable::GetNcVarFromNcFileVector(
 		NcAtt * attFillValue = var->get_att("_FillValue");
 		if (attFillValue != NULL) {
 			m_dFillValueFloat = attFillValue->as_float(0);
+		} else {
+			NcAtt * attMissingValue = var->get_att("missing_value");
+			if (attMissingValue != NULL) {
+				m_dFillValueFloat = attMissingValue->as_float(0);
+			}
 		}
 	}
 
