@@ -404,7 +404,7 @@ try {
 				const NcTimeDimension & vecTimes = ncfilevec.GetNcTimeDimension(0);
 				_ASSERT(vecTimes.size() == dimTime->size());
 				if (strStartTime != "") {
-					if (t == 0) {
+					if (timeStartTime.GetCalendarType() == Time::CalendarUnknown) {
 						timeStartTime = Time(vecTimes[0].GetCalendarType());
 						timeStartTime.FromFormattedString(strStartTime);
 					}
@@ -414,7 +414,7 @@ try {
 					}
 				}
 				if (strEndTime != "") {
-					if (t == 0) {
+					if (timeEndTime.GetCalendarType() == Time::CalendarUnknown) {
 						timeEndTime = Time(vecTimes[0].GetCalendarType());
 						timeEndTime.FromFormattedString(strEndTime);
 					}
