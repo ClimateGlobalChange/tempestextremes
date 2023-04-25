@@ -425,9 +425,6 @@ try {
 				}
 			}
 
-			// This time slice is retained
-			nRetainedTimeSlices++;
-
 			// Get _FillValue if it exists
 			if (dFillValue == std::numeric_limits<float>::max()) {
 				dFillValue = varQuantile.GetFillValueFloat();
@@ -438,7 +435,7 @@ try {
 
 			// Estimate first bin edges with missing data
 			if (fMissingData) {
-				if (t == 0) {
+				if (nRetainedTimeSlices == 0) {
 					for (size_t i = 0; i < sGridSize; i++) {
 						if ((data[i] == dFillValue) || (data[i] != data[i])) {
 							dBinEdges(i,0) = dFillValue;
@@ -484,7 +481,7 @@ try {
 
 			// Estimate first bin edges without missing data
 			} else {
-				if (t == 0) {
+				if (nRetainedTimeSlices == 0) {
 					for (size_t i = 0; i < sGridSize; i++) {
 						dBinEdges(i,0) = data[i];
 						dBinEdges(i,nQuantileBins) = data[i];
@@ -501,6 +498,9 @@ try {
 					}
 				}
 			}
+
+			// This time slice is retained
+			nRetainedTimeSlices++;
 		}
 
 		if ((!fMissingData) && (nRetainedTimeSlices < 2)) {
@@ -744,6 +744,14 @@ try {
 			}
 
 			AnnounceEndBlock(NULL);
+		}
+
+		if (nTotalPointCount < 1) {
+			if ((strStartTime != "") || (strEndTime != "")) {
+				_EXCEPTIONT("No time slices found which satisfy --time_start and --time_end bounds");
+			} else {
+				_EXCEPTIONT("Logic error: No time slices found across input files");
+			}
 		}
 
 		// Determine which bin contains the correct quantile
