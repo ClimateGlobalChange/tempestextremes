@@ -79,6 +79,12 @@ try {
 	// Input includes missing data
 	bool fMissingData;
 
+	// Start time
+	std::string strStartTime;
+	
+	// End time
+	std::string strEndTime;
+
 	// Time filter
 	std::string strTimeFilter;
 
@@ -90,6 +96,12 @@ try {
 
 	// Output variable
 	std::string strVariableOutName;
+
+	// Minimum value of the field incorporated in quantile calculation
+	std::string strMinThreshold;
+
+	// Maximum value of the field incorporated in quantile calculation
+	std::string strMaxThreshold;
 
 	// Quantile to calculate
 	double dQuantile;
@@ -114,10 +126,14 @@ try {
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineBool(fRegional, "regional");
 		CommandLineBool(fMissingData, "missingdata");
+		CommandLineString(strStartTime, "time_start", "");
+		CommandLineString(strEndTime, "time_end", "");
 		CommandLineString(strTimeFilter, "timefilter", "");
 		//CommandLineString(strDimensionName, "dimname", "time");
 		CommandLineString(strVariableName, "var", "");
 		CommandLineString(strVariableOutName, "varout", "");
+		CommandLineString(strMinThreshold, "minthreshold", "");
+		CommandLineString(strMaxThreshold, "maxthreshold", "");
 		CommandLineDouble(dQuantile, "quantile", 0.95);
 		CommandLineInt(nQuantileBins, "bins", 16);
 		CommandLineInt(nIterations, "iter", 8);
@@ -140,13 +156,6 @@ try {
 	if (strOutputData.length() == 0) {
 		_EXCEPTIONT("No output file (--out_data) specified");
 	}
-/*
-	unsigned int nLog2QuantileBins = mylog2((unsigned int) nQuantileBins);
-	if ((1 << nLog2QuantileBins) != nQuantileBins) {
-		_EXCEPTIONT("--bins must be a power of 2");
-	}
-*/
-
 	if (nQuantileBins < 2) {
 		_EXCEPTIONT("--bins must be at least 2");
 	}
@@ -162,6 +171,32 @@ try {
 		strVariableOutName = strVariableName;
 	}
 
+	// Thresholds (automatically turn on --missingdata)
+	double dMinThreshold = -std::numeric_limits<float>::max();
+	double dMaxThreshold = std::numeric_limits<float>::max();
+	if (strMinThreshold != "") {
+		if (!STLStringHelper::IsFloat(strMinThreshold)) {
+			_EXCEPTIONT("--minthreshold must be a floating point number");
+		}
+		dMinThreshold = std::stof(strMinThreshold);
+		fMissingData = true;
+	}
+	if (strMaxThreshold != "") {
+		if (!STLStringHelper::IsFloat(strMaxThreshold)) {
+			_EXCEPTIONT("--maxthreshold must be a floating point number");
+		}
+		dMaxThreshold = std::stof(strMaxThreshold);
+		fMissingData = true;
+	}
+	if (dMaxThreshold < dMinThreshold) {
+		_EXCEPTIONT("--maxthreshold must be greater than or equal to --minthreshold");
+	}
+
+	// Start and end time (initialized on first pass through files)
+	Time timeStartTime;
+	Time timeEndTime;
+
+	// Time filter
 	bool fTimeFilterSpecified = (strTimeFilter != "");
 #ifdef TEMPEST_NOREGEX
 	if (strTimeFilter != "") {
@@ -169,7 +204,6 @@ try {
 	}
 #endif
 #ifndef TEMPEST_NOREGEX
-	// Parse --timefilter
 	std::regex reTimeSubset;
 	if (strTimeFilter != "") {
 		
@@ -345,10 +379,7 @@ try {
 		}
 
 		// Get minimum and maximum at each point
-		int nRetainedTimeSlices = dimTime->size();
-		if (fTimeFilterSpecified) {
-			nRetainedTimeSlices = 0;
-		}
+		int nRetainedTimeSlices = 0;
 
 		for (long t = 0; t < dimTime->size(); t++) {
 			//Announce("Time %li/%li", t+1, dimTime->size());
@@ -366,10 +397,37 @@ try {
 				if (!std::regex_search(strTime, match, reTimeSubset)) {
 					continue;
 				}
-
-				nRetainedTimeSlices++;
 			}
 #endif
+			// Apply time bounds
+			if ((strStartTime != "") || (strEndTime != "")) {
+				const NcTimeDimension & vecTimes = ncfilevec.GetNcTimeDimension(0);
+				_ASSERT(vecTimes.size() == dimTime->size());
+				if (strStartTime != "") {
+					if (t == 0) {
+						timeStartTime = Time(vecTimes[0].GetCalendarType());
+						timeStartTime.FromFormattedString(strStartTime);
+					}
+					double dDeltaSeconds = timeStartTime - vecTimes[t];
+					if (dDeltaSeconds > 0.0) {
+						continue;
+					}
+				}
+				if (strEndTime != "") {
+					if (t == 0) {
+						timeEndTime = Time(vecTimes[0].GetCalendarType());
+						timeEndTime.FromFormattedString(strEndTime);
+					}
+					double dDeltaSeconds = vecTimes[t] - timeEndTime;
+					if (dDeltaSeconds > 0.0) {
+						continue;
+					}
+				}
+			}
+
+			// This time slice is retained
+			nRetainedTimeSlices++;
+
 			// Get _FillValue if it exists
 			if (dFillValue == std::numeric_limits<float>::max()) {
 				dFillValue = varQuantile.GetFillValueFloat();
@@ -384,6 +442,8 @@ try {
 					for (size_t i = 0; i < sGridSize; i++) {
 						if ((data[i] == dFillValue) || (data[i] != data[i])) {
 							dBinEdges(i,0) = dFillValue;
+						} else if ((data[i] < dMinThreshold) || (data[i] > dMaxThreshold)) {
+							dBinEdges(i,0) = dFillValue;
 						} else {
 							dBinEdges(i,0) = data[i];
 						}
@@ -393,6 +453,9 @@ try {
 				} else {
 					for (size_t i = 0; i < sGridSize; i++) {
 						if ((data[i] == dFillValue) || (data[i] != data[i])) {
+							continue;
+						}
+						if ((data[i] < dMinThreshold) || (data[i] > dMaxThreshold)) {
 							continue;
 						}
 						if ((dBinEdges(i,0) == dFillValue) || (dBinEdges(i,0) != dBinEdges(i,0))) {
@@ -485,10 +548,7 @@ try {
 					ncfilevec.GetFilename(0).c_str());
 			}
 
-			int nRetainedTimeSlices = dimTime->size();
-			if (fTimeFilterSpecified) {
-				nRetainedTimeSlices = 0;
-			}
+			int nRetainedTimeSlices = 0;
 
 			for (long t = 0; t < dimTime->size(); t++) {
 
@@ -503,10 +563,28 @@ try {
 					if (!std::regex_search(strTime, match, reTimeSubset)) {
 						continue;
 					}
-
-					nRetainedTimeSlices++;
 				}
 #endif
+				// Apply time bounds
+				if ((strStartTime != "") || (strEndTime != "")) {
+					const NcTimeDimension & vecTimes = ncfilevec.GetNcTimeDimension(0);
+					_ASSERT(vecTimes.size() == dimTime->size());
+					if (strStartTime != "") {
+						double dDeltaSeconds = timeStartTime - vecTimes[t];
+						if (dDeltaSeconds > 0.0) {
+							continue;
+						}
+					}
+					if (strEndTime != "") {
+						double dDeltaSeconds = vecTimes[t] - timeEndTime;
+						if (dDeltaSeconds > 0.0) {
+							continue;
+						}
+					}
+				}
+
+				// This time slice is retained
+				nRetainedTimeSlices++;
 
 				// Load data
 				ncfilevec.SetConstantTimeIx(t);
@@ -527,6 +605,9 @@ try {
 					if (it == 0) {
 						for (size_t i = 0; i < sGridSize; i++) {
 							if ((data[i] == dFillValue) || (data[i] != data[i])) {
+								continue;
+							}
+							if ((data[i] < dMinThreshold) || (data[i] > dMaxThreshold)) {
 								continue;
 							}
 
@@ -586,6 +667,9 @@ try {
 					} else {
 						for (size_t i = 0; i < sGridSize; i++) {
 							if ((data[i] == dFillValue) || (data[i] != data[i])) {
+								continue;
+							}
+							if ((data[i] < dMinThreshold) || (data[i] > dMaxThreshold)) {
 								continue;
 							}
 							if ((dBinEdges(i,nQuantileBins) == dFillValue) ||
@@ -655,7 +739,7 @@ try {
 
 			nTotalPointCount += nRetainedTimeSlices;
 
-			if (fTimeFilterSpecified) {
+			if (fTimeFilterSpecified || (strStartTime != "") || (strEndTime != "")) {
 				Announce("%i/%li time slices retained after time filtering", nRetainedTimeSlices, dimTime->size());
 			}
 
