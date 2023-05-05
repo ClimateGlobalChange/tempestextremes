@@ -311,12 +311,15 @@ try {
 		_ASSERT(vecFiles.size() > 0);
 
 		// Get time information
+		bool fFileHasTime = (vecFiles[0]->get_var("time") != NULL);
 		NcTimeDimension vecTimes;
-		ReadCFTimeDataFromNcFile(
-			vecFiles[0],
-			vecFiles.GetFilename(0),
-			vecTimes,
-			false);
+		if (fFileHasTime) {
+			ReadCFTimeDataFromNcFile(
+				vecFiles[0],
+				vecFiles.GetFilename(0),
+				vecTimes,
+				false);
+		}
 
 		NcTimeDimension vecOutputTimes;
 
@@ -338,6 +341,10 @@ try {
 		vecOutputTimes = vecTimes;
 #endif
 
+		if (!fFileHasTime) {
+			vecOutputTimes.push_back(Time(Time::CalendarNone));
+		}
+
 		// Open output file
 		NcFile ncout(vecOutputFileList[f].c_str(), NcFile::Replace);
 		if (!ncout.is_valid()) {
@@ -346,13 +353,16 @@ try {
 		}
 
 		// Write new time dimension
-		WriteCFTimeDataToNcFile(
-			&ncout,
-			vecOutputFileList[f],
-			vecOutputTimes);
+		NcDim * dimTime = NULL;
+		if (fFileHasTime) {
+			WriteCFTimeDataToNcFile(
+				&ncout,
+				vecOutputFileList[f],
+				vecOutputTimes);
 
-		NcDim * dimTime = ncout.get_dim("time");
-		_ASSERT(dimTime != NULL);
+			dimTime = ncout.get_dim("time");
+			_ASSERT(dimTime != NULL);
+		}
 
 		// Write grid dimensions
 		NcDim * dim0 = NULL;
@@ -422,7 +432,10 @@ try {
 				&vecAuxDimInfo);
 
 			std::vector<NcDim *> vecDimOut;
-			vecDimOut.push_back(dimTime);
+
+			if (fFileHasTime) {
+				vecDimOut.push_back(dimTime);
+			}
 
 			for (long d = 0; d < vecAuxDimInfo.size(); d++) {
 				NcDim * dim =
@@ -456,9 +469,11 @@ try {
 
 		// Loop through all times in this file
 		for (int t = 0; t < vecOutputTimes.size(); t++) {
-			AnnounceStartBlock("Time %s (%lu/%lu)",
-				vecOutputTimes[t].ToString().c_str(),
-				t+1, vecOutputTimes.size());
+			if (fFileHasTime) {
+				AnnounceStartBlock("Time %s (%lu/%lu)",
+					vecOutputTimes[t].ToString().c_str(),
+					t+1, vecOutputTimes.size());
+			}
 
 			vecFiles.SetTime(vecOutputTimes[t]);
 
@@ -482,7 +497,9 @@ try {
 
 				// Get the output position and size
 				VariableAuxIndex lPos = varreg.GetProcessingQueueAuxIx();
-				lPos.insert(lPos.begin(), t);
+				if (fFileHasTime) {
+					lPos.insert(lPos.begin(), t);
+				}
 				VariableAuxIndex lSize(lPos.size(), 1);
 
 				if (grid.m_nGridDim.size() == 1) {
@@ -507,7 +524,10 @@ try {
 					_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
 				}
 			}
-			AnnounceEndBlock(NULL);
+
+			if (fFileHasTime) {
+				AnnounceEndBlock(NULL);
+			}
 		}
 		if (vecInputFileList.size() != 1) {
 			AnnounceEndBlock("Done");
