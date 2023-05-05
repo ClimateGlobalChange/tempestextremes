@@ -51,11 +51,17 @@ try {
 	// Source connectivity file
 	std::string strSourceConnect;
 
+	// Source variable (used for masking)
+	std::string strSourceVar;
+
 	// Target data
 	std::string strTargetData;
 
 	// Target connectivity file
 	std::string strTargetConnect;
+
+	// Target variable (used for masking)
+	std::string strTargetVar;
 
 	// Regional
 	bool fRegional = true;
@@ -79,8 +85,10 @@ try {
 	BeginCommandLine()
 		CommandLineString(strSourceData, "src_data", "");
 		CommandLineString(strSourceConnect, "src_connect", "");
+		CommandLineString(strSourceVar, "src_var", "");
 		CommandLineString(strTargetData, "tgt_data", "");
 		CommandLineString(strTargetConnect, "tgt_connect", "");
+		CommandLineString(strTargetVar, "tgt_var", "");
 		CommandLineString(strOutputMap, "out_map", "");
 		CommandLineString(strSourceLongitudeName, "src_lonname", "lon");
 		CommandLineString(strSourceLatitudeName, "src_latname", "lat");
@@ -99,11 +107,17 @@ try {
 	if ((strSourceData.length() != 0) && (strSourceConnect.length() != 0)) {
 		_EXCEPTIONT("Only one source data file (--src_data) or source connectivity file (--src_connect) may be specified");
 	}
+	if ((strSourceData.length() == 0) && (strSourceVar.length() != 0)) {
+		_EXCEPTIONT("Argument (--src_var) must be combined with (--src_data)");
+	}
 	if ((strTargetData.length() == 0) && (strTargetConnect.length() == 0)) {
 		_EXCEPTIONT("No target data file (--tgt_data) or target connectivity file (--tgt_connect) specified");
 	}
 	if ((strTargetData.length() != 0) && (strTargetConnect.length() != 0)) {
 		_EXCEPTIONT("Only one target data file (--tgt_data) or target connectivity file (--tgt_connect) may be specified");
+	}
+	if ((strTargetData.length() == 0) && (strTargetVar.length() != 0)) {
+		_EXCEPTIONT("Argument (--tgt_var) must be combined with (--tgt_data)");
 	}
 	if (strOutputMap.length() == 0) {
 		_EXCEPTIONT("No output map (--out_map) specified");
@@ -172,9 +186,63 @@ try {
 	}
 
 	// Build the KD tree on the source grid
-	AnnounceStartBlock("Building kd-tree on source grid");
-	gridSource.BuildKDTree();
-	AnnounceEndBlock("Done");
+	if (strSourceVar == "") {
+		AnnounceStartBlock("Building kd-tree on source grid");
+		gridSource.BuildKDTree();
+		AnnounceEndBlock("Done");
+
+	} else {
+		AnnounceStartBlock("Building kd-tree on source grid (masked)");
+		size_t sGridSizeSrc = gridSource.m_dLon.GetRows();
+
+		// Load the data for the src grid
+		NcFileVector vecNcFilesSrc;
+		vecNcFilesSrc.ParseFromString(strSourceData);
+		vecNcFilesSrc.SetConstantTimeIx(0);
+
+		VariableRegistry varregSrc;
+		VariableIndex ixSrcData = varregSrc.FindOrRegister(strSourceVar);
+		Variable & varSrcData = varregSrc.Get(ixSrcData);
+		varSrcData.LoadGridData(varregSrc, vecNcFilesSrc, gridSource);
+
+		const DataArray1D<float> & dataSrc = varSrcData.GetData();
+
+		float dFillValueSrc = varSrcData.GetFillValueFloat();
+
+		DataArray1D<bool> fMask(sGridSizeSrc);
+		for (size_t i = 0; i < sGridSizeSrc; i++) {
+			if ((dataSrc[i] == dFillValueSrc) || (dataSrc[i] != dataSrc[i])) {
+				fMask[i] = false;
+			} else {
+				fMask[i] = true;
+			}
+		}
+		gridSource.BuildMaskedKDTree(fMask);
+		AnnounceEndBlock("Done");
+	}
+
+	// Load target data
+	VariableRegistry varregTgt;
+	float dFillValueTgt;
+	const DataArray1D<float> * pTargetData = NULL;
+
+	if (strTargetVar != "") {
+		size_t sGridSizeTgt = gridTarget.m_dLon.GetRows();
+
+		// Load the data for the tgt grid
+		NcFileVector vecNcFilesTgt;
+		vecNcFilesTgt.ParseFromString(strTargetData);
+		vecNcFilesTgt.SetConstantTimeIx(0);
+
+		VariableIndex ixTgtData = varregTgt.FindOrRegister(strTargetVar);
+		Variable & varTgtData = varregTgt.Get(ixTgtData);
+		varTgtData.LoadGridData(varregTgt, vecNcFilesTgt, gridTarget);
+
+		pTargetData = &(varTgtData.GetData());
+		dFillValueTgt = varTgtData.GetFillValueFloat();
+
+		_ASSERT(pTargetData->GetRows() == gridTarget.GetSize());
+	}
 
 	// Build the map
 	AnnounceStartBlock("Building map");
@@ -196,10 +264,17 @@ try {
 			int nPctComplete = j / (nB / 10);
 			Announce("%i%% complete", nPctComplete * 10);
 		}
+
 		vecTgtLonDeg[j] = RadToDeg(gridTarget.m_dLon[j]);
 		vecTgtLatDeg[j] = RadToDeg(gridTarget.m_dLat[j]);
 
-		size_t sNearestNode =
+		if (pTargetData != NULL) {
+			if (((*pTargetData)[j] == dFillValueTgt) || ((*pTargetData)[j] != (*pTargetData)[j])) {
+				continue;
+			}
+		}
+
+		size_t sNearestNode = 
 			gridSource.NearestNode(
 				gridTarget.m_dLon[j],
 				gridTarget.m_dLat[j]);
@@ -214,7 +289,6 @@ try {
 		vecSrcLonDeg[i] = RadToDeg(gridSource.m_dLon[i]);
 		vecSrcLatDeg[i] = RadToDeg(gridSource.m_dLat[i]);
 	}
-	Announce("100%% complete");
 	AnnounceEndBlock(NULL);
 
 	// Write the map

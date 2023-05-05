@@ -262,6 +262,14 @@ public:
 	void BuildKDTree();
 
 	///	<summary>
+	///		Build a kdtree using this SimpleGrid, only including points
+	///		indicated by the mask.
+	///	</summary>
+	void BuildMaskedKDTree(
+		const DataArray1D<bool> & fMask
+	);
+
+	///	<summary>
 	///		Find the nearest node to the given coordinate.
 	///	</summary>
 	size_t NearestNode(

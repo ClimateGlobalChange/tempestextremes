@@ -1392,6 +1392,41 @@ void SimpleGrid::BuildKDTree() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void SimpleGrid::BuildMaskedKDTree(
+	const DataArray1D<bool> & fMask
+) {
+	if (m_kdtree != NULL) {
+		_EXCEPTIONT("kdtree already exists");
+	}
+	if (m_dLon.GetRows() == 0) {
+		_EXCEPTIONT("At least one grid cell needed in SimpleGrid");
+	}
+	if (m_dLon.GetRows() != fMask.GetRows()) {
+		_EXCEPTIONT("Mask array length must be the same as grid cell count");
+	}
+
+	_ASSERT(m_dLon.GetRows() == m_dLat.GetRows());
+
+	// Create the kd tree
+	m_kdtree = kd_create(3);
+	if (m_kdtree == NULL) {
+		_EXCEPTIONT("kd_create(3) failed");
+	}
+
+	// Insert all nodes from this SimpleGrid into the kdtree
+	for (size_t i = 0; i < m_dLon.GetRows(); i++) {
+		if (fMask[i]) {
+			double dX = cos(m_dLon[i]) * cos(m_dLat[i]);
+			double dY = sin(m_dLon[i]) * cos(m_dLat[i]);
+			double dZ = sin(m_dLat[i]);
+
+			kd_insert3(m_kdtree, dX, dY, dZ, (void*)(i));
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 size_t SimpleGrid::NearestNode(
 	double dLonRad,
 	double dLatRad
