@@ -437,8 +437,8 @@ void PersistentBlobs(
 		std::vector<bool> vecTimeRetained(vecTimes.size(), false);
 		std::vector<Time> vecOutputTimes;
 
-		Time timeStartTime;
-		Time timeEndTime;
+		Time timeStartTime(Time::CalendarUnknown);
+		Time timeEndTime(Time::CalendarUnknown);
 
 		if (param.strStartTime != "") {
 			timeStartTime = Time(vecTimes[0].GetCalendarType());
@@ -464,10 +464,12 @@ void PersistentBlobs(
 			}
 
 #ifndef TEMPEST_NOREGEX
-			std::string strTime = vecTimes[t].ToString();
-			std::smatch match;
-			if (!std::regex_search(strTime, match, reTimeSubset)) {
-				continue;
+			if (param.strTimeFilter != "") {
+				std::string strTime = vecTimes[t].ToString();
+				std::smatch match;
+				if (!std::regex_search(strTime, match, reTimeSubset)) {
+					continue;
+				}
 			}
 #endif
 			vecOutputTimes.push_back(vecTimes[t]);
@@ -478,7 +480,7 @@ void PersistentBlobs(
 		NcFile & ncInput = *(vecFiles[0]);
 
 		// Open the NetCDF output file
-		vecpncOutputFiles[f] = new NcFile(vecOutputFiles[f].c_str(), NcFile::Replace);
+		vecpncOutputFiles[f] = new NcFile(vecOutputFiles[f].c_str(), NcFile::Replace, NULL, 0, NcFile::Netcdf4);
 		if (!vecpncOutputFiles[f]->is_valid()) {
 			_EXCEPTION1("Unable to open NetCDF file \"%s\" for writing",
 				vecOutputFiles[f].c_str());
@@ -487,7 +489,7 @@ void PersistentBlobs(
 		// Copy over time variable to output file
 		NcDim * dimTimeOut = NULL;
 		if ((dimTime != NULL) && (varTime != NULL)) {
-			if (param.strTimeFilter != "") {
+			if (vecOutputTimes.size() != vecTimes.size()) {
 				CopyNcVarTimeSubset(ncInput, *(vecpncOutputFiles[f]), "time", vecOutputTimes);
 
 			} else {
@@ -525,14 +527,16 @@ void PersistentBlobs(
 		int to = (-1);
 		for (int t = 0; t < vecTimes.size(); t++) {
 
-			// Announce
 			std::string strTime = vecTimes[t].ToString();
-			Announce("Input time %s", strTime.c_str());
 
+			// Skip if not retained
 			if (!vecTimeRetained[t]) {
-				AnnounceEndBlock("Skipping (timefilter)");
+				Announce("Input time %s.. Skipping (timefilter)", strTime.c_str());
 				continue;
 			}
+
+			Announce("Input time %s", strTime.c_str());
+
 			to++;
 
 			// Load the search variable data
@@ -541,15 +545,22 @@ void PersistentBlobs(
 			var.LoadGridData(varreg, vecFiles, grid);
 			const DataArray1D<float> & dataState = var.GetData();
 
+			float dFillValue = var.GetFillValueFloat();
+
 			// Copy over count and update
 			for (size_t i = 0; i < dCount.GetRows(); i++) {
-				if (vecPersistenceThresholdOp[0].IsSatisfiedBy(dataState[i])) {
-					dCount[i]++;
-					if (dCount[i] >= nPersistenceThresholdTimesteps) {
-						dCountdown[i] = nPersistenceThresholdTimesteps;
-					}
-				} else {
+				if ((dataState[i] == dFillValue) || (dataState[i] != dataState[i])) {
 					dCount[i] = 0;
+					continue;
+				}
+				if (!vecPersistenceThresholdOp[0].IsSatisfiedBy(dataState[i])) {
+					dCount[i] = 0;
+					continue;
+				}
+
+				dCount[i]++;
+				if (dCount[i] >= nPersistenceThresholdTimesteps) {
+					dCountdown[i] = nPersistenceThresholdTimesteps;
 				}
 			}
 
