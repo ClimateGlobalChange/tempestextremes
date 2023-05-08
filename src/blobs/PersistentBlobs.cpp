@@ -257,6 +257,8 @@ public:
 		fOutFloat(false),
 		fRegional(false),
 		strTagVar("binary_tag"),
+		strStartTime(""),
+		strEndTime(""),
 		strTimeFilter(""),
 		strLongitudeName("lon"),
 		strLatitudeName("lat"),
@@ -275,6 +277,12 @@ public:
 
 	// Variable name for tags
 	std::string strTagVar;
+
+	// Start time
+	std::string strStartTime;
+
+	// End time
+	std::string strEndTime;
 
 	// Time filter
 	std::string strTimeFilter;
@@ -423,31 +431,48 @@ void PersistentBlobs(
 			}
 		}
 
-		// Read the time data
+		// Read the time data and filter
 		const NcTimeDimension & vecTimes = vecFiles.GetNcTimeDimension(0);
 
-		std::vector<bool> vecTimeRetained;
+		std::vector<bool> vecTimeRetained(vecTimes.size(), false);
 		std::vector<Time> vecOutputTimes;
-#ifndef TEMPEST_NOREGEX
-		if (param.strTimeFilter != "") {
-			vecTimeRetained.resize(vecTimes.size(), false);
-			for (int t = 0; t < vecTimes.size(); t++) {
-				std::string strTime = vecTimes[t].ToString();
-				std::smatch match;
-				if (std::regex_search(strTime, match, reTimeSubset)) {
-					vecOutputTimes.push_back(vecTimes[t]);
-					vecTimeRetained[t] = true;
+
+		Time timeStartTime;
+		Time timeEndTime;
+
+		if (param.strStartTime != "") {
+			timeStartTime = Time(vecTimes[0].GetCalendarType());
+			timeStartTime.FromFormattedString(param.strStartTime);
+		}
+		if (param.strEndTime != "") {
+			timeEndTime = Time(vecTimes[0].GetCalendarType());
+			timeEndTime.FromFormattedString(param.strEndTime);
+		}
+
+		for (int t = 0; t < vecTimes.size(); t++) {
+			if (timeStartTime.GetCalendarType() != Time::CalendarUnknown) {
+				double dDeltaSeconds = timeStartTime - vecTimes[t];
+				if (dDeltaSeconds > 0.0) {
+					continue;
+				}
+			}
+			if (timeEndTime.GetCalendarType() != Time::CalendarUnknown) {
+				double dDeltaSeconds = vecTimes[t] - timeEndTime;
+				if (dDeltaSeconds > 0.0) {
+					continue;
 				}
 			}
 
-		} else {
-			vecOutputTimes = vecTimes;
-			vecTimeRetained.resize(vecTimes.size(), true);
-		}
-#else
-		vecOutputTimes = vecTimes;
-		vecTimeRetained.resize(vecTimes.size(), true);
+#ifndef TEMPEST_NOREGEX
+			std::string strTime = vecTimes[t].ToString();
+			std::smatch match;
+			if (!std::regex_search(strTime, match, reTimeSubset)) {
+				continue;
+			}
 #endif
+			vecOutputTimes.push_back(vecTimes[t]);
+			vecTimeRetained[t] = true;	
+		}
 
 		// Create reference to NetCDF input file
 		NcFile & ncInput = *(vecFiles[0]);
@@ -669,6 +694,9 @@ try {
 		CommandLineString(strOutputFileList, "out_list", "");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,timesteps;...]");
 		CommandLineBool(pbparam.fRegional, "regional");
+		CommandLineString(pbparam.strStartTime, "time_start", "");
+		CommandLineString(pbparam.strEndTime, "time_end", "");
+		CommandLineString(pbparam.strTimeFilter, "timefilter", "");
 		CommandLineBool(pbparam.fOutFloat, "out_float");
 		CommandLineString(pbparam.strTagVar, "tagvar", "binary_tag");
 		CommandLineString(pbparam.strLongitudeName, "lonname", "lon");

@@ -259,6 +259,10 @@ try {
 	std::vector<double> vecTgtLonDeg(nB);
 	std::vector<double> vecTgtLatDeg(nB);
 
+	for (int i = 0; i < nA; i++) {
+		vecSrcLonDeg[i] = RadToDeg(gridSource.m_dLon[i]);
+		vecSrcLatDeg[i] = RadToDeg(gridSource.m_dLat[i]);
+	}
 	for (int j = 0; j < nB; j++) {
 		if ((j % (nB / 10) == 0) && (j != 0)) {
 			int nPctComplete = j / (nB / 10);
@@ -279,15 +283,19 @@ try {
 				gridTarget.m_dLon[j],
 				gridTarget.m_dLat[j]);
 
+		//printf("%1.5f %1.5f ; %1.5f %1.5f\n", vecTgtLatDeg[j], vecSrcLatDeg[sNearestNode], vecTgtLonDeg[j], vecSrcLonDeg[sNearestNode]);
+		if (fabs(vecTgtLatDeg[j] - vecSrcLatDeg[sNearestNode]) > 0.07) {
+			continue;
+		}
+		if (fabs(LonDegToStandardRange(vecTgtLonDeg[j]) - LonDegToStandardRange(vecSrcLonDeg[sNearestNode])) > 0.07) {
+			continue;
+		}
+
 		_ASSERT(sNearestNode < static_cast<size_t>(nA));
 
 		vecRow[j] = j + 1;
 		vecCol[j] = static_cast<int>(sNearestNode) + 1;
 		vecS[j] = 1.0;
-	}
-	for (int i = 0; i < nA; i++) {
-		vecSrcLonDeg[i] = RadToDeg(gridSource.m_dLon[i]);
-		vecSrcLatDeg[i] = RadToDeg(gridSource.m_dLat[i]);
 	}
 	AnnounceEndBlock(NULL);
 
