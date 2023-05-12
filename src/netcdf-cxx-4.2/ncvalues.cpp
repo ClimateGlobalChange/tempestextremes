@@ -7,31 +7,31 @@
  *   $Header: /upc/share/CVS/netcdf-3/cxx/ncvalues.cpp,v 1.12 2008/03/05 16:45:32 russ Exp $
  *********************************************************************/
 
-//#include "config.h"
 #include <iostream>
 #include <string>
 #include <cstring>
 
 #include "ncvalues.h"
 
-NcValues::NcValues( void ) : the_type(ncNoType), the_number(0)
+NcValues::NcValues( void ) :
+	the_type(ncNoType),
+	the_number(0)
 {}
 
-NcValues::NcValues(NcType type, long num)
-	: the_type(type), the_number(num)
+NcValues::NcValues( NcType type, long num ) :
+	the_type(type),
+	the_number(num)
 {}
 
 NcValues::~NcValues( void )
 {}
 
-long NcValues::num( void )
-{
-    return the_number;
-}    
+long NcValues::num( void ) {
+	return the_number;
+}
 
-std::ostream& operator<< (std::ostream& os, const NcValues& vals)
-{
-    return vals.print(os);
+std::ostream& operator<< (std::ostream& os, const NcValues& vals) {
+	return vals.print(os);
 }
 
 implement(NcValues,ncbyte)
@@ -67,19 +67,16 @@ as_ncbyte_implement(double)
 as_ncbyte_implement(ncint64)
 as_ncbyte_implement(ncuint64)
 
-inline ncbyte NcValues_char::as_ncbyte( long n ) const
-{
-    return the_values[n];
+inline ncbyte NcValues_char::as_ncbyte( long n ) const {
+	return the_values[n];
 }
 
-inline ncbyte NcValues_ncbyte::as_ncbyte( long n ) const
-{
-    return the_values[n];
+inline ncbyte NcValues_ncbyte::as_ncbyte( long n ) const {
+	return the_values[n];
 }
 
-inline ncbyte NcValues_ncstring::as_ncbyte( long n ) const
-{
-    return the_values[n];
+inline ncbyte NcValues_ncstring::as_ncbyte( long n ) const {
+	return the_values[n];
 }
 
 as_char_implement(short)
@@ -91,19 +88,16 @@ as_char_implement(double)
 as_char_implement(ncint64)
 as_char_implement(ncuint64)
 
-inline char NcValues_ncbyte::as_char( long n ) const
-{
-    return the_values[n] > CHAR_MAX ? ncBad_char : (char) the_values[n];
+inline char NcValues_ncbyte::as_char( long n ) const {
+	return the_values[n] > CHAR_MAX ? ncBad_char : (char) the_values[n];
 }
 
-inline char NcValues_char::as_char( long n ) const
-{
-    return the_values[n];
+inline char NcValues_char::as_char( long n ) const {
+	return the_values[n];
 }
 
-inline char NcValues_ncstring::as_char( long n ) const
-{
-    return the_values[n];
+inline char NcValues_ncstring::as_char( long n ) const {
+	return the_values[n];
 }
 
 as_short_implement(int)
@@ -114,24 +108,20 @@ as_short_implement(double)
 as_short_implement(ncint64)
 as_short_implement(ncuint64)
 
-inline short NcValues_ncbyte::as_short( long n ) const
-{
-    return the_values[n];
+inline short NcValues_ncbyte::as_short( long n ) const {
+	return the_values[n];
 }
 
-inline short NcValues_char::as_short( long n ) const
-{
-    return the_values[n];
+inline short NcValues_char::as_short( long n ) const {
+	return the_values[n];
 }
 
-inline short NcValues_short::as_short( long n ) const
-{
-    return the_values[n];
+inline short NcValues_short::as_short( long n ) const {
+	return the_values[n];
 }
 
-inline short NcValues_ncstring::as_short( long n ) const
-{
-    return the_values[n];
+inline short NcValues_ncstring::as_short( long n ) const {
+	return the_values[n];
 }
 
 
@@ -140,39 +130,32 @@ as_int_implement(double)
 as_int_implement(ncint64)
 as_int_implement(ncuint64)
 
-inline int NcValues_ncbyte::as_int( long n ) const
-{
-    return the_values[n];
+inline int NcValues_ncbyte::as_int( long n ) const {
+	return the_values[n];
 }
 
-inline int NcValues_char::as_int( long n ) const
-{
-    return the_values[n];
+inline int NcValues_char::as_int( long n ) const {
+	return the_values[n];
 }
 
-inline int NcValues_short::as_int( long n ) const
-{
-    return the_values[n];
+inline int NcValues_short::as_int( long n ) const {
+	return the_values[n];
 }
 
-inline int NcValues_int::as_int( long n ) const
-{
-    return the_values[n];
+inline int NcValues_int::as_int( long n ) const {
+	return the_values[n];
 }
 
-inline int NcValues_nclong::as_int( long n ) const
-{
-    return the_values[n];
+inline int NcValues_nclong::as_int( long n ) const {
+	return the_values[n];
 }
 
-inline int NcValues_long::as_int( long n ) const
-{
-    return the_values[n];
+inline int NcValues_long::as_int( long n ) const {
+	return the_values[n];
 }
 
-inline int NcValues_ncstring::as_int( long n ) const
-{
-    return the_values[n];
+inline int NcValues_ncstring::as_int( long n ) const {
+	return the_values[n];
 }
 
 
@@ -181,183 +164,149 @@ as_nclong_implement(double)
 as_nclong_implement(ncint64)
 as_nclong_implement(ncuint64)
 
-inline nclong NcValues_ncbyte::as_nclong( long n ) const
-{
-    return the_values[n];
+inline nclong NcValues_ncbyte::as_nclong( long n ) const {
+	return the_values[n];
 }
 
-inline nclong NcValues_char::as_nclong( long n ) const
-{
-    return the_values[n];
+inline nclong NcValues_char::as_nclong( long n ) const {
+	return the_values[n];
 }
 
-inline nclong NcValues_short::as_nclong( long n ) const
-{
-    return the_values[n];
+inline nclong NcValues_short::as_nclong( long n ) const {
+	return the_values[n];
 }
 
-inline nclong NcValues_int::as_nclong( long n ) const
-{
-    return the_values[n];
+inline nclong NcValues_int::as_nclong( long n ) const {
+	return the_values[n];
 }
 
-inline nclong NcValues_nclong::as_nclong( long n ) const
-{
-    return the_values[n];
+inline nclong NcValues_nclong::as_nclong( long n ) const {
+	return the_values[n];
 }
 
-inline nclong NcValues_long::as_nclong( long n ) const
-{
-    return the_values[n];
+inline nclong NcValues_long::as_nclong( long n ) const {
+	return the_values[n];
 }
 
-inline nclong NcValues_ncstring::as_nclong( long n ) const
-{
-    return the_values[n];
+inline nclong NcValues_ncstring::as_nclong( long n ) const {
+	return the_values[n];
 }
 
 as_long_implement(float)
 as_long_implement(double)
 
-inline long NcValues_ncbyte::as_long( long n ) const
-{
-    return the_values[n];
-}
-
-inline long NcValues_char::as_long( long n ) const
-{
-    return the_values[n];
-}
-
-inline long NcValues_short::as_long( long n ) const
-{
-    return the_values[n];
-}
-
-inline long NcValues_int::as_long( long n ) const
-{
-    return the_values[n];
-}
-
-inline long NcValues_nclong::as_long( long n ) const
-{
-    return the_values[n];
-}
-
-inline long NcValues_long::as_long( long n ) const
-{
-    return the_values[n];
-}
-
-inline long NcValues_ncint64::as_long( long n ) const
-{
+inline long NcValues_ncbyte::as_long( long n ) const {
 	return the_values[n];
 }
 
-inline long NcValues_ncuint64::as_long( long n ) const
-{
+inline long NcValues_char::as_long( long n ) const {
 	return the_values[n];
 }
 
-inline long NcValues_ncstring::as_long( long n ) const
-{
-    return the_values[n];
+inline long NcValues_short::as_long( long n ) const {
+	return the_values[n];
+}
+
+inline long NcValues_int::as_long( long n ) const {
+	return the_values[n];
+}
+
+inline long NcValues_nclong::as_long( long n ) const {
+	return the_values[n];
+}
+
+inline long NcValues_long::as_long( long n ) const {
+	return the_values[n];
+}
+
+inline long NcValues_ncint64::as_long( long n ) const {
+	return the_values[n];
+}
+
+inline long NcValues_ncuint64::as_long( long n ) const {
+	return the_values[n];
+}
+
+inline long NcValues_ncstring::as_long( long n ) const {
+	return the_values[n];
 }
 
 as_ncint64_implement(float)
 as_ncint64_implement(double)
 
-inline ncint64 NcValues_ncbyte::as_ncint64( long n ) const
-{
-    return the_values[n];
-}
-
-inline ncint64 NcValues_char::as_ncint64( long n ) const
-{
-    return the_values[n];
-}
-
-inline ncint64 NcValues_short::as_ncint64( long n ) const
-{
-    return the_values[n];
-}
-
-inline ncint64 NcValues_int::as_ncint64( long n ) const
-{
-    return the_values[n];
-}
-
-inline ncint64 NcValues_nclong::as_ncint64( long n ) const
-{
-    return the_values[n];
-}
-
-inline ncint64 NcValues_long::as_ncint64( long n ) const
-{
-    return the_values[n];
-}
-
-inline ncint64 NcValues_ncint64::as_ncint64( long n ) const
-{
+inline ncint64 NcValues_ncbyte::as_ncint64( long n ) const {
 	return the_values[n];
 }
 
-inline ncint64 NcValues_ncuint64::as_ncint64( long n ) const
-{
+inline ncint64 NcValues_char::as_ncint64( long n ) const {
 	return the_values[n];
 }
 
-inline ncint64 NcValues_ncstring::as_ncint64( long n ) const
-{
-    return the_values[n];
+inline ncint64 NcValues_short::as_ncint64( long n ) const {
+	return the_values[n];
+}
+
+inline ncint64 NcValues_int::as_ncint64( long n ) const {
+	return the_values[n];
+}
+
+inline ncint64 NcValues_nclong::as_ncint64( long n ) const {
+	return the_values[n];
+}
+
+inline ncint64 NcValues_long::as_ncint64( long n ) const {
+	return the_values[n];
+}
+
+inline ncint64 NcValues_ncint64::as_ncint64( long n ) const {
+	return the_values[n];
+}
+
+inline ncint64 NcValues_ncuint64::as_ncint64( long n ) const {
+	return the_values[n];
+}
+
+inline ncint64 NcValues_ncstring::as_ncint64( long n ) const {
+	return the_values[n];
 }
 
 as_ncuint64_implement(float)
 as_ncuint64_implement(double)
 
-inline ncuint64 NcValues_ncbyte::as_ncuint64( long n ) const
-{
-    return the_values[n];
-}
-
-inline ncuint64 NcValues_char::as_ncuint64( long n ) const
-{
-    return the_values[n];
-}
-
-inline ncuint64 NcValues_short::as_ncuint64( long n ) const
-{
-    return the_values[n];
-}
-
-inline ncuint64 NcValues_int::as_ncuint64( long n ) const
-{
-    return the_values[n];
-}
-
-inline ncuint64 NcValues_nclong::as_ncuint64( long n ) const
-{
-    return the_values[n];
-}
-
-inline ncuint64 NcValues_long::as_ncuint64( long n ) const
-{
-    return the_values[n];
-}
-
-inline ncuint64 NcValues_ncint64::as_ncuint64( long n ) const
-{
+inline ncuint64 NcValues_ncbyte::as_ncuint64( long n ) const {
 	return the_values[n];
 }
 
-inline ncuint64 NcValues_ncuint64::as_ncuint64( long n ) const
-{
+inline ncuint64 NcValues_char::as_ncuint64( long n ) const {
 	return the_values[n];
 }
 
-inline ncuint64 NcValues_ncstring::as_ncuint64( long n ) const
-{
-    return the_values[n];
+inline ncuint64 NcValues_short::as_ncuint64( long n ) const {
+	return the_values[n];
+}
+
+inline ncuint64 NcValues_int::as_ncuint64( long n ) const {
+	return the_values[n];
+}
+
+inline ncuint64 NcValues_nclong::as_ncuint64( long n ) const {
+	return the_values[n];
+}
+
+inline ncuint64 NcValues_long::as_ncuint64( long n ) const {
+	return the_values[n];
+}
+
+inline ncuint64 NcValues_ncint64::as_ncuint64( long n ) const {
+	return the_values[n];
+}
+
+inline ncuint64 NcValues_ncuint64::as_ncuint64( long n ) const {
+	return the_values[n];
+}
+
+inline ncuint64 NcValues_ncstring::as_ncuint64( long n ) const {
+	return the_values[n];
 }
 
 as_float_implement(ncbyte)
@@ -393,130 +342,124 @@ as_string_implement(float)
 as_string_implement(double)
 as_string_implement(ncint64)
 as_string_implement(ncuint64)
-as_string_implement(ncstring)
 
-inline char* NcValues_ncbyte::as_string( long n ) const
-{
-    char* s = new char[the_number + 1];
-    s[the_number] = '\0';
-    strncpy(s, (const char*)the_values + n, (int)the_number);
-    return s;
+inline char* NcValues_ncbyte::as_string( long n ) const {
+	char* s = new char[the_number + 1];
+	s[the_number] = '\0';
+	strncpy(s, (const char*)the_values + n, (int)the_number);
+	return s;
 }
 
-inline char* NcValues_char::as_string( long n ) const
-{
-    char* s = new char[the_number + 1];
-    s[the_number] = '\0';
-    strncpy(s, (const char*)the_values + n, (int)the_number);
-    return s;
+inline char* NcValues_char::as_string( long n ) const {
+	char* s = new char[the_number + 1];
+	s[the_number] = '\0';
+	strncpy(s, (const char*)the_values + n, (int)the_number);
+	return s;
 }
 
-std::ostream& NcValues_short::print(std::ostream& os) const
-{
-    for(int i = 0; i < the_number - 1; i++)
-      os << the_values[i] << ", ";
-    if (the_number > 0)
-      os << the_values[the_number-1] ;
-    return os;
+inline char* NcValues_ncstring::as_string( long n ) const {
+	char* s = new char[the_number + 1];
+	s[the_number] = '\0';
+	strncpy(s, (const char*)the_values + n, (int)the_number);
+	return s;
 }
 
-std::ostream& NcValues_int::print(std::ostream& os) const
-{
-    for(int i = 0; i < the_number - 1; i++)
-      os << the_values[i] << ", ";
-    if (the_number > 0)
-      os << the_values[the_number-1] ;
-    return os;
+std::ostream& NcValues_short::print(std::ostream& os) const {
+	for(int i = 0; i < the_number - 1; i++)
+		os << the_values[i] << ", ";
+	if (the_number > 0)
+		os << the_values[the_number-1] ;
+	return os;
 }
 
-std::ostream& NcValues_nclong::print(std::ostream& os) const
-{
-    for(int i = 0; i < the_number - 1; i++)
-      os << the_values[i] << ", ";
-    if (the_number > 0)
-      os << the_values[the_number-1] ;
-    return os;
+std::ostream& NcValues_int::print(std::ostream& os) const {
+	for(int i = 0; i < the_number - 1; i++)
+		os << the_values[i] << ", ";
+	if (the_number > 0)
+		os << the_values[the_number-1] ;
+	return os;
 }
 
-std::ostream& NcValues_long::print(std::ostream& os) const
-{
-    for(int i = 0; i < the_number - 1; i++)
-      os << the_values[i] << ", ";
-    if (the_number > 0)
-      os << the_values[the_number-1] ;
-    return os;
+std::ostream& NcValues_nclong::print(std::ostream& os) const {
+	for(int i = 0; i < the_number - 1; i++)
+		os << the_values[i] << ", ";
+	if (the_number > 0)
+		os << the_values[the_number-1] ;
+	return os;
 }
 
-std::ostream& NcValues_ncbyte::print(std::ostream& os) const
-{
-    for(int i = 0; i < the_number - 1; i++)
-      os << the_values[i] << ", ";
-    if (the_number > 0)
-      os << the_values[the_number-1] ;
-    return os;
+std::ostream& NcValues_long::print(std::ostream& os) const {
+	for(int i = 0; i < the_number - 1; i++)
+		os << the_values[i] << ", ";
+	if (the_number > 0)
+		os << the_values[the_number-1] ;
+	return os;
 }
 
-std::ostream& NcValues_char::print(std::ostream& os) const
-{
-    os << '"';
-    long len = the_number;
-    while (the_values[--len] == '\0') // don't output trailing null bytes
+std::ostream& NcValues_ncbyte::print(std::ostream& os) const {
+	for(int i = 0; i < the_number - 1; i++)
+		os << the_values[i] << ", ";
+	if (the_number > 0)
+		os << the_values[the_number-1] ;
+	return os;
+}
+
+std::ostream& NcValues_char::print(std::ostream& os) const {
+	os << '"';
+	long len = the_number;
+	while (the_values[--len] == '\0') // don't output trailing null bytes
 	;
-    for(int i = 0; i <= len; i++)
+	for(int i = 0; i <= len; i++)
 	os << the_values[i] ;
-    os << '"';
-    
-    return os;
+	os << '"';
+
+	return os;
 }
 
-std::ostream& NcValues_float::print(std::ostream& os) const
-{
-    std::streamsize save=os.precision();
-    os.precision(7);
-    for(int i = 0; i < the_number - 1; i++)
-      os << the_values[i] << ", ";
-    if (the_number > 0)
-      os << the_values[the_number-1] ;
-    os.precision(save);
-    return os;
+std::ostream& NcValues_float::print(std::ostream& os) const {
+	std::streamsize save=os.precision();
+	os.precision(7);
+	for(int i = 0; i < the_number - 1; i++)
+		os << the_values[i] << ", ";
+	if (the_number > 0)
+		os << the_values[the_number-1] ;
+	os.precision(save);
+	return os;
 }
 
-std::ostream& NcValues_double::print(std::ostream& os) const
-{
-    std::streamsize save=os.precision();
-    os.precision(15);
-    for(int i = 0; i < the_number - 1; i++)
-      os << the_values[i] << ", ";
-    if (the_number > 0)
-      os << the_values[the_number-1];
-    os.precision(save);
-    return os;
+std::ostream& NcValues_double::print(std::ostream& os) const {
+	std::streamsize save=os.precision();
+	os.precision(15);
+	for(int i = 0; i < the_number - 1; i++)
+		os << the_values[i] << ", ";
+	if (the_number > 0)
+		os << the_values[the_number-1];
+	os.precision(save);
+	return os;
 }
 
-std::ostream& NcValues_ncint64::print(std::ostream& os) const
-{
-    for(int i = 0; i < the_number - 1; i++)
-      os << the_values[i] << ", ";
-    if (the_number > 0)
-      os << the_values[the_number-1] ;
-    return os;
+std::ostream& NcValues_ncint64::print(std::ostream& os) const {
+	for(int i = 0; i < the_number - 1; i++)
+		os << the_values[i] << ", ";
+	if (the_number > 0)
+		os << the_values[the_number-1] ;
+	return os;
 }
 
-std::ostream& NcValues_ncuint64::print(std::ostream& os) const
-{
-    for(int i = 0; i < the_number - 1; i++)
-      os << the_values[i] << ", ";
-    if (the_number > 0)
-      os << the_values[the_number-1] ;
-    return os;
+std::ostream& NcValues_ncuint64::print(std::ostream& os) const {
+	for(int i = 0; i < the_number - 1; i++)
+		os << the_values[i] << ", ";
+	if (the_number > 0)
+		os << the_values[the_number-1] ;
+	return os;
 }
 
-std::ostream& NcValues_ncstring::print(std::ostream& os) const
-{
-    for(int i = 0; i < the_number - 1; i++)
-      os << the_values[i] << ", ";
-    if (the_number > 0)
-      os << the_values[the_number-1] ;
-    return os;
+std::ostream& NcValues_ncstring::print(std::ostream& os) const {
+	for(int i = 0; i < the_number - 1; i++)
+		os << the_values[i] << ", ";
+	if (the_number > 0)
+		os << the_values[the_number-1] ;
+	return os;
 }
+
 
