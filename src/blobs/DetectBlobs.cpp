@@ -1911,7 +1911,9 @@ try {
 
 		// Generate output file name
 		if (vecInputFiles.size() == 1) {
-			if (strOutputFile == "") {
+			if (vecOutputFiles.size() == 1) {
+				strOutputFileCurrent = vecOutputFiles[0];
+			} else if (strOutputFile == "") {
 				strOutputFileCurrent = "out.nc";
 			} else {
 				strOutputFileCurrent = strOutputFile;
