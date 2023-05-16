@@ -2,10 +2,10 @@
 ///
 ///	\file    GridElements.cpp
 ///	\author  Paul Ullrich
-///	\version March 7, 2014
+///	\version May 12, 2023
 ///
 ///	<remarks>
-///		Copyright 2000-2014 Paul Ullrich
+///		Copyright 2023 Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -29,8 +29,75 @@
 #include <cstring>
 #include <algorithm>
 #include "netcdfcpp.h"
+#include "kdtree.h"
 
-//#include "triangle.h"
+///////////////////////////////////////////////////////////////////////////////
+/// NodeTree
+///////////////////////////////////////////////////////////////////////////////
+
+NodeTree::NodeTree(
+	double minimum_spacing
+) :
+	m_minimum_spacing(minimum_spacing),
+	m_size(0)
+{
+	m_kdtree = kd_create(3);
+	if (m_kdtree == NULL) {
+		_EXCEPTIONT("kd_create(3) failed");
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+NodeTree::~NodeTree() {
+	kd_free(m_kdtree);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+size_t NodeTree::find(
+	const Node & node
+) {
+	kdres * kdresNearestRange = kd_nearest_range3(m_kdtree, node.x, node.y, node.z, m_minimum_spacing);
+	if (kdresNearestRange == NULL) {
+		_EXCEPTIONT("kd_nearest_range3() failed");
+	}
+	int nResSize = kd_res_size(kdresNearestRange);
+	if (nResSize == 0) {
+		kd_res_free(kdresNearestRange);
+		return (size_t)(InvalidNode);
+	}
+	size_t iMinimalIndex = std::numeric_limits<int>::max();
+	for (;;) {
+		size_t j = (size_t)(kd_res_item_data(kdresNearestRange));
+		if (j < iMinimalIndex) {
+			iMinimalIndex = j;
+		}
+
+		if (kd_res_next(kdresNearestRange) == 0) {
+			break;
+		}
+	}
+	_ASSERT(iMinimalIndex != std::numeric_limits<int>::max());
+	kd_res_free(kdresNearestRange);
+	return iMinimalIndex;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+size_t NodeTree::find_or_insert(
+	const Node & node,
+	size_t index
+) {
+	int findindex = find(node);
+	if (findindex != (size_t)(InvalidNode)) {
+		return findindex;
+	}
+
+	kd_insert3(m_kdtree, node.x, node.y, node.z, (void*)(index));
+	m_size++;
+	return index;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Face
@@ -257,33 +324,28 @@ void Mesh::ExchangeFirstAndSecondMesh() {
 ///////////////////////////////////////////////////////////////////////////////
 
 void Mesh::RemoveCoincidentNodes() {
-
-	// Put nodes into a map, tagging uniques
-	std::map<Node, int> mapNodes;
-
 	std::vector<int> vecNodeIndex;
 	std::vector<int> vecUniques;
 
 	vecNodeIndex.reserve(nodes.size());
 	vecUniques.reserve(nodes.size());
 
-	for (int i = 0; i < nodes.size(); i++) {
-		std::map<Node, int>::const_iterator iter = mapNodes.find(nodes[i]);
+	// Identify duplicate nodes
+	NodeTree nt(coincident_node_tolerance);
 
-		if (iter != mapNodes.end()) {
-			vecNodeIndex[i] = vecNodeIndex[iter->second];
-		} else {
-			mapNodes.insert(std::pair<Node, int>(nodes[i], i));
-			vecNodeIndex[i] = vecUniques.size();
+	for (size_t i = 0; i < nodes.size(); i++) {
+		size_t s = nt.find_or_insert(nodes[i], i);
+		if (s == i) {
 			vecUniques.push_back(i);
+			vecNodeIndex.push_back(i);
+		} else {
+			vecNodeIndex.push_back(s);
 		}
 	}
 
-	if (vecUniques.size() == nodes.size()) {
-		return;
+	if (nodes.size() - vecUniques.size() != 0) {
+		Announce("%i duplicate nodes detected", nodes.size() - vecUniques.size());
 	}
-
-	Announce("%i duplicate nodes detected", nodes.size() - vecUniques.size());
 
 	// Remove duplicates
 	NodeVector nodesOld = nodes;
@@ -304,96 +366,6 @@ void Mesh::RemoveCoincidentNodes() {
 	}
 }
 
-///////////////////////////////////////////////////////////////////////////////
-/*
-void Mesh::RemoveCoincidentNodes_Fixed() {
-	if (nodes.size() == 0) {
-		return;
-	}
-
-	class NodeXYZ {
-		public:
-			double x;
-			double y;
-			double z;
-			int ix;
-	
-		public:
-			bool operator<(const NodeXYZ & node) const {
-				if (x < node.x) {
-					return true;
-				} else if (x > node.x) {
-					return false;
-				}
-
-				if (y < node.y) {
-					return true;
-				} else if (y > node.y) {
-					return false;
-				}
-
-				if (z < node.z) {
-					return true;
-				} else if (z > node.z) {
-					return false;
-				}
-
-				return false;
-			}
-	};
-
-	std::vector<NodeXYZ> vecNodeXI(nodes.size());
-
-	for (int i = 0; i < nodes.size(); i++) {
-		vecNodeXI[i].x = nodes[i].x;
-		vecNodeXI[i].y = nodes[i].y;
-		vecNodeXI[i].z = nodes[i].z;
-		vecNodeXI[i].ix = i;
-	}
-
-	std::sort(vecNodeXI.begin(), vecNodeXI.end());
-
-	auto itRef = vecNodeXI.begin();
-
-	//auto itBeginX = vecNodeXI.begin();
-	auto itEndX = vecNodeXI.begin();
-
-	for (int i = 0; i < vecNodeXI.size(); i++) {
-		if (itRef->ix != i) {
-			continue;
-		}
-		//while(itRef->x - itBeginX->x > ReferenceTolerance) {
-		//	itBeginX++;
-		//}
-		while((itEndX != vecNodeXI.end()) && (itEndX->x - itRef->x <= ReferenceTolerance)) {
-			itEndX++;
-		}
-
-		for (auto itY = itRef; itY != itEndX; itY++) {
-			if ((fabs(itRef->y - itY->y) <= ReferenceTolerance) &&
-			    (fabs(itRef->z - itY->z) <= ReferenceTolerance)
-			) {
-				itY->ix = i;
-			}
-		}
-
-		itRef++;
-	}
-
-	int nRemoved = 0;
-	for (int i = 0; i < vecNodeXI.size(); i++) {
-		if (vecNodeXI[i].ix != i) {
-			printf("%1.5e %1.5e %1.5e\n",
-				fabs(vecNodeXI[i].x - vecNodeXI[vecNodeXI[i].ix].x),
-				fabs(vecNodeXI[i].y - vecNodeXI[vecNodeXI[i].ix].y),
-				fabs(vecNodeXI[i].z - vecNodeXI[vecNodeXI[i].ix].z));
-			nRemoved++;
-		}
-	}
-
-	Announce("%i duplicate nodes detected", nRemoved);
-}
-*/
 ///////////////////////////////////////////////////////////////////////////////
 
 void Mesh::Write(
@@ -1895,6 +1867,8 @@ void EqualizeCoincidentNodes(
 	const Mesh & meshFirst,
 	Mesh & meshSecond
 ) {
+	_EXCEPTION();
+/*
 	// Sort nodes
 	std::map<Node, int> setSortedFirstNodes;
 	for (int i = 0; i < meshFirst.nodes.size(); i++) {
@@ -1912,6 +1886,7 @@ void EqualizeCoincidentNodes(
 			meshSecond.nodes[i] = iter->first;
 		}
 	}
+*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1946,6 +1921,8 @@ int BuildCoincidentNodeVector(
 	const Mesh & meshSecond,
 	std::vector<int> & vecSecondToFirstCoincident
 ) {
+	_EXCEPTION();
+/*
 	int nCoincidentNodes = 0;
 
 	// Sort nodes
@@ -1971,6 +1948,7 @@ int BuildCoincidentNodeVector(
 	}
 
 	return nCoincidentNodes;
+*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////

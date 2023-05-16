@@ -279,7 +279,7 @@ double GenerateMetaData(
 	dataGLLnodes.Allocate(nP, nP, nElements);
 	dataGLLJacobian.Allocate(nP, nP, nElements);
 
-	std::map<Node, int> mapNodes;
+	NodeTree nt;
 
 	// GLL Quadrature nodes
 	DataArray1D<double> dG;
@@ -400,17 +400,7 @@ double GenerateMetaData(
 				dDx2G);
 
 			// Determine if this is a unique Node
-			std::map<Node, int>::const_iterator iter = mapNodes.find(nodeGLL);
-			if (iter == mapNodes.end()) {
-
-				// Insert new unique node into map
-				int ixNode = static_cast<int>(mapNodes.size());
-				mapNodes.insert(std::pair<Node, int>(nodeGLL, ixNode));
-				dataGLLnodes[j][i][k] = ixNode + 1;
-
-			} else {
-				dataGLLnodes[j][i][k] = iter->second + 1;
-			}
+			dataGLLnodes[j][i][k] = nt.find_or_insert(nodeGLL, nt.size()+1);
 
 			// Cross product gives local Jacobian
 			Node nodeCross = CrossProduct(dDx1G, dDx2G);

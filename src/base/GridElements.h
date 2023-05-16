@@ -2,10 +2,10 @@
 ///
 ///	\file    GridElements.h
 ///	\author  Paul Ullrich
-///	\version March 7, 2014
+///	\version May 12, 2023
 ///
 ///	<remarks>
-///		Copyright 2000-2014 Paul Ullrich
+///		Copyright 2023 Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -28,17 +28,11 @@
 #include <cmath>
 #include <cassert>
 
-#if defined(OVERLAPMESH_USE_UNSORTED_MAP)
-#include <unordered_map>
-#endif
-#if defined(OVERLAPMESH_USE_NODE_MULTIMAP)
-#include "node_multimap_3d.h"
-#endif
-
 #include "Exception.h"
 #include "DataArray1D.h"
 #include "CoordTransforms.h"
 #include "netcdfcpp.h"
+#include "kdtree.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -124,21 +118,21 @@ public:
 		// !!!!       are not sorted properly in a std::map.
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-		if (x < node.x) {
+		if (x < node.x - ReferenceTolerance) {
 			return true;
-		} else if (x > node.x) {
+		} else if (x > node.x + ReferenceTolerance) {
 			return false;
 		}
 
-		if (y < node.y) {
+		if (y < node.y - ReferenceTolerance) {
 			return true;
-		} else if (y > node.y) {
+		} else if (y > node.y + ReferenceTolerance) {
 			return false;
 		}
 
-		if (z < node.z) {
+		if (z < node.z - ReferenceTolerance) {
 			return true;
-		} else if (z > node.z) {
+		} else if (z > node.z + ReferenceTolerance) {
 			return false;
 		}
 
@@ -270,7 +264,17 @@ public:
 	Real Magnitude() const {
 		return sqrt(x * x + y * y + z * z);
 	}
+/*
+	///	<summary>
+	///		int64 hash of this node (assumes all coordinates in [-1,1] interval).
+	///	</summary>
+	inline int64_t Hash64() const {
+		int64_t i64x = (int64_t)(std::round(0.5 * (1.0 + nodes.x) * (double)(1 << 20)));
+		int64_t i64y = (int64_t)(std::round(0.5 * (1.0 + nodes.y) * (double)(1 << 20)));
 
+		return ((i64x << 40) + (i64y << 20) + (i64z));
+	}
+*/
 	///	<summary>
 	///		Output node to stdout.
 	///	</summary>
@@ -278,7 +282,6 @@ public:
 		printf("%s: %1.15e %1.15e %1.15e\n", szName, x, y, z);
 	}
 };
-
 
 ///	<summary>
 ///		A vector for the storage of Nodes.
@@ -288,32 +291,7 @@ typedef std::vector<Node> NodeVector;
 ///	<summary>
 ///		A map between Nodes and indices.
 ///	</summary>
-#if defined(OVERLAPMESH_RETAIN_REPEATED_NODES)
 typedef std::map<Node, int> NodeMap;
-#endif
-
-#if defined(OVERLAPMESH_USE_NODE_MULTIMAP)
-typedef node_multimap_3d<Node, int> NodeMap;
-#endif
-
-#if defined(OVERLAPMESH_USE_UNSORTED_MAP)
-///	<summary>
-///		Hasher for a Node.
-///	</summary>
-struct NodeHash {
-	std::size_t operator()(const Node& node) const {
-		static const double bin_width = OVERLAPMESH_BIN_WIDTH;
-
-		int i = static_cast<int>((node.x + 2.123456789101112) / bin_width);
-		int j = static_cast<int>((node.y + 2.123456789101112) / bin_width);
-		int k = static_cast<int>((node.z + 2.123456789101112) / bin_width);
-
-		return (std::size_t)(i * 18397 + j * 20483 + k * 29303);
-	}
-};
-
-typedef std::unordered_map<Node, int, NodeHash> NodeMap;
-#endif
 
 ///	<summary>
 ///		Value type for NodeMap.
@@ -346,6 +324,68 @@ static const NodeIndex InvalidNode = (-1);
 ///		An index indicating this Face is invalid.
 ///	</summary>
 static const NodeIndex InvalidFace = (-1);
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A structure for storing Nodes that ensures that minimum Node
+///		spacing is met.
+///	</summary>
+class NodeTree {
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	NodeTree(
+		double minimum_spacing = ReferenceTolerance
+	);
+
+	///	<summary>
+	///		Destructor.
+	///	</summary>
+	~NodeTree();
+
+	///	<summary>
+	///		Find a node in the NodeTree that is within minimum_spacing of
+	///		the provided node.  If multiple nodes exist satisfying this criteria
+	///		return the node with lowest index.
+	///	</summary>
+	size_t find(
+		const Node & node
+	);
+
+	///	<summary>
+	///		Similar to find() except insert the node into the NodeTree if no
+	///		nearby node is found.  The return value is then equal to index.
+	///	</summary>
+	size_t find_or_insert(
+		const Node & node,
+		size_t index
+	);
+
+	///	<summary>
+	///		Number of nodes in this NodeTree.
+	///	</summary>
+	size_t size() const {
+		return m_size;
+	}
+
+private:
+	///	<summary>
+	///		Minimum node spacing (Cartesian distance).
+	///	</summary>
+	double m_minimum_spacing;
+
+	///	<summary>
+	///		kd-tree used for quick lookup of grid points (optionally initialized).
+	///	</summary>
+	kdtree * m_kdtree;
+
+	///	<summary>
+	///		Number of nodes in tree.
+	///	</summary>
+	size_t m_size;
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -702,7 +742,8 @@ public:
         MeshType_IcosaHedral = 2,
         MeshType_IcosaHedralDual = 3,
         MeshType_Overlap = 4,
-		MeshType_UTM = 5
+		MeshType_UTM = 5,
+		MeshType_Transect = 6
     };
 
     MeshType type;
@@ -722,6 +763,11 @@ public:
 	///		Vector of Faces for this mesh.
 	///	<summary>
 	FaceVector faces;
+
+	///	<summary>
+	///		Tolerance for removing coincident nodes.
+	///	</summary>
+	double coincident_node_tolerance;
 
 	///	<summary>
 	///		Vector of first mesh Face indices.
@@ -763,13 +809,23 @@ public:
 	///	<summary>
 	///		Default constructor.
 	///	</summary>
-    Mesh() : type(MeshType_Unknown) {
-	}
+    Mesh(
+		double _coincident_node_tolerance = ReferenceTolerance
+	) :
+		type(MeshType_Unknown),
+		coincident_node_tolerance(_coincident_node_tolerance) 
+	{ }
 
 	///	<summary>
 	///		Constructor with input mesh parameter.
 	///	</summary>
-	Mesh(const std::string & strFile) {
+	Mesh(
+		const std::string & strFile,
+		double _coincident_node_tolerance = ReferenceTolerance
+	) :
+		type(MeshType_Unknown),
+		coincident_node_tolerance(_coincident_node_tolerance)
+	{
 		Read(strFile);
 	}
 
@@ -809,15 +865,11 @@ public:
 	void ExchangeFirstAndSecondMesh();
 
 	///	<summary>
-	///		Remove coincident nodes from the Mesh and adjust indices in faces.
+	///		Remove coincident nodes from the Mesh and adjust indices in faces
+	///		using a kd-tree for nearest neighbor search.
 	///	</summary>
 	void RemoveCoincidentNodes();
-/*
-	///	<summary>
-	///		Remove coincident nodes from the Mesh and adjust indices in faces.
-	///	</summary>
-	void RemoveCoincidentNodes_Fixed();
-*/
+
 	///	<summary>
 	///		Write the mesh to a NetCDF file in Exodus format.
 	///	</summary>
