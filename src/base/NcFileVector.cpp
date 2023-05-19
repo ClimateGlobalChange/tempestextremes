@@ -65,9 +65,9 @@ void NcFileVector::InsertFile(
 
 	// Identify the FileType by the properties of the "time" variable
 	} else {
-		NcDim * dimTime = pNewFile->get_dim("time");
+		NcDim * dimTime = NcGetTimeDimension(*pNewFile);
 		if (dimTime == NULL) {
-			NcVar * varTime = pNewFile->get_var("time");
+			NcVar * varTime = NcGetTimeVariable(*pNewFile);
 			if (varTime != NULL) {
 				ReadCFTimeDataFromNcFile(
 					pNewFile,
@@ -79,7 +79,7 @@ void NcFileVector::InsertFile(
 				m_vecFileType.push_back(FileType_NoTimeDim);
 			}
 		} else {
-			NcVar * varTime = pNewFile->get_var("time");
+			NcVar * varTime = NcGetTimeVariable(*pNewFile);
 			if (varTime == NULL) {
 				m_vecFileType.push_back(FileType_NoTimeVar);
 			} else {
@@ -175,7 +175,7 @@ long NcFileVector::GetTimeIx(size_t pos) const {
 			return NoTimeIndex;
 		}
 
-		NcDim * dimTime = m_vecNcFile[pos]->get_dim("time");
+		NcDim * dimTime = NcGetTimeDimension(*m_vecNcFile[pos]);
 		if (dimTime == NULL) {
 			_EXCEPTIONT("Logic error: Dimension \"time\" missing in file");
 		}

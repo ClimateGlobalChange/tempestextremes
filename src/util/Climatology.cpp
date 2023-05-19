@@ -446,6 +446,7 @@ void Climatology(
 	const std::string & strOutputFile,
 	const std::vector<std::string> & vecVariableNames,
 	const std::vector< std::vector<std::string> > & vecVariableSpecifiedDims,
+	const std::vector<std::string> & vecVariableOutNames,
 	size_t sMemoryMax,
 	bool fIncludeLeapDays,
 	const std::string & strStartTime,
@@ -844,9 +845,15 @@ void Climatology(
 				vecVarNcDims.push_back(itNcDim->second);
 			}
 
-			std::string strOutVar =
-				ClimoVariablePrefix(eClimoPeriod, eClimoType)
-				+ vecVariableNames[v];
+			std::string strOutVar;
+			if (vecVariableOutNames.size() == 0) {
+		   		strOutVar =
+					ClimoVariablePrefix(eClimoPeriod, eClimoType)
+					+ vecVariableNames[v];
+			} else {
+				_ASSERT(v < vecVariableOutNames.size());
+				strOutVar = vecVariableOutNames[v];
+			}
 
 			NcVar * varOut =
 				ncoutfile.add_var(
@@ -1827,6 +1834,9 @@ try {
 	// Variable to use
 	std::string strVariable;
 
+	// Output variable names
+	std::string strVariableOut;
+
 	// Maximum memory allocation per thread
 	std::string strMemoryMax;
 
@@ -1872,6 +1882,7 @@ try {
 		CommandLineString(strInputFileList, "in_data_list", "");
 		CommandLineString(strOutputFile, "out_data", "");
 		CommandLineString(strVariable, "var", "");
+		CommandLineString(strVariableOut, "varout", "");
 		CommandLineStringD(strMemoryMax, "memmax", "2G", "[#K,#M,#G]");
 		CommandLineStringD(strClimoPeriod, "period", "daily", "[daily|monthly|seasonal|annual]");
 		CommandLineStringD(strClimoType, "type", "mean", "[mean|meansq]");
@@ -1958,6 +1969,15 @@ try {
 		vecVariableNames,
 		vecVariableSpecifiedDims
 	);
+
+	// Parse output variable list
+	std::vector<std::string> vecVariableOutNames;
+	if (strVariableOut != "") {
+		STLStringHelper::ParseVariableList(strVariableOut, vecVariableOutNames);
+		if (vecVariableOutNames.size() != vecVariableStrings.size()) {
+			_EXCEPTIONT("If specified, --varout and --var must have the same length");
+		}
+	}
 
 	// Memory maximum
 	size_t sMemoryMax = (-1);
@@ -2049,6 +2069,7 @@ try {
 		strMyOutputFile,
 		vecVariableNames,
 		vecVariableSpecifiedDims,
+		vecVariableOutNames,
 		sMemoryMax,
 		fIncludeLeapDays,
 		strStartTime,

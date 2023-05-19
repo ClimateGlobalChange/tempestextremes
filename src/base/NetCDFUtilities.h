@@ -118,6 +118,33 @@ void NcGetLatitudeLongitudeName(
 ////////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		Determine if a given NcDim is a time dimension.
+///	</summary>
+bool NcIsTimeDimension(
+	NcDim * dim
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Get the time dimension from the NetCDF file.
+///	</summary>
+NcDim * NcGetTimeDimension(
+	NcFile & ncFile
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Get the time variable from the NetCDF file.
+///	</summary>
+NcVar * NcGetTimeVariable(
+	NcFile & ncFile
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Copy NetCDF attribute metadata from one file to another.
 ///	</summary>
 void CopyNcFileAttributes(

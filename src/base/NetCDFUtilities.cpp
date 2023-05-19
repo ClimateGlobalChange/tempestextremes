@@ -90,6 +90,64 @@ void NcGetLatitudeLongitudeName(
 
 ////////////////////////////////////////////////////////////////////////////////
 
+bool NcIsTimeDimension(
+	NcDim * dim
+) {
+	if (strlen(dim->name()) != 4) {
+		return false;
+	}
+	if (strcmp(dim->name(), "time") == 0) {
+		return true;
+	}
+	if (strcmp(dim->name(), "Time") == 0) {
+		return true;
+	}
+	return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+NcDim * NcGetTimeDimension(
+	NcFile & ncFile
+) {
+	NcDim * dim = ncFile.get_dim("time");
+	if (dim != NULL) {
+		return dim;
+	}
+
+	dim = ncFile.get_dim("Time");
+	if (dim != NULL) {
+		return dim;
+	}
+
+	return NULL;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+NcVar * NcGetTimeVariable(
+	NcFile & ncFile
+) {
+	NcVar * var = ncFile.get_var("time");
+	if (var != NULL) {
+		return var;
+	}
+
+	var = ncFile.get_var("Time");
+	if (var != NULL) {
+		return var;
+	}
+
+	var = ncFile.get_var("xtime");
+	if (var != NULL) {
+		return var;
+	}
+
+	return NULL;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void CopyNcFileAttributes(
 	NcFile * fileIn,
 	NcFile * fileOut
@@ -289,7 +347,7 @@ void CopyNcVar(
 					"output file dimension (UNLIMITED / %i)",
 					dimA->name(), dimOut[d]->size());
 			} else if (!dimA->is_unlimited() && dimOut[d]->is_unlimited()) {
-				if (std::string(dimA->name()) != std::string("time")) {
+				if (!NcIsTimeDimension(dimA)) {
 					_EXCEPTION2("Mismatch between input file dimension \"%s\" and "
 						"output file dimension (%i / UNLIMITED)",
 						dimA->name(), dimA->size());
@@ -584,8 +642,8 @@ void ReadCFTimeDataFromNcFile(
 
 	// Get time dimension and  variable
 	long lTimeCount = 0;
-	NcDim * dimTime = ncfile->get_dim("time");
-	NcVar * varTime = ncfile->get_var("time");
+	NcDim * dimTime = NcGetTimeDimension(*ncfile);
+	NcVar * varTime = NcGetTimeVariable(*ncfile);
 
 	if (varTime == NULL) {
 		_EXCEPTION1("Variable \"time\" not found in file \"%s\"",
@@ -603,8 +661,8 @@ void ReadCFTimeDataFromNcFile(
 			_EXCEPTION1("Variable \"time\" has more than one dimension in file \"%s\"",
 				strFilename.c_str());
 		}
-		if (strcmp(varTime->get_dim(0)->name(), "time") != 0) {
-			_EXCEPTION1("Variable \"time\" does not have dimension \"time\" in file \"%s\"",
+		if (!NcIsTimeDimension(varTime->get_dim(0))) {
+			_EXCEPTION1("Variable \"time\" does not have time dimension in file \"%s\"",
 				strFilename.c_str());
 		}
 		lTimeCount = dimTime->size();
@@ -728,7 +786,7 @@ void WriteCFTimeDataToNcFile(
 		_EXCEPTIONT("NcTimeDimension has zero size");
 	}
 
-	NcDim * dimTime = ncfile->get_dim("time");
+	NcDim * dimTime = NcGetTimeDimension(*ncfile);
 	if (dimTime == NULL) {
 		if (fRecordDim) {
 			dimTime = ncfile->add_dim("time", 0);

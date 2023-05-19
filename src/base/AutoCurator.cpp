@@ -103,8 +103,8 @@ void AutoCurator::IndexFiles(
 	}
 
 	// Check for time dimension and variable
-	NcDim * dimTime = ncFile.get_dim("time");
-	NcVar * varTime = ncFile.get_var("time");
+	NcDim * dimTime = NcGetTimeDimension(ncFile);
+	NcVar * varTime = NcGetTimeVariable(ncFile);
 
 	if (dimTime == NULL) {
 		if (varTime != NULL) {
@@ -142,13 +142,11 @@ void AutoCurator::IndexFiles(
 	// fill in FileTimePairs.
 	} else {
 		if (varTime->num_dims() != 1) {
-			_EXCEPTION1("\"time\" variable requires one dimension "
-				"with name \"time\" in file \"%s\"",
+			_EXCEPTION1("\"time\" variable may have only one dimension in file \"%s\"",
 				strFile.c_str());
 		}
-		if (strcmp(varTime->get_dim(0)->name(), "time") != 0) {
-			_EXCEPTION1("\"time\" variable requires one dimension "
-				"with name \"time\" in file \"%s\"",
+		if (!NcIsTimeDimension(varTime->get_dim(0)) != 0) {
+			_EXCEPTION1("First dimension of \"time\" is not a time dimension in file \"%s\"",
 				strFile.c_str());
 		}
 

@@ -762,7 +762,8 @@ void Time::FromFormattedString(
 		// Record in Date format (yyyy-MM-dd-sssss)
 		if ((strFormattedTime[i] == '-') ||
 		    (strFormattedTime[i] == ' ') ||
-			(strFormattedTime[i] == 'T')
+			(strFormattedTime[i] == 'T') ||
+			(strFormattedTime[i] == '_')
 		) {
 			if (state != FormatState_Date) {
 				break;

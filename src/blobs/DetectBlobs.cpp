@@ -1008,6 +1008,8 @@ public:
 		pvecFilterOp(NULL),
 		pvecGeoFilterOp(NULL),
 		pvecOutputOp(NULL),
+		strStartTime(""),
+		strEndTime(""),
 		strTimeFilter("")
 	{ }
 
@@ -1065,6 +1067,12 @@ public:
 
 	// Vector of output operators
 	std::vector<BlobOutputOp> * pvecOutputOp;
+
+	// Start time
+	std::string strStartTime;
+
+	// End time
+	std::string strEndTime;
 
 	// Time filter
 	std::string strTimeFilter;
@@ -1185,12 +1193,12 @@ void DetectBlobs(
 	}
 
 	// Get time dimension
-	NcVar * varTime = vecFiles[0]->get_var("time");
+	NcVar * varTime = NcGetTimeVariable(*vecFiles[0]);
 	if (varTime == NULL) {
 		_EXCEPTION1("File \"%s\" missing \"time\" variable",
 			vecFiles.GetFilename(0).c_str());
 	}
-	NcDim * dimTime = vecFiles[0]->get_dim("time");
+	NcDim * dimTime = NcGetTimeDimension(*vecFiles[0]);
 	if (dimTime == NULL) {
 		if (varTime->num_dims() != 0) {
 			_EXCEPTION1("File \"%s\" missing \"time\" dimension",
@@ -1201,28 +1209,47 @@ void DetectBlobs(
 	// Read the time data
 	const NcTimeDimension & vecTimes = vecFiles.GetNcTimeDimension(0);
 
-	std::vector<bool> vecTimeRetained;
+	std::vector<bool> vecTimeRetained(vecTimes.size(), false);
 	std::vector<Time> vecOutputTimes;
-#ifndef TEMPEST_NOREGEX
-	if (param.strTimeFilter != "") {
-		vecTimeRetained.resize(vecTimes.size(), false);
-		for (int t = 0; t < vecTimes.size(); t++) {
-			std::string strTime = vecTimes[t].ToString();
-			std::smatch match;
-			if (std::regex_search(strTime, match, reTimeSubset)) {
-				vecOutputTimes.push_back(vecTimes[t]);
-				vecTimeRetained[t] = true;
+
+	Time timeStartTime(Time::CalendarUnknown);
+	Time timeEndTime(Time::CalendarUnknown);
+
+	if (param.strStartTime != "") {
+		timeStartTime = Time(vecTimes[0].GetCalendarType());
+		timeStartTime.FromFormattedString(param.strStartTime);
+	}
+	if (param.strEndTime != "") {
+		timeEndTime = Time(vecTimes[0].GetCalendarType());
+		timeEndTime.FromFormattedString(param.strEndTime);
+	}
+
+	for (int t = 0; t < vecTimes.size(); t++) {
+		if (timeStartTime.GetCalendarType() != Time::CalendarUnknown) {
+			double dDeltaSeconds = timeStartTime - vecTimes[t];
+			if (dDeltaSeconds > 0.0) {
+				continue;
+			}
+		}
+		if (timeEndTime.GetCalendarType() != Time::CalendarUnknown) {
+			double dDeltaSeconds = vecTimes[t] - timeEndTime;
+			if (dDeltaSeconds > 0.0) {
+				continue;
 			}
 		}
 
-	} else {
-		vecOutputTimes = vecTimes;
-		vecTimeRetained.resize(vecTimes.size(), true);
-	}
-#else
-	vecOutputTimes = vecTimes;
-	vecTimeRetained.resize(vecTimes.size(), true);
+#ifndef TEMPEST_NOREGEX
+		if (param.strTimeFilter != "") {
+			std::string strTime = vecTimes[t].ToString();
+			std::smatch match;
+			if (!std::regex_search(strTime, match, reTimeSubset)) {
+				continue;
+			}
+		}
 #endif
+		vecOutputTimes.push_back(vecTimes[t]);
+		vecTimeRetained[t] = true;	
+	}
 
 	// Create reference to NetCDF input file
 	NcFile & ncInput = *(vecFiles[0]);
@@ -1237,14 +1264,14 @@ void DetectBlobs(
 	// Copy over time variables to output file
 	NcDim * dimTimeOut = NULL;
 	if ((dimTime != NULL) && (varTime != NULL)) {
-		if (param.strTimeFilter != "") {
+		if (vecOutputTimes.size() != vecTimes.size()) {
 			CopyNcVarTimeSubset(ncInput, ncOutput, "time", vecOutputTimes);
 
 		} else {
 			CopyNcVar(ncInput, ncOutput, "time", true);
 		}
 
-		dimTimeOut = ncOutput.get_dim("time");
+		dimTimeOut = NcGetTimeDimension(ncOutput);
 		if (dimTimeOut == NULL) {
 			_EXCEPTIONT("Error copying variable \"time\" to output file");
 		}
@@ -1665,6 +1692,8 @@ try {
 		CommandLineStringD(strFilterCmd, "filtercmd", "", "[var,op,value,count]");
 		CommandLineStringD(strGeoFilterCmd, "geofiltercmd", "", "[prop,op,value]");
 		CommandLineStringD(strOutputCmd, "outputcmd", "", "[var,name;...]");
+		CommandLineString(dbparam.strStartTime, "time_start", "");
+		CommandLineString(dbparam.strEndTime, "time_end", "");
 		CommandLineString(dbparam.strTimeFilter, "timefilter", "");
 		CommandLineDouble(dbparam.dMinAbsLat, "minabslat", 0.0);
 		CommandLineDouble(dbparam.dMaxAbsLat, "maxabslat", 90.0);

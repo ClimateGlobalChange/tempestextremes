@@ -400,8 +400,11 @@ void VariableRegistry::GetAuxiliaryDimInfo(
 	long lEnd = var->num_dims() - grid.DimCount();
 
 	// If the first dimension is time then ignore it.
-	if ((var->num_dims() > 0) && (strcmp(var->get_dim(0)->name(), "time") == 0)) {
-		lBegin++;
+	std::string strDim0Name(var->get_dim(0)->name());
+	if (var->num_dims() > 0) {
+		if ((strDim0Name == "time") || (strDim0Name == "Time")) {
+			lBegin++;
+		}
 	}
 
 	// Ignore grid dimensions at the end
