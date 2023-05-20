@@ -53,6 +53,16 @@ public:
 		TypeDelta
 	};
 
+	///	<summary>
+	///		Season.
+	///	</summary>
+	enum SeasonIndex {
+		SeasonIndex_DJF = 0,
+		SeasonIndex_MAM = 1,
+		SeasonIndex_JJA = 2,
+		SeasonIndex_SON = 3
+	};
+
 public:
 	///	<summary>
 	///		Default constructor.
@@ -393,6 +403,30 @@ public:
 	///	</summary>
 	inline int GetYear() const {
 		return m_iYear;
+	}
+
+	///	<summary>
+	///		Get the season.
+	///	</summary>
+	inline SeasonIndex GetSeasonIndex() const {
+		_ASSERT(m_eTimeType == TypeFixed);
+		_ASSERT(m_eCalendarType != CalendarNone);
+
+		int iMonth = GetZeroIndexedMonth();
+		if ((iMonth == 11) || (iMonth == 0) || (iMonth == 1)) {
+			return SeasonIndex_DJF;
+		}
+		if ((iMonth == 2) || (iMonth == 3) || (iMonth == 4)) {
+			return SeasonIndex_MAM;
+		}
+		if ((iMonth == 5) || (iMonth == 6) || (iMonth == 7)) {
+			return SeasonIndex_JJA;
+		}
+		if ((iMonth == 8) || (iMonth == 9) || (iMonth == 10)) {
+			return SeasonIndex_SON;
+		}
+
+		_EXCEPTION1("Invalid ZeroIndexedMonth() %i", iMonth);
 	}
 
 	///	<summary>
