@@ -1341,7 +1341,8 @@ void Climatology(
 			    (eClimoType == ClimatologyType_AvgMax)
 			) {
 				int iCurrentTimeIndex = GetClimatologyTimeIndex(timeCurrent, eClimoPeriod);
-				Announce("Accumulating index %i", iCurrentTimeIndex);
+				AnnounceStartBlock("Accumulating index %i", iCurrentTimeIndex);
+				bool fScratchContainsData = false;
 				for (size_t i = 0; i < vecOutputAuxSize[v]; i++) {
 					if (fabs(dScratchData[i]) == std::numeric_limits<double>::max()) {
 						continue;
@@ -1355,10 +1356,16 @@ void Climatology(
 						}
 						nTimeSlicesGrid(iCurrentTimeIndex,i)++;
 					}
+					fScratchContainsData = true;
 					dAccumulatedData(iCurrentTimeIndex,i) += dScratchData[i];
 				}
-				if (!fMissingData) {
+				if ((!fMissingData) && (fScratchContainsData)) {
 					nTimeSlices(iCurrentTimeIndex)++;
+				}
+				if (!fScratchContainsData) {
+					AnnounceEndBlock("No data in scratch");
+				} else {
+					AnnounceEndBlock(NULL);
 				}
 			}
 
