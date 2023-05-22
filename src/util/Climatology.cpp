@@ -1021,7 +1021,7 @@ void Climatology(
 
 			// Scratch data array (used for accumulating minimums and maximums)
 			DataArray1D<double> dScratchData;
-			Time timeCurrent;
+			Time timeCurrent(Time::CalendarUnknown);
 
 			if (eClimoType == ClimatologyType_AvgMin) {
 				dScratchData.Allocate(vecOutputAuxSize[v]);
@@ -1094,11 +1094,6 @@ void Climatology(
 					vecInputFileList[f],
 					vecTimes,
 					false);
-
-				if (f == 0) {
-					_ASSERT(vecTimes.size() > 0);
-					timeCurrent = vecTimes[0];
-				}
 
 				// Get the variable
 				NcVar * varIn = ncinfile.get_var(vecVariableNames[v].c_str());
@@ -1194,6 +1189,11 @@ void Climatology(
 					if ((eClimoType == ClimatologyType_AvgMin) ||
 					    (eClimoType == ClimatologyType_AvgMax)
 					) {
+
+						if (timeCurrent.GetCalendarType() == Time::CalendarUnknown) {
+							timeCurrent = vecTimes[t];
+						}
+
 						if (vecTimes[t] - timeCurrent < 0.0) {
 							_EXCEPTIONT("For --type \"avgmin\" and \"avgmax\" time across files must be monotone increasing");
 						}
@@ -1340,6 +1340,10 @@ void Climatology(
 			if ((eClimoType == ClimatologyType_AvgMin) ||
 			    (eClimoType == ClimatologyType_AvgMax)
 			) {
+				if (timeCurrent.GetCalendarType() == Time::CalendarUnknown) {
+					_EXCEPTIONT("Data contains no valid time steps given command-line constraints");
+				}
+
 				int iCurrentTimeIndex = GetClimatologyTimeIndex(timeCurrent, eClimoPeriod);
 				AnnounceStartBlock("Accumulating index %i", iCurrentTimeIndex);
 				bool fScratchContainsData = false;
