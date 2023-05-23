@@ -17,6 +17,10 @@ else ifeq ($(UNAME),Linux)
     SYSTEM= CORI
     SYSTEM_MAKEFILE= cori.make
   endif
+  ifeq ($(NERSC_HOST),perlmutter)
+    SYSTEM= PERLMUTTER
+    SYSTEM_MAKEFILE= perlmutter.make
+  endif
   ifeq ($(findstring casper,$(HOST)),casper)
     SYSTEM= CHEYENNE
     SYSTEM_MAKEFILE= cheyenne.make

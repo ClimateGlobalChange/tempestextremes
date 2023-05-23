@@ -28,6 +28,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <limits>
 #include "netcdfcpp.h"
 #include "kdtree.h"
 
