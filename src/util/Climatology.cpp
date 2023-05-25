@@ -24,6 +24,7 @@
 #include "TimeObj.h"
 #include "TimeMatch.h"
 #include "DataArray2D.h"
+#include "DataArray3D.h"
 #include "FourierTransforms.h"
 #include "Units.h"
 
@@ -409,6 +410,8 @@ enum ClimatologyPeriod {
 enum ClimatologyType {
 	ClimatologyType_Mean,
 	ClimatologyType_MeanSq,
+	ClimatologyType_StdDev,
+	ClimatologyType_AutoCor,
 	ClimatologyType_AvgMin,
 	ClimatologyType_AvgMax
 };
@@ -433,6 +436,10 @@ std::string ClimoVariablePrefix(
 		strVariablePrefix += "mean_";
 	} else if (eClimoType == ClimatologyType_MeanSq) {
 		strVariablePrefix += "meansq_";
+	} else if (eClimoType == ClimatologyType_StdDev) {
+		strVariablePrefix += "stddev_";
+	} else if (eClimoType == ClimatologyType_AutoCor) {
+		strVariablePrefix += "autocor_";
 	} else if (eClimoType == ClimatologyType_AvgMin) {
 		strVariablePrefix += "avgmin_";
 	} else if (eClimoType == ClimatologyType_AvgMax) {
@@ -495,7 +502,7 @@ void Climatology(
 	const std::string & strEndTime,
 	ClimatologyPeriod eClimoPeriod,
 	ClimatologyType eClimoType,
-	int nFourierModes,
+	int nAutoCorLag,
 	bool fMissingData,
 	const std::string & strFillValueOverride,
 	const std::string & strTimeFilter,
@@ -518,10 +525,22 @@ void Climatology(
 	// Climatology type
 	if ((eClimoType != ClimatologyType_Mean) &&
 	    (eClimoType != ClimatologyType_MeanSq) &&
+	    (eClimoType != ClimatologyType_StdDev) &&
+	    (eClimoType != ClimatologyType_AutoCor) &&
 		(eClimoType != ClimatologyType_AvgMin) &&
 		(eClimoType != ClimatologyType_AvgMax)
 	) {
 		_EXCEPTIONT("Invalid eClimoType");
+	}
+
+	// Autocorrelation only available with annual period
+	if (eClimoType == ClimatologyType_AutoCor) {
+		if (eClimoPeriod != ClimatologyPeriod_Annual) {
+			_EXCEPTIONT("At present, --type \"autocor\" can only be combined with --period \"annual\"");
+		}
+		if (fMissingData) {
+			_EXCEPTIONT("At present, --type \"autocor\" cannot be used with --missingdata");
+		}
 	}
 
 	// Time units
@@ -844,10 +863,10 @@ void Climatology(
 			vecTimes,
 			true);
 
-		NcDim * dimOutTime = ncoutfile.get_dim("time");
+		NcDim * dimOutTime = NcGetTimeDimension(ncoutfile);
 		_ASSERT(dimOutTime != NULL);
 
-		NcVar * varOutTime = ncoutfile.get_var("time");
+		NcVar * varOutTime = NcGetTimeVariable(ncoutfile);
 		_ASSERT(varOutTime != NULL);
 		
 		std::string strTimeTypeAtt;
@@ -865,6 +884,10 @@ void Climatology(
 			strTimeTypeAtt += "mean ";
 		} else if (eClimoType == ClimatologyType_MeanSq) {
 			strTimeTypeAtt += "meansq ";
+		} else if (eClimoType == ClimatologyType_StdDev) {
+			strTimeTypeAtt += "stddev ";
+		} else if (eClimoType == ClimatologyType_AutoCor) {
+			strTimeTypeAtt += "lag " + std::to_string((long long)nAutoCorLag) + " autocorrelation ";
 		} else if (eClimoType == ClimatologyType_AvgMin) {
 			strTimeTypeAtt += "average minimum ";
 		} else if (eClimoType == ClimatologyType_AvgMax) {
@@ -1019,22 +1042,33 @@ void Climatology(
 			// Accumulated data array
 			DataArray2D<double> dAccumulatedData(sOutputTimes, vecOutputAuxSize[v]);
 
-			// Scratch data array (used for accumulating minimums and maximums)
-			DataArray1D<double> dScratchData;
-			Time timeCurrent(Time::CalendarUnknown);
+			// Scratch data
+			int iScratchIndex = 0;
+			DataArray3D<double> dScratchData;
+			DataArray3D<float> dScratchDataFloat;
 
-			if (eClimoType == ClimatologyType_AvgMin) {
-				dScratchData.Allocate(vecOutputAuxSize[v]);
+			if (eClimoType == ClimatologyType_StdDev) {
+				dScratchData.Allocate(1, sOutputTimes, vecOutputAuxSize[v]);
+
+			} else if (eClimoType == ClimatologyType_AvgMin) {
+				dScratchData.Allocate(1, 1, vecOutputAuxSize[v]);
 				for (size_t i = 0; i < vecOutputAuxSize[v]; i++) {
-					dScratchData[i] = std::numeric_limits<double>::max();
+					dScratchData(0,0,i) = std::numeric_limits<double>::max();
 				}
-			}
-			if (eClimoType == ClimatologyType_AvgMax) {
-				dScratchData.Allocate(vecOutputAuxSize[v]);
+
+			} else if (eClimoType == ClimatologyType_AvgMax) {
+				dScratchData.Allocate(1, 1, vecOutputAuxSize[v]);
 				for (size_t i = 0; i < vecOutputAuxSize[v]; i++) {
-					dScratchData[i] = -std::numeric_limits<double>::max();
+					dScratchData(0,0,i) = -std::numeric_limits<double>::max();
 				}
+
+			} else if (eClimoType == ClimatologyType_AutoCor) {
+				dScratchData.Allocate(4, 1, vecOutputAuxSize[v]);
+				dScratchDataFloat.Allocate(nAutoCorLag, 1, vecOutputAuxSize[v]);
 			}
+
+			// Current time (used for avgmin and avgmax calculations)
+			Time timeCurrent(Time::CalendarUnknown);
 
 			// If missing data is present need to count number of data points
 			// at each location.
@@ -1227,19 +1261,19 @@ void Climatology(
 						if (fNewPeriod) {
 							Announce("Accumulating index %i; Next time %s", iCurrentTimeIndex, vecTimes[t].ToString().c_str());
 							for (size_t i = 0; i < sGetRows; i++) {
-								if (fabs(dScratchData[i]) == std::numeric_limits<double>::max()) {
+								if (fabs(dScratchData(0,0,i)) == std::numeric_limits<double>::max()) {
 									continue;
 								}
 								if (fMissingData) {
-									if (dScratchData[i] == dFillValue) {
+									if (dScratchData(0,0,i) == dFillValue) {
 										continue;
 									}
-									if (dScratchData[i] != dScratchData[i]) {
+									if (dScratchData(0,0,i) != dScratchData(0,0,i)) {
 										continue;
 									}
 									nTimeSlicesGrid(iCurrentTimeIndex,i)++;
 								}
-								dAccumulatedData(iCurrentTimeIndex,i) += dScratchData[i];
+								dAccumulatedData(iCurrentTimeIndex,i) += dScratchData(0,0,i);
 							}
 							if (!fMissingData) {
 								nTimeSlices(iCurrentTimeIndex)++;
@@ -1247,12 +1281,12 @@ void Climatology(
 
 							if (eClimoType == ClimatologyType_AvgMin) {
 								for (size_t i = 0; i < sGetRows; i++) {
-									dScratchData[i] = std::numeric_limits<double>::max();
+									dScratchData(0,0,i) = std::numeric_limits<double>::max();
 								}
 							}
 							if (eClimoType == ClimatologyType_AvgMax) {
 								for (size_t i = 0; i < sGetRows; i++) {
-									dScratchData[i] = -std::numeric_limits<double>::max();
+									dScratchData(0,0,i) = -std::numeric_limits<double>::max();
 								}
 							}
 
@@ -1265,6 +1299,8 @@ void Climatology(
 
 					// Count number of time slices at each point and accumulate data
 					if (fMissingData) {
+
+						// Mean
 						if (eClimoType == ClimatologyType_Mean) {
 							for (size_t i = 0; i < sGetRows; i++) {
 								if ((dDataIn[i] != dFillValue) && (dDataIn[i] == dDataIn[i])) {
@@ -1273,6 +1309,7 @@ void Climatology(
 								}
 							}
 
+						// Expectation of the square
 						} else if (eClimoType == ClimatologyType_MeanSq) {
 							for (size_t i = 0; i < sGetRows; i++) {
 								if ((dDataIn[i] != dFillValue) && (dDataIn[i] == dDataIn[i])) {
@@ -1283,20 +1320,45 @@ void Climatology(
 								}
 							}
 
+						// Standard deviation
+						// + dAccumulatedData stores the mean
+						// + dScratchData(0) stores the expectation of the square
+						} else if (eClimoType == ClimatologyType_StdDev) {
+							for (size_t i = 0; i < sGetRows; i++) {
+								if ((dDataIn[i] != dFillValue) && (dDataIn[i] == dDataIn[i])) {
+									nTimeSlicesGrid(iTimeIndex,i)++;
+
+									dAccumulatedData(iTimeIndex,i) +=
+										static_cast<double>(dDataIn[i]);
+
+									dScratchData(0,iTimeIndex,i) +=
+										static_cast<double>(dDataIn[i])
+										* static_cast<double>(dDataIn[i]);
+								}
+							}
+
+						// Autocorrelation
+						} else if (eClimoType == ClimatologyType_AutoCor) {
+							_EXCEPTION();
+
+						// Average of the minimum
+						// + dScratchData(0) stores the minimum over the current period
 						} else if (eClimoType == ClimatologyType_AvgMin) {
 							for (size_t i = 0; i < sGetRows; i++) {
 								if ((dDataIn[i] != dFillValue) && (dDataIn[i] == dDataIn[i])) {
-									if (dDataIn[i] < dScratchData[i]) {
-										dScratchData[i] = dDataIn[i];
+									if (dDataIn[i] < dScratchData(0,0,i)) {
+										dScratchData(0,0,i) = dDataIn[i];
 									}
 								}
 							}
 
+						// Average of the maximum
+						// + dScratchData(0) stores the maximum over the current period
 						} else if (eClimoType == ClimatologyType_AvgMax) {
 							for (size_t i = 0; i < sGetRows; i++) {
 								if ((dDataIn[i] != dFillValue) && (dDataIn[i] == dDataIn[i])) {
-									if (dDataIn[i] > dScratchData[i]) {
-										dScratchData[i] = dDataIn[i];
+									if (dDataIn[i] > dScratchData(0,0,i)) {
+										dScratchData(0,0,i) = dDataIn[i];
 									}
 								}
 							}
@@ -1304,12 +1366,15 @@ void Climatology(
 
 					// Count number of time slices at each time and accumulate data
 					} else {
+
+						// Mean
 						if (eClimoType == ClimatologyType_Mean) {
 							nTimeSlices[iTimeIndex]++;
 							for (size_t i = 0; i < sGetRows; i++) {
 								dAccumulatedData[iTimeIndex][i] += static_cast<double>(dDataIn[i]);
 							}
 
+						// Expectation of the square
 						} else if (eClimoType == ClimatologyType_MeanSq) {
 							nTimeSlices[iTimeIndex]++;
 							for (size_t i = 0; i < sGetRows; i++) {
@@ -1318,17 +1383,70 @@ void Climatology(
 									* static_cast<double>(dDataIn[i]);
 							}
 
+						// Standard deviation
+						} else if (eClimoType == ClimatologyType_StdDev) {
+							nTimeSlices[iTimeIndex]++;
+							for (size_t i = 0; i < sGetRows; i++) {
+								dAccumulatedData(iTimeIndex,i) +=
+									static_cast<double>(dDataIn[i]);
+
+								dScratchData(0,iTimeIndex,i) +=
+									static_cast<double>(dDataIn[i])
+									* static_cast<double>(dDataIn[i]);
+							}
+
+						// Autocorrelation
+						// + dAccumulatedData stores sum_{i=k}^{n-1}(y_i y_{i-k})
+						// + dScratchData(0) stores the expectation of the square of all y
+						// + dScratchData(1) stores the sum of all y
+						// + dScratchData(2) stores the sum of i=[0,n-k)
+						// + dScratchData(3) stores the sum of i=[k,n)
+						} else if (eClimoType == ClimatologyType_AutoCor) {
+
+							for (size_t i = 0; i < sGetRows; i++) {
+								dScratchData(0,iTimeIndex,i) +=
+									static_cast<double>(dDataIn[i])
+									* static_cast<double>(dDataIn[i]);
+
+								dScratchData(1,iTimeIndex,i) +=
+									static_cast<double>(dDataIn[i]);
+							}
+
+							if (nTimeSlices[iTimeIndex] >= nAutoCorLag) {
+								for (size_t i = 0; i < sGetRows; i++) {
+									dAccumulatedData(iTimeIndex,i) +=
+										static_cast<double>(dDataIn[i])
+										* static_cast<double>(dScratchDataFloat(iScratchIndex,0,i));
+
+									dScratchData(2,iTimeIndex,i) +=
+										static_cast<double>(dScratchDataFloat(iScratchIndex,0,i));
+
+									dScratchData(3,iTimeIndex,i) +=
+										static_cast<double>(dDataIn[i]);
+								}
+							}
+							for (size_t i = 0; i < sGetRows; i++) {
+								dScratchDataFloat(iScratchIndex,0,i) = dDataIn[i];
+							}
+							iScratchIndex++;
+							if (iScratchIndex >= nAutoCorLag) {
+								iScratchIndex = 0;
+							}
+							nTimeSlices[iTimeIndex]++;
+
+						// Average of the minimum
 						} else if (eClimoType == ClimatologyType_AvgMin) {
 							for (size_t i = 0; i < sGetRows; i++) {
-								if (dDataIn[i] < dScratchData[i]) {
-									dScratchData[i] = dDataIn[i];
+								if (dDataIn[i] < dScratchData(0,0,i)) {
+									dScratchData(0,0,i) = dDataIn[i];
 								}
 							}
 
+						// Average of the maximum
 						} else if (eClimoType == ClimatologyType_AvgMax) {
 							for (size_t i = 0; i < sGetRows; i++) {
-								if (dDataIn[i] > dScratchData[i]) {
-									dScratchData[i] = dDataIn[i];
+								if (dDataIn[i] > dScratchData(0,0,i)) {
+									dScratchData(0,0,i) = dDataIn[i];
 								}
 							}
 						}
@@ -1348,20 +1466,20 @@ void Climatology(
 				AnnounceStartBlock("Accumulating index %i", iCurrentTimeIndex);
 				bool fScratchContainsData = false;
 				for (size_t i = 0; i < vecOutputAuxSize[v]; i++) {
-					if (fabs(dScratchData[i]) == std::numeric_limits<double>::max()) {
+					if (fabs(dScratchData(0,0,i)) == std::numeric_limits<double>::max()) {
 						continue;
 					}
 					if (fMissingData) {
-						if (dScratchData[i] == dFillValue) {
+						if (dScratchData(0,0,i) == dFillValue) {
 							continue;
 						}
-						if (dScratchData[i] != dScratchData[i]) {
+						if (dScratchData(0,0,i) != dScratchData(0,0,i)) {
 							continue;
 						}
 						nTimeSlicesGrid(iCurrentTimeIndex,i)++;
 					}
 					fScratchContainsData = true;
-					dAccumulatedData(iCurrentTimeIndex,i) += dScratchData[i];
+					dAccumulatedData(iCurrentTimeIndex,i) += dScratchData(0,0,i);
 				}
 				if ((!fMissingData) && (fScratchContainsData)) {
 					nTimeSlices(iCurrentTimeIndex)++;
@@ -1373,51 +1491,91 @@ void Climatology(
 				}
 			}
 
-			// Calculate the mean over all data
-			for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
+			// Standard deviation
+			if (eClimoType == ClimatologyType_StdDev) {
+				for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
+					if (fMissingData) {
+						for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
+							double dTimeSliceCount = static_cast<double>(nTimeSlicesGrid(t,i));
+							double dBesselCorrection = dTimeSliceCount / (dTimeSliceCount - 1.0);
 
-				// ..with missing data
-				if (fMissingData) {
-					for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
-						if (nTimeSlicesGrid[t][i] != 0) {
-							dAccumulatedData[t][i] /=
-								static_cast<double>(nTimeSlicesGrid[t][i]);
-						} else {
-							dAccumulatedData[t][i] = dFillValue;
+							if (nTimeSlicesGrid(t,i) != 0) {
+								double dEX = dAccumulatedData(t,i) / dTimeSliceCount;
+								double dEX2 = dScratchData(0,t,i) / dTimeSliceCount;
+								dAccumulatedData(t,i) = sqrt(dBesselCorrection * (dEX2 - dEX * dEX));
+							} else {
+								dAccumulatedData(t,i) = dFillValue;
+							}
+						}
+
+					} else {
+						if (nTimeSlices[t] == 0) {
+							continue;
+						}
+						double dTimeSliceCount = static_cast<double>(nTimeSlices(t));
+						double dBesselCorrection = dTimeSliceCount / (dTimeSliceCount - 1.0);
+
+						for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
+							double dEX = dAccumulatedData(t,i) / dTimeSliceCount;
+							double dEX2 = dScratchData(0,t,i) / dTimeSliceCount;
+							dAccumulatedData(t,i) = sqrt(dBesselCorrection * (dEX2 - dEX * dEX));
 						}
 					}
-
-				// ..without missing data
-				} else {
-					if (nTimeSlices[t] == 0) {
-						continue;
-					}
-					for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
-						dAccumulatedData[t][i] /= static_cast<double>(nTimeSlices[t]);
-					}
 				}
 			}
-/*
-			// Apply Fourier smoothing in time
-			if ((nFourierModes != 0) &&
-			    (nFourierModes < dAccumulatedData.GetColumns() / 2)
-			) {
-				AnnounceStartBlock("Performing Fourier filtering");
-				DataArray1D<double> an(dAccumulatedData.GetRows());
-				DataArray1D<double> bn(dAccumulatedData.GetRows());
+
+			// Autocorrelation
+			if (eClimoType == ClimatologyType_AutoCor) {
+				double dInvCount = 1.0 / static_cast<double>(nTimeSlices(0));
+				double dModCount = static_cast<double>(nTimeSlices(0) - nAutoCorLag);
 
 				for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
-					fourier_filter<double>(
-						&(dAccumulatedData[0][i]),
-						dAccumulatedData.GetRows(),
-						dAccumulatedData.GetColumns(),
-						nFourierModes,
-						an,
-						bn);
+					double dSumXY = dAccumulatedData(0,i);
+
+					double dEX2 = dScratchData(0,0,i) * dInvCount;
+					double dEX = dScratchData(1,0,i) * dInvCount;
+
+					double dSumX = dScratchData(2,0,i);
+					double dSumY = dScratchData(3,0,i);
+
+					dAccumulatedData(0,i) =
+						dInvCount
+						* (dSumXY - dSumX * dEX - dSumY * dEX + dModCount * dEX * dEX)
+						/ (dEX2 - dEX * dEX);
 				}
-				AnnounceEndBlock("Done");
 			}
-*/
+
+			// Calculate the mean over all data
+			if ((eClimoType == ClimatologyType_Mean) ||
+			    (eClimoType == ClimatologyType_MeanSq) ||
+			    (eClimoType == ClimatologyType_AvgMin) ||
+			    (eClimoType == ClimatologyType_AvgMax) 
+			) {
+				for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
+
+					// ..with missing data
+					if (fMissingData) {
+						for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
+							if (nTimeSlicesGrid(t,i) != 0) {
+								dAccumulatedData(t,i) /=
+									static_cast<double>(nTimeSlicesGrid(t,i));
+							} else {
+								dAccumulatedData(t,i) = dFillValue;
+							}
+						}
+
+					// ..without missing data
+					} else {
+						if (nTimeSlices[t] == 0) {
+							continue;
+						}
+						for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
+							dAccumulatedData(t,i) /= static_cast<double>(nTimeSlices[t]);
+						}
+					}
+				}
+			}
+
 			// Write data
 			if (fMissingData) {
 				AnnounceStartBlock("Writing data and slice counts to file");
@@ -1429,7 +1587,7 @@ void Climatology(
 				// Convert to float and write to disk
 				DataArray1D<float> dMeanData(dAccumulatedData.GetColumns());
 				for (size_t i = 0; i < dMeanData.GetRows(); i++) {
-					dMeanData[i] = static_cast<float>(dAccumulatedData[t][i]);
+					dMeanData[i] = static_cast<float>(dAccumulatedData(t,i));
 				}
 
 				lPos0put[0] = t;
@@ -1445,7 +1603,7 @@ void Climatology(
 				if (fOutputSliceCounts && fMissingData) {
 
 					DataArray1D<int> nTimeSlicesGrid1D(nTimeSlicesGrid.GetColumns(), false);
-					nTimeSlicesGrid1D.AttachToData(&(nTimeSlicesGrid[t][0]));
+					nTimeSlicesGrid1D.AttachToData(&(nTimeSlicesGrid(t,0)));
 
 					NcGetPutSpecifiedDataSize<int>(
 						vecNcVarCount[v],
@@ -2040,6 +2198,9 @@ try {
 	// Type of climatology
 	std::string strClimoType;
 
+	// Autocorrelation lag
+	int nAutoCorLag;
+
 	// Include leap days
 	bool fIncludeLeapDays;
 
@@ -2048,9 +2209,6 @@ try {
 
 	// End time
 	std::string strEndTime;
-
-	// Number of Fourier modes to retain
-	int nFourierModes;
 
 	// Dataset has missing data
 	bool fMissingData;
@@ -2079,14 +2237,14 @@ try {
 		CommandLineString(strVariableOut, "varout", "");
 		CommandLineStringD(strMemoryMax, "memmax", "2G", "[#K,#M,#G]");
 		CommandLineStringD(strClimoPeriod, "period", "daily", "[daily|monthly|seasonal|annual]");
-		CommandLineStringD(strClimoType, "type", "mean", "[mean|meansq|avgmin|avgmax]");
+		CommandLineStringD(strClimoType, "type", "mean", "[mean|meansq|stddev|autocor|avgmin|avgmax]");
+		CommandLineInt(nAutoCorLag, "autocorlag", 1);
 		CommandLineBool(fIncludeLeapDays, "include_leap_days");
 		CommandLineString(strStartTime, "time_start", "");
 		CommandLineString(strEndTime, "time_end", "");
-		//CommandLineInt(nFourierModes, "time_modes", 0);
 		CommandLineBool(fMissingData, "missingdata");
 		CommandLineString(strTempFilePath, "temp_file_path", "/tmp");
-		CommandLineString(strFillValueOverride, "*fillvalue", "");
+		CommandLineString(strFillValueOverride, "fillvalue", "");
 		CommandLineString(strTimeFilter, "timefilter", "");
 		CommandLineBool(fKeepTempFiles, "keep_temp_files");
 		CommandLineBool(fVerbose, "verbose");
@@ -2135,12 +2293,21 @@ try {
 		eClimoType = ClimatologyType_Mean;
 	} else if (strClimoType == "meansq") {
 		eClimoType = ClimatologyType_MeanSq;
+	} else if (strClimoType == "stddev") {
+		eClimoType = ClimatologyType_StdDev;
+	} else if (strClimoType == "autocor") {
+		eClimoType = ClimatologyType_AutoCor;
 	} else if (strClimoType == "avgmin") {
 		eClimoType = ClimatologyType_AvgMin;
 	} else if (strClimoType == "avgmax") {
 		eClimoType = ClimatologyType_AvgMax;
 	} else {
-		_EXCEPTIONT("--type invalid; expected \"mean\", \"meansq\", \"avgmin\", \"avgmax\"");
+		_EXCEPTIONT("--type invalid; expected \"mean\", \"meansq\", \"stddev\", \"autocor\", \"avgmin\", \"avgmax\"");
+	}
+
+	// Autocorrelation lag
+	if (nAutoCorLag < 1) {
+		_EXCEPTIONT("Autocorrelation lag (--autocorlag) must be a positive integer");
 	}
 
 	// Parse input file list
@@ -2274,7 +2441,7 @@ try {
 		strEndTime,
 		eClimoPeriod,
 		eClimoType,
-		nFourierModes,
+		nAutoCorLag,
 		fMissingData,
 		strFillValueOverride,
 		strTimeFilter,
