@@ -153,6 +153,8 @@ public:
 			return Calendar360Day;
 		} else if (strCalendarTemp == "365_day") {
 			return Calendar365Day;
+		} else if (strCalendarTemp == "365-day") {
+			return Calendar365Day;
 		} else {
 			return CalendarUnknown;
 		}
