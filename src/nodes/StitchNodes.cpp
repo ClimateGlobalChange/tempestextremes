@@ -253,6 +253,9 @@ void ParseDetectNodesFile(
 					fWarnInsufficientCandidateInfo = true;
 				}
 
+				if (tscinfo[iCandidate].size() < sGridDims) {
+					_EXCEPTION2("On line %lu there are too few columns in data; first %lu columns must be integer indices", sLineNumber, sGridDims);
+				}
 				for (size_t d = 0; d < sGridDims; d++) {
 					if (!STLStringHelper::IsIntegerIndex(tscinfo[iCandidate][d])) {
 						_EXCEPTION2("On line %lu first %lu columns are not integer indices (equal to number of grid dimensions); "
@@ -272,7 +275,7 @@ void ParseDetectNodesFile(
 		}
 	}
 
-	fclose(fp);	
+	fclose(fp);
 
 	// Insufficient candidate information
 	if (fWarnInsufficientCandidateInfo) {
