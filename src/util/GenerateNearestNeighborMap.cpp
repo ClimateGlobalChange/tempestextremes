@@ -81,6 +81,9 @@ try {
 	// Name of longitude dimension on target grid
 	std::string strTargetLongitudeName;
 
+	// Maximum allowed distance from nearest neighbor
+	double dMaximumDistDeg;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strSourceData, "src_data", "");
@@ -94,6 +97,7 @@ try {
 		CommandLineString(strSourceLatitudeName, "src_latname", "lat");
 		CommandLineString(strTargetLongitudeName, "tgt_lonname", "lon");
 		CommandLineString(strTargetLatitudeName, "tgt_latname", "lat");
+		CommandLineDoubleD(dMaximumDistDeg, "maxdist", 180.0, "(degrees GCD)");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -249,9 +253,9 @@ try {
 	long nA = gridSource.GetSize();
 	long nB = gridTarget.GetSize();
 
-	std::vector<int> vecCol(nB);
-	std::vector<int> vecRow(nB);
-	std::vector<double> vecS(nB);
+	std::vector<int> vecCol(nB, 1);
+	std::vector<int> vecRow(nB, 1);
+	std::vector<double> vecS(nB, 0.0);
 
 	std::vector<double> vecSrcLonDeg(nA);
 	std::vector<double> vecSrcLatDeg(nA);
@@ -283,12 +287,20 @@ try {
 				gridTarget.m_dLon[j],
 				gridTarget.m_dLat[j]);
 
-		//printf("%1.5f %1.5f ; %1.5f %1.5f\n", vecTgtLatDeg[j], vecSrcLatDeg[sNearestNode], vecTgtLonDeg[j], vecSrcLonDeg[sNearestNode]);
-		if (fabs(vecTgtLatDeg[j] - vecSrcLatDeg[sNearestNode]) > 0.07) {
-			continue;
-		}
-		if (fabs(LonDegToStandardRange(vecTgtLonDeg[j]) - LonDegToStandardRange(vecSrcLonDeg[sNearestNode])) > 0.07) {
-			continue;
+		if (dMaximumDistDeg < 180.0) {
+			double dR =
+				GreatCircleDistance_Deg(
+					DegToRad(vecSrcLonDeg[sNearestNode]),
+					DegToRad(vecSrcLatDeg[sNearestNode]),
+					DegToRad(vecTgtLonDeg[j]),
+					DegToRad(vecTgtLatDeg[j]));
+
+			if (dR > dMaximumDistDeg) {
+				vecRow[j] = 1;
+				vecCol[j] = 1;
+				vecS[j] = 0.0;
+				continue;
+			}
 		}
 
 		_ASSERT(sNearestNode < static_cast<size_t>(nA));
