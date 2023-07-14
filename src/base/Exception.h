@@ -113,7 +113,7 @@ class Exception {
 			va_start(arguments, szText);
 
 			// Write to string
-			vsprintf(szBuffer, szText, arguments);
+			vsnprintf(szBuffer, ExceptionBufferSize, szText, arguments);
 
 			m_strText = szBuffer;
 
@@ -128,17 +128,17 @@ class Exception {
 		std::string ToString() const {
 			std::string strReturn;
 
-			char szBuffer[128];
+			char szBuffer[ExceptionBufferSize];
 
 			// Preamble
-			sprintf(szBuffer, "EXCEPTION (");
+			snprintf(szBuffer, ExceptionBufferSize, "EXCEPTION (");
 			strReturn.append(szBuffer);
 
 			// File name
 			strReturn.append(m_strFile);
 
 			// Line number
-			sprintf(szBuffer, ", Line %u) ", m_uiLine);
+			snprintf(szBuffer, ExceptionBufferSize, ", Line %u) ", m_uiLine);
 			strReturn.append(szBuffer);
 
 			// Text

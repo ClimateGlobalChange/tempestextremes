@@ -1553,7 +1553,7 @@ try {
 					Announce("histogram (%i bins)", nBins);
 
 					char szBuffer[128];
-					sprintf(szBuffer, "hist%i", v);
+					snprintf(szBuffer, 128, "hist%i", v);
 
 					NcDim * dimHist = ncoutfile.add_dim(szBuffer, nBins);
 					if (dimHist == NULL) {

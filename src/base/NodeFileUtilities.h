@@ -248,7 +248,7 @@ public:
 	///	</summary>
 	virtual std::string ToString() const {
 		char szBuffer[32];
-		sprintf(szBuffer, "%3.6e", m_dData);
+		snprintf(szBuffer, 32, "%3.6e", m_dData);
 		return std::string(szBuffer);
 	}
 
@@ -276,7 +276,7 @@ public:
 	///	</summary>
 	virtual std::string ToString() const {
 		char szVelocity[100];
-		sprintf(szVelocity, "\"%3.6e %3.6e\"", m_dU, m_dV);
+		snprintf(szVelocity, 100, "\"%3.6e %3.6e\"", m_dU, m_dV);
 		return szVelocity;
 	}
 
@@ -326,7 +326,7 @@ public:
 		char buf[100];
 		std::string strOut = "\"[";
 		for (int i = 0; i < m_dValues.size(); i++) {
-			sprintf(buf, "%3.6e", m_dValues[i]);
+			snprintf(buf, 100, "%3.6e", m_dValues[i]);
 			strOut += buf;
 			if (i == m_dValues.size()-1) {
 				strOut += "]\"";
@@ -382,7 +382,7 @@ public:
 		char buf[100];
 		std::string strOut = "\"[";
 		for (int i = 0; i < m_dUa.size(); i++) {
-			sprintf(buf, "%3.6e", m_dUa[i]);
+			snprintf(buf, 100, "%3.6e", m_dUa[i]);
 			strOut += buf;
 			if (i == m_dUa.size()-1) {
 				strOut += "]\"";

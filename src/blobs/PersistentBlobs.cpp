@@ -172,7 +172,7 @@ public:
 		}
 
 		char szBuffer[128];
-		sprintf(szBuffer, "%f for %i timesteps",
+		snprintf(szBuffer, 128, "%f for %i timesteps",
 			m_dValue, m_nTimesteps);
 		strDescription += szBuffer;
 

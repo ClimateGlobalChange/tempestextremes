@@ -278,7 +278,7 @@ try {
 		}
 
 		// Create output variable
-		NcVar * varout = ncfileout.add_var(var->name(), ncFloat, vecVarDims.size(), const_cast<const NcDim**>(&(vecVarDims[0])));
+		NcVar * varout = ncfileout.add_var(strVariableOutName.c_str(), ncFloat, vecVarDims.size(), const_cast<const NcDim**>(&(vecVarDims[0])));
 		if (varout == NULL) {
 			_EXCEPTION1("Error adding variable \"%s\" to output file", var->name());
 		}

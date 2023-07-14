@@ -1676,7 +1676,7 @@ try {
 			strLogFile += "/";
 		}
 		char szTemp[20];
-		sprintf(szTemp, "log%06i.txt", nMPIRank);
+		snprintf(szTemp, 20, "log%06i.txt", nMPIRank);
 		strLogFile += szTemp;
 
 		arparam.fpLog = fopen(strLogFile.c_str(), "w");

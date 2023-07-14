@@ -288,7 +288,7 @@ try {
 		FILE * fpLog = NULL;
 		if ((vecInputFileList.size() > 1) && (nMPISize > 1)) {
 			char szFileIndex[32];
-			sprintf(szFileIndex, "%06lu", f);
+			snprintf(szFileIndex, 32, "%06lu", f);
 
 			std::string strLogFile = std::string("log") + szFileIndex + ".txt";
 

@@ -460,7 +460,7 @@ void Mesh::Write(
 		strftime(szTime, sizeof(szTime), "%X", timestruct);
 
 		char szTitle[128];
-		sprintf(szTitle, "tempest(%s) %s: %s", strFile.c_str(), szDate, szTime);
+		snprintf(szTitle, 128, "tempest(%s) %s: %s", strFile.c_str(), szDate, szTime);
 		ncOut.add_att("title", szTitle);
 
 		// Time_whole (unused)
@@ -521,7 +521,7 @@ void Mesh::Write(
 
 	char szBuffer[ParamLenString];
 	for (int n = 0; n < vecBlockSizes.size(); n++) {
-		sprintf(szBuffer, "num_el_in_blk%i", n+1);
+		snprintf(szBuffer, ParamLenString, "num_el_in_blk%i", n+1);
 		vecElementBlockDim[n] =
 			ncOut.add_dim(szBuffer, vecBlockSizeFaces[n]);
 
@@ -529,7 +529,7 @@ void Mesh::Write(
 			_EXCEPTION1("Error creating dimension \"%s\"", szBuffer);
 		}
 
-		sprintf(szBuffer, "num_nod_per_el%i", n+1);
+		snprintf(szBuffer, ParamLenString, "num_nod_per_el%i", n+1);
 		vecNodesPerElementDim[n] =
 			ncOut.add_dim(szBuffer, vecBlockSizes[n]);
 
@@ -537,7 +537,7 @@ void Mesh::Write(
 			_EXCEPTION1("Error creating dimension \"%s\"", szBuffer);
 		}
 
-		sprintf(szBuffer, "num_att_in_blk%i", n+1);
+		snprintf(szBuffer, ParamLenString, "num_att_in_blk%i", n+1);
 		vecAttBlockDim[n] =
 			ncOut.add_dim(szBuffer, 1);
 
@@ -599,7 +599,7 @@ void Mesh::Write(
 			}
 
 			char szAttribName[ParamLenString];
-			sprintf(szAttribName, "attrib%i", n+1);
+			snprintf(szAttribName, ParamLenString, "attrib%i", n+1);
 
 			NcVar * varAttrib =
 				ncOut.add_var(
@@ -664,7 +664,7 @@ void Mesh::Write(
 			vecEdgeType[n].Allocate(vecBlockSizeFaces[n], vecBlockSizes[n]);
 	
 			char szConnectVarName[ParamLenString];
-			sprintf(szConnectVarName, "connect%i", n+1);
+			snprintf(szConnectVarName, ParamLenString, "connect%i", n+1);
 			vecConnectVar[n] =
 				ncOut.add_var(
 					szConnectVarName, ncInt,
@@ -677,11 +677,11 @@ void Mesh::Write(
 			}
 
 			char szConnectAttrib[ParamLenString];
-			sprintf(szConnectAttrib, "SHELL%i", vecBlockSizes[n]);
+			snprintf(szConnectAttrib, ParamLenString, "SHELL%i", vecBlockSizes[n]);
 			vecConnectVar[n]->add_att("elem_type", szConnectAttrib);
 
 			char szGlobalIdVarName[ParamLenString];
-			sprintf(szGlobalIdVarName, "global_id%i", n+1);
+			snprintf(szGlobalIdVarName, ParamLenString, "global_id%i", n+1);
 			vecGlobalIdVar[n] = 
 				ncOut.add_var(
 					szGlobalIdVarName, ncInt,
@@ -693,7 +693,7 @@ void Mesh::Write(
 			}
 
 			char szEdgeTypeVarName[ParamLenString];
-			sprintf(szEdgeTypeVarName, "edge_type%i", n+1);
+			snprintf(szEdgeTypeVarName, ParamLenString, "edge_type%i", n+1);
 			vecEdgeTypeVar[n] =
 				ncOut.add_var(
 					szEdgeTypeVarName, ncInt,
@@ -709,7 +709,7 @@ void Mesh::Write(
 				vecFaceParentA[n].Allocate(vecBlockSizeFaces[n]);
 
 				char szParentAVarName[ParamLenString];
-				sprintf(szParentAVarName, "el_parent_a%i", n+1);
+				snprintf(szParentAVarName, ParamLenString, "el_parent_a%i", n+1);
 				vecFaceParentAVar[n] =
 					ncOut.add_var(
 						szParentAVarName, ncInt,
@@ -725,7 +725,7 @@ void Mesh::Write(
 				vecFaceParentB[n].Allocate(vecBlockSizeFaces[n]);
 
 				char szParentBVarName[ParamLenString];
-				sprintf(szParentBVarName, "el_parent_b%i", n+1);
+				snprintf(szParentBVarName, ParamLenString, "el_parent_b%i", n+1);
 				vecFaceParentBVar[n] =
 					ncOut.add_var(
 						szParentBVarName, ncInt,
@@ -1372,7 +1372,7 @@ void Mesh::Read(const std::string & strFile) {
 
 			// Determine number of nodes per element in this block
 			char szNodesPerElement[ParamLenString];
-			sprintf(szNodesPerElement, "num_nod_per_el%i", n+1);
+			snprintf(szNodesPerElement, ParamLenString, "num_nod_per_el%i", n+1);
 			NcDim * dimNodesPerElement = ncFile.get_dim(szNodesPerElement);
 			if (dimNodesPerElement == NULL) {
 				_EXCEPTION2("Exodus Grid file \"%s\" is missing dimension "
@@ -1382,7 +1382,7 @@ void Mesh::Read(const std::string & strFile) {
 
 			// Number of elements in block
 			char szElementsInBlock[ParamLenString];
-			sprintf(szElementsInBlock, "num_el_in_blk%i", n+1);
+			snprintf(szElementsInBlock, ParamLenString, "num_el_in_blk%i", n+1);
 
 			NcDim * dimBlockElements = ncFile.get_dim(szElementsInBlock);
 			if (dimBlockElements == NULL) {
@@ -1401,7 +1401,7 @@ void Mesh::Read(const std::string & strFile) {
 
 			// Load in nodes for all elements in this block
 			char szConnect[ParamLenString];
-			sprintf(szConnect, "connect%i", n+1);
+			snprintf(szConnect, ParamLenString, "connect%i", n+1);
 
 			NcVar * varConnect = ncFile.get_var(szConnect);
 			if (varConnect == NULL) {
@@ -1424,7 +1424,7 @@ void Mesh::Read(const std::string & strFile) {
 			// Load in global id for all elements in this block
 			} else {
 				char szGlobalId[ParamLenString];
-				sprintf(szGlobalId, "global_id%i", n+1);
+				snprintf(szGlobalId, ParamLenString, "global_id%i", n+1);
 
 				NcVar * varGlobalId = ncFile.get_var(szGlobalId);
 				if (varGlobalId == NULL) {
@@ -1441,9 +1441,9 @@ void Mesh::Read(const std::string & strFile) {
 			// Load in edge type for all elements in this block
 			char szEdgeType[ParamLenString];
 			if (flVersion == 4.98f) {
-				sprintf(szEdgeType, "edge_type");
+				snprintf(szEdgeType, ParamLenString, "edge_type");
 			} else {
-				sprintf(szEdgeType, "edge_type%i", n+1);
+				snprintf(szEdgeType, ParamLenString, "edge_type%i", n+1);
 			}
 
 			NcVar * varEdgeType = ncFile.get_var(szEdgeType);
@@ -1458,9 +1458,9 @@ void Mesh::Read(const std::string & strFile) {
 			// Load in parent from A grid for all elements in this block
 			char szParentA[ParamLenString];
 			if (flVersion == 4.98f) {
-				sprintf(szParentA, "face_source_1");
+				snprintf(szParentA, ParamLenString, "face_source_1");
 			} else {
-				sprintf(szParentA, "el_parent_a%i", n+1);
+				snprintf(szParentA, ParamLenString, "el_parent_a%i", n+1);
 			}
 
 			NcVar * varParentA = ncFile.get_var(szParentA);
@@ -1482,9 +1482,9 @@ void Mesh::Read(const std::string & strFile) {
 			// Load in parent from A grid for all elements in this block
 			char szParentB[ParamLenString];
 			if (flVersion == 4.98f) {
-				sprintf(szParentB, "face_source_2");
+				snprintf(szParentB, ParamLenString, "face_source_2");
 			} else {
-				sprintf(szParentB, "el_parent_b%i", n+1);
+				snprintf(szParentB, ParamLenString, "el_parent_b%i", n+1);
 			}
 
 			NcVar * varParentB = ncFile.get_var(szParentB);
@@ -2640,7 +2640,7 @@ void ConvexifyMesh(
 	int nFaces = mesh.faces.size();
 	for (int f = 0; f < nFaces; f++) {
 		if (fVerbose) {
-			sprintf(szBuffer, "Face %i", f);
+			snprintf(szBuffer, 256, "Face %i", f);
 			AnnounceStartBlock(szBuffer);
 		}
 
@@ -2679,7 +2679,7 @@ void ConvexifyMesh(
 	int nFaces = mesh.faces.size();
 	for (int f = 0; f < nFaces; f++) {
 		if (fVerbose) {
-			sprintf(szBuffer, "Face %i", f);
+			snprintf(szBuffer, 256, "Face %i", f);
 			AnnounceStartBlock(szBuffer);
 		}
 

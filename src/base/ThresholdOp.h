@@ -155,7 +155,7 @@ public:
 		}
 
 		char szBuffer[128];
-		sprintf(szBuffer, "%f within %f degrees",
+		snprintf(szBuffer, 128, "%f within %f degrees",
 			m_dValue, m_dDistance);
 		strDescription += szBuffer;
 

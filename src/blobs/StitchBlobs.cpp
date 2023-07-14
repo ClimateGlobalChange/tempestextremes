@@ -231,7 +231,7 @@ public:
 		std::string strDescription;
 
 		char szValue[128];
-		sprintf(szValue, "%f", m_dValue);
+		snprintf(szValue, 128, "%f", m_dValue);
 
 		if (m_eQuantity == MinArea) {
 			strDescription += "Minimum area ";

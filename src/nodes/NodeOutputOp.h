@@ -219,7 +219,7 @@ public:
 		strDescription += m_strVariableString;
 
 		char szBuffer[128];
-		sprintf(szBuffer, " within %f degrees", m_dDistance);
+		snprintf(szBuffer, 128, " within %f degrees", m_dDistance);
 		strDescription += szBuffer;
 
 		return strDescription;
@@ -292,7 +292,7 @@ void ApplyNodeOutputOp(
 			dValue,
 			dRMax);
 
-		sprintf(buf, szFormat, dValue);
+		snprintf(buf, 100, szFormat, dValue);
 		strResult = buf;
 
 	// Distance to the minimum or maximum value within given range
@@ -310,7 +310,7 @@ void ApplyNodeOutputOp(
 			dValue,
 			dRMax);
 
-		sprintf(buf, szFormat, dRMax);
+		snprintf(buf, 100, szFormat, dRMax);
 		strResult = buf;
 
 	// Coordinates (lon,lat) of the minimum or maximum value within given range
@@ -334,12 +334,12 @@ void ApplyNodeOutputOp(
 		if (ixExtremum >= grid.m_dLat.GetRows()) {
 			_EXCEPTIONT("Longitude/latitude array size inconsistency in SimpleGrid");
 		}
-		sprintf(buf, "%3.6f", grid.m_dLon[ixExtremum] * 180.0 / M_PI);
+		snprintf(buf, 100, "%3.6f", grid.m_dLon[ixExtremum] * 180.0 / M_PI);
 		strResult = buf;
 
 		strResult += "\t";
 
-		sprintf(buf, "%3.6f", grid.m_dLat[ixExtremum] * 180.0 / M_PI);
+		snprintf(buf, 100, "%3.6f", grid.m_dLat[ixExtremum] * 180.0 / M_PI);
 		strResult += buf;
 
 	// Coordinates (lon,lat) of the minimum or maximum value within given range
@@ -357,7 +357,7 @@ void ApplyNodeOutputOp(
 			dValue,
 			dRMax);
 
-		sprintf(buf, "%i", ixExtremum);
+		snprintf(buf, 100, "%i", ixExtremum);
 		strResult = buf;
 
 	// Average of the field over a given distance
@@ -369,7 +369,7 @@ void ApplyNodeOutputOp(
 			op.m_dDistance,
 			dValue);
 
-		sprintf(buf, szFormat, dValue);
+		snprintf(buf, 100, szFormat, dValue);
 		strResult = buf;
 
 	// Positive closed contour deltas (valleys)
@@ -383,7 +383,7 @@ void ApplyNodeOutputOp(
 			true,
 			dValue);
 
-		sprintf(buf, szFormat, dValue);
+		snprintf(buf, 100, szFormat, dValue);
 		strResult = buf;
 
 	// Negative closed contour deltas (hills)
@@ -397,7 +397,7 @@ void ApplyNodeOutputOp(
 			false,
 			dValue);
 
-		sprintf(buf, szFormat, dValue);
+		snprintf(buf, 100, szFormat, dValue);
 		strResult = buf;
 
 	} else {

@@ -1353,7 +1353,7 @@ try {
 
 		} else {
 			char szFileIndex[32];
-			sprintf(szFileIndex, "%06i", f);
+			snprintf(szFileIndex, 32, "%06i", f);
 
 			if (vecOutputFiles.size() == 0) {
 				strOutputFile =

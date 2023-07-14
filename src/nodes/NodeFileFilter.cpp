@@ -173,7 +173,7 @@ public:
 		// Output announcement
 		char szBuffer[128];
 
-		sprintf(szBuffer, "%f", m_dDistance);
+		snprintf(szBuffer, 128, "%f", m_dDistance);
 		std::string strDescription =
 			std::string("Include blobs with at least 1 point within ") + szBuffer
 			+ std::string(" degrees where ") + varreg.GetVariableString(m_varix);
@@ -192,13 +192,13 @@ public:
 		}
 
 		if (fabs(m_dValue) < 1.0e-4) {
-			sprintf(szBuffer, "%e", m_dValue);
+			snprintf(szBuffer, 128, "%e", m_dValue);
 		} else {
-			sprintf(szBuffer, "%f", m_dValue);
+			snprintf(szBuffer, 128, "%f", m_dValue);
 		}
 		strDescription += szBuffer;
 
-		sprintf(szBuffer, "%f", m_dMaxDist);
+		snprintf(szBuffer, 128, "%f", m_dMaxDist);
 		strDescription += std::string(" (max dist ") + szBuffer + " degrees)";
 
 		Announce("%s", strDescription.c_str());
@@ -1531,7 +1531,7 @@ try {
 		FILE * fpLog = NULL;
 		if ((vecInputFileList.size() > 1) && (nMPISize > 1)) {
 			char szFileIndex[32];
-			sprintf(szFileIndex, "%06lu", f);
+			snprintf(szFileIndex, 32, "%06lu", f);
 
 			std::string strLogFile = std::string("log") + szFileIndex + ".txt";
 

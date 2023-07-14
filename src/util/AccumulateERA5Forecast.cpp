@@ -165,7 +165,7 @@ try {
 		}
 
 		char szYearMonth[32];
-		sprintf(szYearMonth, "%04i%02i", nInputYearPrev, nInputMonthPrev);
+		snprintf(szYearMonth, 32, "%04i%02i", nInputYearPrev, nInputMonthPrev);
 
 		std::string strTempFile = std::string("/tmp/accum") + std::string(szYearMonth);
 
@@ -181,7 +181,7 @@ try {
 		Announce(strSystemString.c_str());
 		system(strSystemString.c_str());
 
-		sprintf(szYearMonth, "%04i%02i", nInputYear, nInputMonth);
+		snprintf(szYearMonth, 32, "%04i%02i", nInputYear, nInputMonth);
 		strYearMonthDir = strInputDir + "/" + std::string(szYearMonth);
 
 		strSystemString = std::string("ls ") + strYearMonthDir + std::string("/*235_055* >> ") + strTempFile;

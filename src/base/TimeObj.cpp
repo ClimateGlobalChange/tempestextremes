@@ -580,7 +580,7 @@ std::string Time::ToDateString() const {
 		_EXCEPTIONT("ToDateString() only valid for Time::TypeFixed");
 	}
 
-	sprintf(szBuffer, "%04i-%02i-%02i",
+	snprintf(szBuffer, 100, "%04i-%02i-%02i",
 		m_iYear, m_iMonth+1, m_iDay+1);
 
 	return std::string(szBuffer);
@@ -595,7 +595,7 @@ std::string Time::ToShortString() const {
 		_EXCEPTIONT("ToShortString() only valid for Time::TypeFixed");
 	}
 
-	sprintf(szBuffer, "%04i-%02i-%02i-%05i",
+	snprintf(szBuffer, 100, "%04i-%02i-%02i-%05i",
 		m_iYear, m_iMonth+1, m_iDay+1, m_iSecond);
 
 	return std::string(szBuffer);
@@ -618,7 +618,7 @@ std::string Time::ToLongString() const {
 		iReindexedDay++;
 	}
 
-	sprintf(szBuffer, "%04i-%02i-%02i-%05i-%06i",
+	snprintf(szBuffer, 100, "%04i-%02i-%02i-%05i-%06i",
 		m_iYear, iReindexedMonth, iReindexedDay, m_iSecond, m_iMicroSecond);
 
 	return std::string(szBuffer);
@@ -642,7 +642,7 @@ std::string Time::ToString() const {
 	}
 
 	if (m_iMicroSecond == 0) {
-		sprintf(szBuffer, "%04i-%02i-%02i %02i:%02i:%02i",
+		snprintf(szBuffer, 100, "%04i-%02i-%02i %02i:%02i:%02i",
 			m_iYear,
 			iReindexedMonth,
 			iReindexedDay,
@@ -651,7 +651,7 @@ std::string Time::ToString() const {
 			(m_iSecond % 60));
 
 	} else {
-		sprintf(szBuffer, "%04i-%02i-%02i %02i:%02i:%02i.%06i",
+		snprintf(szBuffer, 100, "%04i-%02i-%02i %02i:%02i:%02i.%06i",
 			m_iYear,
 			iReindexedMonth,
 			iReindexedDay,
@@ -672,23 +672,23 @@ std::string Time::ToFreeString() const {
 	char szBuffer[100];
 
 	if (m_iYear != 0) {
-		sprintf(szBuffer, "%iy", m_iYear);
+		snprintf(szBuffer, 100, "%iy", m_iYear);
 		strFreeString += szBuffer;
 	}
 	if (m_iMonth != 0) {
-		sprintf(szBuffer, "%iM", m_iMonth);
+		snprintf(szBuffer, 100, "%iM", m_iMonth);
 		strFreeString += szBuffer;
 	}
 	if (m_iDay != 0) {
-		sprintf(szBuffer, "%id", m_iDay);
+		snprintf(szBuffer, 100, "%id", m_iDay);
 		strFreeString += szBuffer;
 	}
 	if (m_iSecond != 0) {
-		sprintf(szBuffer, "%is", m_iSecond);
+		snprintf(szBuffer, 100, "%is", m_iSecond);
 		strFreeString += szBuffer;
 	}
 	if (m_iMicroSecond != 0) {
-		sprintf(szBuffer, "%iu", m_iMicroSecond);
+		snprintf(szBuffer, 100, "%iu", m_iMicroSecond);
 		strFreeString += szBuffer;
 	}
 

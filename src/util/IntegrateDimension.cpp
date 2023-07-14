@@ -681,10 +681,10 @@ try {
 			}
 
 			if (lAuxSize != 1) {
-				char szPos[10];
+				char szPos[100];
 				std::string strPos;
 				for (long d = 0; d < vecAuxDimSize.size(); d++) {
-					sprintf(szPos, "%s=%li", varIn->get_dim(d)->name(), lPos[d]);
+					snprintf(szPos, 100, "%s=%li", varIn->get_dim(d)->name(), lPos[d]);
 					strPos += szPos;
 					if (d != vecAuxDimSize.size()-1) {
 						strPos += ",";

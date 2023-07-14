@@ -525,7 +525,7 @@ public:
 		}
 
 		char szValue[128];
-		sprintf(szValue, "%f", m_dValue);
+		snprintf(szValue, 128, "%f", m_dValue);
 		strDescription += szValue;
 
 		char szMinCount[160];
@@ -536,7 +536,7 @@ public:
 		} else if (m_nMinimumCount == Count_Last) {
 			strDescription += " at the last time";
 		} else {
-			sprintf(szMinCount, " at least %i time(s)", m_nMinimumCount);
+			snprintf(szMinCount, 160, " at least %i time(s)", m_nMinimumCount);
 			strDescription += szMinCount;
 		}
 
