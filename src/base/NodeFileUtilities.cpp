@@ -205,12 +205,18 @@ void NodeFile::ReadCSV(
 			_EXCEPTION2("hour must be of type integer in nodefile \"%s\" on line %i", strNodeFile.c_str(), iLine);
 		}
 
-		int iYear = stoi(vecValues[iColYear]);
-		int iMonth = stoi(vecValues[iColMonth]);
-		int iDay = stoi(vecValues[iColDay]);
-		int iHour = stoi(vecValues[iColHour]);
+		int iYear = std::stoi(vecValues[iColYear]);
+		int iMonth = std::stoi(vecValues[iColMonth]);
+		int iDay = std::stoi(vecValues[iColDay]);
+		int iSecond;
 
-		Time time(iYear, iMonth-1, iDay-1, iHour * 3600, 0, caltype);
+		if (vecValues[iColHour].length() == 5) {
+			iSecond = std::stoi(vecValues[iColHour]);
+		} else {
+			iSecond = std::stoi(vecValues[iColHour]) * 3600;
+		}
+
+		Time time(iYear, iMonth-1, iDay-1, iSecond, 0, caltype);
 
 		pathnode.m_time = time;
 
@@ -220,9 +226,9 @@ void NodeFile::ReadCSV(
 		// Store coordinate
 		if (iColI != (-1)) {
 			if (iColJ == (-1)) {
-				pathnode.m_gridix = stoi(vecValues[iColI]);
+				pathnode.m_gridix = std::stoi(vecValues[iColI]);
 			} else {
-				pathnode.m_gridix = stoi(vecValues[iColI]) + nGridDim[1] * stoi(vecValues[iColJ]);
+				pathnode.m_gridix = std::stoi(vecValues[iColI]) + nGridDim[1] * std::stoi(vecValues[iColJ]);
 			}
 
 			if (pathnode.m_gridix < 0) {
@@ -333,7 +339,9 @@ void NodeFile::Read(
 				int iYear;
 				int iMonth;
 				int iDay;
-				int iHour;
+				int iSecond;
+
+				std::string strHour;
 
 				iss >> iYear;
 				iss >> iMonth;
@@ -345,7 +353,12 @@ void NodeFile::Read(
 						iLine, strNodeFile.c_str());
 				}
 
-				iss >> iHour;
+				iss >> strHour;
+				if (strHour.length() == 5) {
+					iSecond = std::stoi(strHour);
+				} else {
+					iSecond = std::stoi(strHour) * 3600;
+				}
 
 				if (!iss.eof()) {
 					_EXCEPTION2("Format error on line %i of \"%s\"",
@@ -359,7 +372,7 @@ void NodeFile::Read(
 							iYear,
 							iMonth-1,
 							iDay-1,
-							3600 * iHour,
+							iSecond,
 							0,
 							caltype);
 				}
@@ -371,7 +384,7 @@ void NodeFile::Read(
 						iYear,
 						iMonth-1,
 						iDay-1,
-						3600 * iHour,
+						iSecond,
 						0,
 						caltype);
 
@@ -381,7 +394,7 @@ void NodeFile::Read(
 				int iYear;
 				int iMonth;
 				int iDay;
-				int iHour;
+				int iSecond;
 
 				iss >> strStart;
 				iss >> nCount;
@@ -394,7 +407,8 @@ void NodeFile::Read(
 						iLine, strNodeFile.c_str());
 				}
 
-				iss >> iHour;
+				std::string strHour;
+				iss >> strHour;
 
 				if (strStart != "start") {
 					_EXCEPTION2("Format error on line %i of \"%s\"",
@@ -405,13 +419,19 @@ void NodeFile::Read(
 						iLine, strNodeFile.c_str());
 				}
 
+				if (strHour.length() == 5) {
+					iSecond = std::stoi(strHour);
+				} else {
+					iSecond = std::stoi(strHour) * 3600;
+				}
+
 				m_pathvec.resize(m_pathvec.size() + 1);
 				m_pathvec[m_pathvec.size()-1].m_timeStart =
 					Time(
 						iYear,
 						iMonth-1,
 						iDay-1,
-						3600 * iHour,
+						iSecond,
 						0,
 						caltype);
 
@@ -545,13 +565,19 @@ void NodeFile::Read(
 				int iYear = std::stoi(vecDelimitedOutput[nOutputSize-4]);
 				int iMonth = std::stoi(vecDelimitedOutput[nOutputSize-3]);
 				int iDay = std::stoi(vecDelimitedOutput[nOutputSize-2]);
-				int iHour = std::stoi(vecDelimitedOutput[nOutputSize-1]);
+
+				int iSecond;
+				if (vecDelimitedOutput[nOutputSize-1].length() == 5) {
+					iSecond = std::stoi(vecDelimitedOutput[nOutputSize-1]);
+				} else {
+					iSecond = std::stoi(vecDelimitedOutput[nOutputSize-1]) * 3600;
+				}
 
 				time = Time(
 					iYear,
 					iMonth-1,
 					iDay-1,
-					3600 * iHour,
+					iSecond,
 					0,
 					caltype);
 

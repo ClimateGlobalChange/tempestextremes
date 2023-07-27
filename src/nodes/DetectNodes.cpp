@@ -320,6 +320,7 @@ public:
 		strLongitudeName("lon"),
 		fRegional(false),
 		fOutputHeader(false),
+		fOutputSeconds(false),
 		iVerbosityLevel(0)
 	{ }
 
@@ -392,6 +393,9 @@ public:
 
 	// Output header
 	bool fOutputHeader;
+
+	// Output seconds as part of timestamp
+	bool fOutputSeconds;
 
 	// Verbosity level
 	int iVerbosityLevel;
@@ -910,12 +914,21 @@ void DetectCyclonesUnstructured(
 		// Write results to file
 		{
 			// Write time information
-			fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
-				vecTimes[t].GetYear(),
-				vecTimes[t].GetMonth(),
-				vecTimes[t].GetDay(),
-				static_cast<int>(setCandidates.size()),
-				vecTimes[t].GetSecond() / 3600);
+			if (param.fOutputSeconds) {
+				fprintf(fpOutput, "%i\t%i\t%i\t%i\t%05i\n",
+					vecTimes[t].GetYear(),
+					vecTimes[t].GetMonth(),
+					vecTimes[t].GetDay(),
+					static_cast<int>(setCandidates.size()),
+					vecTimes[t].GetSecond() % 86400);
+			} else {
+				fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
+					vecTimes[t].GetYear(),
+					vecTimes[t].GetMonth(),
+					vecTimes[t].GetDay(),
+					static_cast<int>(setCandidates.size()),
+					vecTimes[t].GetSecond() / 3600);
+			}
 /*
 			if (param.fOutputInfileInfo) {
 				fprintf(fpOutput, "\t\"%s\"\t%i\n", strInputFiles.c_str(), t);
@@ -1073,6 +1086,7 @@ try {
 		CommandLineString(dcuparam.strLongitudeName, "lonname", "lon");
 		CommandLineBool(dcuparam.fRegional, "regional");
 		CommandLineBool(dcuparam.fOutputHeader, "out_header");
+		CommandLineBool(dcuparam.fOutputSeconds, "out_seconds");
 		CommandLineInt(dcuparam.iVerbosityLevel, "verbosity", 0);
 
 		ParseCommandLine(argc, argv);
