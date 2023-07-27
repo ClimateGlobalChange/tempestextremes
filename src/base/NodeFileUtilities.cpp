@@ -643,7 +643,8 @@ void NodeFile::Write(
 	const SimpleGrid * pgrid,
 	const std::vector<int> * pvecColumnDataOutIx,
 	FileFormat eFileFormat,
-	bool fIncludeHeader
+	bool fIncludeHeader,
+	bool fOutputSeconds
 ) {
 	FILE * fpOutput = fopen(strNodeFile.c_str(),"w");
 	if (fpOutput == NULL) {
@@ -661,12 +662,21 @@ void NodeFile::Write(
 				if (m_pathvec[p].size() == 0) {
 					_EXCEPTIONT("Zero length Path found");
 				}
-				fprintf(fpOutput, "start\t%i\t%i\t%i\t%i\t%i\n",
-					static_cast<int>(path.size()),
-					path.m_timeStart.GetYear(),
-					path.m_timeStart.GetMonth(),
-					path.m_timeStart.GetDay(),
-					path.m_timeStart.GetSecond() / 3600);
+				if (fOutputSeconds) {
+					fprintf(fpOutput, "start\t%i\t%i\t%i\t%i\t%05i\n",
+						static_cast<int>(path.size()),
+						path.m_timeStart.GetYear(),
+						path.m_timeStart.GetMonth(),
+						path.m_timeStart.GetDay(),
+						path.m_timeStart.GetSecond());
+				} else {
+					fprintf(fpOutput, "start\t%i\t%i\t%i\t%i\t%i\n",
+						static_cast<int>(path.size()),
+						path.m_timeStart.GetYear(),
+						path.m_timeStart.GetMonth(),
+						path.m_timeStart.GetDay(),
+						path.m_timeStart.GetSecond() / 3600);
+				}
 
 				for (int i = 0; i < m_pathvec[p].size(); i++) {
 					PathNode & pathnode = path[i];
@@ -695,11 +705,19 @@ void NodeFile::Write(
 						}
 					}
 
-					fprintf(fpOutput, "\t%i\t%i\t%i\t%i\n",
-						pathnode.m_time.GetYear(),
-						pathnode.m_time.GetMonth(),
-						pathnode.m_time.GetDay(),
-						pathnode.m_time.GetSecond() / 3600);
+					if (fOutputSeconds) {
+						fprintf(fpOutput, "\t%i\t%i\t%i\t%05i\n",
+							pathnode.m_time.GetYear(),
+							pathnode.m_time.GetMonth(),
+							pathnode.m_time.GetDay(),
+							pathnode.m_time.GetSecond());
+					} else {
+						fprintf(fpOutput, "\t%i\t%i\t%i\t%i\n",
+							pathnode.m_time.GetYear(),
+							pathnode.m_time.GetMonth(),
+							pathnode.m_time.GetDay(),
+							pathnode.m_time.GetSecond() / 3600);
+					}
 				}
 			}
 

@@ -736,7 +736,8 @@ public:
 		const SimpleGrid * pgrid = NULL,
 		const std::vector<int> * pvecColumnDataOutIx = NULL,
 		FileFormat eFileFormat = FileFormatGFDL,
-		bool fIncludeHeader = false
+		bool fIncludeHeader = false,
+		bool fOutputSeconds = false
 	);
 
 	///	<summary>

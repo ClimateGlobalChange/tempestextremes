@@ -920,7 +920,7 @@ void DetectCyclonesUnstructured(
 					vecTimes[t].GetMonth(),
 					vecTimes[t].GetDay(),
 					static_cast<int>(setCandidates.size()),
-					vecTimes[t].GetSecond() % 86400);
+					vecTimes[t].GetSecond());
 			} else {
 				fprintf(fpOutput, "%i\t%i\t%i\t%i\t%i\n",
 					vecTimes[t].GetYear(),

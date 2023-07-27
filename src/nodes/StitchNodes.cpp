@@ -187,7 +187,12 @@ void ParseDetectNodesFile(
 			time.SetYear(std::stoi(vecTimeString[0]));
 			time.SetMonth(std::stoi(vecTimeString[1]));
 			time.SetDay(std::stoi(vecTimeString[2]));
-			time.SetSecond(std::stoi(vecTimeString[4]) * 3600);
+
+			if (vecTimeString[4].length() == 5) {
+				time.SetSecond(std::stoi(vecTimeString[4]));
+			} else {
+				time.SetSecond(std::stoi(vecTimeString[4]) * 3600);
+			}
 
 			fIncludeTimeSlice = true;
 			if (timeBegin.GetCalendarType() != Time::CalendarUnknown) {
@@ -727,6 +732,9 @@ try {
 	// Thresholds
 	std::string strThreshold;
 
+	// Output in seconds
+	bool fOutputSeconds;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in", "");
@@ -749,6 +757,7 @@ try {
 		CommandLineBool(fAllowRepeatedTimes, "allow_repeated_times");
 		//CommandLineInt(nTimeStride, "timestride", 1);
 		CommandLineStringD(strOutputFileFormat, "out_file_format", "gfdl", "(gfdl|csv|csvnohead)");
+		CommandLineBool(fOutputSeconds, "out_seconds");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -1354,7 +1363,7 @@ try {
 		}
 
 		if (strOutputFileFormat == "gfdl") {
-			nodefile.Write(strOutputFile);
+			nodefile.Write(strOutputFile, NULL, NULL, NodeFile::FileFormatGFDL, false, fOutputSeconds);
 		} else if (strOutputFileFormat == "csv") {
 			nodefile.Write(strOutputFile, NULL, NULL, NodeFile::FileFormatCSV, true);
 		} else if (strOutputFileFormat == "csvnohead") {
