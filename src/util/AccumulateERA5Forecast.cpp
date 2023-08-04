@@ -100,7 +100,7 @@ try {
 		CommandLineInt(nInputYear, "year", -1);
 		CommandLineInt(nInputMonth, "month", -1);
 		CommandLineString(strOutputData, "out_data", "");
-		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|6h|daily]");
+		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|3h|6h|daily]");
 		CommandLineString(strVariableName, "var", "MTPR");
 		CommandLineString(strVariableOutName, "varout", "tp");
 
@@ -139,12 +139,14 @@ try {
 	long lAccumFrequency = 0;
 	if (strAccumFrequency == "1h") {
 		lAccumFrequency = 1;
+	} else if (strAccumFrequency == "3h") {
+		lAccumFrequency = 3;
 	} else if (strAccumFrequency == "6h") {
 		lAccumFrequency = 6;
 	} else if ((strAccumFrequency == "daily") || (strAccumFrequency == "24h")) {
 		lAccumFrequency = 24;
 	} else {
-		_EXCEPTIONT("--accumfreq must be \"1h\", \"6h\" or \"daily\"");
+		_EXCEPTIONT("--accumfreq must be \"1h\", \"3h\", \"6h\" or \"daily\"");
 	}
 
 	// Input files
