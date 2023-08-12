@@ -1059,6 +1059,9 @@ try {
 	// Output commands
 	std::string strOutputCmd;
 
+	// Path for log files
+	std::string strLogDir;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in_data", "");
@@ -1087,6 +1090,7 @@ try {
 		CommandLineBool(dcuparam.fRegional, "regional");
 		CommandLineBool(dcuparam.fOutputHeader, "out_header");
 		CommandLineBool(dcuparam.fOutputSeconds, "out_seconds");
+		CommandLineString(strLogDir, "logdir", ".");
 		CommandLineInt(dcuparam.iVerbosityLevel, "verbosity", 0);
 
 		ParseCommandLine(argc, argv);
@@ -1344,7 +1348,7 @@ try {
 		} else {
 			Announce("Output will be written following --out_file_list");
 		}
-		Announce("Logs will be written to logXXXXXX.txt");
+		Announce("Logs will be written to %s/logXXXXXX.txt", strLogDir.c_str());
 	}
 
 	// Loop over all files to be processed
@@ -1380,7 +1384,7 @@ try {
 					vecOutputFiles[f];
 			}
 
-			std::string strLogFile = "log" + std::string(szFileIndex) + ".txt";
+			std::string strLogFile = strLogDir + "/log" + std::string(szFileIndex) + ".txt";
 			dcuparam.fpLog = fopen(strLogFile.c_str(), "w");
 		}
 

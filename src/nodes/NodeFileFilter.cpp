@@ -1229,6 +1229,9 @@ try {
 	// Name of longitude dimension
 	std::string strLongitudeName;
 
+	// Log dir
+	std::string strLogDir;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputNodeFile, "in_nodefile", "");
@@ -1257,6 +1260,8 @@ try {
 		CommandLineString(strTimeFilter, "timefilter", "");
 		CommandLineString(strLongitudeName, "lonname", "[auto]");
 		CommandLineString(strLatitudeName, "latname", "[auto]");
+
+		CommandLineString(strLogDir, "logdir", ".");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -1515,7 +1520,7 @@ try {
 
 	// Set up logging
 	if ((vecInputFileList.size() > 1) && (nMPISize > 1)) {
-		Announce("Logs will be written to logXXXXXX.txt");
+		Announce("Logs will be written to %s/logXXXXXX.txt", strLogDir.c_str());
 	}
 #endif
 
@@ -1533,7 +1538,7 @@ try {
 			char szFileIndex[32];
 			snprintf(szFileIndex, 32, "%06lu", f);
 
-			std::string strLogFile = std::string("log") + szFileIndex + ".txt";
+			std::string strLogFile = strLogDir + std::string("/log") + szFileIndex + ".txt";
 
 			fpLog = fopen(strLogFile.c_str(), "w");
 			if (fpLog == NULL) {

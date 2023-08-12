@@ -1679,6 +1679,9 @@ try {
 	// Output commands
 	std::string strOutputCmd;
 
+	// Log dir
+	std::string strLogDir;
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in_data", "");
@@ -1706,6 +1709,7 @@ try {
 		CommandLineString(dbparam.strTagVar, "tagvar", "binary_tag");
 		CommandLineString(dbparam.strLongitudeName, "lonname", "lon");
 		CommandLineString(dbparam.strLatitudeName, "latname", "lat");
+		CommandLineString(strLogDir, "logdir", ".");
 		CommandLineInt(dbparam.iVerbosityLevel, "verbosity", 0);
 
 		ParseCommandLine(argc, argv);
@@ -1918,7 +1922,7 @@ try {
 		}
 #if defined(TEMPEST_MPIOMP)
 		if (vecInputFiles.size() != 1) {
-			Announce("Logs will be written to logXXXXXX.txt");
+			Announce("Logs will be written to %s/logXXXXXX.txt", strLogDir.c_str());
 		}
 #endif
 	}
@@ -1964,7 +1968,7 @@ try {
 				}
 			}
 
-			std::string strLogFile = "log" + std::string(szFileIndex) + ".txt";
+			std::string strLogFile = strLogDir + "/log" + std::string(szFileIndex) + ".txt";
 #if defined(TEMPEST_MPIOMP)
 			fpLog = fopen(strLogFile.c_str(), "w");
 			if (fpLog == NULL) {
