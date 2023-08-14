@@ -80,6 +80,9 @@ try {
 	// Accumulation frequency
 	std::string strAccumFrequency;
 
+	// File string
+	std::string strFileString;
+
 	// Variable to use for quantile calculation
 	std::string strVariableName;
 
@@ -101,6 +104,7 @@ try {
 		CommandLineInt(nInputMonth, "month", -1);
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|3h|6h|daily]");
+		CommandLineString(strFileString, "file", "*235_055*");
 		CommandLineString(strVariableName, "var", "MTPR");
 		CommandLineString(strVariableOutName, "varout", "tp");
 
@@ -178,7 +182,7 @@ try {
 
 		std::string strYearMonthDir = strInputDir + "/" + std::string(szYearMonth);
 
-		strSystemString = std::string("ls ") + strYearMonthDir + std::string("/*235_055* >> ") + strTempFile;
+		strSystemString = std::string("ls ") + strYearMonthDir + std::string("/") + strFileString + std::string(" >> ") + strTempFile;
 
 		Announce(strSystemString.c_str());
 		system(strSystemString.c_str());
@@ -186,7 +190,7 @@ try {
 		snprintf(szYearMonth, 32, "%04i%02i", nInputYear, nInputMonth);
 		strYearMonthDir = strInputDir + "/" + std::string(szYearMonth);
 
-		strSystemString = std::string("ls ") + strYearMonthDir + std::string("/*235_055* >> ") + strTempFile;
+		strSystemString = std::string("ls ") + strYearMonthDir + std::string("/") + strFileString + std::string(" >> ") + strTempFile;
 
 		Announce(strSystemString.c_str());
 		system(strSystemString.c_str());
