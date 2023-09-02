@@ -176,7 +176,9 @@ try {
 
 	// Parse output variable list (--varout)
 	std::vector<std::string> vecVariableOutNames;
-	if (strVariableOut != "") {
+	if (strVariableOut == "") {
+		vecVariableOutNames = vecVariableNames;
+	} else {
 		STLStringHelper::ParseVariableList(strVariableOut, vecVariableOutNames);
 		if (vecVariableOutNames.size() != vecVariableStrings.size()) {
 			_EXCEPTIONT("If specified, --varout and --var must have the same length");
@@ -217,6 +219,16 @@ try {
 
 		AnnounceStartBlock("Variable \"%s\"", vecVariableStrings[v].c_str());
 
+		vecPos.clear();
+		vecSize.clear();
+
+		if (dataAccum.IsAttached()) {
+			dataAccum.Zero();
+		}
+		if (dataAccumCount.IsAttached()) {
+			dataAccumCount.Zero();
+		}
+
 		for (size_t f = 0; f < vecInputFiles.size(); f++) {
 	
 			AnnounceStartBlock("%s", vecInputFiles[f].c_str());
@@ -232,7 +244,7 @@ try {
 				ncfileoutmode = NcFile::Write;
 			}
 
-			NcFile ncfileout(vecOutputFiles[f].c_str(), NcFile::Replace, NULL, 0, NcFile::Netcdf4);
+			NcFile ncfileout(vecOutputFiles[f].c_str(), ncfileoutmode, NULL, 0, NcFile::Netcdf4);
 			if (!ncfileout.is_valid()) {
 				_EXCEPTION1("Unable to open output file \"%s\"", vecOutputFiles[f].c_str());
 			}
