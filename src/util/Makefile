@@ -16,7 +16,18 @@ TEMPESTEXTREMESBASELIB= $(TEMPESTEXTREMESBASEDIR)/libextremesbase.a
 TEMPESTEXTREMESNETCDFDIR= $(TEMPESTEXTREMESDIR)/src/netcdf-cxx-4.2
 TEMPESTEXTREMESNETCDFLIB= $(TEMPESTEXTREMESNETCDFDIR)/libnetcdf_c++.a
 
-EXEC_FILES= GenerateNearestNeighborMap.cpp GenerateConnectivityFile.cpp Climatology.cpp FourierFilter.cpp VariableProcessor.cpp CompressBlobs.cpp IntegrateDimension.cpp LagrangianParcelTracker.cpp QuantileCalculator.cpp AccumulateERA5Forecast.cpp AccumulateData.cpp
+EXEC_FILES= GenerateNearestNeighborMap.cpp \
+            GenerateConnectivityFile.cpp \
+            Climatology.cpp \
+            FourierFilter.cpp \
+            VariableProcessor.cpp \
+            CompressBlobs.cpp \
+            IntegrateDimension.cpp \
+            LagrangianParcelTracker.cpp \
+            QuantileCalculator.cpp \
+            AccumulateERA5Forecast.cpp \
+            AccumulateData.cpp \
+            ShapefileMask.cpp
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 

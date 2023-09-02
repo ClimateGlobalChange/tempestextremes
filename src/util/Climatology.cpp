@@ -306,94 +306,6 @@ long long NcGetPutSpecifiedDataSize(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SplitVariableStrings(
-	const std::vector<std::string> & vecVariableStrings,
-	std::vector<std::string> & vecVariableNames,
-	std::vector< std::vector<std::string> > & vecVariableSpecifiedDims
-) {
-	vecVariableNames.clear();
-	vecVariableSpecifiedDims.clear();
-
-	vecVariableNames.resize(vecVariableStrings.size());
-	vecVariableSpecifiedDims.resize(vecVariableStrings.size());
-
-	// Loop through all variables
-	for (int v = 0; v < vecVariableStrings.size(); v++) {
-
-		// Split variable string into variable name and any specified dimensions
-		int iBeginParentheses = (-1);
-		int iEndParentheses = (-1);
-		for (int i = 0; i < vecVariableStrings[v].length(); i++) {
-			if (vecVariableStrings[v][i] == '(') {
-				if (iBeginParentheses != (-1)) {
-					_EXCEPTIONT("Multiple open parentheses in --var");
-				} else {
-					iBeginParentheses = i;
-				}
-			}
-			if (vecVariableStrings[v][i] == ')') {
-				if (iEndParentheses != (-1)) {
-					_EXCEPTIONT("Multiple closed parentheses in --var");
-				} else {
-					iEndParentheses = i;
-				}
-			}
-		}
-	
-		// Extract variable name and specified dimensions
-		if (iBeginParentheses != (-1)) {
-			if ((iBeginParentheses != (-1)) && (iEndParentheses == (-1))) {
-				_EXCEPTIONT("Unbalanced open parentheses in --var");
-			}
-			if ((iBeginParentheses == (-1)) && (iEndParentheses != (-1))) {
-				_EXCEPTIONT("Unbalanced closed parentheses in --var");
-			}
-			if (iBeginParentheses >= iEndParentheses) {
-				_EXCEPTIONT("Unbalanced closed parentheses in --var");
-			}
-	
-			vecVariableNames[v] =
-				vecVariableStrings[v].substr(0, iBeginParentheses);
-	
-			int iLast = iBeginParentheses+1;
-			for (int i = iBeginParentheses+1; i <= iEndParentheses; i++) {
-				if ((i == iEndParentheses) ||
-				    (vecVariableStrings[v][i] == ',')
-				) {
-					std::string strDimValue =
-						vecVariableStrings[v].substr(iLast, i-iLast);
-
-					std::string strValue;
-					std::string strUnits;
-					SplitIntoValueAndUnits(strDimValue, strValue, strUnits);
-
-					if (!STLStringHelper::IsFloat(strValue)) {
-						_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer or value index.",
-							strDimValue.c_str());
-					}
-
-					//if (strDimValue == "*") {
-					//	vecVariableSpecifiedDims[v].push_back(-1);
-					//	iLast = i+1;
-					//}
-					//long lDimValue = std::stol(strDimValue);
-					//if (lDimValue < 0) {
-					//	_EXCEPTION1("Invalid dimension index \"%s\" in --var; expected positive integer.",
-					//		strDimValue.c_str());
-					//}
-					vecVariableSpecifiedDims[v].push_back(strDimValue);
-					iLast = i+1;
-				}
-			}
-
-		} else {
-			vecVariableNames[v] = vecVariableStrings[v];
-		}
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 ///	<summary>
 ///		Possible climatology periods that can be calculated with Climatology().
 ///	</summary>
@@ -1349,8 +1261,15 @@ void Climatology(
 
 									double dEXY = dScratchData(4,0,i) * dModCount;
 
-									dAccumulatedData(iCurrentTimeIndex,i) +=
-										(dEXY - dEX * dEY) / sqrt(dEX2 - dEX * dEX) / sqrt(dEY2 - dEY * dEY);
+									double dVarX = dEX2 - dEX * dEX;
+									double dVarY = dEY2 - dEY * dEY;
+
+									if ((fabs(dVarX) <= 1.0e-12 * dEX2) || (fabs(dVarY) <= 1.0e-12 * dEY2)) {
+										dAccumulatedData(iCurrentTimeIndex,i) += 1.0;
+									} else {
+										dAccumulatedData(iCurrentTimeIndex,i) +=
+											(dEXY - dEX * dEY) / sqrt(dVarX) / sqrt(dVarY);
+									}
 								}
 							}
 
@@ -1660,8 +1579,15 @@ void Climatology(
 
 					double dEXY = dScratchData(4,0,i) * dModCount;
 
-					dAccumulatedData(iCurrentTimeIndex,i) +=
-						(dEXY - dEX * dEY) / sqrt(dEX2 - dEX * dEX) / sqrt(dEY2 - dEY * dEY);
+					double dVarX = dEX2 - dEX * dEX;
+					double dVarY = dEY2 - dEY * dEY;
+
+					if ((fabs(dVarX) <= 1.0e-12 * dEX2) || (fabs(dVarY) <= 1.0e-12 * dEY2)) {
+						dAccumulatedData(iCurrentTimeIndex,i) += 1.0;
+					} else {
+						dAccumulatedData(iCurrentTimeIndex,i) +=
+							(dEXY - dEX * dEY) / sqrt(dVarX) / sqrt(dVarY);
+					}
 				}
 
 				nTimePeriods(iCurrentTimeIndex)++;
@@ -2488,7 +2414,7 @@ try {
 	std::vector<std::string> vecVariableNames;
 	std::vector< std::vector<std::string> > vecVariableSpecifiedDims;
 
-	SplitVariableStrings(
+	STLStringHelper::SplitVariableStrings(
 		vecVariableStrings,
 		vecVariableNames,
 		vecVariableSpecifiedDims

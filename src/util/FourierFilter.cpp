@@ -114,7 +114,7 @@ try {
 	std::vector<std::string> vecVariableStrings;
 	STLStringHelper::ParseVariableList(strVarName, vecVariableStrings);
 
-	// Prase preserve list
+	// Parse preserve list
 	std::vector<std::string> vecPreserveVariableStrings;
 	STLStringHelper::ParseVariableList(strPreserveVarName, vecPreserveVariableStrings);
 
