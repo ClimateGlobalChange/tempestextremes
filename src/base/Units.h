@@ -18,6 +18,7 @@
 #define _UNITS_H_
 
 #include <string>
+#include <cmath>
 
 #include "Constants.h"
 
