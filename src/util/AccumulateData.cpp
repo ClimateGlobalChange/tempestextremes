@@ -219,6 +219,8 @@ try {
 
 		AnnounceStartBlock("Variable \"%s\"", vecVariableStrings[v].c_str());
 
+		sTotalSize = 1;
+
 		vecPos.clear();
 		vecSize.clear();
 
@@ -318,7 +320,7 @@ try {
 				}
 			}
 	
-			if (vecTimesOut.size() != 0) {
+			if ((v == 0) && (vecTimesOut.size() != 0)) {
 				WriteCFTimeDataToNcFile(&ncfileout, vecOutputFiles[f], vecTimesOut);
 			}
 	
@@ -334,11 +336,17 @@ try {
 					_EXCEPTION4("Variable \"%s\" in file \"%s\" has mismatched dimension %li size: expected %li",
 						var->name(), vecInputFiles[f].c_str(), d, vecSize[d]);
 				}
-				vecVarDims[d] = ncfileout.add_dim(var->get_dim(d)->name(), var->get_dim(d)->size());
-				if (vecVarDims[d] == NULL) {
-					_EXCEPTION1("Error writing dimension \"%s\" to output file", var->get_dim(d)->name());
+				NcDim * dimOut = ncfileout.get_dim(var->get_dim(d)->name());
+				if (dimOut == NULL) {
+					vecVarDims[d] = ncfileout.add_dim(var->get_dim(d)->name(), var->get_dim(d)->size());
+					if (vecVarDims[d] == NULL) {
+						_EXCEPTION1("Error writing dimension \"%s\" to output file", var->get_dim(d)->name());
+					}
+					CopyNcVarIfExists(ncfilein, ncfileout, var->get_dim(d)->name());
+
+				} else {
+					vecVarDims[d] = dimOut;
 				}
-				CopyNcVarIfExists(ncfilein, ncfileout, var->get_dim(d)->name());
 			}
 	
 			// Create output variable
@@ -362,7 +370,7 @@ try {
 			CopyNcVarAttributes(var, varout);
 	
 			// Copy preserve variables
-			if (strPreserveVar != "") {
+			if ((v == 0) && (strPreserveVar != "")) {
 				AnnounceStartBlock("Preserving variables");
 	
 				for (int v = 0; v < vecPreserveVariableStrings.size(); v++) {
