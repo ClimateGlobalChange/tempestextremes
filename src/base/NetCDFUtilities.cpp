@@ -93,13 +93,13 @@ void NcGetLatitudeLongitudeName(
 bool NcIsTimeDimension(
 	NcDim * dim
 ) {
-	if (strlen(dim->name()) != 4) {
-		return false;
-	}
 	if (strcmp(dim->name(), "time") == 0) {
 		return true;
 	}
 	if (strcmp(dim->name(), "Time") == 0) {
+		return true;
+	}
+	if (strcmp(dim->name(), "initial_time0_hours") == 0) {
 		return true;
 	}
 	return false;
@@ -116,6 +116,11 @@ NcDim * NcGetTimeDimension(
 	}
 
 	dim = ncFile.get_dim("Time");
+	if (dim != NULL) {
+		return dim;
+	}
+
+	dim = ncFile.get_dim("initial_time0_hours");
 	if (dim != NULL) {
 		return dim;
 	}
@@ -139,6 +144,11 @@ NcVar * NcGetTimeVariable(
 	}
 
 	var = ncFile.get_var("xtime");
+	if (var != NULL) {
+		return var;
+	}
+
+	var = ncFile.get_var("initial_time0_hours");
 	if (var != NULL) {
 		return var;
 	}

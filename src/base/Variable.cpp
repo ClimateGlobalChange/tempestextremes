@@ -400,9 +400,8 @@ void VariableRegistry::GetAuxiliaryDimInfo(
 	long lEnd = var->num_dims() - grid.DimCount();
 
 	// If the first dimension is time then ignore it.
-	std::string strDim0Name(var->get_dim(0)->name());
 	if (var->num_dims() > 0) {
-		if ((strDim0Name == "time") || (strDim0Name == "Time")) {
+		if (NcIsTimeDimension(var->get_dim(0))) {
 			lBegin++;
 		}
 	}
@@ -849,8 +848,7 @@ NcVar * Variable::GetNcVarFromNcFileVector(
 
 	// Get the time index
 	long lTime;
-	std::string strDim0Name = var->get_dim(0)->name();
-	if (strDim0Name != "time") {
+	if (!NcIsTimeDimension(var->get_dim(0))) {
 		lTime = NcFileVector::NoTimeIndex;
 		m_fNoTimeInNcFile = true;
 	} else {
