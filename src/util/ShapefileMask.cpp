@@ -21,6 +21,7 @@
 #include "LatLonBox.h"
 #include "GridElements.h"
 #include "ShpFile.h"
+#include "STLStringHelper.h"
 
 #include "netcdfcpp.h"
 
@@ -152,6 +153,33 @@ try {
 
 	AnnounceBanner();
 
+	// Check arguments
+	if (strSourceData.length() == 0) {
+		_EXCEPTIONT("No input file (--in_data) specified");
+	}
+	if (strShapefile.length() == 0) {
+		_EXCEPTIONT("No shapefile (--shp) specified");
+	}
+	if (strOutputData.length() == 0) {
+		_EXCEPTIONT("No output file (--out_data) specified");
+	}
+	if (strVariable.length() == 0) {
+		_EXCEPTIONT("No variables (--var) specified");
+	}
+
+	// Parse variable list (--var)
+	std::vector<std::string> vecVariableStrings;
+	STLStringHelper::ParseVariableList(strVariable, vecVariableStrings);
+
+	std::vector<std::string> vecVariableNames;
+	std::vector< std::vector<std::string> > vecVariableSpecifiedDims;
+
+	STLStringHelper::SplitVariableStrings(
+		vecVariableStrings,
+		vecVariableNames,
+		vecVariableSpecifiedDims
+	);
+
 	// Load the shapefile
 	AnnounceStartBlock("Loading shapefile");
 	Mesh mesh;
@@ -218,37 +246,6 @@ try {
 	dLatDeg.resize(varLat->get_dim(0)->size());
 	varLat->get(&(dLatDeg[0]), dLatDeg.size());
 
-	// Get data values
-	NcVar * varData = ncInput.get_var(strVariable.c_str());
-	if (varData == NULL) {
-		_EXCEPTION2("File \"%s\" does not contain variable \"%s\"",
-			strSourceData.c_str(), strVariable.c_str());
-	}
-	if ((varData->num_dims() < 2) || (varData->num_dims() > 3)) {
-		_EXCEPTION2("File \"%s\" variable \"%s\" must contain two (time, ncol) or three dimensions (time, lat, lon)",
-			strSourceData.c_str(), strVariable.c_str());
-	}
-	if (varData->num_dims() == 3) {
-		if (varData->get_dim(1)->size() != dLatDeg.size()) {
-			_EXCEPTION2("File \"%s\" variable \"%s\" must have latitude as its second dimension",
-				strSourceData.c_str(), strVariable.c_str());
-		}
-		if (varData->get_dim(2)->size() != dLonDeg.size()) {
-			_EXCEPTION2("File \"%s\" variable \"%s\" must have longitude as its third dimension",
-				strSourceData.c_str(), strVariable.c_str());
-		}
-	}
-	if (varData->num_dims() == 2) {
-		if (varData->get_dim(1)->size() != dLatDeg.size()) {
-			_EXCEPTION2("File \"%s\" variable \"%s\" must have a second dimension with the same length as \"lat\"",
-				strSourceData.c_str(), strVariable.c_str());
-		}
-		if (dLonDeg.size() != dLatDeg.size()) {
-			_EXCEPTION1("File \"%s\" dimension \"lat\" must be the same length as dimension \"lon\"",
-				strSourceData.c_str());
-		}
-	}
-
 	// Get time variable
 	NcVar * varTime = NcGetTimeVariable(ncInput);
 	if (varTime == NULL) {
@@ -275,98 +272,149 @@ try {
 		_EXCEPTIONT("Error creating dimension \"shpix\" in output file");
 	}
 
-	NcVar * varDataOut = ncOutput.add_var(strVariable.c_str(), ncFloat, dimTimeOut, dimShp);
-	if (varDataOut == NULL) {
-		_EXCEPTION1("Error creating variable \"%s\" in output file", strVariable.c_str());
-	}
-
 	AnnounceEndBlock("Done");
 
-	// Create the map
-	AnnounceStartBlock("Creating map");
-	std::vector<float> dData;
-	std::vector<size_t> sDataCount(sShpRegionCount, 0);
+	// Map from input data to shapefiles
 	std::vector<size_t> sShpMap;
-	if (varData->num_dims() == 3) {
-		dData.resize(dLatDeg.size() * dLonDeg.size());
-		sShpMap.resize(dLatDeg.size() * dLonDeg.size(), static_cast<size_t>(-1));
-		for (size_t j = 0; j < dLatDeg.size(); j++) {
-		for (size_t i = 0; i < dLonDeg.size(); i++) {
-			size_t k = j * dLonDeg.size() + i;
+	std::vector<size_t> sDataCount(sShpRegionCount, 0);
 
-			for (size_t s = 0; s < sShpRegionCount; s++) {
-				double dStandardLonDeg = LonDegToStandardRange(dLonDeg[i]);
-				if (vecLatLonBox[s].contains(dLatDeg[j], dStandardLonDeg)) {
-					if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg[j], dStandardLonDeg)) {
-						sShpMap[k] = s;
-						sDataCount[s]++;
-						break;
-					}
-				}
-			}
-		}
-		}
-	}
-	if (varData->num_dims() == 2) {
-		dData.resize(dLatDeg.size());
-		sShpMap.resize(dLatDeg.size(), static_cast<size_t>(-1));
-		for (size_t k = 0; k < dLatDeg.size(); k++) {
-			for (size_t s = 0; s < sShpRegionCount; s++) {
-				double dStandardLonDeg = LonDegToStandardRange(dLonDeg[k]);
-				if (vecLatLonBox[s].contains(dLatDeg[k], dStandardLonDeg)) {
-					if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg[k], dStandardLonDeg)) {
-						sShpMap[k] = s;
-						sDataCount[s]++;
-						break;
-					}
-				}
-			}
-		}
-	}
-
-	// Warn user about shapefiles that don't have points
-	for (size_t s = 0; s < sShpRegionCount; s++) {
-		if (sDataCount[s] == 0) {
-			Announce("Warning: Shapefile region %lu has no contributing points", s);
-		}
-	}
-	AnnounceEndBlock("Done");
-
-	// Loop through all times
+	// Loop through all variables
 	AnnounceStartBlock("Processing data");
 
-	for (size_t t = 0; t < dimTimeOut->size(); t++) {
+	for (size_t v = 0; v < vecVariableStrings.size(); v++) {
+		AnnounceStartBlock("Variable \"%s\"", vecVariableStrings[v].c_str());
 
-		Announce("Time %lu/%lu", t, dimTimeOut->size());
-
-		// Allocate output data
-		std::vector<float> dDataOut(sShpRegionCount, 0.0f);
-
-		// Load data
+		// Get data values
+		NcVar * varData = ncInput.get_var(vecVariableStrings[v].c_str());
+		if (varData == NULL) {
+			_EXCEPTION2("File \"%s\" does not contain variable \"%s\"",
+				strSourceData.c_str(), vecVariableStrings[v].c_str());
+		}
+		if ((varData->num_dims() < 2) || (varData->num_dims() > 3)) {
+			_EXCEPTION2("File \"%s\" variable \"%s\" must contain two (time, ncol) or three dimensions (time, lat, lon)",
+				strSourceData.c_str(), vecVariableStrings[v].c_str());
+		}
 		if (varData->num_dims() == 3) {
-			varData->set_cur(t,0,0);
-			varData->get(&(dData[0]), 1, dLatDeg.size(), dLonDeg.size());
-		} else {
-			varData->set_cur(t,0);
-			varData->get(&(dData[0]), 1, dLatDeg.size());
+			if (varData->get_dim(1)->size() != dLatDeg.size()) {
+				_EXCEPTION2("File \"%s\" variable \"%s\" must have latitude as its second dimension",
+					strSourceData.c_str(), vecVariableStrings[v].c_str());
+			}
+			if (varData->get_dim(2)->size() != dLonDeg.size()) {
+				_EXCEPTION2("File \"%s\" variable \"%s\" must have longitude as its third dimension",
+					strSourceData.c_str(), vecVariableStrings[v].c_str());
+			}
 		}
-
-		// Remap data
-		for (size_t k = 0; k < sShpMap.size(); k++) {
-			if (sShpMap[k] != static_cast<size_t>(-1)) {
-				dDataOut[sShpMap[k]] += static_cast<double>(dData[k]);
+		if (varData->num_dims() == 2) {
+			if (varData->get_dim(1)->size() != dLatDeg.size()) {
+				_EXCEPTION2("File \"%s\" variable \"%s\" must have a second dimension with the same length as \"lat\"",
+					strSourceData.c_str(), vecVariableStrings[v].c_str());
+			}
+			if (dLonDeg.size() != dLatDeg.size()) {
+				_EXCEPTION1("File \"%s\" dimension \"lat\" must be the same length as dimension \"lon\"",
+					strSourceData.c_str());
 			}
 		}
 
-		// Normalize data
-		for (size_t s = 0; s < sShpRegionCount; s++) {
-			if (sDataCount[s] != 0) {
-				dDataOut[s] /= static_cast<float>(sDataCount[s]);
-			}
+		// Allocate data and count
+		std::vector<float> dData;
+
+		if (varData->num_dims() == 3) {
+			dData.resize(dLatDeg.size() * dLonDeg.size());
+		}
+		if (varData->num_dims() == 2) {
+			dData.resize(dLatDeg.size());
 		}
 
-		varDataOut->set_cur(t,0);
-		varDataOut->put(&(dDataOut[0]), 1, sShpRegionCount);
+		// For the first variable, create the map
+		if (v == 0) {
+			AnnounceStartBlock("Creating map");
+
+			if (varData->num_dims() == 3) {
+				sShpMap.resize(dLatDeg.size() * dLonDeg.size(), static_cast<size_t>(-1));
+				for (size_t j = 0; j < dLatDeg.size(); j++) {
+				for (size_t i = 0; i < dLonDeg.size(); i++) {
+					size_t k = j * dLonDeg.size() + i;
+		
+					for (size_t s = 0; s < sShpRegionCount; s++) {
+						double dStandardLonDeg = LonDegToStandardRange(dLonDeg[i]);
+						if (vecLatLonBox[s].contains(dLatDeg[j], dStandardLonDeg)) {
+							if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg[j], dStandardLonDeg)) {
+								sShpMap[k] = s;
+								sDataCount[s]++;
+								break;
+							}
+						}
+					}
+				}
+				}
+			}
+			if (varData->num_dims() == 2) {
+				sShpMap.resize(dLatDeg.size(), static_cast<size_t>(-1));
+				for (size_t k = 0; k < dLatDeg.size(); k++) {
+					for (size_t s = 0; s < sShpRegionCount; s++) {
+						double dStandardLonDeg = LonDegToStandardRange(dLonDeg[k]);
+						if (vecLatLonBox[s].contains(dLatDeg[k], dStandardLonDeg)) {
+							if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg[k], dStandardLonDeg)) {
+								sShpMap[k] = s;
+								sDataCount[s]++;
+								break;
+							}
+						}
+					}
+				}
+			}
+
+			// Warn user about shapefiles that don't have points
+			for (size_t s = 0; s < sShpRegionCount; s++) {
+				if (sDataCount[s] == 0) {
+					Announce("Warning: Shapefile region %lu has no contributing points", s);
+				}
+			}
+			AnnounceEndBlock("Done");
+		}
+
+		// Create output variable
+		NcVar * varDataOut = ncOutput.add_var(vecVariableStrings[v].c_str(), ncFloat, dimTimeOut, dimShp);
+		if (varDataOut == NULL) {
+			_EXCEPTION1("Error creating variable \"%s\" in output file", vecVariableStrings[v].c_str());
+		}
+
+		// Loop through all times
+		for (size_t t = 0; t < dimTimeOut->size(); t++) {
+	
+			Announce("Time %lu/%lu", t, dimTimeOut->size());
+	
+			// Allocate output data
+			std::vector<float> dDataOut(sShpRegionCount, 0.0f);
+	
+			// Load data
+			if (varData->num_dims() == 3) {
+				varData->set_cur(t,0,0);
+				varData->get(&(dData[0]), 1, dLatDeg.size(), dLonDeg.size());
+			} else {
+				varData->set_cur(t,0);
+				varData->get(&(dData[0]), 1, dLatDeg.size());
+			}
+	
+			// Remap data
+			for (size_t k = 0; k < sShpMap.size(); k++) {
+				if (sShpMap[k] != static_cast<size_t>(-1)) {
+					dDataOut[sShpMap[k]] += static_cast<double>(dData[k]);
+				}
+			}
+	
+			// Normalize data
+			for (size_t s = 0; s < sShpRegionCount; s++) {
+				if (sDataCount[s] != 0) {
+					dDataOut[s] /= static_cast<float>(sDataCount[s]);
+				}
+			}
+	
+			varDataOut->set_cur(t,0);
+			varDataOut->put(&(dDataOut[0]), 1, sShpRegionCount);
+		}
+
+		AnnounceEndBlock("Done");
 	}
 
 	AnnounceEndBlock("Done");
