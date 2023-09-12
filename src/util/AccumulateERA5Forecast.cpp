@@ -299,6 +299,12 @@ try {
 		if (!ncfilein.is_valid()) {
 			_EXCEPTION1("Unable to open input file \"%s\"", vecInputFiles[0].c_str());
 		}
+
+		NcVar * varIn = ncfilein.get_var(strVariableName.c_str());
+		if (varIn == NULL) {
+			_EXCEPTION2("File \"%s\" does not contain variable \"%s\"",
+				vecInputFiles[0].c_str(), strVariableName.c_str());
+		}
 	
 		NcVar * varTimeOut = ncfileout.add_var("time", ncInt, dimTimeOut);
 		if (varTimeOut == NULL) {
@@ -373,9 +379,19 @@ try {
 			_EXCEPTION1("Unable to add variable \"%s\" to output file", strVariableOutName.c_str());
 		}
 
-		varOut->add_att("long_name", "total precipitation");
-		varOut->add_att("short_name", "tp");
-		varOut->add_att("units", "m");
+		NcAtt * attLongName = varIn->get_att("long_name");
+		if (attLongName != NULL) {
+			varOut->add_att("long_name", attLongName->as_string(0));
+		}
+		NcAtt * attShortName = varIn->get_att("short_name");
+		if (attShortName != NULL) {
+			varOut->add_att("short_name", attShortName->as_string(0));
+		}
+		NcAtt * attUnits = varIn->get_att("units");
+		if (attUnits != NULL) {
+			varOut->add_att("units", attUnits->as_string(0));
+		}
+		
 		varOut->add_att("grid_specification", "0.25 degree x 0.25 degree from 90N to 90S and 0E to 359.75E (721 x 1440 Latitude/Longitude)");
 		varOut->add_att("rda_dataset", "ds633.0");
 		varOut->add_att("rda_dataset_url", "https:/rda.ucar.edu/datasets/ds633.0/");
