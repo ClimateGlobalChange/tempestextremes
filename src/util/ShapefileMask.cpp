@@ -25,6 +25,8 @@
 
 #include "netcdfcpp.h"
 
+#include <cfloat>
+
 ///////////////////////////////////////////////////////////////////////////////
 
 bool FaceContainsNode(
@@ -246,24 +248,11 @@ try {
 	dLatDeg.resize(varLat->get_dim(0)->size());
 	varLat->get(&(dLatDeg[0]), dLatDeg.size());
 
-	// Get time variable
-	NcVar * varTime = NcGetTimeVariable(ncInput);
-	if (varTime == NULL) {
-		_EXCEPTION1("File \"%s\" does not appear to contain a time variable",
-			strSourceData.c_str());
-	}
-
 	// Open output file
 	NcFile ncOutput(strOutputData.c_str(), NcFile::Replace);
 	if (!ncOutput.is_valid()) {
 		_EXCEPTION1("Unable to open NetCDF file \"%s\" for writing",
 			strOutputData.c_str());
-	}
-
-	CopyNcVar(ncInput, ncOutput, varTime->name());
-	NcDim * dimTimeOut = NcGetTimeDimension(ncOutput);
-	if (dimTimeOut == NULL) {
-		_EXCEPTIONT("Error writing time dimension to output file");
 	}
 
 	// Create a new variable
@@ -315,6 +304,20 @@ try {
 			}
 		}
 
+		// Copy first dimension
+		NcDim * dimVarFirst = varData->get_dim(0);
+		_ASSERT(dimVarFirst != NULL);
+
+		NcDim * dimVarFirstOut = ncOutput.get_dim(dimVarFirst->name());
+		if (dimVarFirstOut == NULL) {
+			dimVarFirstOut = ncOutput.add_dim(dimVarFirst->name(), dimVarFirst->size());
+			if (dimVarFirstOut == NULL) {
+				_EXCEPTION2("Error creating dimension \"%s\" in file \"%s\"",
+					dimVarFirst->name(), strOutputData.c_str());
+			}
+			CopyNcVarIfExists(ncInput, ncOutput, dimVarFirst->name());
+		}
+
 		// Allocate data and count
 		std::vector<float> dData;
 
@@ -340,7 +343,6 @@ try {
 						if (vecLatLonBox[s].contains(dLatDeg[j], dStandardLonDeg)) {
 							if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg[j], dStandardLonDeg)) {
 								sShpMap[k] = s;
-								sDataCount[s]++;
 								break;
 							}
 						}
@@ -348,6 +350,7 @@ try {
 				}
 				}
 			}
+
 			if (varData->num_dims() == 2) {
 				sShpMap.resize(dLatDeg.size(), static_cast<size_t>(-1));
 				for (size_t k = 0; k < dLatDeg.size(); k++) {
@@ -356,7 +359,6 @@ try {
 						if (vecLatLonBox[s].contains(dLatDeg[k], dStandardLonDeg)) {
 							if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg[k], dStandardLonDeg)) {
 								sShpMap[k] = s;
-								sDataCount[s]++;
 								break;
 							}
 						}
@@ -364,25 +366,30 @@ try {
 				}
 			}
 
-			// Warn user about shapefiles that don't have points
-			for (size_t s = 0; s < sShpRegionCount; s++) {
-				if (sDataCount[s] == 0) {
-					Announce("Warning: Shapefile region %lu has no contributing points", s);
-				}
-			}
 			AnnounceEndBlock("Done");
 		}
 
 		// Create output variable
-		NcVar * varDataOut = ncOutput.add_var(vecVariableStrings[v].c_str(), ncFloat, dimTimeOut, dimShp);
+		NcVar * varDataOut = ncOutput.add_var(vecVariableStrings[v].c_str(), ncFloat, dimVarFirstOut, dimShp);
 		if (varDataOut == NULL) {
 			_EXCEPTION1("Error creating variable \"%s\" in output file", vecVariableStrings[v].c_str());
 		}
+		CopyNcVarAttributes(varData, varDataOut);
+
+		// Fillvalue
+		float dFillValue = FLT_MAX;
+		NcAtt * attFillValue = varData->get_att("_FillValue");
+		if (attFillValue != NULL) {
+			dFillValue = attFillValue->as_float(0);
+		}
 
 		// Loop through all times
-		for (size_t t = 0; t < dimTimeOut->size(); t++) {
+		for (size_t t = 0; t < dimVarFirst->size(); t++) {
 	
-			Announce("Time %lu/%lu", t, dimTimeOut->size());
+			Announce("Time %lu/%lu", t, dimVarFirst->size());
+
+			// Reset the counts
+			std::fill(sDataCount.begin(), sDataCount.end(), 0);
 	
 			// Allocate output data
 			std::vector<float> dDataOut(sShpRegionCount, 0.0f);
@@ -398,8 +405,12 @@ try {
 	
 			// Remap data
 			for (size_t k = 0; k < sShpMap.size(); k++) {
-				if (sShpMap[k] != static_cast<size_t>(-1)) {
-					dDataOut[sShpMap[k]] += static_cast<double>(dData[k]);
+				if ((!std::isnan(dData[k])) && (dData[k] != dFillValue)) {
+					//printf("%1.5f %lu\n", dData[k], sShpMap[k]);
+					if (sShpMap[k] != static_cast<size_t>(-1)) {
+						dDataOut[sShpMap[k]] += static_cast<double>(dData[k]);
+						sDataCount[sShpMap[k]]++;
+					}
 				}
 			}
 	
@@ -408,8 +419,12 @@ try {
 				if (sDataCount[s] != 0) {
 					dDataOut[s] /= static_cast<float>(sDataCount[s]);
 				}
+				//if (dDataOut[s] != 0.0) {
+				//	printf("%1.5f\n", dDataOut[s]);
+				//}
 			}
 	
+			// Write to disk
 			varDataOut->set_cur(t,0);
 			varDataOut->put(&(dDataOut[0]), 1, sShpRegionCount);
 		}
