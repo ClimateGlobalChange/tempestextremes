@@ -128,6 +128,30 @@ void FindMaxClosedContourDelta(
 	real & dMaxClosedContourDelta
 );
 
+///	<summary>
+///		Find the weighted area of positive values in a given radius
+///		minus the weighted area of negative values in that radius.
+///	</summary>
+template <typename real>
+void PositiveMinusNegativeWeightedArea(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & data,
+	int ix0,
+	double dDistDeg,
+	real & dValue);
+
+///	<summary>
+///		Find the maximum value of the data field that is poleward of
+///		the given candidate within a given longitude swath.
+///	</summary>
+template <typename real>
+void MaxPolewardValue(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & data,
+	int ix0,
+	double dDistDeg,
+	real & dValue);
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #endif // _SIMPLEGRIDUTILITIES_H_

@@ -604,6 +604,113 @@ void FindMaxClosedContourDelta(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+template <typename real>
+void PositiveMinusNegativeWeightedArea(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & data,
+	int ix0,
+	double dMaxDistDeg,
+	real & dValue
+) {
+	_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
+
+	// Verify that dDistDeg is less than 180.0
+	if ((dMaxDistDeg <= 0.0) || (dMaxDistDeg > 180.0)) {
+		_EXCEPTIONT("MaxDistDeg must be positive, between 0.0 and 180.0");
+	}
+
+	// Central lat/lon and Cartesian coord
+	double dLon0 = grid.m_dLon[ix0];
+	double dLat0 = grid.m_dLat[ix0];
+
+	// Queue of nodes that remain to be visited
+	std::queue<int> queueNodes;
+	queueNodes.push(ix0);
+
+	// Set of nodes that have already been visited
+	std::set<int> setNodesVisited;
+
+	// Positive values and negative values
+	real dPositiveValues = 0.0;
+	real dNegativeValues = 0.0;
+
+	// Loop through all elements
+	while (queueNodes.size() != 0) {
+		int ix = queueNodes.front();
+		queueNodes.pop();
+
+		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
+			continue;
+		}
+
+		setNodesVisited.insert(ix);
+
+		double dLatThis = grid.m_dLat[ix];
+		double dLonThis = grid.m_dLon[ix];
+
+		// Great circle distance to this element
+		double dRDeg = GreatCircleDistance_Deg(dLon0, dLat0, dLonThis, dLatThis);
+		if (dRDeg > dMaxDistDeg) {
+			continue;
+		}
+
+		// Check positive or negative
+		if (data[ix] > 0.0) {
+			dPositiveValues += data[ix] * grid.m_dArea[ix];
+		} else {
+			dNegativeValues -= data[ix] * grid.m_dArea[ix];
+		}
+
+		// Add all neighbors of this point
+		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+			queueNodes.push(grid.m_vecConnectivity[ix][n]);
+		}
+	}
+
+	dValue = dPositiveValues - dNegativeValues;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+template <typename real>
+void MaxPolewardValue(
+	const SimpleGrid & grid,
+	const DataArray1D<real> & data,
+	int ix0,
+	double dMaxDistDeg,
+	real & dValue
+) {
+	_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
+
+	dValue = data[ix0];
+
+	double dMaxDistRad = DegToRad(dMaxDistDeg);
+
+	double dLatRad0 = grid.m_dLat[ix0];
+	double dLonRad0 = LonRadToStandardRange(grid.m_dLon[ix0]);
+
+	for (int i = 0; i < grid.m_dLon.GetRows(); i++) {
+		double dLatRadThis = grid.m_dLat[i];
+		double dLonRadThis = LonRadToStandardRange(grid.m_dLon[i]);
+
+		if ((dLatRad0 >= 0.0) && (dLatRadThis < dLatRad0)) {
+			continue;
+		}
+		if ((dLatRad0 <= 0.0) && (dLatRadThis > dLatRad0)) {
+			continue;
+		}
+		if ((fabs(dLonRadThis - dLonRad0) < dMaxDistRad) ||
+		    (fabs(dLonRadThis - dLonRad0 - 2.0 * M_PI) < dMaxDistRad)
+		) {
+			if (data[i] > dValue) {
+				dValue = data[i];
+			}
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // Explicit template instantiation
 
 template void FindLocalMinMax<float>(
@@ -719,5 +826,33 @@ template void FindMaxClosedContourDelta<double>(
 	bool fMaxClosedContourDeltaSign,
 	double & dMaxClosedContourDelta
 );
+
+template void PositiveMinusNegativeWeightedArea<float>(
+	const SimpleGrid & grid,
+	const DataArray1D<float> & data,
+	int ix0,
+	double dDistDeg,
+	float & dValue);
+
+template void PositiveMinusNegativeWeightedArea<double>(
+	const SimpleGrid & grid,
+	const DataArray1D<double> & data,
+	int ix0,
+	double dDistDeg,
+	double & dValue);
+
+template void MaxPolewardValue<float>(
+	const SimpleGrid & grid,
+	const DataArray1D<float> & data,
+	int ix0,
+	double dDistDeg,
+	float & dValue);
+
+template void MaxPolewardValue<double>(
+	const SimpleGrid & grid,
+	const DataArray1D<double> & data,
+	int ix0,
+	double dDistDeg,
+	double & dValue);
 
 ///////////////////////////////////////////////////////////////////////////////

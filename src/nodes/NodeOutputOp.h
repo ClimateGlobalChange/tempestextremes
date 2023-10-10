@@ -42,7 +42,9 @@ public:
 		MaxIndex,
 		MinIndex,
 		PosClosedContour,
-		NegClosedContour
+		NegClosedContour,
+		PosMinusNegWtArea,
+		MaxPoleward
 	};
 
 public:
@@ -114,6 +116,10 @@ public:
 						m_eOp = PosClosedContour;
 					} else if (strSubStr == "negclosedcontour") {
 						m_eOp = NegClosedContour;
+					} else if (strSubStr == "posminusnegwtarea") {
+						m_eOp = PosMinusNegWtArea;
+					} else if (strSubStr == "maxpoleward") {
+						m_eOp = MaxPoleward;
 
 					} else {
 						_EXCEPTION1("Output invalid operation \"%s\"",
@@ -214,6 +220,10 @@ public:
 			strDescription += "Greatest positive closed contour delta of ";
 		} else if (m_eOp == NegClosedContour) {
 			strDescription += "Greatest negative closed contour delta of ";
+		} else if (m_eOp == PosMinusNegWtArea) {
+			strDescription += "Positive minus negative weighted area of ";
+		} else if (m_eOp == MaxPoleward) {
+			strDescription += "Maximum poleward value of ";
 		}
 
 		strDescription += m_strVariableString;
@@ -221,6 +231,10 @@ public:
 		char szBuffer[128];
 		snprintf(szBuffer, 128, " within %f degrees", m_dDistance);
 		strDescription += szBuffer;
+
+		if (m_eOp == MaxPoleward) {
+			strDescription += " longitude";
+		}
 
 		return strDescription;
 	}
@@ -395,6 +409,30 @@ void ApplyNodeOutputOp(
 			op.m_dDistance,
 			op.m_dMinMaxDist,
 			false,
+			dValue);
+
+		snprintf(buf, 100, szFormat, dValue);
+		strResult = buf;
+
+	// Positive minus negative weighted area
+	} else if (op.m_eOp == NodeOutputOp::PosMinusNegWtArea) {
+		PositiveMinusNegativeWeightedArea<float>(
+			grid,
+			dataState,
+			ixCandidate,
+			op.m_dDistance,
+			dValue);
+
+		snprintf(buf, 100, szFormat, dValue);
+		strResult = buf;
+
+	// Positive minus negative weighted area
+	} else if (op.m_eOp == NodeOutputOp::MaxPoleward) {
+		MaxPolewardValue<float>(
+			grid,
+			dataState,
+			ixCandidate,
+			op.m_dDistance,
 			dValue);
 
 		snprintf(buf, 100, szFormat, dValue);
