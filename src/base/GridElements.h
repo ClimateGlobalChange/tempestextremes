@@ -710,6 +710,14 @@ public:
 	///		Remove zero Edges (Edges with repeated Node indices)
 	///	</summary>
 	void RemoveZeroEdges();
+
+	///	<summary>
+	///		Returns true if the Node is inside this Face.
+	///	</summary>
+	bool Contains(
+		const Node & node,
+		const NodeVector & nodevec
+	) const;
 };
 
 ///	<summary>

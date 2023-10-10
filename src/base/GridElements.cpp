@@ -131,6 +131,88 @@ void Face::RemoveZeroEdges() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+bool Face::Contains(
+	const Node & n0,
+	const NodeVector & nodevec
+) const {
+	int nParity = 0;
+
+	for (size_t i1 = 0; i1 < edges.size(); i1++) {
+		size_t i2 = (i1 + 1) % edges.size();
+		
+		const Node & n1 = nodevec[(*this)[i1]];
+		const Node & n2 = nodevec[(*this)[i2]];
+
+		// If both nodes are on the same size of n0.z then there will be no
+		// intersection with the plane z=n0.z. If nodes are on opposite sides
+		// of this plane then they must have an intersection.
+		if ((n1.z > n0.z) && (n2.z > n0.z)) {
+			continue;
+		}
+		if ((n1.z < n0.z) && (n2.z < n0.z)) {
+			continue;
+		}
+
+		// Arcs of constant z aren't informative for determining inside/outside
+		if (n1.z == n2.z) {
+			continue;
+		}
+
+		// Intersection between n1-n2 and n0.z plane
+		// Branch here to ensure result is the same regardless of n1-n2 ordering
+		// Under the rules of floating point arithmetic, dA should always be
+		// in the range [0,1].
+		Node nx;
+		if (n1.z < n2.z) {
+			double dA = (n0.z - n1.z) / (n2.z - n1.z);
+			nx.x = (1.0 - dA) * n1.x + dA * n2.x;
+			nx.y = (1.0 - dA) * n1.y + dA * n2.y;
+			nx.z = n0.z;
+		} else {
+			double dA = (n0.z - n2.z) / (n1.z - n2.z);
+			nx.x = (1.0 - dA) * n2.x + dA * n1.x;
+			nx.y = (1.0 - dA) * n2.y + dA * n1.y;
+			nx.z = n0.z;
+		}
+
+		// Signed angle argument to ensure we only move towards positive longitudes
+		double dc = n0.x * nx.y - n0.y * nx.x;
+		double dd = n0.x * nx.x + n0.y * nx.y + n0.z * nx.z;
+
+		// The actual angle is arctan(da), but since arctan is monotone the
+		// actual angle is not needed.
+		double da = dc / dd;
+
+		if (da < 0.0) {
+			continue;
+		}
+
+		// Arcs that go from smaller z to larger z have positive parity.
+		// Arcs that go from larger z to smaller z have negative parity.
+		if (n1.z < n2.z) {
+			if ((n1.z == n0.z) || (n2.z == n0.z)) {
+				nParity++;
+			} else {
+				nParity += 2;
+			}
+
+		} else {
+			if ((n1.z == n0.z) || (n2.z == n0.z)) {
+				nParity--;
+			} else {
+				nParity -= 2;
+			}
+		}
+	}
+
+	if (nParity >= 0) {
+		return false;
+	}
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// Mesh
 ///////////////////////////////////////////////////////////////////////////////
 
