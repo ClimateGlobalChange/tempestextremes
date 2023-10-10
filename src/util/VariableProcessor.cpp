@@ -76,6 +76,9 @@ try {
 	// Time filter
 	std::string strTimeFilter;
 
+	// Override _FillValue
+	std::string strFillValue;
+
 	// Name of latitude dimension
 	std::string strLatitudeName;
 
@@ -100,6 +103,8 @@ try {
 		CommandLineString(strVariables, "var", "");
 		CommandLineString(strOutputVariables, "varout", "");
 		CommandLineString(strTimeFilter, "timefilter", "");
+
+		CommandLineString(strFillValue, "fillvalue", "");
 
 		CommandLineString(strLongitudeName, "lonname", "lon");
 		CommandLineString(strLatitudeName, "latname", "lat");
@@ -129,6 +134,15 @@ try {
 	if ((strOutputData.length() != 0) && (strOutputDataList.length() != 0)) {
 		_EXCEPTIONT("Only one of (--out_data) or (--out_data_list)"
 			" may be specified");
+	}
+
+	// Parse --fillvalue argument
+	float dFillValue = 0.0;
+	if (strFillValue != "") {
+		if (!STLStringHelper::IsFloat(strFillValue)) {
+			_EXCEPTIONT("Argument --fillvalue must be a floating point value");
+		}
+		dFillValue = std::stof(strFillValue);
 	}
 
 	// Parse --var argument
@@ -469,6 +483,11 @@ try {
 				vecVariableNamesOut[v].c_str(),
 				vecOutputFileList[f].c_str());
 			}
+
+			// Add _FillValue
+			if (strFillValue != "") {
+				vecNcVarOut[v]->add_att("_FillValue", dFillValue);
+			}
 		}
 
 		// Loop through all times in this file
@@ -482,7 +501,6 @@ try {
 			vecFiles.SetTime(vecOutputTimes[t]);
 
 			// Loop through all variables
-			//for (int v = 0; v < vecVarIxIn.size(); v++) {
 			varreg.ResetProcessingQueue();
 			while(varreg.AdvanceProcessingQueue()) {
 				size_t v = varreg.GetProcessingQueueVarPos();
