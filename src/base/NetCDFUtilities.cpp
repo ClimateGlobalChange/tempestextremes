@@ -196,6 +196,10 @@ void CopyNcFileAttributes(
 			fileOut->add_att(att->name(), num_vals,
 				(const double*)(pValues->base()));
 
+		} else if (att->type() == ncInt64) {
+			fileOut->add_att(att->name(), num_vals,
+				(const int64_t*)(pValues->base()));
+
 		} else if (att->type() == ncString) {
 			fileOut->add_att(att->name(), strlen((const char *)pValues->base()),
 				(const char*)(pValues->base()));
@@ -260,6 +264,10 @@ void CopyNcVarAttributes(
 		} else if (att->type() == ncDouble) {
 			varOut->add_att(att->name(), num_vals,
 				(const double*)(pValues->base()));
+
+		} else if (att->type() == ncInt64) {
+			varOut->add_att(att->name(), num_vals,
+				(const int64_t*)(pValues->base()));
 
 		} else if (att->type() == ncString) {
 			varOut->add_att(att->name(), strlen((const char *)pValues->base()),
