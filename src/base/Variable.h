@@ -617,7 +617,7 @@ public:
 	///	<summary>
 	///		Equality operator.
 	///	</summary>
-	bool operator==(const Variable & var);
+	bool operator==(const Variable & var) const;
 
 	///	<summary>
 	///		Get the name of this Variable.
