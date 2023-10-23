@@ -677,7 +677,6 @@ try {
 		CommandLineBool(fFlatten, "flatten");
 		CommandLineString(strLatitudeName, "latname","lat");
 		CommandLineString(strLongitudeName, "lonname","lon");
-		//CommandLineString(strTimeName, "timename", "time");
 		CommandLineString(strOutTimeUnits,"outtimeunits","");
 		CommandLineString(strThresholdCmd, "thresholdcmd", "");
 		CommandLineBool(fVerbose, "verbose");

@@ -199,6 +199,9 @@ try {
 	// Output file
 	std::string strOutputFile;
 
+	// Output nodefile
+	std::string strOutputNodeFile;
+
 	// Input variable
 	std::string strInputVariable;
 
@@ -210,6 +213,12 @@ try {
 
 	// Summary quantities
 	std::string strOutputQuantities;
+
+	// Format BlobStats output as a nodefile
+	bool fOutputNodefile;
+
+	// When outputting BlobStats as a nodefile write out seconds instead of hours
+	bool fOutputSeconds;
 
 	// Output headers
 	bool fOutputHeaders;
@@ -244,10 +253,12 @@ try {
 		CommandLineBool(fDiagonalConnectivity, "diag_connect");
 		CommandLineBool(fRegional, "regional");
 		CommandLineString(strOutputFile, "out_file", "");
-		CommandLineString(strInputVariable, "var", "");
+		CommandLineString(strInputVariable, "var", "object_id");
 		CommandLineString(strSumVariables, "sumvar", "");
 		CommandLineString(strWeightVariable, "wtvar", "");
 		CommandLineString(strOutputQuantities, "out", "");
+		CommandLineBool(fOutputNodefile, "out_nodefile");
+		CommandLineBool(fOutputSeconds, "out_seconds");
 		CommandLineBool(fOutputHeaders, "out_headers");
 		CommandLineBool(fOutputFullTimes, "out_fulltime");
 		CommandLineString(strTimeFilter, "timefilter", "");
@@ -283,8 +294,13 @@ try {
 	}
 
 	// Check output variable
-	if (strOutputQuantities == "") {
+	if ((strOutputQuantities == "") && (!fOutputNodefile)) {
 		_EXCEPTIONT("No output quantities (--out) specified");
+	}
+
+	// Nodefile output
+	if (fOutputSeconds && !fOutputNodefile) {
+		_EXCEPTIONT("--out_seconds must be in combination with --out_nodefile");
 	}
 
 	// Input file list
@@ -334,7 +350,7 @@ try {
 	// Parse the list of output quantities
 	bool fTwoPassCalculation = false;
 	std::vector<BlobQuantities::OutputQuantity> vecOutputVars;
-	{
+	if (strOutputQuantities != "") {
 		// Parse output quantities and store in vecOutputVars
 		AnnounceStartBlock("Parsing output quantities");
 
@@ -393,6 +409,33 @@ try {
 		}
 
 		AnnounceEndBlock("Done");
+	}
+
+	// Check output variables when fOutputNodefile is active
+	if (fOutputNodefile) {
+		if (vecOutputVars.size() == 0) {
+			vecOutputVars.push_back(BlobQuantities::CentroidLon);
+			vecOutputVars.push_back(BlobQuantities::CentroidLat);
+
+		} else if (vecOutputVars.size() == 1) {
+			_EXCEPTIONT("When using --out_nodefile, the first two arguments of --out must be a longitude and latitude");
+
+		} else {
+			if ((vecOutputVars[0] == BlobQuantities::MeanLon) &&
+			    (vecOutputVars[1] == BlobQuantities::MeanLat)
+			) {
+			} else if (
+			    (vecOutputVars[0] == BlobQuantities::CentroidLon) &&
+			    (vecOutputVars[1] == BlobQuantities::CentroidLat)
+			) {
+			} else if (
+			    (vecOutputVars[0] == BlobQuantities::WtCentroidLon) &&
+			    (vecOutputVars[1] == BlobQuantities::WtCentroidLat)
+			) {
+			} else {
+				_EXCEPTIONT("When using --out_nodefile, the first two arguments of --out must be a longitude and latitude");
+			}
+		}
 	}
 
 	// VariableRegistry
@@ -872,12 +915,31 @@ try {
 
 			for (; iterBlobs != mapAllQuantities.end(); iterBlobs++) {
 
-				//fprintf(fpout, "Blob %i (%lu)\n",
-				//	iterBlobs->first,
-				//	iterBlobs->second.size());
+				if (iterBlobs->second.size() == 0) {
+					continue;
+				}
 
 				TimedBlobQuantitiesMap::iterator iterTimes =
 					iterBlobs->second.begin();
+
+				if (fOutputNodefile) {
+					const Time & timeStart = vecFileTimes[iterTimes->first - iFirstFileTime];
+					if (fOutputSeconds) {
+						fprintf(fpout, "start\t%lu\t%i\t%i\t%i\t%05i\n",
+							iterBlobs->second.size(),
+							timeStart.GetYear(),
+							timeStart.GetMonth(),
+							timeStart.GetDay(),
+							timeStart.GetSecond());
+					} else {
+						fprintf(fpout, "start\t%lu\t%i\t%i\t%i\t%i\n",
+							iterBlobs->second.size(),
+							timeStart.GetYear(),
+							timeStart.GetMonth(),
+							timeStart.GetDay(),
+							timeStart.GetSecond() / 3600);
+					}
+				}
 
 				if (iterBlobs->first != iBlobOutputIndex) {
 					iBlobOutputTime = 0;
@@ -886,14 +948,22 @@ try {
 
 				for (; iterTimes != iterBlobs->second.end(); iterTimes++) {
 
-					fprintf(fpout, "%i\t%i\t", iterBlobs->first, iBlobOutputTime);
+					if (!fOutputNodefile) {
+						fprintf(fpout, "%i\t%i\t", iterBlobs->first, iBlobOutputTime);
+					}
 					iBlobOutputTime++;
 
-					if (fOutputFullTimes) {
-						_ASSERT(iterTimes->first-iFirstFileTime < vecFileTimes.size());
-						fprintf(fpout, "%s", vecFileTimes[iterTimes->first-iFirstFileTime].ToShortString().c_str());
+					_ASSERT(iterTimes->first-iFirstFileTime < vecFileTimes.size());
+					Time & timeCurrent = vecFileTimes[iterTimes->first-iFirstFileTime];
+
+					if (fOutputNodefile) {
+						fprintf(fpout, "\t0\t0");
 					} else {
-						fprintf(fpout, "%i", iterTimes->first);
+						if (fOutputFullTimes) {
+							fprintf(fpout, "%s", vecFileTimes[iterTimes->first - iFirstFileTime].ToShortString().c_str());
+						} else {
+							fprintf(fpout, "%i", iterTimes->first);
+						}
 					}
 
 					// BlobQuantities for this blob at this timestep
@@ -1033,6 +1103,23 @@ try {
 					// Sum variables
 					for (int v = 0; v < bq.dSumVars.size(); v++) {
 						fprintf(fpout,"\t%1.6e", bq.dSumVars[v]);
+					}
+
+					// Times
+					if (fOutputNodefile) {
+						if (fOutputSeconds) {
+							fprintf(fpout, "\t%i\t%i\t%i\t%05i",
+								timeCurrent.GetYear(),
+								timeCurrent.GetMonth(),
+								timeCurrent.GetDay(),
+								timeCurrent.GetSecond());
+						} else {
+							fprintf(fpout, "\t%i\t%i\t%i\t%i",
+								timeCurrent.GetYear(),
+								timeCurrent.GetMonth(),
+								timeCurrent.GetDay(),
+								timeCurrent.GetSecond() / 3600);
+						}
 					}
 
 					// Endline
