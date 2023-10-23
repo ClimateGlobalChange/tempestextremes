@@ -763,7 +763,7 @@ DataOp * VariableRegistry::GetDataOp(
 
 bool Variable::operator==(
 	const Variable & var
-) {
+) const {
 	if (m_fOp != var.m_fOp) {
 		return false;
 	}
