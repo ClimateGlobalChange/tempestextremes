@@ -474,6 +474,36 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class DataOp_EQUALS : public DataOp {
+
+public:
+	///	<summary>
+	///		Operartor name.
+	///	</summary>
+	static const char * name;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_EQUALS() :
+		DataOp(name)
+	{ }
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 class DataOp_SQRT : public DataOp {
 
 public:
@@ -547,6 +577,66 @@ public:
 	///		Constructor.
 	///	</summary>
 	DataOp_LAT() :
+		DataOp(name)
+	{ }
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class DataOp_LON : public DataOp {
+
+public:
+	///	<summary>
+	///		Operartor name.
+	///	</summary>
+	static const char * name;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_LON() :
+		DataOp(name)
+	{ }
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class DataOp_AREA : public DataOp {
+
+public:
+	///	<summary>
+	///		Operartor name.
+	///	</summary>
+	static const char * name;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_AREA() :
 		DataOp(name)
 	{ }
 

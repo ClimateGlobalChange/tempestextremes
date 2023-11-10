@@ -64,7 +64,7 @@ inline double LonDegToStandardRange(
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		Translate a longitude value to the range [0,360)
+///		Translate a longitude value to the range [0,2pi)
 ///	</summary>
 inline double LonRadToStandardRange(
 	double dLonRad

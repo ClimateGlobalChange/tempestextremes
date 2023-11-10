@@ -97,6 +97,9 @@ DataOp * DataOpManager::Add(
 	} else if (strName == "_COND") {
 		return Add(new DataOp_COND);
 
+	} else if (strName == "_EQUALS") {
+		return Add(new DataOp_EQUALS);
+
 	} else if (strName == "_SQRT") {
 		return Add(new DataOp_SQRT);
 	
@@ -105,6 +108,12 @@ DataOp * DataOpManager::Add(
 
 	} else if (strName == "_LAT") {
 		return Add(new DataOp_LAT);
+
+	} else if (strName == "_LON") {
+		return Add(new DataOp_LON);
+
+	} else if (strName == "_AREA") {
+		return Add(new DataOp_AREA);
 
 	} else if (strName == "_F") {
 		return Add(new DataOp_F);
@@ -803,7 +812,11 @@ bool DataOp_DIV::Apply(
 		const DataArray1D<float> & dataRight = *(vecArgData[1]);
 
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = dataLeft[i] / dataRight[i];
+			if (dataRight[i] == 0.0) {
+				dataout[i] = std::numeric_limits<float>::quiet_NaN();
+			} else {
+				dataout[i] = dataLeft[i] / dataRight[i];
+			}
 		}
 	}
 
@@ -1042,7 +1055,96 @@ bool DataOp_COND::Apply(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// DataOp_SQRT
+// DataOp_EQUALS
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_EQUALS::name = "_EQUALS";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_EQUALS::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 2) {
+		_EXCEPTION2("%s expects two arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	for (int v = 0; v < vecArgData.size(); v++) {
+		if (vecArgData[v] == NULL) {
+			if (!STLStringHelper::IsFloat(strArg[v])) {
+				_EXCEPTION1("Arguments to %s must be data variables or floats",
+					m_strName.c_str());
+			}
+		}
+	}
+
+	// First argument is a float
+	if (vecArgData[0] == NULL) {
+		float dValue0 = atof(strArg[0].c_str());
+
+		// Second argument is a float
+		if (vecArgData[1] == NULL) {
+			float dValue1 = atof(strArg[1].c_str());
+
+			if (dValue0 == dValue1) {
+				for (int i = 0; i < dataout.GetRows(); i++) {
+					dataout[i] = 1.0;
+				}
+			} else {
+				for (int i = 0; i < dataout.GetRows(); i++) {
+					dataout[i] = 0.0;
+				}
+			}
+
+		// Second argument is a field
+		} else {
+			const DataArray1D<float> & data1 = *(vecArgData[1]);
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				if (dValue0 == data1[i]) {
+					dataout[i] = 1.0;
+				} else {
+					dataout[i] = 0.0;
+				}
+			}
+		}
+
+	// First argument is a field
+	} else {
+		const DataArray1D<float> & data0 = *(vecArgData[0]);
+
+		// Second argument is a float
+		if (vecArgData[1] == NULL) {
+			float dValue1 = atof(strArg[1].c_str());
+
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				if (data0[i] == dValue1) {
+					dataout[i] = 1.0;
+				} else {
+					dataout[i] = 0.0;
+				}
+			}
+
+		// Second argument is a field
+		} else {
+			const DataArray1D<float> & data1 = *(vecArgData[1]);
+			for (int i = 0; i < dataout.GetRows(); i++) {
+				if (data0[i] == data1[i]) {
+					dataout[i] = 1.0;
+				} else {
+					dataout[i] = 0.0;
+				}
+			}
+		}
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_EQUALS
 ///////////////////////////////////////////////////////////////////////////////
 
 const char * DataOp_SQRT::name = "_SQRT";
@@ -1155,6 +1257,62 @@ bool DataOp_LAT::Apply(
 
 	for (int i = 0; i < dataout.GetRows(); i++) {
 		dataout[i] = grid.m_dLat[i] * 180.0 / M_PI;
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_LAT
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_LON::name = "_LON";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_LON::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 0) {
+		_EXCEPTION2("%s expects zero arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+
+	for (int i = 0; i < dataout.GetRows(); i++) {
+		dataout[i] = grid.m_dLon[i] * 180.0 / M_PI;
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_AREA
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_AREA::name = "_AREA";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_AREA::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() > 1) {
+		_EXCEPTION2("%s expects at most one argument: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+	if (!grid.HasAreas()) {
+		_EXCEPTION1("Grid area not available in %s operator",
+			m_strName.c_str());
+	}
+
+	for (int i = 0; i < dataout.GetRows(); i++) {
+		dataout[i] = grid.m_dArea[i] * EarthRadius * EarthRadius;
 	}
 
 	return true;
