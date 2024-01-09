@@ -139,7 +139,9 @@ public:
 		std::string strCalendarTemp = strCalendar;
 		STLStringHelper::ToLower(strCalendarTemp);
 
-		if (strCalendarTemp == "none") {
+		if (strCalendarTemp == "unknown") {
+			return CalendarUnknown;
+		} else if (strCalendarTemp == "none") {
 			return CalendarNone;
 		} else if (strCalendarTemp == "noleap") {
 			return CalendarNoLeap;
@@ -157,6 +159,64 @@ public:
 			return Calendar365Day;
 		} else {
 			return CalendarUnknown;
+		}
+	}
+
+	///	<summary>
+	///		Returns the string associated with the given CalendarType.
+	///	</summary>
+	static std::string StringFromCalendarType(
+		CalendarType eCalendarType
+	) {
+		if (eCalendarType == CalendarUnknown) {
+			return std::string("unknown");
+		} else if (eCalendarType == CalendarNone) {
+			return std::string("none");
+		} else if (eCalendarType == CalendarNoLeap) {
+			return std::string("noleap");
+		} else if (eCalendarType == CalendarStandard) {
+			return std::string("standard");
+		} else if (eCalendarType == CalendarGregorian) {
+			return std::string("gregorian");
+		} else if (eCalendarType == Calendar360Day) {
+			return std::string("360_day");
+		} else if (eCalendarType == Calendar365Day) {
+			return std::string("365_day");
+		} else {
+			_EXCEPTIONT("Invalid CalendarType");
+		}
+	}
+
+	///	<summary>
+	///		Returns the TimeType associated with the given string.
+	///	</summary>
+	static TimeType TimeTypeFromString(
+		const std::string & strTimeType
+	) {
+		std::string strTimeTypeTemp = strTimeType;
+		STLStringHelper::ToLower(strTimeTypeTemp);
+
+		if (strTimeType == "fixed") {
+			return TypeFixed;
+		} else if (strTimeType == "delta") {
+			return TypeDelta;
+		} else {
+			_EXCEPTION1("Invalid TimeType string \"%s\"", strTimeType.c_str());
+		}
+	}
+
+	///	<summary>
+	///		Returns the string associated with the given TimeType.
+	///	</summary>
+	static std::string StringFromTimeType(
+		TimeType eTimeType
+	) {
+		if (eTimeType == TypeFixed) {
+			return std::string("fixed");
+		} else if (eTimeType == TypeDelta) {
+			return std::string("delta");
+		} else {
+			_EXCEPTIONT("Invalid TimeType");
 		}
 	}
 
@@ -626,6 +686,24 @@ public:
 	///		Get the name of the calendar.
 	///	</summary>
 	std::string GetCalendarName() const;
+
+	///	<summary>
+	///		Get the TimeType as a string.
+	///	</summary>
+	std::string GetTimeTypeString() const;
+
+public:
+	///	<summary>
+	///		Get the object as a YAML list.
+	///	</summary>
+	std::string GetAsYAMLList() const;
+
+	///	<summary>
+	///		Get the object as a YAML list.
+	///	</summary>
+	void FromYAMLList(
+		const std::string & strYAMLTime
+	);
 
 private:
 	///	<summary>

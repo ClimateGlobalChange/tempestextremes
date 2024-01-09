@@ -58,7 +58,6 @@ public:
 	///	</summary>
 	typedef std::vector<FilenameTimePair> FilenameTimePairVector;
 
-
 public:
 	///	<summary>
 	///		Constructor.
@@ -85,6 +84,21 @@ public:
 	FilenameTimePairVector Find(
 		const Time & time
 	) const;
+
+public:
+	///	<summary>
+	///		Write the AutoCuratorDataset to a file.
+	///	</summary>
+	void ToYAMLFile(
+		const std::string & strFile
+	);
+
+	///	<summary>
+	///		Read from a file.
+	///	</summary>
+	void FromYAMLFile(
+		const std::string & strFile
+	);
 
 public:
 	///	<summary>

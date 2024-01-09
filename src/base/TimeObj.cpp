@@ -1222,20 +1222,114 @@ double Time::GetCFCompliantUnitsOffsetDouble(
 ///////////////////////////////////////////////////////////////////////////////
 
 std::string Time::GetCalendarName() const {
-	if (m_eCalendarType == CalendarNone) {
-		return std::string("none");
-	} else if (m_eCalendarType == CalendarNoLeap) {
-		return std::string("noleap");
-	} else if (m_eCalendarType == CalendarStandard) {
-		return std::string("standard");
-	} else if (m_eCalendarType == CalendarGregorian) {
-		return std::string("gregorian");
-	} else if (m_eCalendarType == Calendar360Day) {
-		return std::string("360_day");
-	} else if (m_eCalendarType == Calendar365Day) {
-		return std::string("365_day");
-	} else {
-		_EXCEPTIONT("Invalid CalendarType");
+	return StringFromCalendarType(m_eCalendarType);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string Time::GetTimeTypeString() const {
+	return StringFromTimeType(m_eTimeType);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string Time::GetAsYAMLList() const {
+	char szYAMLList[256];
+	snprintf(szYAMLList, 256, "[%i,%i,%i,%i,%i,%s,%s]",
+		m_iYear,
+		m_iMonth,
+		m_iDay,
+		m_iSecond,
+		m_iMicroSecond,
+		GetCalendarName().c_str(),
+		GetTimeTypeString().c_str());
+	return std::string(szYAMLList);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void Time::FromYAMLList(
+	const std::string & strYAMLTime
+) {
+	enum ParseState {
+		ParseState_Year,
+		ParseState_Month,
+		ParseState_Day,
+		ParseState_Second,
+		ParseState_MicroSecond,
+		ParseState_Calendar,
+		ParseState_TimeType,
+		ParseState_Done
+	};
+
+	if (strYAMLTime.length() < 2) {
+		_EXCEPTION1("Invalid YAML time string \"%s\"", strYAMLTime.c_str());
+	}
+	if (strYAMLTime[0] != '[') {
+		_EXCEPTION1("Invalid YAML time string \"%s\"", strYAMLTime.c_str());
+	}
+	if (strYAMLTime[strYAMLTime.length()-1] != ']') {
+		_EXCEPTION1("Invalid YAML time string \"%s\"", strYAMLTime.c_str());
+	}
+
+	ParseState eState = ParseState_Year;
+	int ixLast = 1;
+	int ix = 1;
+	for (; ix != strYAMLTime.length(); ix++) {
+		if ((strYAMLTime[ix] == ',') || (strYAMLTime[ix] == ']')) {
+			if (ix == ixLast) {
+				_EXCEPTION1("Invalid YAML time string \"%s\"", strYAMLTime.c_str());
+			}
+			std::string strSubStr = strYAMLTime.substr(ixLast, ix-ixLast-1);
+			STLStringHelper::RemoveWhitespaceInPlace(strSubStr);
+			ixLast = ix+1;
+
+			if ((eState == ParseState_Year) ||
+			    (eState == ParseState_Month) ||
+			    (eState == ParseState_Day) ||
+			    (eState == ParseState_Second) ||
+			    (eState == ParseState_MicroSecond)
+			) {
+				if (!STLStringHelper::IsInteger(strSubStr)) {
+					_EXCEPTION1("Invalid YAML time string \"%s\"", strYAMLTime.c_str());
+				}
+			}
+
+			if (eState == ParseState_Year) {
+				m_iYear = stoi(strSubStr);
+				eState = ParseState_Month;
+
+			} else if (eState == ParseState_Month) {
+				m_iMonth = stoi(strSubStr);
+				eState = ParseState_Day;
+
+			} else if (eState == ParseState_Day) {
+				m_iDay = stoi(strSubStr);
+				eState = ParseState_Second;
+
+			} else if (eState == ParseState_Second) {
+				m_iSecond = stoi(strSubStr);
+				eState = ParseState_MicroSecond;
+
+			} else if (eState == ParseState_MicroSecond) {
+				m_iMicroSecond = stoi(strSubStr);
+				eState = ParseState_Calendar;
+
+			} else if (eState == ParseState_Calendar) {
+				m_eCalendarType = CalendarTypeFromString(strSubStr);
+				eState = ParseState_TimeType;
+
+			} else if (eState == ParseState_TimeType) {
+				m_eTimeType = TimeTypeFromString(strSubStr);
+				eState = ParseState_Done;
+
+			} else if (eState == ParseState_Done) {
+				_EXCEPTION1("Invalid YAML time string \"%s\"", strYAMLTime.c_str());
+			}
+		}
+	}
+	if (eState != ParseState_Done) {
+		_EXCEPTION1("Invalid YAML time string \"%s\"", strYAMLTime.c_str());
 	}
 }
 

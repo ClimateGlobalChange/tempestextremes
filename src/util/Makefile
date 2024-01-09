@@ -27,7 +27,8 @@ EXEC_FILES= GenerateNearestNeighborMap.cpp \
             QuantileCalculator.cpp \
             AccumulateERA5Forecast.cpp \
             AccumulateData.cpp \
-            ShapefileMask.cpp
+            ShapefileMask.cpp \
+			AutoCuratorTool.cpp
 
 EXEC_TARGETS= $(EXEC_FILES:%.cpp=%)
 

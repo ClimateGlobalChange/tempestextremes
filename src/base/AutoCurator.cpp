@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
-///	\file    AutoCurator.h
+///	\file    AutoCurator.cpp
 ///	\author  Paul Ullrich
 ///	\version August 15, 2018
 ///
@@ -67,6 +67,177 @@ AutoCuratorDataset::FilenameTimePairVector AutoCuratorDataset::Find(
 	}
 
 	return vec;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void AutoCuratorDataset::ToYAMLFile(
+	const std::string & strYAMLFile
+) {
+	std::ofstream ofAC(strYAMLFile);
+	if (!ofAC.is_open()) {
+		_EXCEPTION1("Unable to open file \"%s\" for reading", strYAMLFile.c_str());
+	}
+
+	ofAC << "---" << std::endl;
+	ofAC << "calendar: " << Time::StringFromCalendarType(m_eCalendarType) << std::endl;
+	ofAC << "time_nctype: " << (int)(m_eNcTimeType) << std::endl;
+	ofAC << "time_units: \"" << m_strNcTimeUnits << "\"" << std::endl;
+	ofAC << "files:" << std::endl;
+	for (size_t f = 0; f < m_vecFiles.size(); f++) {
+		ofAC << "  - \"" << m_vecFiles[f] << "\"" << std::endl;
+	}
+	ofAC << "times:" << std::endl;
+	for (auto it = m_mapTimeToTimeFileIx.begin(); it != m_mapTimeToTimeFileIx.end(); it++) {
+		ofAC << "  - \"" << it->first.ToString() << "\"" << std::endl;
+		for (size_t ft = 0; ft < it->second.size(); ft++) {
+			ofAC << "    - [" << it->second[ft].first << "," << it->second[ft].second << "]" << std::endl;
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void AutoCuratorDataset::FromYAMLFile(
+	const std::string & strYAMLFile
+) {
+	size_t sLine = 0;
+
+	m_vecFiles.clear();
+	m_mapTimeToTimeFileIx.clear();
+
+	std::ifstream ifAC(strYAMLFile);
+	if (!ifAC.is_open()) {
+		_EXCEPTION1("Unable to open file \"%s\" for reading", strYAMLFile.c_str());
+	}
+
+	std::string strBuf;
+
+	std::getline(ifAC, strBuf); sLine++;
+	if (strBuf != "---") {
+		_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+	}
+
+	// Calendar
+	std::getline(ifAC, strBuf); sLine++;
+	if (strBuf.substr(0,9) != "calendar:") {
+		_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+	}
+	strBuf = strBuf.substr(10);
+	STLStringHelper::RemoveWhitespaceInPlace(strBuf);
+	m_eCalendarType = Time::CalendarTypeFromString(strBuf);
+
+	// Time nctype
+	std::getline(ifAC, strBuf); sLine++;
+	if (strBuf.substr(0,12) != "time_nctype:") {
+		_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+	}
+	strBuf = strBuf.substr(12);
+	STLStringHelper::RemoveWhitespaceInPlace(strBuf);
+	m_eNcTimeType = (NcType)std::stoi(strBuf);
+
+	// Time units
+	std::getline(ifAC, strBuf); sLine++;
+	if (strBuf.substr(0,11) != "time_units:") {
+		_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+	}
+	strBuf = strBuf.substr(11);
+	STLStringHelper::RemoveWhitespaceInPlace(strBuf);
+	if (strBuf.length() < 2) {
+		_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+	}
+	if ((strBuf[0] != '\"') || (strBuf[strBuf.length()-1] != '\"')) {
+		_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+	}
+	m_strNcTimeUnits = strBuf.substr(1,strBuf.length()-2);
+
+	// File names
+	std::getline(ifAC, strBuf); sLine++;
+	if (strBuf != "files:") {
+		_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+	}
+	std::getline(ifAC, strBuf); sLine++;
+	while(strBuf != "times:") {
+		if (ifAC.eof()) {
+			_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+		}
+		if (strBuf.substr(0,4) != "  - ") {
+			_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+		}
+		strBuf = strBuf.substr(4);
+		STLStringHelper::RemoveWhitespaceInPlace(strBuf);
+		if ((strBuf[0] != '\"') || (strBuf[strBuf.length()-1] != '\"')) {
+			_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+		}
+		m_vecFiles.push_back(strBuf.substr(1,strBuf.length()-2));
+		std::getline(ifAC, strBuf); sLine++;
+	}
+
+	// Times
+	if (strBuf != "times:") {
+		_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+	}
+	std::getline(ifAC, strBuf); sLine++;
+	while(!ifAC.eof()) {
+		if (strBuf.substr(0,4) != "  - ") {
+			_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+		}
+		strBuf = strBuf.substr(4);
+		STLStringHelper::RemoveWhitespaceInPlace(strBuf);
+		if ((strBuf[0] != '\"') || (strBuf[strBuf.length()-1] != '\"')) {
+			_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+		}
+		Time time(m_eCalendarType);
+		time.FromFormattedString(strBuf.substr(1,strBuf.length()-2));
+		std::pair<TimeToFileTimeIxMap::iterator, bool> map_insert_res =
+			m_mapTimeToTimeFileIx.insert(
+				std::pair<Time, FileTimeIxVector>(
+					time, FileTimeIxVector()));
+		if (!map_insert_res.second) {
+			_EXCEPTIONT("Error inserting object into map");
+		}
+
+		// Load file time pairs
+		std::getline(ifAC, strBuf); sLine++;
+		while(!ifAC.eof()) {
+			if (strBuf.substr(0,4) == "  - ") {
+				break;
+			}
+			if (strBuf.substr(0,6) != "    - ") {
+				_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+			}
+			strBuf = strBuf.substr(6);
+			if (strBuf.length() < 2) {
+				_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+			}
+			if ((strBuf[0] != '[') || (strBuf[strBuf.length()-1] != ']')) {
+				_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+			}
+			std::string strBufFirst;
+			std::string strBufSecond;
+			for (int ix = 1; ix < strBuf.length()-1; ix++) {
+				if (strBuf[ix] == ',') {
+					strBufFirst = strBuf.substr(1,ix-1);
+					strBufSecond = strBuf.substr(ix+1,strBuf.length()-ix-2);
+					break;
+				}
+			}
+			if (!STLStringHelper::IsInteger(strBufFirst)) {
+				_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+			}
+			if (!STLStringHelper::IsInteger(strBufSecond)) {
+				_EXCEPTION2("Invalid format of \"%s\" on line %lu", strYAMLFile.c_str(), sLine);
+			}
+
+			map_insert_res.first->second.push_back(
+				FileTimeIx(
+					std::stoi(strBufFirst),
+					std::stoi(strBufSecond)));
+
+			std::getline(ifAC, strBuf); sLine++;
+		}
+	}
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////
