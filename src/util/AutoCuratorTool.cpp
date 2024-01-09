@@ -36,6 +36,9 @@ try {
 	// Input data list
 	std::string strInputDataList;
 
+	// Add a calendar attribute
+	std::string strCalendarName;
+
 	// Output file
 	std::string strOutputFile;
 
@@ -43,7 +46,8 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
-		CommandLineString(strOutputFile, "out", "");
+		CommandLineString(strCalendarName, "add_calendar", "");
+		CommandLineString(strOutputFile, "out_index", "");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -60,11 +64,16 @@ try {
 			" may be specified");
 	}
 	if (strOutputFile.length() == 0) {
-		_EXCEPTIONT("No output file (--out) specified");
+		_EXCEPTIONT("No output index file (--out_index) specified");
 	}
 
 	// Create autocurator
 	AutoCurator autocurator;
+
+	// Set calendar manually
+	if (strCalendarName.length() != 0) {
+		autocurator.SetCalendar(Time::CalendarTypeFromString(strCalendarName));
+	}
 
 	// Curate input data
 	if (strInputData.length() != 0) {

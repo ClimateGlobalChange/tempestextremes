@@ -1132,6 +1132,9 @@ try {
 	// Input list of data files
 	std::string strInputDataList;
 
+	// Input data index
+	std::string strInputDataIndex;
+
 	// Connectivity file
 	std::string strConnectivity;
 
@@ -1185,6 +1188,7 @@ try {
 		CommandLineStringD(strPathType, "in_nodefile_type", "SN", "[DN|SN]");
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
+		CommandLineString(strInputDataIndex, "in_data_index", "");
 		CommandLineString(strConnectivity, "in_connect", "");
 		CommandLineBool(fDiagonalConnectivity, "diag_connect");
 		CommandLineBool(fRegional, "regional");
@@ -1231,8 +1235,12 @@ try {
 			" specified");
 	}
 */
-	if ((strInputData.length() != 0) && (strInputDataList.length() != 0)) {
-		_EXCEPTIONT("Only one of (--in_data) or (--in_data_list)"
+	int nInputArguments =
+		  ((strInputData.length() != 0)?(1):(0))
+		+ ((strInputDataList.length() != 0)?(1):(0))
+		+ ((strInputDataIndex.length() != 0)?(1):(0));
+	if (nInputArguments > 1) {
+		_EXCEPTIONT("Only one of (--in_data), (--in_data_list) or (--in_data_index)"
 			" may be specified");
 	}
 	if ((strOutputFileFormat != "gfdl") &&
@@ -1360,6 +1368,10 @@ try {
 			Announce(strFileLine.c_str());
 			autocurator.IndexFiles(strFileLine);
 		}
+
+	} else if (strInputDataIndex.length() != 0) {
+		AnnounceStartBlock("Reading autocurator index from \"%s\"", strInputDataIndex.c_str());
+		autocurator.FromYAMLFile(strInputDataIndex);
 	}
 	AnnounceEndBlock("Done");
 

@@ -321,17 +321,6 @@ void AutoCurator::IndexFiles(
 				strFile.c_str());
 		}
 
-		NcAtt * attCalendar = varTime->get_att("calendar");
-		NcAtt * attUnits = varTime->get_att("units");
-		if (attCalendar == NULL) {
-			_EXCEPTION1("\"time\" variable in \"%s\" missing "
-				"\"calendar\" attribute", strFile.c_str());
-		}
-		if (attUnits == NULL) {
-			_EXCEPTION1("\"time\" variable in \"%s\" missing "
-				"\"units\" attribute", strFile.c_str());
-		}
-
 		// Check if this file is a daily mean climatology
 		bool fDailyMeanClimatology = false;
 		NcAtt * attType = varTime->get_att("type");
@@ -347,6 +336,31 @@ void AutoCurator::IndexFiles(
 			pacd = &m_acdDailyMean;
 		}
 
+		// Get calendar and units information
+		Time::CalendarType eCalendarType = Time::CalendarUnknown;
+
+		NcAtt * attCalendar = varTime->get_att("calendar");
+		NcAtt * attUnits = varTime->get_att("units");
+		if (attCalendar == NULL) {
+			if (pacd->m_eCalendarType != Time::CalendarUnknown) {
+				eCalendarType = pacd->m_eCalendarType;
+				Announce("WARNING: \"time\" variable in \"%s\" missing "
+					"\"calendar\" attribute. Assuming calendar is \"%s\"",
+					strFile.c_str(),
+					Time::StringFromCalendarType(eCalendarType).c_str());
+			} else {
+				_EXCEPTION1("\"time\" variable in \"%s\" missing "
+					"\"calendar\" attribute", strFile.c_str());
+			}
+		} else {
+			eCalendarType = Time::CalendarTypeFromString(attCalendar->as_string(0));
+		}
+
+		if (attUnits == NULL) {
+			_EXCEPTION1("\"time\" variable in \"%s\" missing "
+				"\"units\" attribute", strFile.c_str());
+		}
+
 		// Index file
 		int iFileIx = static_cast<int>(pacd->m_vecFiles.size());
 		pacd->m_vecFiles.push_back(strFile);
@@ -355,9 +369,6 @@ void AutoCurator::IndexFiles(
 			pacd->m_eNcTimeType = varTime->type();
 			pacd->m_strNcTimeUnits = attUnits->as_string(0);
 		}
-
-		Time::CalendarType eCalendarType =
-			Time::CalendarTypeFromString(attCalendar->as_string(0));
 
 		if (pacd->m_eCalendarType == Time::CalendarUnknown) {
 			pacd->m_eCalendarType = eCalendarType;

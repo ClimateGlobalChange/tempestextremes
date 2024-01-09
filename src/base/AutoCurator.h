@@ -140,6 +140,16 @@ public:
 
 public:
 	///	<summary>
+	///		Change the calendar type.
+	///	</summary>
+	void SetCalendar(
+		const Time::CalendarType eCalendarType
+	) {
+		m_eCalendarType = eCalendarType;
+	}
+
+public:
+	///	<summary>
 	///		Index the contents of a single file or list of files delimited
 	///		by semicolons.
 	///	</summary>
