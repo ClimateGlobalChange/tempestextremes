@@ -1470,15 +1470,28 @@ try {
 			autocurator.GetCalendarType());
 		AnnounceEndBlock("Done");
 
-		// If the nodefile contains negative grid indices, build the kd tree
+		// If the nodefile contains negative grid indices, build the kd-tree
+		int ixCDHLon = (-1);
+		int ixCDHLat = (-1);
 		if (nodefile.ContainsNegativeGridIx()) {
+			AnnounceStartBlock("Negative grid indices found in nodefile");
+			ixCDHLon = cdhInput.GetIndexFromString("lon");
+			if (ixCDHLon == (-1)) {
+				_EXCEPTIONT("Missing column header \"lon\", needed if negative grid indices present");
+			}
+			ixCDHLat = cdhInput.GetIndexFromString("lat");
+			if (ixCDHLat == (-1)) {
+				_EXCEPTIONT("Missing column header \"lat\", needed if negative grid indices present");
+			}
+			AnnounceStartBlock("Building kd-tree on grid");
 			grid.BuildKDTree();
+			AnnounceEndBlock("Done");
+			AnnounceEndBlock(NULL);
 		}
 
 		// Time filter the nodefile
 		if (strTimeFilter != "") {
 #ifndef TEMPEST_NOREGEX
-
 			for (int p = 0; p < nodefile.m_pathvec.size(); p++) {
 				Path & path = nodefile.m_pathvec[p];
 				for (int n = 0; n < path.size(); n++) {
@@ -1522,6 +1535,23 @@ try {
 
 		// Generate the TimeToPathNodeMap
 		nodefile.GenerateTimeToPathNodeMap();
+
+		// Verify that all data is available for the nodefile
+		{
+			AnnounceStartBlock("Verifying that all data is available");
+			TimeToPathNodeMap::iterator iterPathNode =
+				mapTimeToPathNode.begin();
+			for (; iterPathNode != mapTimeToPathNode.end(); iterPathNode++) {
+				const Time & time = iterPathNode->first;
+				NcFileVector vecncDataFiles;
+				autocurator.FindFilesAtTime(time, vecncDataFiles);
+				if (vecncDataFiles.size() == 0) {
+					_EXCEPTION1("Time (%s) does not exist in input data fileset",
+						time.ToString().c_str());
+				}
+			}
+			AnnounceEndBlock("Done");
+		}
 
 		// Working ColumnDataHeader
 		ColumnDataHeader & cdhWorking = nodefile.m_cdh;
@@ -1584,8 +1614,6 @@ try {
 						"outputcmd(<variable>, <op>, <dist>)");
 				}
 
-				//std::cout << strOutputCmd << std::endl;
-
 				NodeOutputOp opOutputCmd;
 				opOutputCmd.Parse(varreg, strOutputCmd, false);
 
@@ -1596,6 +1624,8 @@ try {
 					mapTimeToPathNode.begin();
 				for (; iterPathNode != mapTimeToPathNode.end(); iterPathNode++) {
 					const Time & time = iterPathNode->first;
+
+					Announce("%s", time.ToString().c_str());
 
 					// Unload data from the VariableRegistry
 					varreg.UnloadAllGridData();
@@ -1616,6 +1646,23 @@ try {
 						PathNode & pathnode =
 							pathvec[iPath][iPathNode];
 
+						int ix0 = pathnode.m_gridix;
+						if (ix0 < 0) {
+							double dLonNodeDeg = pathnode.GetColumnDataAsDouble(ixCDHLon);
+							double dLatNodeDeg = pathnode.GetColumnDataAsDouble(ixCDHLat);
+							ix0 = static_cast<int>(
+								grid.NearestNode(
+									DegToRad(dLonNodeDeg),
+									DegToRad(dLatNodeDeg)));
+/*
+							Announce("[%f,%f]->[%f,%f]",
+								dLonNodeDeg,
+								dLatNodeDeg,
+								RadToDeg(grid.m_dLon[ix0]),
+								RadToDeg(grid.m_dLat[ix0]));
+*/
+						}
+
 						std::string strResult;
 
 						ApplyNodeOutputOp<float>(
@@ -1624,7 +1671,7 @@ try {
 							varreg,
 							vecncDataFiles,
 							time,
-							pathnode.m_gridix,
+							ix0,
 							strResult);
 
 						// Add this data to the pathnode
