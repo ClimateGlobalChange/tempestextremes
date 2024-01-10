@@ -689,7 +689,8 @@ public:
 	///		Constructor.
 	///	</summary>
 	NodeFile() :
-		m_ePathType(PathTypeSN)
+		m_ePathType(PathTypeSN),
+		m_fContainsNegativeGridIx(false)
 	{ }
 
 public:
@@ -816,6 +817,13 @@ public:
 		return m_mapTimeToPathNode;
 	}
 
+	///	<summary>
+	///		Return true if the NodeFile may contain negative grid indices.
+	///	</summary>
+	bool ContainsNegativeGridIx() const {
+		return m_fContainsNegativeGridIx;
+	}
+
 public:
 	///	<summary>
 	///		The type of path described by this NodeFile.
@@ -857,6 +865,12 @@ protected:
 	///		Vector of alpha indices from interpolation.
 	///	</summary>
 	std::vector<double> m_vecInterpAlpha;
+
+protected:
+	///	<summary>
+	///		A flag indicating the NodeFile may contain negative grid indices.
+	///	</summary>
+	bool m_fContainsNegativeGridIx;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

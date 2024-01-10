@@ -230,12 +230,11 @@ void NodeFile::ReadCSV(
 			} else {
 				pathnode.m_gridix = std::stol(vecValues[iColI]) + nGridDim[1] * std::stol(vecValues[iColJ]);
 			}
-/*
 			if (pathnode.m_gridix < 0) {
-				_EXCEPTION2("Negative coordinate index on line %i of \"%s\"",
-					iLine, strNodeFile.c_str());
+				m_fContainsNegativeGridIx = true;
+				//_EXCEPTION2("Negative coordinate index on line %i of \"%s\"",
+				//	iLine, strNodeFile.c_str());
 			}
-*/
 		}
 
 		// Store all other data
@@ -262,6 +261,9 @@ void NodeFile::Read(
 	size_t sGridSize,
 	Time::CalendarType caltype
 ) {
+	// Reset the negative grid ix flag
+	m_fContainsNegativeGridIx = false;
+
 	// Load in file as CSV
 	if (strNodeFile.length() >= 4) {
 		std::string strExt = strNodeFile.substr(strNodeFile.length()-4,4);
@@ -460,27 +462,30 @@ void NodeFile::Read(
 			for (int n = 0; n < nGridDim.size(); n++) {
 				iss >> coord[n];
 			}
-/*
+
 			// Note that for 2D grids the coordinate indices are swapped
 			if (coord.size() == 1) {
 				if (coord[0] < 0) {
-					_EXCEPTION4("Negative coordinate index on line %i of \"%s\""
-						" (%i/%i) (%i/%i)",
-						iLine, strNodeFile.c_str(),
-						coord[0], nGridDim[0]);
+					m_fContainsNegativeGridIx = true;
+					//_EXCEPTION4("Negative coordinate index on line %i of \"%s\""
+					//	" (%i/%i) (%i/%i)",
+					//	iLine, strNodeFile.c_str(),
+					//	coord[0], nGridDim[0]);
+
 				}
 			} else if (coord.size() == 2) {
 				if ((coord[0] < 0) || (coord[1] < 0)) {
-					_EXCEPTION6("Negative coordinate index on line %i of \"%s\""
-						" (%i/%i) (%i/%i)",
-						iLine, strNodeFile.c_str(),
-						coord[0], nGridDim[1],
-						coord[1], nGridDim[0]);
+					m_fContainsNegativeGridIx = true;
+					//_EXCEPTION6("Negative coordinate index on line %i of \"%s\""
+					//	" (%i/%i) (%i/%i)",
+					//	iLine, strNodeFile.c_str(),
+					//	coord[0], nGridDim[1],
+					//	coord[1], nGridDim[0]);
 				}
 			} else {
 				_EXCEPTION();
 			}
-*/
+
 			if (iss.eof()) {
 				_EXCEPTION2("Format error on line %i of \"%s\"",
 					iLine, strNodeFile.c_str());
@@ -531,12 +536,13 @@ void NodeFile::Read(
 				} else {
 					_EXCEPTIONT("Undefined behavior for SimpleGrid dimensionality > 2");
 				}
-/*
+
 				if (pathnode.m_gridix < 0) {
-					_EXCEPTION2("Negative coordinate index on line %i of \"%s\"",
-						iLine, strNodeFile.c_str());
+					m_fContainsNegativeGridIx = true;
+					//_EXCEPTION2("Negative coordinate index on line %i of \"%s\"",
+					//	iLine, strNodeFile.c_str());
 				}
-*/
+
 				// Store all other data as strings
 				for (int j = 0; j < nOutputSize; j++) {
 					pathnode.PushColumnDataString(
@@ -601,12 +607,13 @@ void NodeFile::Read(
 				} else {
 					_EXCEPTIONT("Undefined behavior for SimpleGrid dimensionality > 2");
 				}
-/*
+
 				if (pathnode.m_gridix < 0) {
-					_EXCEPTION2("Negative coordinate index on line %i of \"%s\"",
-						iLine, strNodeFile.c_str());
+					m_fContainsNegativeGridIx = true;
+					//_EXCEPTION2("Negative coordinate index on line %i of \"%s\"",
+					//	iLine, strNodeFile.c_str());
 				}
-*/
+
 				// Store all other data as strings
 				for (int j = 0; j < nOutputSize-4; j++) {
 					pathnode.PushColumnDataString(

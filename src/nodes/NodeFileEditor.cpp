@@ -1470,6 +1470,11 @@ try {
 			autocurator.GetCalendarType());
 		AnnounceEndBlock("Done");
 
+		// If the nodefile contains negative grid indices, build the kd tree
+		if (nodefile.ContainsNegativeGridIx()) {
+			grid.BuildKDTree();
+		}
+
 		// Time filter the nodefile
 		if (strTimeFilter != "") {
 #ifndef TEMPEST_NOREGEX
