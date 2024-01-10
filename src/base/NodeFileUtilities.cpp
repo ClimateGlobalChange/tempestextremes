@@ -694,8 +694,8 @@ void NodeFile::Write(
 							fprintf(fpOutput, "\t%li", pathnode.m_gridix);
 						} else if (pgrid->m_nGridDim.size() == 2) {
 							fprintf(fpOutput, "\t%li\t%li",
-								pathnode.m_gridix % pgrid->m_nGridDim[1],
-								pathnode.m_gridix / pgrid->m_nGridDim[1]);
+								pathnode.m_gridix % static_cast<long>(pgrid->m_nGridDim[1]),
+								pathnode.m_gridix / static_cast<long>(pgrid->m_nGridDim[1]));
 						}
 					}
 
