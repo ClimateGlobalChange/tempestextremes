@@ -37,6 +37,9 @@ void FindLocalMinMax(
 	if (dMaxDist > 180.0) {
 		_EXCEPTIONT("MaxDist must be less than 180.0");
 	}
+	if ((ix0 < 0) || (ix0 >= data.GetRows())) {
+		_EXCEPTION2("Grid index (%i) out of range (%lu)", ix0, data.GetRows());
+	}
 
 	// Initialize the maximum to the central location
 	ixExtremum = ix0;
@@ -57,6 +60,11 @@ void FindLocalMinMax(
 	// Loop through all latlon elements
 	while (queueNodes.size() != 0) {
 		int ix = queueNodes.front();
+		if ((ix < 0) || (ix >= grid.m_vecConnectivity.size())) {
+			_EXCEPTION2("Out of range index in connectivity matrix (%i/%i)",
+				ix, grid.m_vecConnectivity.size());
+		}
+
 		queueNodes.pop();
 
 		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
@@ -405,6 +413,9 @@ void FindLocalAverage(
 	if (dMaxDist > 180.0) {
 		_EXCEPTIONT("MaxDist must be less than 180.0");
 	}
+	if ((ix0 < 0) || (ix0 >= data.GetRows())) {
+		_EXCEPTION2("Grid index (%i) out of range (%lu)", ix0, data.GetRows());
+	}
 
 	// Queue of nodes that remain to be visited
 	std::queue<int> queueNodes;
@@ -424,6 +435,11 @@ void FindLocalAverage(
 	// Loop through all latlon elements
 	while (queueNodes.size() != 0) {
 		int ix = queueNodes.front();
+		if ((ix < 0) || (ix >= grid.m_vecConnectivity.size())) {
+			_EXCEPTION2("Out of range index in connectivity matrix (%i/%i)",
+				ix, grid.m_vecConnectivity.size());
+		}
+
 		queueNodes.pop();
 
 		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
@@ -480,8 +496,6 @@ void FindMaxClosedContourDelta(
 	bool fMaxClosedContourDeltaSign,
 	real & dMaxClosedContourDelta
 ) {
-	_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
-
 	// Verify that dDistDeg is less than 180.0
 	if ((dDistDeg <= 0.0) || (dDistDeg > 180.0)) {
 		_EXCEPTIONT("DistDeg must be positive, between 0.0 and 180.0");
@@ -613,11 +627,12 @@ void PositiveMinusNegativeWeightedArea(
 	double dMaxDistDeg,
 	real & dValue
 ) {
-	_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
-
 	// Verify that dDistDeg is less than 180.0
 	if ((dMaxDistDeg <= 0.0) || (dMaxDistDeg > 180.0)) {
 		_EXCEPTIONT("MaxDistDeg must be positive, between 0.0 and 180.0");
+	}
+	if ((ix0 < 0) || (ix0 >= data.GetRows())) {
+		_EXCEPTION2("Grid index (%i) out of range (%lu)", ix0, data.GetRows());
 	}
 
 	// Central lat/lon and Cartesian coord
@@ -638,6 +653,11 @@ void PositiveMinusNegativeWeightedArea(
 	// Loop through all elements
 	while (queueNodes.size() != 0) {
 		int ix = queueNodes.front();
+		if ((ix < 0) || (ix >= grid.m_vecConnectivity.size())) {
+			_EXCEPTION2("Out of range index in connectivity matrix (%i/%i)",
+				ix, grid.m_vecConnectivity.size());
+		}
+
 		queueNodes.pop();
 
 		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
@@ -681,7 +701,9 @@ void MaxPolewardValue(
 	double dMaxDistDeg,
 	real & dValue
 ) {
-	_ASSERT((ix0 >= 0) && (ix0 < grid.GetSize()));
+	if ((ix0 < 0) || (ix0 >= data.GetRows())) {
+		_EXCEPTION2("Grid index (%i) out of range (%lu)", ix0, data.GetRows());
+	}
 
 	dValue = data[ix0];
 

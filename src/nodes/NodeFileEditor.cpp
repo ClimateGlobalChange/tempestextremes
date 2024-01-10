@@ -260,7 +260,10 @@ void CalculateRadialProfile(
 	}
 
 	// Get the center grid index
-	const int ix0 = pathnode.m_gridix;
+	const int ix0 = static_cast<int>(pathnode.m_gridix);
+	if (ix0 < 0) {
+		_EXCEPTION1("Invalid grid index (%i) in node file", ix0);
+	}
 
 	// Load the data
 	Variable & var = varreg.Get(varix);
@@ -398,7 +401,10 @@ void CalculateRadialWindProfile(
 	}
 
 	// Get the center grid index
-	const int ix0 = pathnode.m_gridix;
+	const int ix0 = static_cast<int>(pathnode.m_gridix);
+	if (ix0 < 0) {
+		_EXCEPTION1("Invalid grid index (%i) in node file", ix0);
+	}
 
 	// Load the zonal wind data
 	Variable & varU = varreg.Get(varixU);
@@ -714,8 +720,8 @@ void CalculateStormVelocity(
 
 		dX[i] = pathnode.m_time - path.m_timeStart;
 
-		if (pathnode.m_gridix >= grid.m_dLat.GetRows()) {
-			_EXCEPTION2("Grid index of path (%i) out of range "
+		if ((pathnode.m_gridix < 0) || (pathnode.m_gridix >= grid.m_dLat.GetRows())) {
+			_EXCEPTION2("Grid index of path (%li) out of range "
 				"(only %i nodes in grid)",
 				pathnode.m_gridix,
 				grid.m_dLat.GetRows());
@@ -754,6 +760,9 @@ void CalculateStormVelocity(
 	// Calculate zonal velocity
 	for (int i = 0; i < nPathNodes; i++) {
 		PathNode & pathnode = path[i];
+		if ((pathnode.m_gridix < 0) || (pathnode.m_gridix >= grid.m_dLon.GetRows())) {
+			_EXCEPTION1("Grid index (%li) out of range", pathnode.m_gridix);
+		}
 		dY[i] = grid.m_dLon[pathnode.m_gridix];
 	}
 
@@ -979,7 +988,7 @@ void CalculateCycloneMetrics(
 	const DataArray1D<float> & dataStateV = varV.GetData();
 
 	// Check grid index
-	if (ix0 >= grid.m_vecConnectivity.size()) {
+	if ((ix0 < 0) || (ix0 >= grid.m_vecConnectivity.size())) {
 		_EXCEPTION2("Grid index (%i) out of range (< %i)",
 			ix0, static_cast<int>(grid.m_vecConnectivity.size()));
 	}

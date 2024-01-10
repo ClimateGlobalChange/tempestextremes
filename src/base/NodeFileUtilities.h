@@ -597,7 +597,7 @@ public:
 	///	<summary>
 	///		Index on the grid of this point.
 	///	</summary>
-	size_t m_gridix;
+	long m_gridix;
 
 	///	<summary>
 	///		Index of this PathNode in the order it appears in the file.

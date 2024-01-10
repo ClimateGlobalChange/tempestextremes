@@ -226,15 +226,16 @@ void NodeFile::ReadCSV(
 		// Store coordinate
 		if (iColI != (-1)) {
 			if (iColJ == (-1)) {
-				pathnode.m_gridix = std::stoi(vecValues[iColI]);
+				pathnode.m_gridix = std::stol(vecValues[iColI]);
 			} else {
-				pathnode.m_gridix = std::stoi(vecValues[iColI]) + nGridDim[1] * std::stoi(vecValues[iColJ]);
+				pathnode.m_gridix = std::stol(vecValues[iColI]) + nGridDim[1] * std::stol(vecValues[iColJ]);
 			}
-
+/*
 			if (pathnode.m_gridix < 0) {
 				_EXCEPTION2("Negative coordinate index on line %i of \"%s\"",
 					iLine, strNodeFile.c_str());
 			}
+*/
 		}
 
 		// Store all other data
@@ -459,7 +460,7 @@ void NodeFile::Read(
 			for (int n = 0; n < nGridDim.size(); n++) {
 				iss >> coord[n];
 			}
-
+/*
 			// Note that for 2D grids the coordinate indices are swapped
 			if (coord.size() == 1) {
 				if (coord[0] < 0) {
@@ -479,7 +480,7 @@ void NodeFile::Read(
 			} else {
 				_EXCEPTION();
 			}
-
+*/
 			if (iss.eof()) {
 				_EXCEPTION2("Format error on line %i of \"%s\"",
 					iLine, strNodeFile.c_str());
@@ -530,12 +531,12 @@ void NodeFile::Read(
 				} else {
 					_EXCEPTIONT("Undefined behavior for SimpleGrid dimensionality > 2");
 				}
-
+/*
 				if (pathnode.m_gridix < 0) {
 					_EXCEPTION2("Negative coordinate index on line %i of \"%s\"",
 						iLine, strNodeFile.c_str());
 				}
-
+*/
 				// Store all other data as strings
 				for (int j = 0; j < nOutputSize; j++) {
 					pathnode.PushColumnDataString(
@@ -600,12 +601,12 @@ void NodeFile::Read(
 				} else {
 					_EXCEPTIONT("Undefined behavior for SimpleGrid dimensionality > 2");
 				}
-
+/*
 				if (pathnode.m_gridix < 0) {
 					_EXCEPTION2("Negative coordinate index on line %i of \"%s\"",
 						iLine, strNodeFile.c_str());
 				}
-
+*/
 				// Store all other data as strings
 				for (int j = 0; j < nOutputSize-4; j++) {
 					pathnode.PushColumnDataString(
@@ -683,9 +684,9 @@ void NodeFile::Write(
 
 					if (pgrid != NULL) {
 						if (pgrid->m_nGridDim.size() == 1) {
-							fprintf(fpOutput, "\t%lu", pathnode.m_gridix);
+							fprintf(fpOutput, "\t%li", pathnode.m_gridix);
 						} else if (pgrid->m_nGridDim.size() == 2) {
-							fprintf(fpOutput, "\t%lu\t%lu",
+							fprintf(fpOutput, "\t%li\t%li",
 								pathnode.m_gridix % pgrid->m_nGridDim[1],
 								pathnode.m_gridix / pgrid->m_nGridDim[1]);
 						}
@@ -764,9 +765,9 @@ void NodeFile::Write(
 
 					if (pgrid != NULL) {
 						if (pgrid->m_nGridDim.size() == 1) {
-							fprintf(fpOutput, ", %lu", pathnode.m_gridix);
+							fprintf(fpOutput, ", %li", pathnode.m_gridix);
 						} else if (pgrid->m_nGridDim.size() == 2) {
-							fprintf(fpOutput, ", %lu, %lu",
+							fprintf(fpOutput, ", %li, %li",
 								pathnode.m_gridix % pgrid->m_nGridDim[1],
 								pathnode.m_gridix / pgrid->m_nGridDim[1]);
 						}
