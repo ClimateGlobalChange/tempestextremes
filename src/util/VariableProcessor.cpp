@@ -108,7 +108,7 @@ try {
 
 		CommandLineString(strLongitudeName, "lonname", "lon");
 		CommandLineString(strLatitudeName, "latname", "lat");
-		CommandLineString(strLogDir, "logdir", ".");
+		CommandLineString(strLogDir, "logdir", "./");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
