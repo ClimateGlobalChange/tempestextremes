@@ -1104,15 +1104,15 @@ void DetectBlobs(
 	NcDim * dimTimeOut = NULL;
 	if ((dimTime != NULL) && (varTime != NULL)) {
 		if (vecOutputTimes.size() != vecTimes.size()) {
-			CopyNcVarTimeSubset(ncInput, ncOutput, "time", vecOutputTimes);
+			CopyNcVarTimeSubset(ncInput, ncOutput, varTime->name(), vecOutputTimes);
 
 		} else {
-			CopyNcVar(ncInput, ncOutput, "time", true);
+			CopyNcVar(ncInput, ncOutput, varTime->name(), true);
 		}
 
 		dimTimeOut = NcGetTimeDimension(ncOutput);
 		if (dimTimeOut == NULL) {
-			_EXCEPTIONT("Error copying variable \"time\" to output file");
+			_EXCEPTION1("Error copying variable \"%s\" to output file", varTime->name());
 		}
 
 	} /*else if (nAddTimeDim != -1) {
