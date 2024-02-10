@@ -33,7 +33,8 @@ FILES= Announce.cpp \
 	   PolynomialInterp.cpp \
 	   LegendrePolynomial.cpp \
 	   FunctionTimer.cpp \
-	   ShpFile.cpp
+	   ShpFile.cpp \
+	   ThresholdOp.cpp
 
 LIB_TARGET= libextremesbase.a
 
