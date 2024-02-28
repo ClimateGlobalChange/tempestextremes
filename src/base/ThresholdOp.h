@@ -19,8 +19,12 @@
 
 #include "Announce.h"
 #include "Variable.h"
+#include "NcFileVector.h"
+#include "SimpleGrid.h"
+#include "DataArray1D.h"
 
 #include <string>
+#include <set>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -50,8 +54,8 @@ public:
 	ThresholdOp() :
 		m_varix(InvalidVariableIndex),
 		m_eOp(GreaterThan),
-		m_dValue(0.0),
-		m_dDistance(0.0)
+		m_dThresholdValue(0.0),
+		m_dDistanceDeg(0.0)
 	{ }
 
 public:
@@ -61,106 +65,18 @@ public:
 	void Parse(
 		VariableRegistry & varreg,
 		const std::string & strOp
-	) {
-		// Read mode
-		enum {
-			ReadMode_Op,
-			ReadMode_Value,
-			ReadMode_Distance,
-			ReadMode_Invalid
-		} eReadMode = ReadMode_Op;
+	);
 
-		// Parse variable
-		int iLast = varreg.FindOrRegisterSubStr(strOp, &m_varix) + 1;
-
-		// Loop through string
-		for (int i = iLast; i <= strOp.length(); i++) {
-
-			// Comma-delineated
-			if ((i == strOp.length()) || (strOp[i] == ',')) {
-
-				std::string strSubStr =
-					strOp.substr(iLast, i - iLast);
-
-				// Read in operation
-				if (eReadMode == ReadMode_Op) {
-					if (strSubStr == ">") {
-						m_eOp = GreaterThan;
-					} else if (strSubStr == "<") {
-						m_eOp = LessThan;
-					} else if (strSubStr == ">=") {
-						m_eOp = GreaterThanEqualTo;
-					} else if (strSubStr == "<=") {
-						m_eOp = LessThanEqualTo;
-					} else if (strSubStr == "=") {
-						m_eOp = EqualTo;
-					} else if (strSubStr == "!=") {
-						m_eOp = NotEqualTo;
-					} else {
-						_EXCEPTION1("Threshold invalid operation \"%s\"",
-							strSubStr.c_str());
-					}
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Value;
-
-				// Read in value
-				} else if (eReadMode == ReadMode_Value) {
-					m_dValue = atof(strSubStr.c_str());
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Distance;
-
-				// Read in distance to point that satisfies threshold
-				} else if (eReadMode == ReadMode_Distance) {
-					m_dDistance = atof(strSubStr.c_str());
-
-					iLast = i + 1;
-					eReadMode = ReadMode_Invalid;
-
-				// Invalid
-				} else if (eReadMode == ReadMode_Invalid) {
-					_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
-							"\nRequired: \"<name>,<operation>"
-							",<value>,<distance>\"",
-							strOp.c_str());
-				}
-			}
-		}
-
-		if (eReadMode != ReadMode_Invalid) {
-			_EXCEPTION1("\nInsufficient entries in threshold op \"%s\""
-					"\nRequired: \"<name>,<operation>,<value>,<distance>\"",
-					strOp.c_str());
-		}
-
-		if (m_dDistance < 0.0) {
-			_EXCEPTIONT("For threshold op, distance must be nonnegative");
-		}
-
-		// Output announcement
-		std::string strDescription = varreg.GetVariableString(m_varix);
-		if (m_eOp == GreaterThan) {
-			strDescription += " is greater than ";
-		} else if (m_eOp == LessThan) {
-			strDescription += " is less than ";
-		} else if (m_eOp == GreaterThanEqualTo) {
-			strDescription += " is greater than or equal to ";
-		} else if (m_eOp == LessThanEqualTo) {
-			strDescription += " is less than or equal to ";
-		} else if (m_eOp == EqualTo) {
-			strDescription += " is equal to ";
-		} else if (m_eOp == NotEqualTo) {
-			strDescription += " is not equal to ";
-		}
-
-		char szBuffer[128];
-		snprintf(szBuffer, 128, "%f within %f degrees",
-			m_dValue, m_dDistance);
-		strDescription += szBuffer;
-
-		Announce("%s", strDescription.c_str());
-	}
+public:
+	///	<summary>
+	///		Returns true if this threshold is satisfied, or false otherwise.
+	///	</summary>
+	template <typename real>
+	bool IsSatisfied(
+		const SimpleGrid & grid,
+		const DataArray1D<real> & dataState,
+		const int ix0
+	) const;
 
 public:
 	///	<summary>
@@ -176,12 +92,146 @@ public:
 	///	<summary>
 	///		Threshold value.
 	///	</summary>
-	double m_dValue;
+	double m_dThresholdValue;
 
 	///	<summary>
-	///		Distance to search for threshold value
+	///		Distance to search for threshold value (in degrees).
 	///	</summary>
-	double m_dDistance;
+	double m_dDistanceDeg;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A class for holding a tree node from a threshold operator evaluation tree.
+///	</summary>
+class ThresholdOpTreeNode {
+
+public:
+	///	<summary>
+	///		Types of threshold operators.
+	///	</summary>
+	enum NodeType {
+		AlwaysTrueNode,
+		ThresholdNode,
+		AndNode,
+		OrNode
+	};
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	ThresholdOpTreeNode(
+		NodeType eType = AlwaysTrueNode
+	) :
+		m_eType(eType)
+	{ }
+
+	///	<summary>
+	///		Destructor.
+	///	</summary>
+	~ThresholdOpTreeNode() {
+		for (auto pchild : m_vecChildren) {
+			delete pchild;
+		}
+	}
+
+	///	<summary>
+	///		Parse an expression and populate this node.
+	///	</summary>
+	void Parse(
+		VariableRegistry & varreg,
+		std::string strExpression,
+		bool fAllowZeroLengthExpression = true
+	);
+
+	///	<summary>
+	///		Returns true if this threshold is satisfied.
+	///	</summary>
+	template <typename real>
+	bool IsSatisfied(
+		VariableRegistry & varreg,
+		NcFileVector & vecFiles,
+		const SimpleGrid & grid,
+		const int ix0,
+		std::vector<int> * pvecRejectedCount = NULL
+	) const;
+
+	///	<summary>
+	///		Performs IsSatisfied in place over all values in a binary mask.
+	///	</summary>
+	template <typename real>
+	void IsSatisfied(
+		VariableRegistry & varreg,
+		NcFileVector & vecFiles,
+		const SimpleGrid & grid,
+		DataArray1D<int> & bTag
+	) const;
+
+	///	<summary>
+	///		Performs IsSatisfied over a set of candidate nodes, returning
+	///		the set of candidates that satisfy the criteria.
+	///	</summary>
+	template <typename real>
+	void IsSatisfied(
+		VariableRegistry & varreg,
+		NcFileVector & vecFiles,
+		const SimpleGrid & grid,
+		const std::set<int> & setCandidates,
+		std::set<int> & setNewCandidates
+	) const;
+
+	///	<summary>
+	///		If AlwaysTrueNode return 0.
+	///		If ThresholdNode return 1.
+	///		If AndNode or OrNode return the number of children.
+	///	</summary>
+	size_t size() const {
+		if (m_eType == AlwaysTrueNode) {
+			return 0;
+		}
+		if (m_eType == ThresholdNode) {
+			return 1;
+		}
+		return m_vecChildren.size();
+	}
+
+	///	<summary>
+	///		Get the name of this ThresholdOpTreeNode.
+	///	</summary>
+	std::string ToString(
+		VariableRegistry & varreg,
+		int ix
+	) const {
+		_ASSERT((ix >= 0) && (ix < m_vecChildren.size()));
+		if (m_eType == AlwaysTrueNode) {
+			return 0;
+		}
+		if (m_eType == ThresholdNode) {
+			return varreg.GetVariableString(m_threshop.m_varix);
+		}
+		if (m_vecChildren[ix]->m_eType == ThresholdNode) {
+			return m_vecChildren[ix]->ToString(varreg, 0);
+		}
+		return std::string("Compound Expr. ") + std::to_string(ix);
+	}
+
+public:
+	///	<summary>
+	///		Node type.
+	///	</summary>
+	NodeType m_eType;
+
+	///	<summary>
+	///		Threshold operator at this node.
+	///	</summary>
+	ThresholdOp m_threshop;
+
+	///	<summary>
+	///		Children nodes.
+	///	</summary>
+	std::vector<ThresholdOpTreeNode *> m_vecChildren;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

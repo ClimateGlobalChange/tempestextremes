@@ -176,122 +176,6 @@ bool HasClosedContour(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-///	<summary>
-///		Determine if the given field satisfies the threshold.
-///	</summary>
-template <typename real>
-bool SatisfiesThreshold(
-	const SimpleGrid & grid,
-	const DataArray1D<real> & dataState,
-	const int ix0,
-	const ThresholdOp::Operation op,
-	const double dTargetValue,
-	const double dMaxDist
-) {
-	// Verify that dMaxDist is less than 180.0
-	if (dMaxDist > 180.0) {
-		_EXCEPTIONT("MaxDist must be less than 180.0");
-	}
-
-	// Queue of nodes that remain to be visited
-	std::queue<int> queueNodes;
-	queueNodes.push(ix0);
-
-	// Set of nodes that have already been visited
-	std::set<int> setNodesVisited;
-
-	// Latitude and longitude at the origin
-	double dLat0 = grid.m_dLat[ix0];
-	double dLon0 = grid.m_dLon[ix0];
-
-	// Loop through all latlon elements
-	while (queueNodes.size() != 0) {
-		int ix = queueNodes.front();
-		queueNodes.pop();
-
-		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
-			continue;
-		}
-
-		setNodesVisited.insert(ix);
-
-		// Great circle distance to this element
-		double dLatThis = grid.m_dLat[ix];
-		double dLonThis = grid.m_dLon[ix];
-
-		double dR =
-			sin(dLat0) * sin(dLatThis)
-			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
-
-		if (dR >= 1.0) {
-			dR = 0.0;
-		} else if (dR <= -1.0) {
-			dR = 180.0;
-		} else {
-			dR = 180.0 / M_PI * acos(dR);
-		}
-		if (dR != dR) {
-			_EXCEPTIONT("NaN value detected");
-		}
-
-		if ((ix != ix0) && (dR > dMaxDist)) {
-			continue;
-		}
-
-		// Value at this location
-		double dValue = dataState[ix];
-
-		// Apply operator
-		if (op == ThresholdOp::GreaterThan) {
-			if (dValue > dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::LessThan) {
-			if (dValue < dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::GreaterThanEqualTo) {
-			if (dValue >= dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::LessThanEqualTo) {
-			if (dValue <= dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::EqualTo) {
-			if (dValue == dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::NotEqualTo) {
-			if (dValue != dTargetValue) {
-				return true;
-			}
-
-		} else {
-			_EXCEPTIONT("Invalid operation");
-		}
-
-		// Special case: zero distance
-		if (dMaxDist == 0.0) {
-			return false;
-		}
-
-		// Add all neighbors of this point
-		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
-			queueNodes.push(grid.m_vecConnectivity[ix][n]);
-		}
-	}
-
-	return false;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 class DetectCyclonesParam {
 
 public:
@@ -313,7 +197,6 @@ public:
 		dMergeDist(0.0),
 		pvecClosedContourOp(NULL),
 		pvecNoClosedContourOp(NULL),
-		pvecThresholdOp(NULL),
 		pvecOutputOp(NULL),
 		nTimeStride(1),
 		strLatitudeName("lat"),
@@ -367,8 +250,8 @@ public:
 	// Vector of no closed contour operators
 	std::vector<ClosedContourOp> * pvecNoClosedContourOp;
 
-	// Vector of threshold operators
-	std::vector<ThresholdOp> * pvecThresholdOp;
+	// Threshold operator tree
+	ThresholdOpTreeNode aThresholdOp;
 
 	// Vector of output operators
 	std::vector<NodeOutputOp> * pvecOutputOp;
@@ -446,10 +329,6 @@ void DetectCyclonesUnstructured(
 	_ASSERT(param.pvecNoClosedContourOp != NULL);
 	std::vector<ClosedContourOp> & vecNoClosedContourOp =
 		*(param.pvecNoClosedContourOp);
-
-	_ASSERT(param.pvecThresholdOp != NULL);
-	std::vector<ThresholdOp> & vecThresholdOp =
-		*(param.pvecThresholdOp);
 
 	_ASSERT(param.pvecOutputOp != NULL);
 	std::vector<NodeOutputOp> & vecOutputOp =
@@ -617,9 +496,10 @@ void DetectCyclonesUnstructured(
 		int nRejectedLocation = 0;
 		int nRejectedMerge = 0;
 
-		DataArray1D<int> vecRejectedClosedContour(vecClosedContourOp.size());
-		DataArray1D<int> vecRejectedNoClosedContour(vecNoClosedContourOp.size());
-		DataArray1D<int> vecRejectedThreshold(vecThresholdOp.size());
+		std::vector<int> vecRejectedClosedContour(vecClosedContourOp.size(), 0);
+		std::vector<int> vecRejectedNoClosedContour(vecNoClosedContourOp.size(), 0);
+		//std::vector<int> vecRejectedThreshold(param.aThresholdOp.size(), 0);
+		int nRejectedThreshold = 0;
 
 		// Eliminate based on interval
 		if ((param.dMinLatitude != param.dMaxLatitude) ||
@@ -775,41 +655,12 @@ void DetectCyclonesUnstructured(
 		}
 
 		// Eliminate based on thresholds
-		for (int tc = 0; tc < vecThresholdOp.size(); tc++) {
-
-			std::set<int> setNewCandidates;
-
-			// Load the search variable data
-			Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
+		{
 			vecFiles.SetTime(vecTimes[t]);
-			var.LoadGridData(varreg, vecFiles, grid);
-			const DataArray1D<float> & dataState = var.GetData();
-
-			// Loop through all pressure minima
-			std::set<int>::const_iterator iterCandidate
-				= setCandidates.begin();
-
-			for (; iterCandidate != setCandidates.end(); iterCandidate++) {
-
-				// Determine if the threshold is satisfied
-				bool fSatisfiesThreshold =
-					SatisfiesThreshold<float>(
-						grid,
-						dataState,
-						*iterCandidate,
-						vecThresholdOp[tc].m_eOp,
-						vecThresholdOp[tc].m_dValue,
-						vecThresholdOp[tc].m_dDistance
-					);
-
-				// If not rejected, add to new pressure minima array
-				if (fSatisfiesThreshold) {
-					setNewCandidates.insert(*iterCandidate);
-				} else {
-					vecRejectedThreshold[tc]++;
-				}
-			}
-
+			std::set<int> setNewCandidates;
+			param.aThresholdOp.IsSatisfied<float>(
+				varreg, vecFiles, grid, setCandidates, setNewCandidates);
+			nRejectedThreshold = static_cast<int>(setCandidates.size() - setNewCandidates.size());
 			setCandidates = setNewCandidates;
 		}
 
@@ -892,20 +743,21 @@ void DetectCyclonesUnstructured(
 		Announce("Total candidates: %i", setCandidates.size());
 		Announce("Rejected (  location): %i", nRejectedLocation);
 		Announce("Rejected (    merged): %i", nRejectedMerge);
-
-		for (int tc = 0; tc < vecRejectedThreshold.GetRows(); tc++) {
+		Announce("Rejected ( threshold): %i", nRejectedThreshold);
+/*
+		for (int tc = 0; tc < vecRejectedThreshold.size(); tc++) {
 			Announce("Rejected (thresh. %s): %i",
-					varreg.GetVariableString(vecThresholdOp[tc].m_varix).c_str(),
+					param.aThresholdOp.ToString(varreg, tc).c_str(),
 					vecRejectedThreshold[tc]);
 		}
-
-		for (int ccc = 0; ccc < vecRejectedClosedContour.GetRows(); ccc++) {
+*/
+		for (int ccc = 0; ccc < vecRejectedClosedContour.size(); ccc++) {
 			Announce("Rejected (contour %s): %i",
 					varreg.GetVariableString(vecClosedContourOp[ccc].m_varix).c_str(),
 					vecRejectedClosedContour[ccc]);
 		}
 
-		for (int ccc = 0; ccc < vecRejectedNoClosedContour.GetRows(); ccc++) {
+		for (int ccc = 0; ccc < vecRejectedNoClosedContour.size(); ccc++) {
 			Announce("Rejected (nocontour %s): %i",
 					varreg.GetVariableString(vecNoClosedContourOp[ccc].m_varix).c_str(),
 					vecRejectedNoClosedContour[ccc]);
@@ -1230,30 +1082,9 @@ try {
 	}
 
 	// Parse the threshold operator command string
-	std::vector<ThresholdOp> vecThresholdOp;
-	dcuparam.pvecThresholdOp = &vecThresholdOp;
-
 	if (strThresholdCmd != "") {
 		AnnounceStartBlock("Parsing threshold operations");
-
-		int iLast = 0;
-		for (int i = 0; i <= strThresholdCmd.length(); i++) {
-
-			if ((i == strThresholdCmd.length()) ||
-				(strThresholdCmd[i] == ';') ||
-				(strThresholdCmd[i] == ':')
-			) {
-				std::string strSubStr =
-					strThresholdCmd.substr(iLast, i - iLast);
-			
-				int iNextOp = (int)(vecThresholdOp.size());
-				vecThresholdOp.resize(iNextOp + 1);
-				vecThresholdOp[iNextOp].Parse(varreg, strSubStr);
-
-				iLast = i + 1;
-			}
-		}
-
+		dcuparam.aThresholdOp.Parse(varreg, strThresholdCmd);
 		AnnounceEndBlock("Done");
 	}
 

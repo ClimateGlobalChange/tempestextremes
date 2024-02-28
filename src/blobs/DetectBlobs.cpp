@@ -45,162 +45,6 @@ typedef std::pair<int, int> Point;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-///	<summary>
-///		Determine if the given field satisfies the threshold.
-///	</summary>
-template <typename real>
-bool SatisfiesThreshold(
-	const SimpleGrid & grid,
-	const DataArray1D<real> & dataState,
-	const int ix0,
-	const ThresholdOp::Operation op,
-	const double dTargetValue,
-	const double dMaxDist
-) {
-	// Special case if dMaxDist is zero
-	if (dMaxDist < 1.0e-12) {
-		double dValue = dataState[ix0];
-
-		if (op == ThresholdOp::GreaterThan) {
-			if (dValue > dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::LessThan) {
-			if (dValue < dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::GreaterThanEqualTo) {
-			if (dValue >= dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::LessThanEqualTo) {
-			if (dValue <= dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::EqualTo) {
-			if (dValue == dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::NotEqualTo) {
-			if (dValue != dTargetValue) {
-				return true;
-			}
-
-		} else {
-			_EXCEPTIONT("Invalid operation");
-		}
-
-	}
-
-	// Verify that dMaxDist is less than 180.0
-	if (dMaxDist > 180.0) {
-		_EXCEPTIONT("MaxDist must be less than 180.0");
-	}
-
-	// Queue of nodes that remain to be visited
-	std::queue<int> queueNodes;
-	queueNodes.push(ix0);
-
-	// Set of nodes that have already been visited
-	std::set<int> setNodesVisited;
-
-	// Latitude and longitude at the origin
-	double dLat0 = grid.m_dLat[ix0];
-	double dLon0 = grid.m_dLon[ix0];
-
-	// Loop through all latlon elements
-	while (queueNodes.size() != 0) {
-		int ix = queueNodes.front();
-		queueNodes.pop();
-
-		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
-			continue;
-		}
-
-		setNodesVisited.insert(ix);
-
-		// Great circle distance to this element
-		double dLatThis = grid.m_dLat[ix];
-		double dLonThis = grid.m_dLon[ix];
-
-		double dR =
-			sin(dLat0) * sin(dLatThis)
-			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
-
-		if (dR >= 1.0) {
-			dR = 0.0;
-		} else if (dR <= -1.0) {
-			dR = 180.0;
-		} else {
-			dR = 180.0 / M_PI * acos(dR);
-		}
-		if (dR != dR) {
-			_EXCEPTIONT("NaN value detected");
-		}
-
-		if ((ix != ix0) && (dR > dMaxDist)) {
-			continue;
-		}
-
-		// Value at this location
-		double dValue = dataState[ix];
-
-		// Apply operator
-		if (op == ThresholdOp::GreaterThan) {
-			if (dValue > dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::LessThan) {
-			if (dValue < dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::GreaterThanEqualTo) {
-			if (dValue >= dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::LessThanEqualTo) {
-			if (dValue <= dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::EqualTo) {
-			if (dValue == dTargetValue) {
-				return true;
-			}
-
-		} else if (op == ThresholdOp::NotEqualTo) {
-			if (dValue != dTargetValue) {
-				return true;
-			}
-
-		} else {
-			_EXCEPTIONT("Invalid operation");
-		}
-
-		// Special case: zero distance
-		if (dMaxDist == 0.0) {
-			return false;
-		}
-
-		// Add all neighbors of this point
-		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
-			queueNodes.push(grid.m_vecConnectivity[ix][n]);
-		}
-	}
-
-	return false;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 // Set of indicator locations stored as grid indices
 typedef std::set<int> IndicatorSet;
 typedef IndicatorSet::iterator IndicatorSetIterator;
@@ -753,6 +597,12 @@ void ApplyFilters(
 	_ASSERT(bTag.GetRows() == grid.GetSize());
 	_ASSERT(bTag.GetRows() == dataState.GetRows());
 
+	// Threshold operator
+	ThresholdOp threshop;
+	threshop.m_eOp = op;
+	threshop.m_dThresholdValue = dTargetValue;
+	threshop.m_dDistanceDeg = 0.0;
+
 	// Number of blobs
 	int nBlobs = 0;
 	int nBlobsFiltered = 0;
@@ -798,13 +648,8 @@ void ApplyFilters(
 
 			// Check if this point satisfies threshold
 			bool fSatisfiesThreshold =
-				SatisfiesThreshold<real>(
-					grid,
-					dataState,
-					iNext,
-					op,
-					dTargetValue,
-					0.0);
+				threshop.IsSatisfied<real>(
+					grid, dataState, iNext);
 
 			if (fSatisfiesThreshold) {
 				nThresholdPoints++;
@@ -1004,7 +849,6 @@ public:
 		strTagVar("binary_tag"),
 		strLongitudeName("lon"),
 		strLatitudeName("lat"),
-		pvecThresholdOp(NULL),
 		pvecFilterOp(NULL),
 		pvecGeoFilterOp(NULL),
 		pvecOutputOp(NULL),
@@ -1057,7 +901,7 @@ public:
 	std::string strLatitudeName;
 
 	// Vector of threshold operators
-	std::vector<ThresholdOp> * pvecThresholdOp;
+	ThresholdOpTreeNode aThresholdOp;
 
 	// Vector of filter operators
 	std::vector<FilterOp> * pvecFilterOp;
@@ -1088,11 +932,6 @@ void DetectBlobs(
 	VariableRegistry & varreg,
 	const DetectBlobsParam & param
 ) {
-	// Dereference pointers to operators
-	_ASSERT(param.pvecThresholdOp != NULL);
-	std::vector<ThresholdOp> & vecThresholdOp =
-		*(param.pvecThresholdOp);
-
 	// Dereference pointers to operators
 	_ASSERT(param.pvecFilterOp != NULL);
 	std::vector<FilterOp> & vecFilterOp =
@@ -1265,15 +1104,15 @@ void DetectBlobs(
 	NcDim * dimTimeOut = NULL;
 	if ((dimTime != NULL) && (varTime != NULL)) {
 		if (vecOutputTimes.size() != vecTimes.size()) {
-			CopyNcVarTimeSubset(ncInput, ncOutput, "time", vecOutputTimes);
+			CopyNcVarTimeSubset(ncInput, ncOutput, varTime->name(), vecOutputTimes);
 
 		} else {
-			CopyNcVar(ncInput, ncOutput, "time", true);
+			CopyNcVar(ncInput, ncOutput, varTime->name(), true);
 		}
 
 		dimTimeOut = NcGetTimeDimension(ncOutput);
 		if (dimTimeOut == NULL) {
-			_EXCEPTIONT("Error copying variable \"time\" to output file");
+			_EXCEPTION1("Error copying variable \"%s\" to output file", varTime->name());
 		}
 
 	} /*else if (nAddTimeDim != -1) {
@@ -1456,36 +1295,9 @@ void DetectBlobs(
 
 		// Eliminate based on threshold commands
 		AnnounceStartBlock("Apply threshold commands");
-		for (int tc = 0; tc < vecThresholdOp.size(); tc++) {
-
-			// Load the search variable data
-			Variable & var = varreg.Get(vecThresholdOp[tc].m_varix);
-			vecFiles.SetTime(vecTimes[t]);
-			var.LoadGridData(varreg, vecFiles, grid);
-			const DataArray1D<float> & dataState = var.GetData();
-
-			// Loop through data
-			for (int i = 0; i < grid.GetSize(); i++) {
-				if (bTag[i] == 0) {
-					continue;
-				}
-
-				// Determine if the threshold is satisfied
-				bool fSatisfiesThreshold =
-					SatisfiesThreshold<float>(
-						grid,
-						dataState,
-						i,
-						vecThresholdOp[tc].m_eOp,
-						vecThresholdOp[tc].m_dValue,
-						vecThresholdOp[tc].m_dDistance
-					);
-
-				if (!fSatisfiesThreshold) {
-					bTag[i] = 0;
-				}
-			}
-		}
+		vecFiles.SetTime(vecTimes[t]);
+		param.aThresholdOp.IsSatisfied<float>(
+			varreg, vecFiles, grid, bTag);
 		AnnounceEndBlock("Done");
 
 		// Eliminate based on filter commands
@@ -1790,30 +1602,9 @@ try {
 	}
 
 	// Parse the threshold operator command string
-	std::vector<ThresholdOp> vecThresholdOp;
-	dbparam.pvecThresholdOp = &vecThresholdOp;
-
 	if (strThresholdCmd != "") {
 		AnnounceStartBlock("Parsing threshold operations");
-
-		int iLast = 0;
-		for (int i = 0; i <= strThresholdCmd.length(); i++) {
-
-			if ((i == strThresholdCmd.length()) ||
-				(strThresholdCmd[i] == ';') ||
-				(strThresholdCmd[i] == ':')
-			) {
-				std::string strSubStr =
-					strThresholdCmd.substr(iLast, i - iLast);
-			
-				int iNextOp = (int)(vecThresholdOp.size());
-				vecThresholdOp.resize(iNextOp + 1);
-				vecThresholdOp[iNextOp].Parse(varreg, strSubStr);
-
-				iLast = i + 1;
-			}
-		}
-
+		dbparam.aThresholdOp.Parse(varreg, strThresholdCmd);
 		AnnounceEndBlock("Done");
 	}
 
