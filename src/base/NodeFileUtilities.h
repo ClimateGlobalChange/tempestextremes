@@ -165,6 +165,13 @@ class ColumnData {
 
 public:
 	///	<summary>
+	///		Virtual destructor.
+	///	</summary>
+	virtual ~ColumnData() {
+	}
+
+public:
+	///	<summary>
 	///		Express this column data as a string.
 	///	</summary>
 	virtual std::string ToString() const {
