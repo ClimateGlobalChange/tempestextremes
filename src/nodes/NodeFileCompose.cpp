@@ -1133,7 +1133,7 @@ try {
 
 				vecFillValueFloat[v] = var.GetFillValueFloat();
 
-				if (fMissingData && !vecSnapshotsFillValue[v]) {
+				if (fSnapshots && fMissingData && !vecSnapshotsFillValue[v]) {
 					vecSnapshotsFillValue[v] = true;
 					vecvarSnapshots[v]->add_att("_FillValue", vecFillValueFloat[v]);
 				}
