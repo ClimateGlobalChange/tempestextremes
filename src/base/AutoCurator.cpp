@@ -360,6 +360,7 @@ void AutoCurator::IndexFiles(
 			_EXCEPTION1("\"time\" variable in \"%s\" missing "
 				"\"units\" attribute", strFile.c_str());
 		}
+		std::string strCurrentNcTimeUnits = attUnits->as_string(0);
 
 		// Index file
 		int iFileIx = static_cast<int>(pacd->m_vecFiles.size());
@@ -367,7 +368,7 @@ void AutoCurator::IndexFiles(
 
 		if (pacd->m_strNcTimeUnits == "") {
 			pacd->m_eNcTimeType = varTime->type();
-			pacd->m_strNcTimeUnits = attUnits->as_string(0);
+			pacd->m_strNcTimeUnits = strCurrentNcTimeUnits;
 		}
 
 		if (pacd->m_eCalendarType == Time::CalendarUnknown) {
@@ -397,7 +398,7 @@ void AutoCurator::IndexFiles(
 			varTime->get(&(vecTimeDouble[0]), dimTime->size());
 
 		} else {
-			_EXCEPTION1("Variable \"time\" has invalid type in file \"%s\"",
+			_EXCEPTION1("Variable \"time\" has invalid type in file \"%s\" (require int, float or double)",
 				strFile.c_str());
 		}
 
@@ -405,17 +406,17 @@ void AutoCurator::IndexFiles(
 			Time time(pacd->m_eCalendarType);
 			if (varTime->type() == ncInt) {
 				time.FromCFCompliantUnitsOffsetInt(
-					pacd->m_strNcTimeUnits,
+					strCurrentNcTimeUnits,
 					vecTimeInt[t]);
 
 			} else if (varTime->type() == ncFloat) {
 				time.FromCFCompliantUnitsOffsetDouble(
-					pacd->m_strNcTimeUnits,
+					strCurrentNcTimeUnits,
 					static_cast<double>(vecTimeFloat[t]));
 
 			} else if (varTime->type() == ncDouble) {
 				time.FromCFCompliantUnitsOffsetDouble(
-					pacd->m_strNcTimeUnits,
+					strCurrentNcTimeUnits,
 					vecTimeDouble[t]);
 			}
 
