@@ -2,10 +2,10 @@
 ///
 ///	\file    StitchBlobs.cpp
 ///	\author  Paul Ullrich
-///	\version August 20, 2020
+///	\version July 2, 2023
 ///
 ///	<remarks>
-///		Copyright 2020 Paul Ullrich
+///		Copyright 2023 Paul Ullrich
 ///
 ///		This file is distributed as part of the Tempest source code package.
 ///		Permission is granted to use, copy, modify and distribute this
@@ -233,8 +233,10 @@ class TagCollectiveOP {
 		///		Constructor that will read in std::vector< std::vector<Tag>> vecAllBlobTags and MPI communicator
 		///		It will also create the derived MPI_Datatype for Tag and commit it.
 		///	</summary>	
-		TagCollectiveOP(MPI_Comm communicator, 
-						const std::vector< std::vector<Tag>> & vecAllBlobTags){
+		TagCollectiveOP(
+			MPI_Comm communicator, 
+			const std::vector< std::vector<Tag>> & vecAllBlobTags
+		) {
 			this->_vecAllBlobTags = vecAllBlobTags;
 			this->m_comm = communicator;
 			this->serializedFlag = 0;
@@ -242,7 +244,7 @@ class TagCollectiveOP {
 			MPI_Comm_size(m_comm, &size);
 			MPI_Comm_rank(m_comm, &rank);
 
-			//Create an MPI datatype for the Tag:
+			// Create an MPI datatype for the Tag:
 			struct Tag sampleTag;
 			int tagFieldsCount = 3;	
 			MPI_Datatype Tag_typesig[3] = {MPI_INT,MPI_INT,MPI_INT};
@@ -254,25 +256,26 @@ class TagCollectiveOP {
 			MPI_Get_address(&sampleTag.id, &Tag_displacements[0]);
 			MPI_Get_address(&sampleTag.time, &Tag_displacements[1]);
 			MPI_Get_address(&sampleTag.global_id, &Tag_displacements[2]);
+
 			Tag_displacements[0] = MPI_Aint_diff(Tag_displacements[0], base_address);
 			Tag_displacements[1] = MPI_Aint_diff(Tag_displacements[1], base_address);
 			Tag_displacements[2] = MPI_Aint_diff(Tag_displacements[2], base_address);
+
 			MPI_Type_create_struct(tagFieldsCount, Tag_block_lengths, Tag_displacements, Tag_typesig, &MPI_Tag_type);
-			try{				
+			try {
 				MPI_Type_commit(&MPI_Tag_type);
 			} catch (MPI::Exception failure) {
 				_EXCEPTION1("The MPI routine MPI_Type_commit(&MPI_Tag_type) failed: %s.\n", failure.Get_error_string());
 				MPI::COMM_WORLD.Abort(1);	
 			}
 		}
+
 		///	<summary>
 		///		Destructor.
 		///	</summary>
 		~TagCollectiveOP(){
 			MPI_Type_free(&MPI_Tag_type);			
 		}
-
-
 
 		///	<summary>
 		///		The MPI gather process that will gather each local vecAllBlobTags to the processor 0.
@@ -283,14 +286,14 @@ class TagCollectiveOP {
 			MPI_Comm_rank(m_comm, &rank);
 
 			this->Serialize();
-			int d = std::ceil(std::log2(size));//here we use floor.
-
+			int d = std::ceil(std::log2(size)); // here we use floor.
 			
 			for (int j = 0; j < d; j++) {
-				//First send the serialVecAllBlobTags
+
+				// First send the serialVecAllBlobTags
 				if ((rank & (int)std::round(std::pow(2,j))) != 0) {
 					
-					//send to (world_rank ^ pow(2,j)
+					// Send to (world_rank ^ pow(2,j)
 					int destRank = rank ^ (int)round(std::pow(2,j));
 					if (destRank > size - 1) {
 						continue;
@@ -298,12 +301,12 @@ class TagCollectiveOP {
 
 					MPI_Send (serialVecAllBlobTags.data(), serialVecAllBlobTags.size(), MPI_Tag_type, destRank, gather_tag, m_comm);
 					MPI_Send (serialVecAllBlobTags_index.data(), serialVecAllBlobTags_index.size(), MPI_INT, destRank, gather_tag_index, m_comm);
-					//  Simply need to break the algorithm here (juest return, not Finalize())
+					// Simply need to break the algorithm here (juest return, not Finalize())
 					return;
 
 
 				} else {
-					//receive from (world_rank ^ pow(2,j))
+					// Receive from (world_rank ^ pow(2,j))
 					MPI_Status status;
 					int recvCount;
 					int sourceRank = rank ^ (int)std::round(std::pow(2,j));
@@ -312,7 +315,6 @@ class TagCollectiveOP {
 						continue;
 					}
 
-
 					MPI_Probe(sourceRank, gather_tag,  m_comm, &status);
 
 					MPI_Get_count( &status, MPI_Tag_type, &recvCount);					 
@@ -320,7 +322,7 @@ class TagCollectiveOP {
 					recvTags.resize(recvCount);
 					MPI_Recv(recvTags.data(), recvCount, MPI_Tag_type, sourceRank, gather_tag, m_comm, &status);
 
-					//Pack the receive Tag into the local serialVecAllBlobTags.
+					// Pack the receive Tag into the local serialVecAllBlobTags.
 					for (auto recvTag : recvTags) {
 						serialVecAllBlobTags.push_back(recvTag);
 					}
@@ -335,22 +337,22 @@ class TagCollectiveOP {
 					MPI_Recv(recvTagsIndx.data(), recvCount_index, MPI_INT, sourceRank, gather_tag_index, m_comm, &status_index);
 
 					
-					//Update the received index and then Pack the receive Tag index into the local serialVecAllBlobTags_index.
-					//Example:
-					//Initial:
-					//P0 serialVecAllBlobTags: 0, 3, 5, 7;   P1 serialVecAllBlobTags: 0, 3, 5, 7
-					//After Gather:
-					//P0 serialVecAllBlobTags: 0, 3, 5, 7, 9, 11, 13
+					// Update the received index and then Pack the receive Tag index into the
+					// local serialVecAllBlobTags_index.
+					// Example:
+					// Initial:
+					// P0 serialVecAllBlobTags: 0, 3, 5, 7;   P1 serialVecAllBlobTags: 0, 3, 5, 7
+					// After Gather:
+					// P0 serialVecAllBlobTags: 0, 3, 5, 7, 9, 11, 13
 					int serialVecAllBlobTags_index_size = serialVecAllBlobTags_index.size();
 					int curLocalTagSize = serialVecAllBlobTags_index[serialVecAllBlobTags_index_size - 1];
 					for (int i = 1; i < recvTagsIndx.size(); i++) {
-						//Update the index
+						// Update the index
 						int index = recvTagsIndx[i];
 						index += curLocalTagSize;
 						serialVecAllBlobTags_index.push_back(index);
 					}
 				}
-
 			}
 		}
 
@@ -370,8 +372,6 @@ class TagCollectiveOP {
 			} else {
 				_EXCEPTIONT("Only processor 0 should call GetGatheredSetAllTags().");
 			}
-			
-
 		}
 
 		///	<summary>
@@ -381,7 +381,7 @@ class TagCollectiveOP {
 		///		GatheredFalg = 0 indicates that returning the vecAllBlobTags after scattering to each processot.
 		///		(in this case, vecAllBlobTags is the local vecAllBlobTags and all valid processor can call the function)
 		///	</summary>
-		std::vector< std::vector<Tag>> GetUnserialVecAllTags(int GatheredFlag) {
+		std::vector< std::vector<Tag> > GetUnserialVecAllTags(int GatheredFlag) {
 			int rank, size;
 			MPI_Comm_size(m_comm, &size);
 			MPI_Comm_rank(m_comm, &rank);
@@ -393,8 +393,6 @@ class TagCollectiveOP {
 			} else {
 				_EXCEPTIONT("Only processor 0 should call GetUnserialVecAllTags().");
 			}
-			
-
 		}
 
 		///	<summary>
@@ -424,8 +422,6 @@ class TagCollectiveOP {
 				MPI_Gather(&localSize, 1, MPI_INT, NULL, 0, MPI_INT, 0,m_comm);
 
 			}
-			
-
 		}
 
 
@@ -443,7 +439,7 @@ class TagCollectiveOP {
 			this->Serialize();
 
 			if (rank == 0) {
-				//For Tags
+				// For Tags
 				int arrayScatterCounts[size];
 				int arrayScatterDisplacements[size];
 				_ASSERT(vecScatterCounts.size() > 1);
@@ -454,7 +450,7 @@ class TagCollectiveOP {
 					arrayScatterDisplacements[i] = vecScatterCounts[i - 1] + arrayScatterDisplacements[i - 1];
 				}
 
-				//For Tags Index
+				// For Tags Index
 				int arrayScatterCounts_index[size];
 				int arrayScatterDisplacements_index[size];
 				_ASSERT(vecScatterCounts_index.size() > 1);
@@ -466,14 +462,14 @@ class TagCollectiveOP {
 				}
 				
 				//-------------------Scatter---------------------------
-				//For Tags
+				// For Tags
 				auto scatterBuffer = this->serialVecAllBlobTags;
 				this->serialVecAllBlobTags.clear();
 				this->serialVecAllBlobTags.resize(arrayScatterCounts[rank]);
 				MPI_Scatterv(scatterBuffer.data(), arrayScatterCounts, arrayScatterDisplacements, MPI_Tag_type, 
 							serialVecAllBlobTags.data(), arrayScatterCounts[rank], MPI_Tag_type, 0, m_comm);
 
-				//For index
+				// For index
 				auto scatterBuffer_index = this->serialVecAllBlobTags_index;
 				this->serialVecAllBlobTags_index.clear();
 				this->serialVecAllBlobTags_index.resize(arrayScatterCounts_index[rank]);
@@ -492,9 +488,7 @@ class TagCollectiveOP {
 				MPI_Scatterv(NULL, NULL, NULL, MPI_INT, serialVecAllBlobTags_index.data(), localTagSize_index, MPI_INT, 0, m_comm);
 			}
 
-
-
-			//Now modify the received serialVecAllBlobTags_index for deserailization call
+			// Now modify the received serialVecAllBlobTags_index for deserailization call
 			int prevCount = serialVecAllBlobTags_index[0];
 			serialVecAllBlobTags_index[0] = 0;				
 			for (int i = 1; i < serialVecAllBlobTags_index.size() - 1; i++ ) {
@@ -507,9 +501,6 @@ class TagCollectiveOP {
 				serialVecAllBlobTags_index[serialVecAllBlobTags_index.size() - 1] = serialVecAllBlobTags.size();
 			}
 		}
-
-
-
 };
 
 
