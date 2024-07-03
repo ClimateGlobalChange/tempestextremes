@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///
 ///	\file    StitchBlobs.cpp
-///	\author  Paul Ullrich
+///	\author  Paul Ullrich Hongyu Chen
 ///	\version July 2, 2023
 ///
 ///	<remarks>
