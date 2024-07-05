@@ -1145,8 +1145,7 @@ try {
 				AnnounceEndBlock("Done");
 			}
 
-			// Generate the SimpleGrid for each node
-			AnnounceStartBlock("Building composites");
+			// Build the composites
 			const PathNodeIndexVector & vecPathNodes = iter->second;
 
 			// Loop through all Variables
@@ -1421,7 +1420,6 @@ try {
 			}
 
 			AnnounceEndBlock(NULL);
-			AnnounceEndBlock(NULL);
 		}
 
 		// Average all Variables
@@ -1667,7 +1665,7 @@ try {
 					AnnounceEndBlock(NULL);
 				}
 
-				AnnounceEndBlock("Done");
+				AnnounceEndBlock(NULL);
 			}
 			AnnounceEndBlock("Done");
 		}
