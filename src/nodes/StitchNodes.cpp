@@ -726,6 +726,9 @@ try {
 	// Allow repeated times
 	bool fAllowRepeatedTimes;
 
+	// Add relative velocity to the output
+	bool fAddVelocity;
+
 	// Output format
 	std::string strOutputFileFormat;
 
@@ -755,6 +758,7 @@ try {
 			"[col,op,value,count;...]");
 		CommandLineStringD(strCalendar, "caltype", "standard", "(none|standard|noleap|360_day)");
 		CommandLineBool(fAllowRepeatedTimes, "allow_repeated_times");
+		CommandLineBool(fAddVelocity, "add_velocity");
 		//CommandLineInt(nTimeStride, "timestride", 1);
 		CommandLineStringD(strOutputFileFormat, "out_file_format", "gfdl", "(gfdl|csv|csvnohead)");
 		CommandLineBool(fOutputSeconds, "out_seconds");
@@ -1335,6 +1339,13 @@ try {
 			nodefile.m_cdh.push_back(vecFormatStrings[i]);
 		}
 
+		// Additional columns for zonal and meridional velocity of track
+		if (fAddVelocity) {
+			nodefile.m_cdh.push_back("uvel");
+			nodefile.m_cdh.push_back("vvel");
+		}
+
+		// Copy over column data from candidate file to track file for output
 		for (int i = 0; i < vecPaths.size(); i++) {
 			Path & path = nodefile.m_pathvec[i];
 			path.resize(vecPaths[i].m_iTimes.size());
@@ -1353,10 +1364,61 @@ try {
 				path[t].m_time = vecIterCandidates[iTime]->first;
 
 				for (int j = 0; j < vecIterCandidates[iTime]->second[iCandidate].size(); j++) {
-					pathnode.m_vecColumnData.push_back(
-						new ColumnDataString(
-							vecIterCandidates[iTime]->second[iCandidate][j]));
+					pathnode.PushColumnDataString(
+						vecIterCandidates[iTime]->second[iCandidate][j]);
 				}
+			}
+
+			// Add velocity of the system in m/s
+			if (fAddVelocity) {
+
+				char szUvel[32];
+				char szVvel[32];
+
+				if (vecPaths[i].m_iTimes.size() == 1) {
+					snprintf(szUvel, 32, "%3.6f", 0.0);
+					snprintf(szVvel, 32, "%3.6f", 0.0);
+				}
+
+				for (int t = 0; t < path.size()-1; t++) {
+
+					PathNode & pathnode_curr = path[t];
+					PathNode & pathnode_next = path[t+1];
+
+					// Get longitude and latitude of current and next points.
+					double dLon0Deg = pathnode_curr.GetColumnDataAsDouble(iLonIndex);
+					double dLat0Deg = pathnode_curr.GetColumnDataAsDouble(iLatIndex);
+
+					double dLon1Deg = pathnode_next.GetColumnDataAsDouble(iLonIndex);
+					double dLat1Deg = pathnode_next.GetColumnDataAsDouble(iLatIndex);
+
+					double dDeltaSeconds = pathnode_next.m_time - pathnode_curr.m_time;
+
+					// Calculate great circle direction using stereographic projection
+					// At poles use a consistent stereographic plane.
+					double dUvelRad;
+					double dVvelRad;
+
+					GreatCircleDirection_Rad(
+						DegToRad(dLon0Deg),
+						DegToRad(dLat0Deg),
+						DegToRad(dLon1Deg),
+						DegToRad(dLat1Deg),
+						dUvelRad,
+						dVvelRad);
+
+					// Calculate velocities
+					snprintf(szUvel, 32, "%3.6e", EarthRadius * dUvelRad / dDeltaSeconds);
+					snprintf(szVvel, 32, "%3.6e", EarthRadius * dVvelRad / dDeltaSeconds);
+
+					pathnode_curr.PushColumnDataString(szUvel);
+					pathnode_curr.PushColumnDataString(szVvel);
+				}
+
+				PathNode & pathnode_last = path[path.size()-1];
+
+				pathnode_last.PushColumnDataString(szUvel);
+				pathnode_last.PushColumnDataString(szVvel);
 			}
 
 			path.m_timeStart = path[0].m_time;

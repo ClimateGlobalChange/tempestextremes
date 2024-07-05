@@ -387,6 +387,13 @@ inline double GreatCircleDistance_Deg(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Calculate the coordinates of a point (dLonRad, dLatRad) on the
+///		stereographic projection centered at (dLonRad0, dLatRad0).  The Xs
+///		coordinate is to the east and the Ys coordinate is to the north.
+///		At the poles the Y coordinate is a continuation of the constant
+///		longitude line dLonRad0 and the X coordinate points to its right.
+///	</summary>
 inline void StereographicProjection(
 	double dLonRad0,
 	double dLatRad0,
@@ -404,6 +411,9 @@ inline void StereographicProjection(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Calculate the inverse of StereographicProjection().
+///	</summary>
 inline void StereographicProjectionInv(
 	double dLonRad0,
 	double dLatRad0,
@@ -431,6 +441,86 @@ inline void StereographicProjectionInv(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Calculate the spherical direction between two RLL points, specified
+///		in radians.  The result is returned in radians.
+///	</summary>
+inline void GreatCircleDirection_Rad(
+	double dLon1Rad,
+	double dLat1Rad,
+	double dLon2Rad,
+	double dLat2Rad,
+	double & dZonalDirRad,
+	double & dMeridDirRad
+) {
+	if ((fabs(dLon1Rad - dLon2Rad) < 1.0e-14) && (fabs(dLat1Rad - dLat2Rad) < 1.0e-14)) {
+		dZonalDirRad = 0.0;
+		dMeridDirRad = 0.0;
+		return;
+	}
+
+	// Use consistent stereographic projection at poles
+	if ((dLat1Rad > 0.5 * M_PI - 1.0e-7) || (dLat1Rad < -0.5 * M_PI + 1.0e-7))  {
+		dLon1Rad = 0.0;
+	}
+	if ((dLat2Rad > 0.5 * M_PI - 1.0e-7) || (dLat2Rad < -0.5 * M_PI + 1.0e-7))  {
+		dLon2Rad = 0.0;
+	}
+
+	double dXs;
+	double dYs;
+	StereographicProjection(
+		dLon1Rad,
+		dLat1Rad,
+		dLon2Rad,
+		dLat2Rad,
+		dXs,
+		dYs);
+
+	double dDeltaX = sqrt(dXs * dXs + dYs * dYs);
+
+	double dGreatCircleDistRad = atan(dDeltaX);
+
+	if (fabs(dDeltaX) < 1.0e-12) {
+		dZonalDirRad = 0.0;
+		dMeridDirRad = 0.0;
+		return;
+	}
+
+	dZonalDirRad = dXs * dGreatCircleDistRad / dDeltaX;
+	dMeridDirRad = dYs * dGreatCircleDistRad / dDeltaX;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Calculate the spherical direction between two RLL points, specified
+///		in radians. The result is returned in degrees.
+///	</summary>
+inline void GreatCircleDirection_Deg(
+	double dLon1Rad,
+	double dLat1Rad,
+	double dLon2Rad,
+	double dLat2Rad,
+	double & dZonalDirDeg,
+	double & dMeridDirDeg
+) {
+	double dZonalDirRad;
+	double dMeridDirRad;
+
+	GreatCircleDirection_Rad(
+		dLon1Rad,
+		dLat1Rad,
+		dLon2Rad,
+		dLat2Rad,
+		dZonalDirRad,
+		dMeridDirRad);
+
+	dZonalDirDeg = RadToDeg(dZonalDirRad);
+	dMeridDirDeg = RadToDeg(dMeridDirRad);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 #endif // _COORDTRANSFORMS_H_
 
