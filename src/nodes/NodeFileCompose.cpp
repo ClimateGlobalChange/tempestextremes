@@ -230,6 +230,9 @@ try {
 	// Histogram operators
 	std::string strHistogramOp;
 
+	// Remove the value from a nodefile column
+	std::string strMinusNodefileColumn;
+
 	// Grid spacing of output (Cartesian great-circle or radial distance)
 	double dDeltaXDeg;
 
@@ -285,6 +288,7 @@ try {
 		CommandLineBool(fSnapshots, "snapshots");
 		CommandLineStringD(strOperators, "op", "mean", "[mean|min|max,...]");
 		CommandLineStringD(strHistogramOp, "histogram", "", "[var,offset,binsize;...]");
+		CommandLineString(strMinusNodefileColumn, "minus_nodefile_col", "");
 
 		CommandLineDouble(dDeltaXDeg, "dx", 0.5);
 		CommandLineInt(nResolutionX, "resx", 11);
@@ -541,6 +545,34 @@ try {
 		timeMaxDelta.FromFormattedString(strMaxTimeDelta);
 		if (timeMaxDelta.GetTimeType() != Time::TypeDelta) {
 			_EXCEPTIONT("--max_time_delta must be specified as a time difference ([#d][#h][#m][#s])");
+		}
+	}
+
+	// Parse --minus_nodefile_col and get column indices for each output variable
+	std::vector<int> vecMinusNodefileColIx;
+	if (strMinusNodefileColumn != "") {
+		if ((dFixedLatitudeRad != -999.) || (dFixedLongitudeRad != -999.)) {
+			_EXCEPTIONT("Cannot combine --minus_nodefile_col with --fixlon and --fixlat");
+		}
+		std::vector<std::string> vecMinusNodefileCol;
+		STLStringHelper::ParseVariableList(strMinusNodefileColumn, vecMinusNodefileCol);
+		if ((vecMinusNodefileCol.size() != vecVariableNamesIn.size()) &&
+		    (vecMinusNodefileCol.size() != 1)
+		) {
+			_EXCEPTIONT("--minus_nodefile_col must be a single name or a list of same length as --var");
+		}
+		for (std::string & strNodefileCol : vecMinusNodefileCol) {
+			int ixCol = cdhInput.GetIndexFromString(strNodefileCol);
+			if (ixCol == ColumnDataHeader::InvalidIndex) {
+				_EXCEPTION1("Column name from --minus_nodefile_col \"%s\" must appear in --in_fmt",
+					strNodefileCol.c_str());
+			}
+			vecMinusNodefileColIx.push_back(ixCol);
+			if ((vecMinusNodefileCol.size() == 1) && (vecVariableNamesIn.size() != 1)) {
+				for (int n = 0; n < vecVariableNamesIn.size()-1; n++) {
+					vecMinusNodefileColIx.push_back(ixCol);
+				}
+			}
 		}
 	}
 
@@ -1181,6 +1213,13 @@ try {
 						dPathNodeLatRad = dFixedLatitudeRad;
 					}
 
+					// Obtain reference value from nodefile
+					float dNodefileRefValue = 0.0;
+					if (vecMinusNodefileColIx.size() != 0) {
+						dNodefileRefValue =
+							pathnode.GetColumnDataAsDouble(vecMinusNodefileColIx[v]);
+					}
+
 					// Generate the SimpleGrid for this pathnode
 					SimpleGrid gridNode;
 					if (strOutputGrid == "xy") {
@@ -1235,6 +1274,12 @@ try {
 								dataState[ixGridIn];
 						}
 
+						if (dNodefileRefValue != 0.0) {
+							for (size_t i = 0; i < gridNode.GetSize(); i++) {
+								vecOutputDataMean[v][sOffset+i] -= dNodefileRefValue;
+							}
+						}
+
 					// Calculate some subset of mean, min, max
 					} else {
 						for (size_t i = 0; i < gridNode.GetSize(); i++) {
@@ -1261,17 +1306,22 @@ try {
 								}
 							}
 
+							// State value minus reference (adjusted if state is not missing)
+							float dStateValueMinusRef = dataState[ixGridIn];
+
 							// Check for non-missing data
 							if (fMissingData &&
 							    (dataState[ixGridIn] != vecFillValueFloat[v]) &&
 							    (!std::isnan(dataState[ixGridIn]))
 							) {
 								vecPathCountNonMissing[v][sOffset+i]++;
+								dStateValueMinusRef -= dNodefileRefValue;
+							} else if (!fMissingData) {
+								dStateValueMinusRef -= dNodefileRefValue;
 							}
 
 							if (fSnapshots) {
-								dOutputDataSnapshot[i] =
-									dataState[ixGridIn];
+								dOutputDataSnapshot[i] = dStateValueMinusRef;
 							}
 
 							if (fMissingData &&
@@ -1281,17 +1331,16 @@ try {
 							}
 
 							if (fCompositeMean) {
-								vecOutputDataMean[v][sOffset+i] +=
-									dataState[ixGridIn];
+								vecOutputDataMean[v][sOffset+i] += dStateValueMinusRef;
 							}
 							if (fCompositeMin) {
-								if (dataState[ixGridIn] < vecOutputDataMin[v][sOffset+i]) {
-									vecOutputDataMin[v][sOffset+i] = dataState[ixGridIn];
+								if (dStateValueMinusRef < vecOutputDataMin[v][sOffset+i]) {
+									vecOutputDataMin[v][sOffset+i] = dStateValueMinusRef;
 								}
 							}
 							if (fCompositeMax) {
-								if (dataState[ixGridIn] > vecOutputDataMax[v][sOffset+i]) {
-									vecOutputDataMax[v][sOffset+i] = dataState[ixGridIn];
+								if (dStateValueMinusRef > vecOutputDataMax[v][sOffset+i]) {
+									vecOutputDataMax[v][sOffset+i] = dStateValueMinusRef;
 								}
 							}
 
@@ -1301,7 +1350,7 @@ try {
 								for (int hop = 0; hop < vecHistogramOps.size(); hop++) {
 									int iBin =
 										static_cast<int>(
-											dataState[ixGridIn]
+											dStateValueMinusRef
 											- vecHistogramOps[hop].m_dOffset
 										) / vecHistogramOps[hop].m_dBinWidth;
 
@@ -1371,8 +1420,8 @@ try {
 				}
 			}
 
-			AnnounceEndBlock("Done");
-			AnnounceEndBlock("Done");
+			AnnounceEndBlock(NULL);
+			AnnounceEndBlock(NULL);
 		}
 
 		// Average all Variables
@@ -1615,7 +1664,7 @@ try {
 							lOutputDimSize0,
 							lOutputDimSize1);
 					}
-					AnnounceEndBlock("Done");
+					AnnounceEndBlock(NULL);
 				}
 
 				AnnounceEndBlock("Done");
