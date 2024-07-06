@@ -928,8 +928,11 @@ try {
 				for (size_t n = 0; n < pathvec[p].size(); n++) {
 					const PathNode & pn = pathvec[p][n];
 					dataPathId[ipathnode] = p;
-					dataPathLonDeg[ipathnode] = RadToDeg(grid.m_dLon[pn.m_gridix]);
-					dataPathLatDeg[ipathnode] = RadToDeg(grid.m_dLat[pn.m_gridix]);
+
+					dataPathLonDeg[ipathnode] = pn.GetColumnDataAsDouble(iLonColIx);
+					dataPathLatDeg[ipathnode] = pn.GetColumnDataAsDouble(iLatColIx);
+					//dataPathLonDeg[ipathnode] = RadToDeg(grid.m_dLon[pn.m_gridix]);
+					//dataPathLatDeg[ipathnode] = RadToDeg(grid.m_dLat[pn.m_gridix]);
 
 					dataPathTimeDouble[ipathnode] =
 						pn.m_time.GetCFCompliantUnitsOffsetDouble(strNcTimeUnits);
