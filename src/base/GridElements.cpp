@@ -407,45 +407,69 @@ void Mesh::ExchangeFirstAndSecondMesh() {
 ///////////////////////////////////////////////////////////////////////////////
 
 void Mesh::RemoveCoincidentNodes() {
-	std::vector<int> vecNodeIndex;
-	std::vector<int> vecUniques;
 
-	vecNodeIndex.reserve(nodes.size());
+	// Use kdtree to find shortest distance to other nodes
+	kdtree * kdt = kd_create(3);
+	if (kdt == nullptr) {
+		_EXCEPTIONT("Error calling kd_create(3)");
+	}
+
+	std::vector<NodeIndex> vecNewNodeIndex;
+	std::vector<NodeIndex> vecUniques;
+
+	vecNewNodeIndex.reserve(nodes.size());
 	vecUniques.reserve(nodes.size());
 
-	// Identify duplicate nodes
-	NodeTree nt(coincident_node_tolerance);
+	kd_insert3(kdt, nodes[0].x, nodes[0].y, nodes[0].z, (void*)(0));
+	vecNewNodeIndex.push_back(0);
+	vecUniques.push_back(0);
 
-	for (size_t i = 0; i < nodes.size(); i++) {
-		size_t s = nt.find_or_insert(nodes[i], i);
-		if (s == i) {
-			vecUniques.push_back(i);
-			vecNodeIndex.push_back(i);
+	for (size_t k = 1; k < nodes.size(); k++) {
+		const Node & node = nodes[k];
+
+		kdres * kdresNearest = kd_nearest3(kdt, node.x, node.y, node.z);
+		if (kdresNearest == NULL) {
+			_EXCEPTIONT("kd_nearest3() failed");
+		}
+		Node nodeNearest;
+		size_t ixNodeNearestNewIx =
+			(size_t)(kd_res_item3(kdresNearest, &(nodeNearest.x), &(nodeNearest.y), &(nodeNearest.z)));
+		kd_res_free(kdresNearest);
+
+		Node nodeDelta = node - nodeNearest;
+		if (nodeDelta.Magnitude() < ReferenceTolerance) {
+			vecNewNodeIndex.push_back((NodeIndex)ixNodeNearestNewIx);
 		} else {
-			vecNodeIndex.push_back(s);
+			kd_insert3(kdt, node.x, node.y, node.z, (void*)(vecUniques.size()));
+			vecNewNodeIndex.push_back((NodeIndex)(vecUniques.size()));
+			vecUniques.push_back((NodeIndex)k);
 		}
 	}
 
-	if (nodes.size() - vecUniques.size() != 0) {
-		Announce("%i duplicate nodes detected", nodes.size() - vecUniques.size());
+	kd_free(kdt);
+
+	// Number of uniques 
+	if (vecUniques.size() == nodes.size()) {
+		return;
 	}
 
-	// Remove duplicates
-	NodeVector nodesOld = nodes;
+	Announce("%i duplicate nodes detected", nodes.size() - vecUniques.size());
 
-	nodes.resize(vecUniques.size());
-	for (int i = 0; i < vecUniques.size(); i++) {
-		nodes[i] = nodesOld[vecUniques[i]];
+	// Remove duplicates from nodes vector
+	{
+		NodeVector nodesOld = nodes;
+		nodes.resize(vecUniques.size());
+		for (size_t i = 0; i < vecUniques.size(); i++) {
+			nodes[i] = nodesOld[vecUniques[i]];
+		}
 	}
 
 	// Adjust node indices in Faces
-	for (int i = 0; i < faces.size(); i++) {
-	for (int j = 0; j < faces[i].edges.size(); j++) {
-		faces[i].edges[j].node[0] =
-			vecNodeIndex[faces[i].edges[j].node[0]];
-		faces[i].edges[j].node[1] =
-			vecNodeIndex[faces[i].edges[j].node[1]];
-	}
+	for (Face & face : faces) {
+		for (Edge & edge : face.edges) {
+			edge[0] = vecNewNodeIndex[edge[0]];
+			edge[1] = vecNewNodeIndex[edge[1]];
+		}
 	}
 }
 
@@ -1120,7 +1144,10 @@ void Mesh::WriteScrip(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void Mesh::Read(const std::string & strFile) {
+void Mesh::Read(
+	const std::string & strFile,
+	bool fRemoveCoincidentNodes
+) {
 
 	const int ParamFour = 4;
 	const int ParamLenString = 33;
@@ -1398,7 +1425,10 @@ void Mesh::Read(const std::string & strFile) {
 
 		// SCRIP does not reference a node table, so we must remove
 		// coincident nodes.
-		RemoveCoincidentNodes();
+		if (fRemoveCoincidentNodes) {
+			Announce("Removing coincident nodes");
+			RemoveCoincidentNodes();
+		}
 
 		// Output size
 		Announce("Mesh size: Nodes [%i] Elements [%i]",

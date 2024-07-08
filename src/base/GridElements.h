@@ -829,12 +829,13 @@ public:
 	///	</summary>
 	Mesh(
 		const std::string & strFile,
+		bool fRemoveCoincidentNodes = true,
 		double _coincident_node_tolerance = ReferenceTolerance
 	) :
 		type(MeshType_Unknown),
 		coincident_node_tolerance(_coincident_node_tolerance)
 	{
-		Read(strFile);
+		Read(strFile, fRemoveCoincidentNodes);
 	}
 
 public:
@@ -897,7 +898,10 @@ public:
 	///	<summary>
 	///		Read the mesh from a NetCDF file.
 	///	</summary>
-	void Read(const std::string & strFile);
+	void Read(
+		const std::string & strFile,
+		bool fRemoveCoincidentNodes = true
+	);
 
 	///	<summary>
 	///		Remove zero edges from all Faces.
