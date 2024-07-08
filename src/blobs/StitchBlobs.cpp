@@ -18,8 +18,6 @@
 #include <mpi.h>
 #endif
 
-//#define MPI_BOOST_CXX
-
 #include "Constants.h"
 #include "CoordTransforms.h"
 #include "BlobUtilities.h"
@@ -267,18 +265,10 @@ class TagCollectiveOP {
 
 			MPI_Type_create_struct(tagFieldsCount, Tag_block_lengths, Tag_displacements, Tag_typesig, &MPI_Tag_type);
 
-#if defined(MPI_BOOST_CXX)
-			try {
-				MPI_Type_commit(&MPI_Tag_type);
-			} catch (MPI::Exception failure) {
-				_EXCEPTION1("The MPI routine MPI_Type_commit(&MPI_Tag_type) failed: %s.\n", failure.Get_error_string());
-			}
-#else
 			int result = MPI_Type_commit(&MPI_Tag_type);
 			if (result != MPI_SUCCESS) {
 				_EXCEPTION1("The MPI routine MPI_Type_commit(&MPI_Tag_type) failed (code %i)", result);
 			}
-#endif
 		}
 
 		///	<summary>
@@ -651,18 +641,10 @@ class TagExchangeOP {
 			Tag_displacements[2] = MPI_Aint_diff(Tag_displacements[2], base_address);
 			MPI_Type_create_struct(tagFieldsCount, Tag_block_lengths, Tag_displacements, Tag_typesig, &MPI_Tag_type);
 
-#if defined(MPI_BOOST_CXX)
-			try {
-				MPI_Type_commit(&MPI_Tag_type);
-			} catch (MPI::Exception failure) {
-				_EXCEPTION1("The MPI routine MPI_Type_commit(&MPI_Tag_type) failed: %s.\n", failure.Get_error_string());
-			}
-#else
 			int result = MPI_Type_commit(&MPI_Tag_type);
 			if (result != MPI_SUCCESS) {
 				_EXCEPTION1("The MPI routine MPI_Type_commit(&MPI_Tag_type) failed (code %i)", result);
 			}
-#endif
 		}
 
 
@@ -733,22 +715,12 @@ class TagExchangeOP {
 				// Only the odd number processors will send out the data
 				if (rank % 2 != 0) {
 
-#if defined(MPI_BOOST_CXX)
-					try {
-						MPI_Request request;
-						MPI_Isend(sendTags[dir].data(), sendTags[dir].size(), MPI_Tag_type,
-							destRank, tag, m_comm, &request);
-					} catch (MPI::Exception failure) {
-						_EXCEPTION1("The MPI routine MPI_Isend failed: %s.\n", failure.Get_error_string());
-					}	
-#else
 					MPI_Request request;
 					int result = MPI_Isend(sendTags[dir].data(), sendTags[dir].size(), MPI_Tag_type,
 							destRank, tag, m_comm, &request);
 					if (result != MPI_SUCCESS) {
 						_EXCEPTION1("The MPI routine MPI_Isend failed (code %i)", result);
 					}
-#endif
 				}
 			}
 
@@ -797,21 +769,12 @@ class TagExchangeOP {
 					MPI_Get_count( &status, MPI_Tag_type, &recvCount );
 					recvTags[dir].resize(recvCount);
 
-#if defined(MPI_BOOST_CXX)
-					try {
-						MPI_Irecv(recvTags[dir].data(), recvTags[dir].size(), MPI_Tag_type,
-							sourceRank, tag, m_comm, &request);
-					} catch (MPI::Exception failure) {
-						_EXCEPTION1("The MPI routine MPI_Isend failed: %s.\n", failure.Get_error_string());
-					}	
-#else
 					int result =
 						MPI_Irecv(recvTags[dir].data(), recvTags[dir].size(), MPI_Tag_type,
 							sourceRank, tag, m_comm, &request);
 					if (result != MPI_SUCCESS) {
 						_EXCEPTION1("The MPI routine MPI_Isend failed (code %i)", result);
 					}
-#endif
 					MPIrequests.emplace_back(std::move(request));
 					MPIstatuses.push_back(MPI_Status());
 				}
@@ -832,18 +795,10 @@ class TagExchangeOP {
 			MPI_Comm_size(m_comm, &size);
 			MPI_Comm_rank(m_comm, &rank);
 
-#if defined(MPI_BOOST_CXX)
-			try {
-				MPI_Waitall( MPIrequests.size(), MPIrequests.data(), MPIstatuses.data());
-			} catch (MPI::Exception failure) {
-				_EXCEPTION1("The MPI routine MPI_Waitall failed: %s.\n", failure.Get_error_string());
-			}	
-#else
 			int result = MPI_Waitall( MPIrequests.size(), MPIrequests.data(), MPIstatuses.data());
 			if (result != MPI_SUCCESS) {
 				_EXCEPTION1("The MPI routine MPI_Waitall failed (code %i)", result);
 			}
-#endif
 
 			MPIrequests.clear();
 			MPIstatuses.clear();
@@ -1116,18 +1071,10 @@ class BlobBoxesDegExchangeOP {
 		void EndExchange() {
 			// Wait for all Irecv to complete
 
-#if defined(MPI_BOOST_CXX)
-			try {
-				MPI_Waitall( MPIrequests.size(), MPIrequests.data(), MPIstatuses.data());
-			} catch (MPI::Exception failure) {
-				_EXCEPTION1("The MPI routine MPI_Waitall failed: %s.\n", failure.Get_error_string());
-			}	
-#else
 			int result = MPI_Waitall( MPIrequests.size(), MPIrequests.data(), MPIstatuses.data());
 			if (result != MPI_SUCCESS) {
 				_EXCEPTION1("The MPI routine MPI_Waitall failed (code %i)", result);
 			}
-#endif
 
 			MPIrequests.clear();
 			MPIstatuses.clear();
@@ -1503,18 +1450,10 @@ class BlobsExchangeOp {
 		void EndExchange() {
 
 			// Wait for all Irecv to complete
-#if defined(MPI_BOOST_CXX)
-			try {
-				MPI_Waitall( MPIrequests.size(), MPIrequests.data(), MPIstatuses.data());
-			} catch (MPI::Exception failure) {
-				_EXCEPTION1("The MPI routine MPI_Waitall failed: %s.\n", failure.Get_error_string());
-			}
-#else
 			int result = MPI_Waitall( MPIrequests.size(), MPIrequests.data(), MPIstatuses.data());
 			if (result != MPI_SUCCESS) {
 				_EXCEPTION1("The MPI routine MPI_Waitall failed (code %i)", result);
 			}
-#endif
 
 			MPIrequests.clear();
 			MPIstatuses.clear();
@@ -1757,18 +1696,10 @@ class GlobalTimesExchangeOp {
 		///	</summary>
 		void EndExchange() {
 			// Wait for all Irecv to complete
-#if defined(MPI_BOOST_CXX)
-			try {
-				MPI_Waitall( MPIrequests.size(), MPIrequests.data(), MPIstatuses.data());
-			} catch (MPI::Exception failure) {
-				_EXCEPTION1("The MPI routine MPI_Waitall failed: %s.\n", failure.Get_error_string());
-			}
-#else
 			int result = MPI_Waitall( MPIrequests.size(), MPIrequests.data(), MPIstatuses.data());
 			if (result != MPI_SUCCESS) {
 				_EXCEPTION1("The MPI routine MPI_Waitall failed (code %i)", result);
 			}
-#endif
 
 			MPIrequests.clear();
 			MPIstatuses.clear();
@@ -2458,18 +2389,10 @@ int main(int argc, char** argv) {
 
 #if defined(TEMPEST_MPIOMP)
 		// Initialize MPI
-#if defined(MPI_BOOST_CXX)
-		try{
-			MPI_Init(&argc, &argv);
-		} catch (MPI::Exception failure) {
-			std::cerr << failure.Get_error_string()<< std::endl ;
-		}
-#else
 		int result = MPI_Init(&argc, &argv);
 		if (result != MPI_SUCCESS) {
 			_EXCEPTION1("The MPI routine MPI_Init failed (code %i)", result);
 		}
-#endif
 
 #endif
 
