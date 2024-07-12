@@ -81,6 +81,9 @@ typedef TimeToCandidateInfoMap::iterator TimeToCandidateInfoMapIterator;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Read a DetectNodes output file into mapCandidateInfo.
+///	</summary>
 void ParseDetectNodesFile(
 	const std::string & strInputFile,
 	const std::vector< std::string > & vecFormatStrings,
@@ -302,7 +305,31 @@ struct Node {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class SimplePathSegment {
+///	<summary>
+///		A (time,candidate index) pair
+///	</summary>
+struct TimeCandidatePair : public std::pair<int,int> {
+	TimeCandidatePair(int _timeix, int _candidate) :
+		std::pair<int,int>(_timeix, _candidate)
+	{ }
+
+	inline const int & timeix() const {
+		return first;
+	}
+
+	inline const int & candidate() const {
+		return second;
+	}
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		A segment in a simple path connecting candidate indices at two times.
+///	</summary>
+class SimplePathSegment :
+	public std::pair<TimeCandidatePair, TimeCandidatePair>
+{
 
 public:
 	///	<summary>
@@ -313,40 +340,28 @@ public:
 		int iCandidate0,
 		int iTime1,
 		int iCandidate1
-	) {
-		m_iTime[0] = iTime0;
-		m_iTime[1] = iTime1;
-
-		m_iCandidate[0] = iCandidate0;
-		m_iCandidate[1] = iCandidate1;
-	}
+	) :
+		std::pair<TimeCandidatePair, TimeCandidatePair>(
+			TimeCandidatePair(iTime0, iCandidate0),
+			TimeCandidatePair(iTime1, iCandidate1))
+	{ }
 
 public:
 	///	<summary>
 	///		Comparator.
 	///	</summary>
 	bool operator< (const SimplePathSegment & seg) const {
-		std::pair<int,int> pr0(m_iTime[0], m_iCandidate[0]);
-		std::pair<int,int> pr1(seg.m_iTime[0], seg.m_iCandidate[0]);
-		return (pr0 < pr1);
+		return (first < seg.first);
 	}
-
-public:
-	///	<summary>
-	///		Begin and end time.
-	///	</summary>
-	int m_iTime[2];
-
-	///	<summary>
-	///		Begin and end candidate.
-	///	</summary>
-	int m_iCandidate[2];
 };
 
 typedef std::set<SimplePathSegment> SimplePathSegmentSet;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		A vector of times and candidate indices at those times defining a path.
+///	</summary>
 class SimplePath {
 
 public:
@@ -361,10 +376,16 @@ public:
 	std::vector<int> m_iCandidates;
 };
 
+///	<summary>
+///		A vector of SimplePaths.
+///	</summary>
 typedef std::vector<SimplePath> SimplePathVector;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		An operator which is used to enforce some criteria on paths.
+///	</summary>
 class PathThresholdOp {
 
 public:
@@ -671,6 +692,315 @@ protected:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void GeneratePathSegmentsSetBasic(
+	const std::vector<TimeToCandidateInfoMapIterator> & vecIterCandidates,
+	const std::vector< std::vector<Node> > & vecNodes,
+	const std::vector<kdtree *> & vecKDTrees,
+	int nMaxGapSteps,
+	double dMaxGapSeconds,
+	double dRangeDeg,
+	std::vector<SimplePathSegmentSet> & vecPathSegmentsSet
+) {
+
+	vecPathSegmentsSet.resize(vecIterCandidates.size()-1);
+
+	// Null pointer
+	int * noptr = NULL;
+
+	// Search nodes at current time level
+	for (size_t t = 0; t < vecIterCandidates.size()-1; t++) {
+
+		const Time & timeCurrent = vecIterCandidates[t]->first;
+		const TimesliceCandidateInformation & tscinfo = vecIterCandidates[t]->second;
+
+		// Loop through all candidates at current time level
+		for (int i = 0; i < tscinfo.size(); i++) {
+
+			// Check future timesteps for next candidate in path
+			for (int g = 1; ; g++) {
+
+				if ((nMaxGapSteps != (-1)) && (g > nMaxGapSteps+1)) {
+					break;
+				}
+				if (t+g >= vecIterCandidates.size()) {
+					break;
+				}
+
+				if (dMaxGapSeconds >= 0.0) {
+					const Time & timeNext = vecIterCandidates[t+g]->first;
+					double dDeltaSeconds = timeCurrent.DeltaSeconds(timeNext);
+					if (dDeltaSeconds > dMaxGapSeconds) {
+						break;
+					}
+				}
+
+				if (vecKDTrees[t+g] == NULL) {
+					continue;
+				}
+
+				kdres * set = kd_nearest3(vecKDTrees[t+g], vecNodes[t][i].x, vecNodes[t][i].y, vecNodes[t][i].z);
+
+				if (kd_res_size(set) == 0) {
+					kd_res_free(set);
+					break;
+				}
+
+				int iRes =
+					  reinterpret_cast<int*>(kd_res_item_data(set))
+					- reinterpret_cast<int*>(noptr);
+
+				kd_res_free(set);
+
+				// Great circle distance between points
+				double dRDeg =
+					GreatCircleDistance_Deg(
+						vecNodes[t][i].lonRad,
+						vecNodes[t][i].latRad,
+						vecNodes[t+g][iRes].lonRad,
+						vecNodes[t+g][iRes].latRad);
+
+				// Verify great circle distance satisfies range requirement
+				if (dRDeg <= dRangeDeg) {
+
+					// Insert new path segment into set of path segments
+					vecPathSegmentsSet[t].insert(
+						SimplePathSegment(t, i, t+g, iRes));
+
+					break;
+				}
+			}
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		First-come-first-serve method for generating paths (default).
+///	</summary>
+void GeneratePathsBasic(
+	const std::vector<TimeToCandidateInfoMapIterator> & vecIterCandidates,
+	std::vector<SimplePathSegmentSet> & vecPathSegmentsSet,
+	std::vector<SimplePath> & vecPaths
+) {
+	// Loop through all times
+	for (size_t t = 0; t < vecIterCandidates.size()-1; t++) {
+
+		// Loop through all remaining segments at this time
+		while (vecPathSegmentsSet[t].size() > 0) {
+
+			// Create a new path starting with this segment
+			SimplePath path;
+
+			SimplePathSegmentSet::iterator iterSeg
+				= vecPathSegmentsSet[t].begin();
+
+			path.m_iTimes.push_back(iterSeg->first.timeix());
+			path.m_iCandidates.push_back(iterSeg->first.candidate());
+
+			int tx = t;
+
+			for (;;) {
+				path.m_iTimes.push_back(iterSeg->second.timeix());
+				path.m_iCandidates.push_back(iterSeg->second.candidate());
+
+				int txnext = iterSeg->second.timeix();
+
+				if (txnext >= vecIterCandidates.size()-1) {
+					vecPathSegmentsSet[tx].erase(iterSeg);
+					break;
+				}
+
+				SimplePathSegment segFind(
+					iterSeg->second.timeix(), iterSeg->second.candidate(), 0, 0);
+
+				vecPathSegmentsSet[tx].erase(iterSeg);
+
+				iterSeg = vecPathSegmentsSet[txnext].find(segFind);
+
+				if (iterSeg == vecPathSegmentsSet[txnext].end()) {
+					break;
+				}
+
+				tx = txnext;
+			}
+
+			// Add path to array of paths
+			vecPaths.push_back(path);
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Priority method for generating path segments.
+///	</summary>
+void GeneratePathSegmentsWithPriority(
+	const std::vector<TimeToCandidateInfoMapIterator> & vecIterCandidates,
+	const std::vector< std::vector<Node> > & vecNodes,
+	const std::vector<kdtree *> & vecKDTrees,
+	const int ixPriorityCol,
+	int nMaxGapSteps,
+	double dMaxGapSeconds,
+	double dRangeDeg,
+	std::vector<SimplePathSegmentSet> & vecPathSegmentsSet
+) {
+	// For target candidates, priority includes both timestep delta and distance
+	typedef std::pair<int, double> PriorityPair;
+
+	// Null pointer
+	int * noptr = NULL;
+
+	// Chord distance
+	const double dChordLength = ChordLengthFromGreatCircleDistance_Deg(dRangeDeg);
+
+	// Initialize the path segment set
+	vecPathSegmentsSet.resize(vecIterCandidates.size()-1);
+
+	// Get priority of all candidates
+	if (ixPriorityCol < 0) {
+		_EXCEPTIONT("Invalid priority column index");
+	}
+	std::multimap<double, TimeCandidatePair> mapPriority;
+	for (size_t t = 0; t < vecIterCandidates.size()-1; t++) {
+		const TimesliceCandidateInformation & tscinfo = vecIterCandidates[t]->second;
+
+		for (int i = 0; i < tscinfo.size(); i++) {
+			if (tscinfo[i].size() <= ixPriorityCol) {
+				_EXCEPTION2("Priority column index out of range (%i <= %i)", tscinfo[i].size(), ixPriorityCol);
+			}
+
+			double dPriority = std::stod(tscinfo[i][ixPriorityCol]);
+			mapPriority.insert(std::pair<double, TimeCandidatePair>(dPriority, TimeCandidatePair(t,i)));
+		}
+	}
+
+	Announce("%lu total candidates found", mapPriority.size());
+
+	// Set of candidates that are already targets of another node
+	std::set<TimeCandidatePair> setUsedCandidates;
+
+	// Loop through all candidates in increasing priority
+	for (auto & it : mapPriority) {
+		const int t = it.second.timeix();
+		const int i = it.second.candidate();
+
+		const Time & timeCurrent = vecIterCandidates[t]->first;
+
+		// Find all candidates within prescribed distance
+		std::multimap<std::pair<int, double>, TimeCandidatePair> mmapTargets;
+		for (int g = 1; ; g++) {
+
+			if ((nMaxGapSteps != (-1)) && (g > nMaxGapSteps+1)) {
+				break;
+			}
+			if (t+g >= vecKDTrees.size()) {
+				break;
+			}
+			if (dMaxGapSeconds >= 0.0) {
+				const Time & timeNext = vecIterCandidates[t+g]->first;
+				double dDeltaSeconds = timeCurrent.DeltaSeconds(timeNext);
+				if (dDeltaSeconds > dMaxGapSeconds) {
+					break;
+				}
+			}
+			if (vecKDTrees[t+g] == NULL) {
+				continue;
+			}
+
+			kdres * set =
+				kd_nearest_range3(
+					vecKDTrees[t+g],
+					vecNodes[t][i].x,
+					vecNodes[t][i].y,
+					vecNodes[t][i].z,
+					dChordLength);
+
+			if (set == NULL) {
+				_EXCEPTIONT("Fatal exception in kd_nearest_range3");
+			}
+			if (kd_res_size(set) == 0) {
+				kd_res_free(set);
+				continue;
+			}
+
+			do {
+				int iRes =
+					  reinterpret_cast<int*>(kd_res_item_data(set))
+					- reinterpret_cast<int*>(noptr);
+
+				//printf("%i %i %i %i - %lu %lu\n", t, i, t+g, iRes);
+
+				double dRDeg =
+					GreatCircleDistance_Deg(
+						vecNodes[t][i].lonRad,
+						vecNodes[t][i].latRad,
+						vecNodes[t+g][iRes].lonRad,
+						vecNodes[t+g][iRes].latRad);
+
+				mmapTargets.insert(
+					std::pair<PriorityPair, TimeCandidatePair>(
+						PriorityPair(g,dRDeg),
+						TimeCandidatePair(t+g,iRes)));
+
+			} while (kd_res_next(set));
+
+			kd_res_free(set);
+		}
+
+		// Find the shortest target node and insert a segment
+		for (auto & itTarget : mmapTargets) {
+			auto itUsed = setUsedCandidates.find(itTarget.second);
+			if (itUsed == setUsedCandidates.end()) {
+				setUsedCandidates.insert(itTarget.second);
+
+				_ASSERT((t >= 0) && (t < vecPathSegmentsSet.size()));
+				vecPathSegmentsSet[t].insert(
+					SimplePathSegment(t, i, itTarget.second.timeix(), itTarget.second.candidate()));
+
+				break;
+			}
+		}
+	}
+
+/*
+	// Build the reverse candidate map, which identifies, for each candidate,
+	// all candidates pointing to it.
+	typedef std::vector<TimeCandidatePair> TimeCandidateVector;
+	typedef std::map<TimeCandidatePair, TimeCandidateVector> ReverseCandidateMap;
+
+	ReverseCandidateMap mapReverseCandidate;
+
+	for (auto & setPathSegmentsAtTime : vecPathSegmentsSet) {
+		for (auto & aSimplePathSegment : setPathSegmentsAtTime) {
+			auto it = mapReverseCandidate.find(aSimplePathSegment.second);
+			if (it == mapReverseCandidate.end()) {
+				std::pair<ReverseCandidateMap::iterator, bool> prResult =
+					mapReverseCandidate.insert(
+						ReverseCandidateMap::value_type(
+							aSimplePathSegment.second,
+							TimeCandidateVector()));
+
+				prResult.first->second.push_back(
+					aSimplePathSegment.first);
+
+			} else {
+				it->second.push_back(
+					aSimplePathSegment.first);
+			}
+		}
+	}
+
+	// Loop through map and identify priority candidate
+	std::set<TimeCandidatePair> setConsumedCandidates;
+
+	// Only retain that segment in array
+*/
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 try {
@@ -694,7 +1024,7 @@ try {
 	std::string strFormat;
 
 	// Range (in degrees)
-	double dRange;
+	double dRangeDeg;
 
 	// Minimum duration of path
 	std::string strMinTime;
@@ -704,6 +1034,9 @@ try {
 
 	// End time for analysis
 	std::string strTimeEnd;
+
+	// Variable to use when prioritizing paths
+	std::string strPrioritize;
 
 	// Minimum path length
 	int nMinPathLength;
@@ -746,11 +1079,13 @@ try {
 		CommandLineString(strOutputFile, "out", "");
 		CommandLineString(strFormatOld, "*format", "");
 		CommandLineString(strFormat, "in_fmt", "lon,lat");
-		CommandLineDoubleD(dRange, "range", 5.0, "(degrees)");
+		CommandLineDoubleD(dRangeDeg, "range", 5.0, "(degrees)");
+		//TODO: CommandLineDoubleD(dSpeed, "maxspeed", 0.0, "(degrees/hour)");
 		CommandLineString(strMinTime, "mintime", "3");
 		CommandLineInt(nMinPathLength, "*minlength", 1);
 		CommandLineString(strTimeBegin, "time_begin", "");
 		CommandLineString(strTimeEnd, "time_end", "");
+		CommandLineString(strPrioritize, "prioritize", "");
 		CommandLineDoubleD(dMinEndpointDistance, "min_endpoint_dist", 0.0, "(degrees)");
 		CommandLineDoubleD(dMinPathDistance, "min_path_dist", 0.0, "(degrees)");
 		CommandLineString(strMaxGapSize, "maxgap", "0");
@@ -777,39 +1112,6 @@ try {
 	}
 
 	// Check format
-/*
-	std::vector<size_t> nGridDim;
-	if (strFormatOld != "") {
-		Announce("WARNING: --format is deprecated.  Consider using --in_fmt and --in_connect instead");
-
-		if (strFormatOld.substr(0,4) == "i,j,") {
-			strFormat = strFormatOld.substr(4);
-
-			nGridDim.resize(2);
-			nGridDim[0] = static_cast<size_t>(-1);
-			nGridDim[1] = static_cast<size_t>(-1);
-
-		} else if (strFormatOld.substr(0,2) == "i,") {
-			strFormat = strFormatOld.substr(2);
-
-			nGridDim.resize(1);
-			nGridDim[0] = static_cast<size_t>(-1);
-
-		} else {
-			_EXCEPTIONT("Invalid --format string; expected first entries to be \"i,\" or \"i,j,\"");
-		}
-
-	} else {
-		if (strConnectivityFile != "") {
-			nGridDim.resize(1);
-			nGridDim[0] = static_cast<size_t>(-1);
-		} else {
-			nGridDim.resize(2);
-			nGridDim[0] = static_cast<size_t>(-1);
-			nGridDim[1] = static_cast<size_t>(-1);
-		}
-	}
-*/
 	size_t sGridDims = 0;
 	if (strFormatOld != "") {
 		Announce("WARNING: --format is deprecated.  Consider using --in_fmt and --in_connect instead");
@@ -965,9 +1267,10 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
-	// Parse the input
-	std::vector<TimeToCandidateInfoMapIterator> vecIterCandidates;
+	// Parse the input into mapCandidateInfo, then store iterators to all elements
+	// of mapCandidateInfo in vecIterCandidates to enable sequential access.
 	TimeToCandidateInfoMap mapCandidateInfo;
+	std::vector<TimeToCandidateInfoMapIterator> vecIterCandidates;
 	{
 		AnnounceStartBlock("Loading candidate data");
 
@@ -1040,6 +1343,9 @@ try {
 	}
 
 	/////////////////////////////////////////////
+	// 	Remove segments 
+
+	/////////////////////////////////////////////
 	// 	Build KD trees at each time slice
 
 	AnnounceStartBlock("Creating KD trees at each time level");
@@ -1071,8 +1377,8 @@ try {
 
 		// Insert all points at this time level
 		for (int i = 0; i < tscinfo.size(); i++) {
-			vecNodes[t][i].lonRad = DegToRad(std::stod(tscinfo[i][iLonIndex].c_str()));
-			vecNodes[t][i].latRad = DegToRad(std::stod(tscinfo[i][iLatIndex].c_str()));
+			vecNodes[t][i].lonRad = DegToRad(std::stod(tscinfo[i][iLonIndex]));
+			vecNodes[t][i].latRad = DegToRad(std::stod(tscinfo[i][iLatIndex]));
 
 			RLLtoXYZ_Rad(
 				vecNodes[t][i].lonRad,
@@ -1093,166 +1399,136 @@ try {
 	AnnounceEndBlock("Done");
 
 	/////////////////////////////////////////////
-	// 	Populate the set of path segments
+	// 	Find all paths
+	AnnounceStartBlock("Constructing paths");
+
+	std::vector<SimplePath> vecPaths;
+
+	std::vector<SimplePathSegmentSet> vecPathSegmentsSet;
 
 	AnnounceStartBlock("Populating set of path segments");
 
-	std::vector<SimplePathSegmentSet> vecPathSegmentsSet;
-	vecPathSegmentsSet.resize(mapCandidateInfo.size()-1);
+	if (strPrioritize == "") {
 
-	// Search nodes at current time level
-	for (size_t t = 0; t < vecIterCandidates.size()-1; t++) {
+		// Vector over time of sets of all path segments that start at that time
 
-		const Time & timeCurrent = vecIterCandidates[t]->first;
-		const TimesliceCandidateInformation & tscinfo = vecIterCandidates[t]->second;
+		GeneratePathSegmentsSetBasic(
+			vecIterCandidates,
+			vecNodes,
+			vecKDTrees,
+			nMaxGapSteps,
+			dMaxGapSeconds,
+			dRangeDeg,
+			vecPathSegmentsSet);
 
-		// Loop through all candidates at current time level
-		for (int i = 0; i < tscinfo.size(); i++) {
-
-			// Check future timesteps for next candidate in path
-			for (int g = 1; ; g++) {
-
-				if ((nMaxGapSteps != (-1)) && (g > nMaxGapSteps+1)) {
-					break;
-				}
-				if (t+g >= vecIterCandidates.size()) {
-					break;
-				}
-		
-				if (dMaxGapSeconds >= 0.0) {
-					const Time & timeNext = vecIterCandidates[t+g]->first;
-					double dDeltaSeconds = timeCurrent.DeltaSeconds(timeNext);
-					if (dDeltaSeconds > dMaxGapSeconds) {
-						break;
-					}
-				}
-
-				if (vecKDTrees[t+g] == NULL) {
-					continue;
-				}
-
-				kdres * set = kd_nearest3(vecKDTrees[t+g], vecNodes[t][i].x, vecNodes[t][i].y, vecNodes[t][i].z);
-
-				if (kd_res_size(set) == 0) {
-					kd_res_free(set);
-					break;
-				}
-
-				int iRes =
-					  reinterpret_cast<int*>(kd_res_item_data(set))
-					- reinterpret_cast<int*>(noptr);
-
-				kd_res_free(set);
-
-				// Great circle distance between points
-				double dR =
-					GreatCircleDistance_Deg(
-						vecNodes[t][i].lonRad,
-						vecNodes[t][i].latRad,
-						vecNodes[t+g][iRes].lonRad,
-						vecNodes[t+g][iRes].latRad);
-
-				// Verify great circle distance satisfies range requirement
-				if (dR <= dRange) {
-
-					// Insert new path segment into set of path segments
-					vecPathSegmentsSet[t].insert(
-						SimplePathSegment(t, i, t+g, iRes));
-
-					break;
-				}
+	} else {
+		int ixPriorityCol = (-1);
+		for (int i = 0; i < vecFormatStrings.size(); i++) {
+			if (vecFormatStrings[i] == strPrioritize) {
+				ixPriorityCol = i;
+				break;
 			}
 		}
+
+		if (ixPriorityCol == (-1)) {
+			_EXCEPTION1("Format string (--in_fmt) does not contain priority column \"%s\"", strPrioritize.c_str());
+		}
+
+		GeneratePathSegmentsWithPriority(
+			vecIterCandidates,
+			vecNodes,
+			vecKDTrees,
+			ixPriorityCol,
+			nMaxGapSteps,
+			dMaxGapSeconds,
+			dRangeDeg,
+			vecPathSegmentsSet);
 	}
 
 	AnnounceEndBlock("Done");
 
+	AnnounceStartBlock("Connecting path segments");
+
+	GeneratePathsBasic(
+		vecIterCandidates,
+		vecPathSegmentsSet,
+		vecPaths);
+
+	AnnounceEndBlock("Done");
+
+	AnnounceEndBlock("Done");
+
 	/////////////////////////////////////////////
-	// 	Find all paths
-
-	AnnounceStartBlock("Constructing paths");
-
-	std::vector<SimplePath> vecPaths;
+	// 	Filter paths
+	AnnounceStartBlock("Filtering paths");
 
 	int nRejectedMinTimePaths = 0;
 	int nRejectedMinEndpointDistPaths = 0;
 	int nRejectedMinPathDistPaths = 0;
 	int nRejectedThresholdPaths = 0;
 
-	// Remove path
-	for (size_t t = 0; t < vecIterCandidates.size()-1; t++) {
+	std::vector<SimplePath> vecPathsUnfiltered = vecPaths;
+	vecPaths.clear();
 
-		// Loop through all remaining segments
-		while (vecPathSegmentsSet[t].size() > 0) {
+	// Loop through all paths
+	for (const SimplePath & path : vecPathsUnfiltered) {
 
-			// Create a new path
-			SimplePath path;
+		// Reject path due to minimum time
+		if (path.m_iTimes.size() < nMinTimeSteps) {
+			nRejectedMinTimePaths++;
+			continue;
+		}
+		if (dMinTimeSeconds > 0.0) {
+			int nT = path.m_iTimes.size();
+			int iTime0 = path.m_iTimes[0];
+			int iTime1 = path.m_iTimes[nT-1];
 
-			SimplePathSegmentSet::iterator iterSeg
-				= vecPathSegmentsSet[t].begin();
+			_ASSERT((iTime0 >= 0) && (iTime0 < vecIterCandidates.size()));
+			_ASSERT((iTime1 >= 0) && (iTime1 < vecIterCandidates.size()));
 
-			path.m_iTimes.push_back(iterSeg->m_iTime[0]);
-			path.m_iCandidates.push_back(iterSeg->m_iCandidate[0]);
+			const Time & timeFirst = vecIterCandidates[iTime0]->first;
+			const Time & timeLast = vecIterCandidates[iTime1]->first;
 
-			int tx = t;
-
-			for (;;) {
-				path.m_iTimes.push_back(iterSeg->m_iTime[1]);
-				path.m_iCandidates.push_back(iterSeg->m_iCandidate[1]);
-
-				int txnext = iterSeg->m_iTime[1];
-
-				if (txnext >= vecIterCandidates.size()-1) {
-					vecPathSegmentsSet[tx].erase(iterSeg);
-					break;
-				}
-
-				SimplePathSegment segFind(
-					iterSeg->m_iTime[1], iterSeg->m_iCandidate[1], 0, 0);
-
-				vecPathSegmentsSet[tx].erase(iterSeg);
-
-				iterSeg = vecPathSegmentsSet[txnext].find(segFind);
-
-				if (iterSeg == vecPathSegmentsSet[txnext].end()) {
-					break;
-				}
-
-				tx = txnext;
-			}
-
-			// Reject path due to minimum time
-			if (path.m_iTimes.size() < nMinTimeSteps) {
+			double dDeltaSeconds = timeFirst.DeltaSeconds(timeLast);
+			if (dDeltaSeconds < dMinTimeSeconds) {
 				nRejectedMinTimePaths++;
 				continue;
 			}
-			if (dMinTimeSeconds > 0.0) {
-				int nT = path.m_iTimes.size();
-				int iTime0 = path.m_iTimes[0];
-				int iTime1 = path.m_iTimes[nT-1];
+		}
 
-				_ASSERT((iTime0 >= 0) && (iTime0 < vecIterCandidates.size()));
-				_ASSERT((iTime1 >= 0) && (iTime1 < vecIterCandidates.size()));
+		// Reject path due to minimum endpoint distance
+		if (dMinEndpointDistance > 0.0) {
+			int nT = path.m_iTimes.size();
 
-				const Time & timeFirst = vecIterCandidates[iTime0]->first;
-				const Time & timeLast = vecIterCandidates[iTime1]->first;
+			int iTime0 = path.m_iTimes[0];
+			int iRes0  = path.m_iCandidates[0];
 
-				double dDeltaSeconds = timeFirst.DeltaSeconds(timeLast);
-				if (dDeltaSeconds < dMinTimeSeconds) {
-					nRejectedMinTimePaths++;
-					continue;
-				}
+			int iTime1 = path.m_iTimes[nT-1];
+			int iRes1  = path.m_iCandidates[nT-1];
+
+			double dLonRad0 = vecNodes[iTime0][iRes0].lonRad;
+			double dLatRad0 = vecNodes[iTime0][iRes0].latRad;
+
+			double dLonRad1 = vecNodes[iTime1][iRes1].lonRad;
+			double dLatRad1 = vecNodes[iTime1][iRes1].latRad;
+
+			double dR = GreatCircleDistance_Deg(dLonRad0, dLatRad0, dLonRad1, dLatRad1);
+
+			if (dR < dMinEndpointDistance) {
+				nRejectedMinEndpointDistPaths++;
+				continue;
 			}
+		}
 
-			// Reject path due to minimum endpoint distance
-			if (dMinEndpointDistance > 0.0) {
-				int nT = path.m_iTimes.size();
+		// Reject path due to minimum total path distance
+		if (dMinPathDistance > 0.0) {
+			double dTotalPathDistance = 0.0;
+			for (int i = 0; i < path.m_iTimes.size() - 1; i++) {
+				int iTime0 = path.m_iTimes[i];
+				int iRes0 = path.m_iCandidates[i];
 
-				int iTime0 = path.m_iTimes[0];
-				int iRes0  = path.m_iCandidates[0];
-
-				int iTime1 = path.m_iTimes[nT-1];
-				int iRes1  = path.m_iCandidates[nT-1];
+				int iTime1 = path.m_iTimes[i+1];
+				int iRes1 = path.m_iCandidates[i+1];
 
 				double dLonRad0 = vecNodes[iTime0][iRes0].lonRad;
 				double dLatRad0 = vecNodes[iTime0][iRes0].latRad;
@@ -1262,59 +1538,34 @@ try {
 
 				double dR = GreatCircleDistance_Deg(dLonRad0, dLatRad0, dLonRad1, dLatRad1);
 
-				if (dR < dMinEndpointDistance) {
-					nRejectedMinEndpointDistPaths++;
-					continue;
-				}
+				dTotalPathDistance += dR;
 			}
 
-			// Reject path due to minimum total path distance
-			if (dMinPathDistance > 0.0) {
-				double dTotalPathDistance = 0.0;
-				for (int i = 0; i < path.m_iTimes.size() - 1; i++) {
-					int iTime0 = path.m_iTimes[i];
-					int iRes0 = path.m_iCandidates[i];
-
-					int iTime1 = path.m_iTimes[i+1];
-					int iRes1 = path.m_iCandidates[i+1];
-
-					double dLonRad0 = vecNodes[iTime0][iRes0].lonRad;
-					double dLatRad0 = vecNodes[iTime0][iRes0].latRad;
-
-					double dLonRad1 = vecNodes[iTime1][iRes1].lonRad;
-					double dLatRad1 = vecNodes[iTime1][iRes1].latRad;
-
-					double dR = GreatCircleDistance_Deg(dLonRad0, dLatRad0, dLonRad1, dLatRad1);
-
-					dTotalPathDistance += dR;
-				}
-
-				if (dTotalPathDistance < dMinPathDistance) {
-					nRejectedMinPathDistPaths++;
-					continue;
-				}
-			}
-
-			// Reject path due to threshold
-			bool fOpResult = true;
-			for (int x = 0; x < vecThresholdOp.size(); x++) {
-				fOpResult =
-					vecThresholdOp[x].Apply(
-						path,
-						vecIterCandidates);
-
-				if (!fOpResult) {
-					break;
-				}
-			}
-			if (!fOpResult) {
-				nRejectedThresholdPaths++;
+			if (dTotalPathDistance < dMinPathDistance) {
+				nRejectedMinPathDistPaths++;
 				continue;
 			}
-
-			// Add path to array of paths
-			vecPaths.push_back(path);
 		}
+
+		// Reject path due to threshold
+		bool fOpResult = true;
+		for (int x = 0; x < vecThresholdOp.size(); x++) {
+			fOpResult =
+				vecThresholdOp[x].Apply(
+					path,
+					vecIterCandidates);
+
+			if (!fOpResult) {
+				break;
+			}
+		}
+		if (!fOpResult) {
+			nRejectedThresholdPaths++;
+			continue;
+		}
+
+		// Add path to array of paths
+		vecPaths.push_back(path);
 	}
 
 	Announce("Paths rejected (mintime): %i", nRejectedMinTimePaths);
@@ -1326,7 +1577,6 @@ try {
 
 	/////////////////////////////////////////////
 	// 	Write results
-
 	AnnounceStartBlock("Writing results");
 
 	// Convert the result into a NodeFile
