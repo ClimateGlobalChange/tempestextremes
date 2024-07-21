@@ -1089,6 +1089,11 @@ void CalculateCycloneMetrics(
 				_EXCEPTIONT("Invalid eCycloneMetric value");
 			}
 		}
+
+		// Add all neighbors of this point
+		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+			queueNodes.push(grid.m_vecConnectivity[ix][n]);
+		}
 	}
 
 	// Store the maximum closed contour delta as new column data
