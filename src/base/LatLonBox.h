@@ -74,6 +74,50 @@ public:
 	}
 
 	///	<summary>
+	///		Constructor with longitude-latitude coordinates.
+	///	</summary>
+	LatLonBox(
+		Type a_lon0,
+		Type a_lon1,
+		Type a_lat0,
+		Type a_lat1,
+		bool a_lon_periodic = true,
+		Type a_lon_width = static_cast<Type>(360)
+	) :
+		is_null(false),
+		lon_periodic(a_lon_periodic),
+		lon_width(a_lon_width)
+	{
+		lon[0] = a_lon0;
+		lon[1] = a_lon1;
+		lat[0] = a_lat0;
+		lat[1] = a_lat1;
+
+		if (lon[0] < static_cast<Type>(0)) {
+			std::stringstream strError;
+			strError << "lon_pt0 out of range (" << lon[0] << " < 0)" << std::endl;
+			_EXCEPTIONT(strError.str().c_str());
+		}
+		if (lon[0] > lon_width) {
+			std::stringstream strError;
+			strError << "lon_pt0 out of range (" << lon[0] << " > ";
+			strError << lon_width << ")" << std::endl;
+			_EXCEPTIONT(strError.str().c_str());
+		}
+		if (lon[1] < static_cast<Type>(0)) {
+			std::stringstream strError;
+			strError << "lon_pt1 out of range (" << lon[1] << " < 0)" << std::endl;
+			_EXCEPTIONT(strError.str().c_str());
+		}
+		if (lon[1] > lon_width) {
+			std::stringstream strError;
+			strError << "lon_pt1 out of range (" << lon[1] << " > ";
+			strError << lon_width << ")" << std::endl;
+			_EXCEPTIONT(strError.str().c_str());
+		}
+	}
+
+	///	<summary>
 	///		Width of this LatLonBox.
 	///	</summary>
 	Type width() const {
