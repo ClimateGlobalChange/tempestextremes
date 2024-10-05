@@ -1181,6 +1181,9 @@ try {
 	// Connectivity file
 	std::string strConnectivity;
 
+	// Grid file
+	std::string strGridFile;
+
 	// Data is regional
 	bool fRegional;
 
@@ -1240,6 +1243,7 @@ try {
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineString(strGridFile, "in_gridfile", "");
 		CommandLineBool(fDiagonalConnectivity, "diag_connect");
 		CommandLineBool(fRegional, "regional");
 
@@ -1429,8 +1433,30 @@ try {
 	// Define the SimpleGrid
 	SimpleGrid grid;
 
+	// Check for grid file
+	if (strGridFile != "") {
+		AnnounceStartBlock("Generating grid information from grid file");
+
+		NcFile ncFile(strGridFile.c_str());
+		if (!ncFile.is_valid()) {
+			_EXCEPTION1("Unable to open NetCDF file \"%s\"", strGridFile.c_str());
+		}
+
+		grid.GenerateLatitudeLongitude(
+			&ncFile,
+			strLatitudeName,
+			strLongitudeName,
+			fRegional,
+			fDiagonalConnectivity);
+
+		if (grid.m_nGridDim.size() != 2) {
+			_EXCEPTIONT("Logic error when generating connectivity");
+		}
+
+		AnnounceEndBlock("Done");
+
 	// Check for connectivity file
-	if (strConnectivity != "") {
+	} else if (strConnectivity != "") {
 		AnnounceStartBlock("Generating grid information from connectivity file");
 		grid.FromFile(strConnectivity);
 		AnnounceEndBlock("Done");
