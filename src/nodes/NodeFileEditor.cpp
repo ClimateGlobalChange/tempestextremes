@@ -582,6 +582,241 @@ void CalculateRadialWindProfile(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void CalculateQuadrantWindProfile(
+	VariableRegistry & varreg,
+	NcFileVector & vecFiles,
+	const SimpleGrid & grid,
+	const ColumnDataHeader & cdh,
+	PathNode & pathnode,
+	VariableIndex varixU,
+	VariableIndex varixV,
+	std::string strBins,
+	std::string strBinWidth
+) {
+	// Get number of bins
+	int nBins = pathnode.GetColumnDataAsInteger(cdh, strBins);
+
+	// Get bin width
+	double dBinWidth = pathnode.GetColumnDataAsDouble(cdh, strBinWidth);
+
+	// Check arguments
+	if (nBins <= 0) {
+		_EXCEPTIONT("\nNonpositive value of <bins> argument given");
+	}
+	if (dBinWidth <= 0.0) {
+		_EXCEPTIONT("\nNonpositive value of <bin_width> argument given");
+	}
+	if (static_cast<double>(nBins) * dBinWidth > 180.0) {
+		_EXCEPTIONT("\n<bins> x <bin_width> must be no larger than 180 (degrees)");
+	}
+
+	// Get the center grid index
+	const int ix0 = static_cast<int>(pathnode.m_gridix);
+	if (ix0 < 0) {
+		_EXCEPTION1("Invalid grid index (%i) in node file", ix0);
+	}
+
+	// Load the zonal wind data
+	Variable & varU = varreg.Get(varixU);
+	varU.LoadGridData(varreg, vecFiles, grid);
+	const DataArray1D<float> & dataStateU = varU.GetData();
+
+	// Load the meridional wind data
+	Variable & varV = varreg.Get(varixV);
+	varV.LoadGridData(varreg, vecFiles, grid);
+	const DataArray1D<float> & dataStateV = varV.GetData();
+
+	// Verify that dRadius is less than 180.0
+	double dRadius = dBinWidth * static_cast<double>(nBins);
+
+	if ((dRadius < 0.0) || (dRadius > 180.0)) {
+		_EXCEPTIONT("Radius must be in the range [0.0, 180.0]");
+	}
+
+	// Check grid index
+	if (ix0 >= grid.m_vecConnectivity.size()) {
+		_EXCEPTION2("Grid index (%i) out of range (< %i)",
+			ix0, static_cast<int>(grid.m_vecConnectivity.size()));
+	}
+
+	// Central lat/lon and Cartesian coord
+	double dLonRad0 = grid.m_dLon[ix0];
+	double dLatRad0 = grid.m_dLat[ix0];
+
+	double dX0 = cos(dLonRad0) * cos(dLatRad0);
+	double dY0 = sin(dLonRad0) * cos(dLatRad0);
+	double dZ0 = sin(dLatRad0);
+
+	// Allocate bins
+	std::vector< std::vector<double> > dVelocities;
+	dVelocities.resize(4);
+	dVelocities[0].resize(nBins, 0.0);
+	dVelocities[1].resize(nBins, 0.0);
+	dVelocities[2].resize(nBins, 0.0);
+	dVelocities[3].resize(nBins, 0.0);
+
+	std::vector< std::vector<int> > dVelocitiesCount;
+	dVelocitiesCount.resize(4);
+	dVelocitiesCount[0].resize(nBins, 0.0);
+	dVelocitiesCount[1].resize(nBins, 0.0);
+	dVelocitiesCount[2].resize(nBins, 0.0);
+	dVelocitiesCount[3].resize(nBins, 0.0);
+
+	// Queue of nodes that remain to be visited
+	std::queue<int> queueNodes;
+	for (int n = 0; n < grid.m_vecConnectivity[ix0].size(); n++) {
+		queueNodes.push(grid.m_vecConnectivity[ix0][n]);
+	}
+
+	// Set of nodes that have already been visited
+	std::set<int> setNodesVisited;
+
+	// Loop through all latlon elements
+	while (queueNodes.size() != 0) {
+		int ix = queueNodes.front();
+		queueNodes.pop();
+
+		if (setNodesVisited.find(ix) != setNodesVisited.end()) {
+			continue;
+		}
+
+		setNodesVisited.insert(ix);
+
+		// Don't perform calculation on central node
+		if (ix == ix0) {
+			continue;
+		}
+
+		// lat/lon and Cartesian coords of this point
+		double dLatRad = grid.m_dLat[ix];
+		double dLonRad = grid.m_dLon[ix];
+
+		double dX = cos(dLonRad) * cos(dLatRad);
+		double dY = sin(dLonRad) * cos(dLatRad);
+		double dZ = sin(dLatRad);
+
+		// Great circle distance to this element (in degrees)
+		double dR = GreatCircleDistance_Deg(dLonRad0, dLatRad0, dLonRad, dLatRad);
+
+		if (dR >= dRadius) {
+			continue;
+		}
+
+		// Velocities at this location
+		double dUlon = dataStateU[ix];
+		double dUlat = dataStateV[ix];
+
+		double dUtot = sqrt(dUlon * dUlon + dUlat * dUlat);
+/*
+		// Cartesian velocities at this location
+		double dUx = - sin(dLatRad) * cos(dLonRad) * dUlat - sin(dLonRad) * dUlon;
+		double dUy = - sin(dLatRad) * sin(dLonRad) * dUlat + cos(dLonRad) * dUlon;
+		double dUz = cos(dLatRad) * dUlat;
+
+		double dUtot = sqrt(dUlon * dUlon + dUlat * dUlat);
+
+		// Calculate local radial vector from central lat/lon
+		// i.e. project \vec{X} - \vec{X}_0 to the surface of the
+		//      sphere and normalize to unit length.
+		double dRx = dX - dX0;
+		double dRy = dY - dY0;
+		double dRz = dZ - dZ0;
+
+		double dDot = dRx * dX + dRy * dY + dRz * dZ;
+
+		dRx -= dDot * dX;
+		dRy -= dDot * dY;
+		dRz -= dDot * dZ;
+
+		double dMag = sqrt(dRx * dRx + dRy * dRy + dRz * dRz);
+
+		dRx /= dMag;
+		dRy /= dMag;
+		dRz /= dMag;
+
+		// Calculate local azimuthal velocity vector
+		double dAx = dY * dRz - dZ * dRy;
+		double dAy = dZ * dRx - dX * dRz;
+		double dAz = dX * dRy - dY * dRx;
+
+		// Calculate azimuthal velocity
+		double dUa = dUx * dAx + dUy * dAy + dUz * dAz;
+
+		// Azimuthal convention positive if cyclonic, flip in SH
+		if (dLatRad0 < 0.0) {
+			dUa = -dUa;
+		}
+*/
+
+		// Determine quadrant
+		double dXs;
+		double dYs;
+		StereographicProjection(dLonRad0, dLatRad0, dLonRad, dLatRad, dXs, dYs);
+		
+		int iQuadrant = 0;
+		if (dXs > 0.0) {
+			if (dYs > 0.0) {
+				iQuadrant = 0;
+			} else {
+				iQuadrant = 1;
+			}
+		} else {
+			if (dYs > 0.0) {
+				iQuadrant = 3;
+			} else {
+				iQuadrant = 2;
+			}
+		}
+
+		// Determine bin and update total velocity in bin
+		int iBin = static_cast<int>(dR / dBinWidth);
+		if (iBin >= nBins) {
+			_EXCEPTIONT("Logic error");
+		}
+
+		dVelocities[iQuadrant][iBin] += dUtot;
+		dVelocitiesCount[iQuadrant][iBin]++;
+
+		if (iBin < nBins-1) {
+			dVelocities[iQuadrant][iBin+1] += dUtot;
+			dVelocitiesCount[iQuadrant][iBin+1]++;
+		}
+
+		// Add all neighbors of this point
+		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
+			queueNodes.push(grid.m_vecConnectivity[ix][n]);
+		}
+	}
+
+	// Construct radial profile
+	ColumnData2DArray * pdat =
+		new ColumnData2DArray;
+
+	pathnode.PushColumnData(pdat);
+
+	pdat->m_dValues.resize(5);
+	pdat->m_dValues[0].resize(nBins);
+	pdat->m_dValues[1].resize(nBins);
+	pdat->m_dValues[2].resize(nBins);
+	pdat->m_dValues[3].resize(nBins);
+	pdat->m_dValues[4].resize(nBins);
+
+	for (int j = 1; j < nBins; j++) {
+		pdat->m_dValues[0][j] = static_cast<double>(j) * dBinWidth;
+	}
+	for (int i = 0; i < 4; i++) {
+		for (int j = 1; j < nBins; j++) {
+			if (dVelocitiesCount[i][j] != 0) {
+				pdat->m_dValues[i+1][j] = dVelocities[i][j] / static_cast<double>(dVelocitiesCount[i][j]);
+			} else {
+				pdat->m_dValues[i+1][j] = 0.0;
+			}
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void SumRadius(
 	VariableRegistry & varreg,
 	NcFileVector & vecFiles,
@@ -1101,6 +1336,91 @@ void CalculateCycloneMetrics(
 		new ColumnDataDouble(dValue);
 
 	pathnode.PushColumnData(pdat);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+double LastWhere(
+	const ColumnDataHeader & cdh,
+	PathNode & pathnode,
+	const std::string & strOp,
+	const std::string & strThreshold,
+	const std::vector<double> & dIndices,
+	const std::vector<double> & dArray
+) {
+	if (dArray.size() == 0) {
+		_EXCEPTIONT("PathNode RadialProfile has zero size");
+	}
+	if (dIndices.size() != dArray.size()) {
+		_EXCEPTIONT("PathNode R array size different from Ua size");
+	}
+
+	// Get the threshold
+	double dThreshold;
+	if (strThreshold == "max") {
+		dThreshold = dArray[0];
+		for (int k = 0; k < dArray.size(); k++) {
+			if (dArray[k] > dThreshold) {
+				dThreshold = dArray[k];
+			}
+		}
+
+	} else if (strThreshold == "min") {
+		dThreshold = dArray[0];
+		for (int k = 0; k < dArray.size(); k++) {
+			if (dArray[k] < dThreshold) {
+				dThreshold = dArray[k];
+			}
+		}
+
+	} else {
+		dThreshold =
+			pathnode.GetColumnDataAsDouble(cdh, strThreshold);
+	}
+
+	// Find array index
+	int j = dArray.size()-1;
+	if (strOp == ">=") {
+		for (; j > 0; j--) {
+			if (dArray[j] >= dThreshold) {
+				break;
+			}
+		}
+
+	} else if (strOp == ">") {
+		for (; j > 0; j--) {
+			if (dArray[j] > dThreshold) {
+				break;
+			}
+		}
+
+	} else if (strOp == "<=") {
+		for (; j > 0; j--) {
+			if (dArray[j] <= dThreshold) {
+				break;
+			}
+		}
+
+	} else if (strOp == "<") {
+		for (; j > 0; j--) {
+			if (dArray[j] < dThreshold) {
+				break;
+			}
+		}
+
+	} else if (strOp == "=") {
+		for (; j > 0; j--) {
+			if (dArray[j] == dThreshold) {
+				break;
+			}
+		}
+
+	} else {
+		_EXCEPTION1("Invalid operator \"%s\" in function lastwhere()",
+			strOp.c_str());
+	}
+
+	return dIndices[j];
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1849,12 +2169,15 @@ try {
 			}
 
 			// radial_wind_profile
-			if ((*pargtree)[2] == "radial_wind_profile") {
+			if (((*pargtree)[2] == "radial_wind_profile") || ((*pargtree)[2] == "quadrant_wind_profile")) {
 				if (nArguments != 4) {
-					_EXCEPTIONT("Syntax error: Function \"radial_wind_profile\" "
+					_EXCEPTION2("Syntax error: Function \"%s\" "
 						"requires four arguments:\n"
-						"radial_wind_profile(<u variable>, <v variable>, <# bins>, <bin width>)");
+						"%s(<u variable>, <v variable>, <# bins>, <bin width>)",
+						(*pargtree)[2].c_str(), (*pargtree)[2].c_str());
 				}
+
+				bool fRadialWindProfile = ((*pargtree)[2] == "radial_wind_profile");
 
 				// Parse zonal wind variable
 				VariableIndex varixU = varreg.FindOrRegister((*pargfunc)[0]);
@@ -1887,16 +2210,30 @@ try {
 						PathNode & pathnode =
 							pathvec[iPath][iPathNode];
 
-						CalculateRadialWindProfile(
-							varreg,
-							vecncDataFiles,
-							grid,
-							cdhWorking,
-							pathnode,
-							varixU,
-							varixV,
-							(*pargfunc)[2],
-							(*pargfunc)[3]);
+						if (fRadialWindProfile) {
+							CalculateRadialWindProfile(
+								varreg,
+								vecncDataFiles,
+								grid,
+								cdhWorking,
+								pathnode,
+								varixU,
+								varixV,
+								(*pargfunc)[2],
+								(*pargfunc)[3]);
+
+						} else {
+							CalculateQuadrantWindProfile(
+								varreg,
+								vecncDataFiles,
+								grid,
+								cdhWorking,
+								pathnode,
+								varixU,
+								varixV,
+								(*pargfunc)[2],
+								(*pargfunc)[3]);
+						}
 					}
 				}
 
@@ -1916,8 +2253,8 @@ try {
 				}
 
 				// Get arguments
-				int ix = cdhWorking.GetIndexFromString((*pargfunc)[0]);
-				if (ix == (-1)) {
+				int ixCol = cdhWorking.GetIndexFromString((*pargfunc)[0]);
+				if (ixCol == (-1)) {
 					_EXCEPTION1("Invalid column header \"%s\"", (*pargfunc)[0].c_str());
 				}
 
@@ -1932,93 +2269,51 @@ try {
 					for (int i = 0; i < pathvec[p].size(); i++) {
 						PathNode & pathnode = path[i];
 
-						ColumnDataDoubleArrayTemplate * pdat =
+						// Process a ColumnDataDoubleArrayTemplate
+						ColumnDataDoubleArrayTemplate * pdatDA =
 							dynamic_cast<ColumnDataDoubleArrayTemplate *>(
-								pathnode.m_vecColumnData[ix]);
+								pathnode.m_vecColumnData[ixCol]);
 
-						if (pdat == NULL) {
-							_EXCEPTION1("Cannot cast \"%s\" to DoubleArray type",
-								(*pargfunc)[0].c_str());
+						if (pdatDA != NULL) {
+							const std::vector<double> & dIndices = pdatDA->GetIndices();
+							const std::vector<double> & dArray = pdatDA->GetValues();
+
+							double dLastIndex =
+								LastWhere(cdhWorking, pathnode, strOp, strThreshold, dIndices, dArray);
+
+							// Add this data to the pathnode
+							pathnode.PushColumnData(new ColumnDataDouble(dLastIndex));
+
+							continue;
 						}
 
-						const std::vector<double> & dArray = pdat->GetValues();
-						const std::vector<double> & dIndices = pdat->GetIndices();
+						// Process a ColumnData2DArray
+						ColumnData2DArray * pdat2DA =
+							dynamic_cast<ColumnData2DArray *>(
+								pathnode.m_vecColumnData[ixCol]);
 
-						if (dArray.size() == 0) {
-							_EXCEPTIONT("PathNode RadialProfile has zero size");
-						}
-						if (dIndices.size() != dArray.size()) {
-							_EXCEPTIONT("PathNode R array size different from Ua size");
-						}
-
-						// Get the threshold
-						double dThreshold;
-						if (strThreshold == "max") {
-							dThreshold = dArray[0];
-							for (int k = 0; k < dArray.size(); k++) {
-								if (dArray[k] > dThreshold) {
-									dThreshold = dArray[k];
-								}
+						if (pdat2DA != NULL) {
+							if (pdat2DA->m_dValues.size() < 2) {
+								_EXCEPTION1("2DArray \"%s\" must have at least two entries",
+									(*pargfunc)[0].c_str());
 							}
+							ColumnData1DArray * pdatOut = new ColumnData1DArray;
 
-						} else if (strThreshold == "min") {
-							dThreshold = dArray[0];
-							for (int k = 0; k < dArray.size(); k++) {
-								if (dArray[k] < dThreshold) {
-									dThreshold = dArray[k];
-								}
+							const std::vector<double> & dIndices = pdat2DA->m_dValues[0];
+							for (int i = 1; i < pdat2DA->m_dValues.size(); i++) {
+								const std::vector<double> & dArray = pdat2DA->m_dValues[i];
+
+								double dLastIndex =
+									LastWhere(cdhWorking, pathnode, strOp, strThreshold, dIndices, dArray);
+
+								pdatOut->m_dValues.push_back(dLastIndex);
 							}
-
-						} else {
-							dThreshold =
-								pathnode.GetColumnDataAsDouble(cdhWorking, strThreshold);
+							pathnode.PushColumnData(pdatOut);
+							continue;
 						}
 
-						// Find array index
-						int j = dArray.size()-1;
-						if (strOp == ">=") {
-							for (; j > 0; j--) {
-								if (dArray[j] >= dThreshold) {
-									break;
-								}
-							}
-
-						} else if (strOp == ">") {
-							for (; j > 0; j--) {
-								if (dArray[j] > dThreshold) {
-									break;
-								}
-							}
-
-						} else if (strOp == "<=") {
-							for (; j > 0; j--) {
-								if (dArray[j] <= dThreshold) {
-									break;
-								}
-							}
-
-						} else if (strOp == "<") {
-							for (; j > 0; j--) {
-								if (dArray[j] < dThreshold) {
-									break;
-								}
-							}
-
-						} else if (strOp == "=") {
-							for (; j > 0; j--) {
-								if (dArray[j] == dThreshold) {
-									break;
-								}
-							}
-
-						} else {
-							_EXCEPTION1("Invalid operator \"%s\" in function lastwhere()",
-								strOp.c_str());
-						}
-
-						// Add this data to the pathnode
-						pathnode.PushColumnData(
-							new ColumnDataDouble(dIndices[j]));
+						_EXCEPTION1("Cannot cast \"%s\" to DoubleArray or 2DArray type",
+							(*pargfunc)[0].c_str());
 					}
 				}
 
