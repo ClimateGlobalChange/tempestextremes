@@ -1189,7 +1189,8 @@ void MaxClosedContourDelta(
 	PathNode & pathnode,
 	VariableIndex varix,
 	std::string strRadius,
-	std::string strIndex
+	std::string strIndex,
+	bool fAddRootValue
 ) {
 	// Get radius
 	double dRadius = pathnode.GetColumnDataAsDouble(cdh, strRadius);
@@ -1307,6 +1308,11 @@ void MaxClosedContourDelta(
 		if (dDelta > dMaxDelta) {
 			dMaxDelta = dDelta;
 		}
+	}
+
+	// Add the root value in
+	if (fAddRootValue) {
+		dMaxDelta += dValue0;
 	}
 
 	// Store the maximum closed contour delta as new column data
@@ -2570,13 +2576,17 @@ try {
 			}
 
 			// max_closed_contour_delta
-			if ((*pargtree)[2] == "max_closed_contour_delta") {
+			if (((*pargtree)[2] == "max_closed_contour_delta") || ((*pargtree)[2] == "max_closed_contour_value")) {
 				if ((nArguments < 2) && (nArguments > 3)) {
-					_EXCEPTIONT("Syntax error: Function \"max_closed_contour_delta\" "
+					_EXCEPTION3("Syntax error: Function \"%s\" "
 						"requires two or three arguments:\n"
-						"max_closed_contour_delta(<variable>, <radius>)\n"
-						"max_closed_contour_delta(<variable>, <radius>, <index>)");
+						"%s(<variable>, <radius>)\n"
+						"%s(<variable>, <radius>, <index>)",
+						(*pargtree)[2].c_str(), (*pargtree)[2].c_str(), (*pargtree)[2].c_str());
 				}
+
+				// Add the root value back into the max_closed_contour_delta
+				bool fAddRootValue = ((*pargtree)[2] == "max_closed_contour_value");
 
 				// Parse variable
 				VariableIndex varix = varreg.FindOrRegister((*pargfunc)[0]);
@@ -2623,7 +2633,8 @@ try {
 							pathnode,
 							varix,
 							strRadius,
-							strIndex);
+							strIndex,
+							fAddRootValue);
 					}
 				}
 
