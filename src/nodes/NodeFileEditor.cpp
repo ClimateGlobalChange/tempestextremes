@@ -1491,6 +1491,95 @@ void CalculateCycloneMetrics(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+double FirstWhere(
+	const ColumnDataHeader & cdh,
+	PathNode & pathnode,
+	const std::string & strOp,
+	const std::string & strThreshold,
+	const std::vector<double> & dIndices,
+	const std::vector<double> & dArray
+) {
+	if (dArray.size() == 0) {
+		_EXCEPTIONT("PathNode RadialProfile has zero size");
+	}
+	if (dIndices.size() != dArray.size()) {
+		_EXCEPTIONT("PathNode R array size different from Ua size");
+	}
+
+	// Get the threshold
+	double dThreshold;
+	if (strThreshold == "max") {
+		dThreshold = dArray[0];
+		for (int k = 0; k < dArray.size(); k++) {
+			if (dArray[k] > dThreshold) {
+				dThreshold = dArray[k];
+			}
+		}
+
+	} else if (strThreshold == "min") {
+		dThreshold = dArray[0];
+		for (int k = 0; k < dArray.size(); k++) {
+			if (dArray[k] < dThreshold) {
+				dThreshold = dArray[k];
+			}
+		}
+
+	} else {
+		dThreshold =
+			pathnode.GetColumnDataAsDouble(cdh, strThreshold);
+	}
+
+	// Find array index
+	int j = 0;
+	if (strOp == ">=") {
+		for (; j < dArray.size(); j++) {
+			if (dArray[j] >= dThreshold) {
+				break;
+			}
+		}
+
+	} else if (strOp == ">") {
+		for (; j < dArray.size(); j++) {
+			if (dArray[j] > dThreshold) {
+				break;
+			}
+		}
+
+	} else if (strOp == "<=") {
+		for (; j < dArray.size(); j++) {
+			if (dArray[j] <= dThreshold) {
+				break;
+			}
+		}
+
+	} else if (strOp == "<") {
+		for (; j < dArray.size(); j++) {
+			if (dArray[j] < dThreshold) {
+				break;
+			}
+		}
+
+	} else if (strOp == "=") {
+		for (; j < dArray.size(); j++) {
+			if (dArray[j] == dThreshold) {
+				break;
+			}
+		}
+
+	} else {
+		_EXCEPTION1("Invalid operator \"%s\" in function firstwhere()",
+			strOp.c_str());
+	}
+
+	if (j < dArray.size()) {
+		return dIndices[j];
+	} else {
+		return dIndices[dArray.size()-1];
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 double LastWhere(
 	const ColumnDataHeader & cdh,
 	PathNode & pathnode,
@@ -2412,12 +2501,15 @@ try {
 			}
 
 			// lastwhere
-			if ((*pargtree)[2] == "lastwhere") {
+			if (((*pargtree)[2] == "firstwhere") || ((*pargtree)[2] == "lastwhere")) {
 				if (nArguments != 3) {
-					_EXCEPTIONT("Syntax error: Function \"lastwhere\" "
+					_EXCEPTION2("Syntax error: Function \"%s\" "
 						"requires three arguments:\n"
-						"lastwhere(<column name>, <op>, <value>)");
+						"%s(<column name>, <op>, <value>)",
+						(*pargtree)[2].c_str(), (*pargtree)[2].c_str());
 				}
+
+				bool fFirstWhere = ((*pargtree)[2] == "firstwhere");
 
 				// Get arguments
 				int ixCol = cdhWorking.GetIndexFromString((*pargfunc)[0]);
@@ -2445,11 +2537,15 @@ try {
 							const std::vector<double> & dIndices = pdatDA->GetIndices();
 							const std::vector<double> & dArray = pdatDA->GetValues();
 
-							double dLastIndex =
-								LastWhere(cdhWorking, pathnode, strOp, strThreshold, dIndices, dArray);
+							double dIndex;
+							if (fFirstWhere) {
+								dIndex = FirstWhere(cdhWorking, pathnode, strOp, strThreshold, dIndices, dArray);
+							} else {
+								dIndex = LastWhere(cdhWorking, pathnode, strOp, strThreshold, dIndices, dArray);
+							}
 
 							// Add this data to the pathnode
-							pathnode.PushColumnData(new ColumnDataDouble(dLastIndex));
+							pathnode.PushColumnData(new ColumnDataDouble(dIndex));
 
 							continue;
 						}
@@ -2470,10 +2566,14 @@ try {
 							for (int i = 1; i < pdat2DA->m_dValues.size(); i++) {
 								const std::vector<double> & dArray = pdat2DA->m_dValues[i];
 
-								double dLastIndex =
-									LastWhere(cdhWorking, pathnode, strOp, strThreshold, dIndices, dArray);
+								double dIndex;
+								if (fFirstWhere) {
+									dIndex = FirstWhere(cdhWorking, pathnode, strOp, strThreshold, dIndices, dArray);
+								} else {
+									dIndex = LastWhere(cdhWorking, pathnode, strOp, strThreshold, dIndices, dArray);
+								}
 
-								pdatOut->m_dValues.push_back(dLastIndex);
+								pdatOut->m_dValues.push_back(dIndex);
 							}
 							pathnode.PushColumnData(pdatOut);
 							continue;
