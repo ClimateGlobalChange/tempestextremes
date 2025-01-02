@@ -1566,6 +1566,20 @@ double FirstWhere(
 			}
 		}
 
+	} else if (strOp == "fallsbelow") {
+		for (; j < dArray.size()-1; j++) {
+			if ((dArray[j] >= dThreshold) && (dArray[j+1] < dThreshold)) {
+				break;
+			}
+		}
+
+	} else if (strOp == "risesabove") {
+		for (; j < dArray.size()-1; j++) {
+			if ((dArray[j] <= dThreshold) && (dArray[j+1] > dThreshold)) {
+				break;
+			}
+		}
+
 	} else {
 		_EXCEPTION1("Invalid operator \"%s\" in function firstwhere()",
 			strOp.c_str());
