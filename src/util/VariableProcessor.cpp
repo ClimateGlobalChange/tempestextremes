@@ -176,7 +176,7 @@ try {
 			vecVarIxIn.size(), vecVariableNamesOut.size());
 	}
 
-	// Prase preserve list (--preserve)
+	// Parse preserve list (--preserve)
 	std::vector<std::string> vecPreserveVariableStrings;
 	STLStringHelper::ParseVariableList(strPreserveVarName, vecPreserveVariableStrings);
 

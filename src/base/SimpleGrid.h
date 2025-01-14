@@ -210,14 +210,14 @@ public:
 	);
 
 	///	<summary>
-	///		Read the grid information from a file.
+	///		Read the grid information from a connectivity file.
 	///	</summary>
 	void FromFile(
 		const std::string & strConnectivityFile
 	);
 
 	///	<summary>
-	///		Write the grid information to a file.
+	///		Write the grid information to a connectivity file.
 	///	</summary>
 	void ToFile(
 		const std::string & strConnectivityFile

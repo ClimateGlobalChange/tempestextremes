@@ -548,27 +548,6 @@ void VariableRegistry::GetAuxiliaryDimInfo(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void VariableRegistry::PopulateFillValues(
-	const NcFileVector & vecncDataFiles
-) {
-	for (Variable * pvar : m_vecVariables) {
-		_ASSERT(pvar != NULL);
-		if ((!pvar->m_fHasExplicitFillValue) && (!pvar->IsOp())) {
-			NcVar * ncvar = NULL;
-			vecncDataFiles.FindContainingVariable(pvar->GetName(), &ncvar);
-			if (ncvar != NULL) {
-				NcAtt * attFillValue = ncvar->get_att("_FillValue");
-				if (attFillValue != NULL) {
-					pvar->m_fHasExplicitFillValue = true;
-					pvar->m_dFillValueFloat = attFillValue->as_float(0);
-				}
-			}
-		}
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 void VariableRegistry::AssignAuxiliaryIndicesRecursive(
 	Variable & var,
 	const std::vector<std::string> & vecArg
@@ -607,6 +586,26 @@ void VariableRegistry::AssignAuxiliaryIndicesRecursive(
 			AssignAuxiliaryIndicesRecursive(
 				Get(var.m_varArg[v]),
 				vecArg);
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void VariableRegistry::PopulateFillValues(
+	const NcFileVector & vecncDataFiles
+) {
+	for (Variable * pvar : m_vecVariables) {
+		if (!pvar->IsOp()) {
+			NcVar * ncvar = NULL;
+			vecncDataFiles.FindContainingVariable(pvar->GetName(), &ncvar);
+			if (ncvar != NULL) {
+				NcAtt * attFillValue = ncvar->get_att("_FillValue");
+				if (attFillValue != NULL) {
+					pvar->m_fHasExplicitFillValue = true;
+					pvar->m_dFillValueFloat = attFillValue->as_float(0);
+				}
+			}
 		}
 	}
 }
