@@ -519,6 +519,7 @@ public:
 		m_fHasExplicitFillValue(false),
 		m_dFillValueFloat(-std::numeric_limits<float>::max()),
 		m_fNoTimeInNcFile(false),
+		m_strSourceFilenames(),
 		m_timeStored(Time::CalendarUnknown)
 	{ }
 
@@ -693,6 +694,11 @@ public:
 	///		Flag indicating this Variable has no time index in NetCDF file.
 	///	</summary>
 	bool m_fNoTimeInNcFile;
+
+	///	<summary>
+	///		Filenames currently used for this Variable.
+	///	</summary>
+	std::string m_strSourceFilenames;
 
 	///	<summary>
 	///		Time currently stored in this Variable.

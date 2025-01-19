@@ -864,9 +864,6 @@ NcVar * Variable::GetNcVarFromNcFileVector(
 			ncfilevec.GetFilename(sPos).c_str());
 	}
 
-	// Get the current time
-	m_timeStored = ncfilevec.GetTime();
-
 	// Get the time index
 	long lTime;
 	if (!NcIsTimeDimension(var->get_dim(0))) {
@@ -969,23 +966,26 @@ void Variable::LoadGridData(
 	const NcFileVector & vecFiles,
 	const SimpleGrid & grid
 ) {
-
 	// Check if data already loaded
 	const Time & time = vecFiles.GetTime();
 	if (time.GetCalendarType() == Time::CalendarUnknown) {
 		_EXCEPTIONT("Invalid time specified");
 	}
-	if (time == m_timeStored) {
-		if (m_data.GetRows() != grid.GetSize()) {
-			_EXCEPTIONT("Logic error");
+
+	std::string strSourceFilenamesArg = vecFiles.GetConcatenatedFilenames();
+	if (strSourceFilenamesArg == m_strSourceFilenames) {
+		if (time == m_timeStored) {
+			if (m_data.GetRows() != grid.GetSize()) {
+				_EXCEPTIONT("Logic error");
+			}
+			return;
 		}
-		return;
-	}
-	if ((m_fNoTimeInNcFile) && (m_timeStored.GetCalendarType() != Time::CalendarUnknown)) {
-		if (m_data.GetRows() != grid.GetSize()) {
-			_EXCEPTIONT("Logic error");
+		if ((m_fNoTimeInNcFile) && (m_timeStored.GetCalendarType() != Time::CalendarUnknown)) {
+			if (m_data.GetRows() != grid.GetSize()) {
+				_EXCEPTIONT("Logic error");
+			}
+			return;
 		}
-		return;
 	}
 
 	//std::cout << "Loading " << ToString(varreg) << " " << lTime << std::endl;
@@ -996,7 +996,6 @@ void Variable::LoadGridData(
 
 	// Get the data directly from a variable
 	if (!m_fOp) {
-
 		// Get pointer to variable
 		NcVar * var = GetNcVarFromNcFileVector(vecFiles, grid);
 		if (var == NULL) {
@@ -1017,10 +1016,6 @@ void Variable::LoadGridData(
 
 		std::vector<long> nDataSize;
 		nDataSize.resize(nVarDims, 1);
-		//long nDataSize[7];
-		//for (int i = 0; i < 7; i++) {
-		//	nDataSize[i] = 1;
-		//}
 
 		// Rectilinear grid
 		if (grid.m_nGridDim.size() == 2) {
@@ -1087,8 +1082,6 @@ void Variable::LoadGridData(
 			}
 		}
 
-		return;
-
 	// Evaluate a data operator to get the contents of this variable
 	} else {
 		// Get the associated operator
@@ -1112,107 +1105,13 @@ void Variable::LoadGridData(
 
 		// Apply the DataOp
 		pop->Apply(grid, m_strArg, vecArgData, m_data);
-
-		// Store the time
-		m_timeStored = time;
 	}
-/*
-	// Evaluate the mean operator
-	} else if (m_strName == "_MEAN") {
-		if (m_varArg.size() != 2) {
-			_EXCEPTION1("_MEAN expects two arguments: %i given",
-				m_varArg.size());
-		}
 
-		// Obtain field and distance
-		Variable & varField = varreg.Get(m_varArg[0]);
-		Variable & varDist = varreg.Get(m_varArg[1]);
+	// Store the time
+	m_timeStored = time;
 
-		varField.LoadGridData(varreg, vecFiles, grid, lTime);
-
-		// Load distance (in degrees) and convert to radians
-		double dDist = atof(varDist.m_strName.c_str());
-
-		if ((dDist < 0.0) || (dDist > 360.0)) {
-			_EXCEPTION1("Distance argument in _MEAN out of range\n"
-				"Expected [0,360], found %1.3e", dDist);
-		}
-
-		// Calculate mean of field
-		m_data.Zero();
-
-		if (grid.m_vecConnectivity.size() != m_data.GetRows()) {
-			_EXCEPTIONT("Invalid grid connectivity array");
-		}
-
-		for (int i = 0; i < m_data.GetRows(); i++) {
-			std::set<int> setNodesVisited;
-			std::set<int> setNodesToVisit;
-			setNodesToVisit.insert(i);
-
-			double dLat0 = grid.m_dLat[i];
-			double dLon0 = grid.m_dLon[i];
-
-			while (setNodesToVisit.size() != 0) {
-
-				// Next node to explore
-				int j = *(setNodesToVisit.begin());
-
-				setNodesToVisit.erase(setNodesToVisit.begin());
-				setNodesVisited.insert(j);
-
-				// Update the mean
-				m_data[i] += varField.m_data[j];
-
-				// Find additional neighbors to explore
-				for (int k = 0; k < grid.m_vecConnectivity[j].size(); k++) {
-					int l = grid.m_vecConnectivity[j][k];
-
-					// Check if already visited
-					if (setNodesVisited.find(l) != setNodesVisited.end()) {
-						continue;
-					}
-
-					// Test that this node satisfies the distance criteria
-					double dLat1 = grid.m_dLat[l];
-					double dLon1 = grid.m_dLon[l];
-
-					double dR =
-						sin(dLat0) * sin(dLat1)
-						+ cos(dLat0) * cos(dLat1) * cos(dLon1 - dLon0);
-
-					if (dR >= 1.0) {
-						dR = 0.0;
-					} else if (dR <= -1.0) {
-						dR = 180.0;
-					} else {
-						dR = 180.0 / M_PI * acos(dR);
-					}
-					if (dR != dR) {
-						_EXCEPTIONT("NaN value detected");
-					}
-
-					if (dR > dDist) {
-						continue;
-					}
-
-					// Add node to visit
-					setNodesToVisit.insert(l);
-				}
-			}
-
-			// Average data to obtain mean
-			if (setNodesVisited.size() == 0) {
-				_EXCEPTIONT("Logic error");
-			}
-
-			m_data[i] /= static_cast<float>(setNodesVisited.size());
-		}
-
-	} else {
-		_EXCEPTION1("Unexpected operator \"%s\"", m_strName.c_str());
-	}
-*/
+	// Store the filenames
+	m_strSourceFilenames = strSourceFilenamesArg;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1221,6 +1120,7 @@ void Variable::UnloadGridData() {
 
 	// Force data to be loaded within this structure
 	m_timeStored = Time(Time::CalendarUnknown);
+	m_strSourceFilenames = "";
 }
 
 ///////////////////////////////////////////////////////////////////////////////
