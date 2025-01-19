@@ -387,6 +387,17 @@ void AutoCurator::IndexFiles(
 			varTime->set_cur((long)0);
 			varTime->get(&(vecTimeInt[0]), dimTime->size());
 
+		} else if (varTime->type() == ncInt64) {
+			DataArray1D<ncint64> vecTimeInt64;
+			vecTimeInt64.Allocate(dimTime->size());
+			varTime->set_cur((long)0);
+			varTime->get(&(vecTimeInt64[0]), dimTime->size());
+
+			vecTimeInt.Allocate(dimTime->size());
+			for (int t = 0; t < dimTime->size(); t++) {
+				vecTimeInt[t] = static_cast<int>(vecTimeInt64[t]);
+			}
+
 		} else if (varTime->type() == ncFloat) {
 			vecTimeFloat.Allocate(dimTime->size());
 			varTime->set_cur((long)0);
@@ -404,7 +415,7 @@ void AutoCurator::IndexFiles(
 
 		for (int t = 0; t < dimTime->size(); t++) {
 			Time time(pacd->m_eCalendarType);
-			if (varTime->type() == ncInt) {
+			if ((varTime->type() == ncInt) || (varTime->type() == ncInt64)) {
 				time.FromCFCompliantUnitsOffsetInt(
 					strCurrentNcTimeUnits,
 					vecTimeInt[t]);
