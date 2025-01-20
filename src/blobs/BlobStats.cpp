@@ -226,6 +226,9 @@ try {
 	// Output the full times rather than time indexes
 	bool fOutputFullTimes;
 
+	// Output times in ISO format
+	bool fOutputISOTimes;
+
 	// Time filter
 	std::string strTimeFilter;
 
@@ -261,6 +264,7 @@ try {
 		CommandLineBool(fOutputSeconds, "out_seconds");
 		CommandLineBool(fOutputHeaders, "out_headers");
 		CommandLineBool(fOutputFullTimes, "out_fulltime");
+		CommandLineBool(fOutputISOTimes, "out_isotime");
 		CommandLineString(strTimeFilter, "timefilter", "");
 		CommandLineString(strStartTime, "time_start", "");
 		CommandLineString(strEndTime, "time_end", "");
@@ -960,7 +964,11 @@ try {
 						fprintf(fpout, "\t0\t0");
 					} else {
 						if (fOutputFullTimes) {
-							fprintf(fpout, "%s", vecFileTimes[iterTimes->first - iFirstFileTime].ToShortString().c_str());
+							if (fOutputISOTimes) {
+								fprintf(fpout, "%s", vecFileTimes[iterTimes->first - iFirstFileTime].ToString().c_str());
+							} else {
+								fprintf(fpout, "%s", vecFileTimes[iterTimes->first - iFirstFileTime].ToShortString().c_str());
+							}
 						} else {
 							fprintf(fpout, "%i", iterTimes->first);
 						}
