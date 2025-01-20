@@ -7,8 +7,6 @@ src/depend/*
 
 *.nc
 
-*.txt
-
 *.o
 
 *.d
