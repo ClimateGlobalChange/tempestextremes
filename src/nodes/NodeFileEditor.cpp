@@ -1890,32 +1890,6 @@ try {
 	}
 #endif
 
-	// Parse --col_filter
-	std::vector<FilterOp> vecFilterOp;
-	if (strColumnFilter != "") {
-		AnnounceStartBlock("Parsing filter operations");
-
-		int iLast = 0;
-		for (int i = 0; i <= strColumnFilter.length(); i++) {
-
-			if ((i == strColumnFilter.length()) ||
-				(strColumnFilter[i] == ';') ||
-				(strColumnFilter[i] == ':')
-			) {
-				std::string strSubStr =
-					strColumnFilter.substr(iLast, i - iLast);
-			
-				int iNextOp = (int)(vecFilterOp.size());
-				vecFilterOp.resize(iNextOp + 1);
-				vecFilterOp[iNextOp].Parse(cdhInput, strSubStr);
-
-				iLast = i + 1;
-			}
-		}
-
-		AnnounceEndBlock("Done");
-	}
-
 	// Parse --calculate
 	ArgumentTree calc(true);
 	if (strCalculate != "") {
@@ -2034,6 +2008,9 @@ try {
 	// Vector of Path information
 	PathVector & pathvec = nodefile.GetPathVector();
 
+	// Column filters
+	std::vector<FilterOp> vecFilterOp;
+
 	// Loop over all files
 	for (int f = 0; f < vecInputNodeFiles.size(); f++) {
 
@@ -2088,6 +2065,31 @@ try {
 				}
 			}
 #endif
+		}
+
+		// Parse --col_filter (need to do it here since cdh information
+		// could be part of Read)
+		if ((f == 0) && (strColumnFilter != "")) {
+			AnnounceStartBlock("Parsing filter operations");
+
+			int iLast = 0;
+			for (int i = 0; i <= strColumnFilter.length(); i++) {
+
+				if ((i == strColumnFilter.length()) ||
+					(strColumnFilter[i] == ';') ||
+					(strColumnFilter[i] == ':')
+				) {
+					std::string strSubStr =
+						strColumnFilter.substr(iLast, i - iLast);
+			
+					int iNextOp = (int)(vecFilterOp.size());
+					vecFilterOp.resize(iNextOp + 1);
+					vecFilterOp[iNextOp].Parse(cdhInput, strSubStr);
+
+					iLast = i + 1;
+				}
+			}
+			AnnounceEndBlock("Done");
 		}
 
 		// Column filter the nodefile
