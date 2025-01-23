@@ -173,23 +173,44 @@ bool Face::Contains(
 ) const {
 	int nParity = 0;
 
-	// First check if the query point N0 is around pole area
-    
-
-
+	// First check if the query point N0 is around pole area. The following check base on the assumption that a face will not contains both ppole points
 	// Check if the query point is the pole point
 	if (std::abs(std::abs(n0.z) - 1.0) <= DOUBLE_EPS) {
 		int face_location = ClassifyFaceLocation(nodevec);
 
-		if (face_location * n0.z > 0 ) {
 
+		if (face_location * n0.z >= 0 ) {// Same hemisphere
+			
+			// Check it's intersection with plane [1,0,0]
+			// TODO: is the Parity test same for the south hemisphere and cross the equator?
+			for (size_t i1 = 0; i1 < edges.size(); i1++) {
+				size_t i2 = (i1 + 1) % edges.size();
+				
+				const Node & n1 = nodevec[(*this)[i1]];
+				const Node & n2 = nodevec[(*this)[i2]];
 
-		} else if (face_location * n0.z < 0 ) {
-			return false;// Different hemisphere
+				// Arcs that go from smaller y to larger y have positive parity.
+				// Arcs that go from larger y to smaller y have negative parity.
+				if (n1.y < n2.y) {
+					nParity++;
+
+				} else {
+					nParity--;
+				}
+
+			}
+
+			if (nParity > 0) {
+				return true;
+			} else {
+				return false;
+			}
+
 
 		} else {
-			// The face cross the equator
-		}
+			return false;// Different hemisphere
+
+		} 
 
 
 	}
@@ -237,7 +258,8 @@ bool Face::Contains(
 		// Under the rules of floating point arithmetic, dA should always be
 		// in the range [0,1].
 
-		//TODO: incoporate the relative error tolerance from the s2geometry
+		//TODO: Consider incoporate the relative error tolerance from the s2geometry
+		// https://github.com/google/s2geometry/blob/d36a49afd22a58be27163d3c835b1e86d312e322/src/s2/s2latlng_rect_bounder.cc#L159
 		Node nx;
 		if (n1.z < n2.z) {
 			double dA = (n0.z - n1.z) / (n2.z - n1.z);
