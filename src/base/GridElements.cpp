@@ -144,14 +144,20 @@ bool Face::Contains(
 		const Node & n1 = nodevec[(*this)[i1]];
 		const Node & n2 = nodevec[(*this)[i2]];
 
+		// TODO: Check if the face contains pole point
+
+		// TODO: Fix the logic here
 		// If both nodes are on the same size of n0.z then there will be no
 		// intersection with the plane z=n0.z. If nodes are on opposite sides
 		// of this plane then they must have an intersection.
+
+		int intersect_flag = 0; // The flag indicating that the edge is very likely to intersect the n0.z plane
 		if ((n1.z > n0.z) && (n2.z > n0.z)) {
 			continue;
-		}
-		if ((n1.z < n0.z) && (n2.z < n0.z)) {
+		}else if ((n1.z < n0.z) && (n2.z < n0.z)) {
 			continue;
+		} else {
+			intersect_flag = 1;
 		}
 
 		// Arcs of constant z aren't informative for determining inside/outside
@@ -163,6 +169,8 @@ bool Face::Contains(
 		// Branch here to ensure result is the same regardless of n1-n2 ordering
 		// Under the rules of floating point arithmetic, dA should always be
 		// in the range [0,1].
+
+		//TODO: incoporate the relative error tolerance from the s2geometry
 		Node nx;
 		if (n1.z < n2.z) {
 			double dA = (n0.z - n1.z) / (n2.z - n1.z);

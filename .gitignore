@@ -38,3 +38,4 @@ test/*.eps
 test/*.png
 
 test/statfigs/*
+/.idea
