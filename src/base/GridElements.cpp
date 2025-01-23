@@ -138,27 +138,87 @@ bool Face::Contains(
 ) const {
 	int nParity = 0;
 
+
+	// TODO: Check if the face contains pole point: Obtain the maximum and the minimum longnitude and check if their difference is larger than Pie
+    
+	// Initialize min and max longitude
+    double minLon = M_PI;  
+    double maxLon = -M_PI; 
+    bool containsPole = false; // Flag to check if the pole might be contained
+
+    // Iterate through edges to calculate min and max longitude
+    for (size_t i1 = 0; i1 < edges.size(); i1++) {
+        size_t i2 = (i1 + 1) % edges.size();
+        
+        const Node &n1 = nodevec[edges[i1]];
+        const Node &n2 = nodevec[edges[i2]];
+
+        // Calculate longitude for n1
+        double lon1 = atan2(n1.y, n1.x); // Longitude in the range [-π, π]
+        if (lon1 < 0.0) lon1 += 2 * M_PI; // Convert to [0, 2π]
+
+        // Calculate longitude for n2
+        double lon2 = atan2(n2.y, n2.x); // Longitude in the range [-π, π]
+        if (lon2 < 0.0) lon2 += 2 * M_PI; // Convert to [0, 2π]
+
+        // Update min and max longitude
+        minLon = std::min({minLon, lon1, lon2});
+        maxLon = std::max({maxLon, lon1, lon2});
+    }
+
+    // Calculate longitude range
+    double lonRange = maxLon - minLon;
+
+
+    if (lonRange >= M_PI) {
+        containsPole = true;
+
+		//Now a quick check about the query node location
+		// If the n0 is the pole point, and the face also contains the same pole point.
+		if (n0.z == 1 && nodevec[edges[0]][2] < 0.0) {
+			if (nodevec[edges[0]][2] < 0.0) {
+				return false;
+			} else {
+				return true;
+			}
+		} else if (n0.z == -1 && nodevec[edges[0]][2] > 0.0) {
+			if (nodevec[edges[0]][2] > 0.0) {
+				return false;
+			} else {
+				return true;
+			}
+		} 
+    } 
+
+
 	for (size_t i1 = 0; i1 < edges.size(); i1++) {
 		size_t i2 = (i1 + 1) % edges.size();
 		
 		const Node & n1 = nodevec[(*this)[i1]];
 		const Node & n2 = nodevec[(*this)[i2]];
 
-		// TODO: Check if the face contains pole point
 
-		// TODO: Fix the logic here
-		// If both nodes are on the same size of n0.z then there will be no
-		// intersection with the plane z=n0.z. If nodes are on opposite sides
-		// of this plane then they must have an intersection.
 
-		int intersect_flag = 0; // The flag indicating that the edge is very likely to intersect the n0.z plane
-		if ((n1.z > n0.z) && (n2.z > n0.z)) {
-			continue;
-		}else if ((n1.z < n0.z) && (n2.z < n0.z)) {
-			continue;
-		} else {
-			intersect_flag = 1;
-		}
+		// Removed the "quick check" that attempted to rule out cases based on both nodes 
+		// being on the same side of n0.z. This approach is not robust and cannot reliably rule out any scenarios.
+		// In the following, maxLat(n1, n2) refers to the actual maximum latitude along the Great Circle Arc (GCA)
+		// formed by n1 and n2, including cases where the arc "arches up."
+		
+		// 1. If n1.z > n0.z && n2.z > n0.z:
+		//    1.1 Even if both nodes are above the plane (n0.z),at least one intersection can still occur 
+		//        if maxLat(n1, n2) >= n0.z >= minLat(n1, n2). 
+		//
+		// 2. If n1.z > n0.z > n2.z:
+		//    2.1 If the GCA does not "arc up," there will be exactly one intersection.
+		//    2.2 If the GCA "arcs up," and maxLat(n1, n2) occurs due to this arc, then maxLat(n1, n2) > n0.z > n2.z > n1.z.
+		//        In this case, there will be two intersection points.
+
+		// Conclusion:
+		// The original statement:
+		// "If both nodes are on the same side of n0.z, then there will be no intersection 
+		// with the plane z = n0.z. If nodes are on opposite sides, they must have an intersection."
+		// is incorrect and cannot reliably rule out any cases.
+
 
 		// Arcs of constant z aren't informative for determining inside/outside
 		if (n1.z == n2.z) {

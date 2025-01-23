@@ -39,3 +39,4 @@ test/*.png
 
 test/statfigs/*
 /.idea
+.vscode/settings.json
