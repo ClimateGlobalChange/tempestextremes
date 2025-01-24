@@ -283,7 +283,10 @@ bool Face::Contains(
 
 		if (da < 0.0) {
 			continue;
-		}
+		} 
+
+		// TODO: Break the arc n1 and n2 at nx such that it's mono-tone, 
+		// because even though n1.z < n2.z, it might have two intersection points as I mentioned above
 
 		// Arcs that go from smaller z to larger z have positive parity.
 		// Arcs that go from larger z to smaller z have negative parity.
