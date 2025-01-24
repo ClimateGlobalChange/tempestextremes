@@ -36,3 +36,5 @@ test/*.eps
 test/*.png
 
 test/statfigs/*
+
+.vscode/

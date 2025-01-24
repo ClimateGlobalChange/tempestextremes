@@ -18,7 +18,6 @@
 #include "Exception.h"
 
 #include <iostream>
-#include <sys/time.h>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -39,14 +38,14 @@ FunctionTimer::FunctionTimer(const char *szGroup) {
 	}
 
 	// Assign start time
-	gettimeofday(&m_tvStartTime, NULL);
+	m_tvStartTime = std::chrono::system_clock::now();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void FunctionTimer::Reset() {
 	m_fStopped = false;
-	gettimeofday(&m_tvStartTime, NULL);
+	m_tvStartTime = std::chrono::system_clock::now();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -54,12 +53,13 @@ void FunctionTimer::Reset() {
 unsigned long long FunctionTimer::Time(bool fDone) {
 
 	if (!m_fStopped) {
-		gettimeofday(&m_tvStopTime, NULL);
+		m_tvStopTime = std::chrono::system_clock::now();
 	}
 
-	unsigned long long iTime =
-	    MICROSECONDS_PER_SECOND * (m_tvStopTime.tv_sec - m_tvStartTime.tv_sec)
-	    + (m_tvStopTime.tv_usec - m_tvStartTime.tv_usec);
+  unsigned long long iTime =
+      std::chrono::duration_cast<std::chrono::microseconds>(m_tvStopTime -
+                                                            m_tvStartTime)
+          .count();
 
 	// If no name associated with this timer, ignore fDone.
 	if (m_strGroup == "") {

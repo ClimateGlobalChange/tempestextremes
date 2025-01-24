@@ -15,7 +15,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/CMake ${CMAKE_MODULE_PATH})
 option(CMAKE_BUILD_TYPE "Build type" Release)
 option(ENABLE_MPI "Enable MPI" ON)
 
-include(ExternalProject)
+if(WIN32)
+  add_compile_definitions(_USE_MATH_DEFINES 1)
+endif()
 
 if(ENABLE_MPI)
   find_package(MPI)

@@ -21,13 +21,13 @@
 
 #include <string>
 #include <map>
-#include <sys/time.h>
+#include <chrono>
 
 ///////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
 ///		FunctionTimer is a class used for timing operations or groups of
-///		operations.  Timing is provided via the Unix gettimeofday class
+///		operations.  Timing is provided via the std::chrono library
 ///		and is calculated in microseconds.
 ///	</summary>
 class FunctionTimer {
@@ -130,12 +130,12 @@ private:
 	///	<summary>
 	///		Time at which this timer was constructed.
 	///	</summary
-	timeval m_tvStartTime;
+	std::chrono::time_point<std::chrono::system_clock> m_tvStartTime;
 
 	///	<summary>
 	///		Time at which this timer was stopped.
 	///	</summary
-	timeval m_tvStopTime;
+	std::chrono::time_point<std::chrono::system_clock> m_tvStopTime;
 
 	///	<summary>
 	///		Group name associated with this timer.
