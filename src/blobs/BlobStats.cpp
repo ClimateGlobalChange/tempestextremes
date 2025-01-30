@@ -960,7 +960,7 @@ try {
 						fprintf(fpout, "\t0\t0");
 					} else {
 						if (fOutputFullTimes) {
-							fprintf(fpout, "%s", vecFileTimes[iterTimes->first - iFirstFileTime].ToShortString().c_str());
+							fprintf(fpout, "\"%s\"", vecFileTimes[iterTimes->first - iFirstFileTime].ToString().c_str());
 						} else {
 							fprintf(fpout, "%i", iterTimes->first);
 						}
