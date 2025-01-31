@@ -23,110 +23,11 @@
 #include "SimpleGrid.h"
 #include "DataOp.h"
 #include "NcFileVector.h"
+#include "NetCDFUtilities.h"
 
 #include <vector>
 #include <string>
 #include <limits>
-
-///////////////////////////////////////////////////////////////////////////////
-
-///	<summary>
-///		An object holding dimension indices for a given Variable.
-///	</summary>
-typedef std::vector<long> VariableDimIndex;
-
-///	<summary>
-///		An object holding auxiliary indices for a given Variable.
-///	</summary>
-typedef VariableDimIndex VariableAuxIndex;
-
-///	<summary>
-///		A structure containing both a dimension name and size.
-///	</summary>
-class DimInfo {
-public:
-	///	<summary>
-	///		Default constructor.
-	///	</summary>
-	DimInfo() : name(), size(0) { }
-
-	///	<summary>
-	///		Constructor.
-	///	</summary>
-	DimInfo(
-		const std::string & _name,
-		long _size
-	) :
-		name(_name),
-		size(_size)
-	{ }
-
-	///	<summary>
-	///		Comparator (needed to have sets of DimInfo).
-	///	</summary>
-	bool operator< (const DimInfo & di) const {
-		if (name < di.name) {
-			return true;
-		}
-		if (size < di.size) {
-			return true;
-		}
-		return false;
-	}
-
-	///	<summary>
-	///		Equality comparator.
-	///	</summary>
-	bool operator== (const DimInfo & di) const {
-		if ((name == di.name) && (size == di.size)) {
-			return true;
-		}
-		return false;
-	}
-
-public:
-	///	<summary>
-	///		Dimension name.
-	///	</summary>
-	std::string name;
-
-	///	<summary>
-	///		Dimension size.
-	///	</summary>
-	long size;
-};
-
-///	<summary>
-///		A vector of DimInfo.
-///	</summary>
-class DimInfoVector : public std::vector<DimInfo> {
-
-public:
-	///	<summary>
-	///		Get the total size of this DimInfoVector.
-	///	</summary>
-	size_t GetTotalSize() const {
-		size_t sTotalSize = 1;
-		for (size_t i = 0; i < size(); i++) {
-			sTotalSize *= static_cast<size_t>((*this)[i].size);
-		}
-		return sTotalSize;
-	}
-
-	///	<summary>
-	///		Convert this to a string.
-	///	</summary>
-	std::string ToString() const {
-		std::string str;
-		for (size_t d = 0; d < size(); d++) {
-			str += "[" + (*this)[d].name + "," + std::to_string((*this)[d].size) + "]";
-		}
-		if (str.length() == 0) {
-			str = "[]";
-		}
-		return str;
-	}
-};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -492,6 +393,13 @@ public:
 		DimInfoVector & vecAuxDimInfo
 	) const;
 
+	///	<summary>
+	///		Get _FillValue information for all variables.
+	///	</summary>
+	void PopulateFillValues(
+		const NcFileVector & vecncDataFiles
+	);
+
 private:
 	///	<summary>
 	///		Recursively assign auxiliary indices to Variables.
@@ -608,8 +516,10 @@ public:
 	Variable() :
 		m_strName(),
 		m_fOp(false),
+		m_fHasExplicitFillValue(false),
 		m_dFillValueFloat(-std::numeric_limits<float>::max()),
 		m_fNoTimeInNcFile(false),
+		m_strSourceFilenames(),
 		m_timeStored(Time::CalendarUnknown)
 	{ }
 
@@ -653,6 +563,13 @@ public:
 	///	</summary>
 	const VariableIndexVector & GetArgumentVarIxs() const {
 		return m_varArg;
+	}
+
+	///	<summary>
+	///		Returns true if this Variable has an explicit _FillValue.
+	///	</summary>
+	bool HasExplicitFillValue() const {
+		return m_fHasExplicitFillValue;
 	}
 
 	///	<summary>
@@ -735,6 +652,11 @@ protected:
 	VariableIndexVector m_varArg;
 
 	///	<summary>
+	///		Variable has an explicit _FillValue.
+	///	</summary>
+	bool m_fHasExplicitFillValue;
+
+	///	<summary>
 	///		_FillValue for this Variable.
 	///	</summary>
 	float m_dFillValueFloat;
@@ -772,6 +694,11 @@ public:
 	///		Flag indicating this Variable has no time index in NetCDF file.
 	///	</summary>
 	bool m_fNoTimeInNcFile;
+
+	///	<summary>
+	///		Filenames currently used for this Variable.
+	///	</summary>
+	std::string m_strSourceFilenames;
 
 	///	<summary>
 	///		Time currently stored in this Variable.

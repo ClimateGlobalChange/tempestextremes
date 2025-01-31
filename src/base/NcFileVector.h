@@ -133,6 +133,11 @@ public:
 	}
 
 	///	<summary>
+	///		Get the concatenated list of filenames.
+	///	</summary>
+	std::string GetConcatenatedFilenames() const;
+
+	///	<summary>
 	///		Get the FileType at the specified position.
 	///	</summary>
 	const FileType & GetFileType(size_t pos) const {

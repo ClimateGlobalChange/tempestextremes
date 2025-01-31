@@ -321,7 +321,7 @@ public:
 void CalculateOrientation(
 	const DataArray1D<double> & dLonRad,
 	const DataArray1D<double> & dLatRad,
-	const DataArray2D<int> & dVarDatatag,
+	const DataArray2D<float> & dVarDatatag,
 	const std::set< std::pair<int,int> > & setSpinePoints,
 	int nSpineOrientationDist,
 	DataArray1D<double> & dSpineOrientation
@@ -809,7 +809,7 @@ void SpineARs(
 	}
 
 	// Tagged cell array
-	DataArray2D<int> dVarDatatag(dimLat->size(), dimLon->size());
+	DataArray2D<float> dVarDatatag(dimLat->size(), dimLon->size());
 
 	NcVar * varIWVtag = NULL;
 	if (dimTimeOut != NULL) {
@@ -1302,7 +1302,7 @@ void SpineARs(
 					CalculateCrossSection(
 						dLonRad,
 						dLatRad,
-						dVarData,
+						dVarDatatag,
 						setSpinePoints,
 						dSpineOrientation,
 						param.nSpineCrossSectionPoints,

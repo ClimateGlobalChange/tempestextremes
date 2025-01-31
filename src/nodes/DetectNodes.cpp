@@ -195,6 +195,7 @@ public:
 		dMaxLongitude(0.0),
 		dMinLongitude(0.0),
 		dMergeDist(0.0),
+		fMergeEqual(false),
 		pvecClosedContourOp(NULL),
 		pvecNoClosedContourOp(NULL),
 		pvecOutputOp(NULL),
@@ -243,6 +244,9 @@ public:
 
 	// Merge distance
 	double dMergeDist;
+
+	// Merge candidates with equal values
+	bool fMergeEqual;
 
 	// Vector of closed contour operators
 	std::vector<ClosedContourOp> * pvecClosedContourOp;
@@ -631,6 +635,13 @@ void DetectCyclonesUnstructured(
 							}
 						}
 
+						if (param.fMergeEqual && (static_cast<double>(dataSearch[*ppr]) == dValue)) {
+							if (setNewCandidates.find(*ppr) != setNewCandidates.end()) {
+								fExtrema = false;
+								break;
+							}
+						}
+
 						int iHasMore = kd_res_next(kdresMerge);
 						if (!iHasMore) {
 							break;
@@ -931,6 +942,7 @@ try {
 		CommandLineDoubleD(dcuparam.dMaxLatitude, "maxlat", 0.0, "(degrees)");
 		CommandLineDoubleD(dcuparam.dMinAbsLatitude, "minabslat", 0.0, "(degrees)");
 		CommandLineDoubleD(dcuparam.dMergeDist, "mergedist", 0.0, "(degrees)");
+		CommandLineBool(dcuparam.fMergeEqual, "mergeequal");
 		CommandLineStringD(strClosedContourCmd, "closedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
 		CommandLineStringD(strNoClosedContourCmd, "noclosedcontourcmd", "", "[var,delta,dist,minmaxdist;...]");
 		CommandLineStringD(strThresholdCmd, "thresholdcmd", "", "[var,op,value,dist;...]");

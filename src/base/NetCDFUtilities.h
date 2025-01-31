@@ -23,6 +23,106 @@
 #include <string>
 #include <vector>
 
+///////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		An object holding dimension indices for a given Variable.
+///	</summary>
+typedef std::vector<long> VariableDimIndex;
+
+///	<summary>
+///		An object holding auxiliary indices for a given Variable.
+///	</summary>
+typedef VariableDimIndex VariableAuxIndex;
+
+///	<summary>
+///		A structure containing both a dimension name and size.
+///	</summary>
+class DimInfo {
+public:
+	///	<summary>
+	///		Default constructor.
+	///	</summary>
+	DimInfo() : name(), size(0) { }
+
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DimInfo(
+		const std::string & _name,
+		long _size
+	) :
+		name(_name),
+		size(_size)
+	{ }
+
+	///	<summary>
+	///		Comparator (needed to have sets of DimInfo).
+	///	</summary>
+	bool operator< (const DimInfo & di) const {
+		if (name < di.name) {
+			return true;
+		}
+		if (size < di.size) {
+			return true;
+		}
+		return false;
+	}
+
+	///	<summary>
+	///		Equality comparator.
+	///	</summary>
+	bool operator== (const DimInfo & di) const {
+		if ((name == di.name) && (size == di.size)) {
+			return true;
+		}
+		return false;
+	}
+
+public:
+	///	<summary>
+	///		Dimension name.
+	///	</summary>
+	std::string name;
+
+	///	<summary>
+	///		Dimension size.
+	///	</summary>
+	long size;
+};
+
+///	<summary>
+///		A vector of DimInfo.
+///	</summary>
+class DimInfoVector : public std::vector<DimInfo> {
+
+public:
+	///	<summary>
+	///		Get the total size of this DimInfoVector.
+	///	</summary>
+	size_t GetTotalSize() const {
+		size_t sTotalSize = 1;
+		for (size_t i = 0; i < size(); i++) {
+			sTotalSize *= static_cast<size_t>((*this)[i].size);
+		}
+		return sTotalSize;
+	}
+
+	///	<summary>
+	///		Convert this to a string.
+	///	</summary>
+	std::string ToString() const {
+		std::string str;
+		for (size_t d = 0; d < size(); d++) {
+			str += "[" + (*this)[d].name + "," + std::to_string((*this)[d].size) + "]";
+		}
+		if (str.length() == 0) {
+			str = "[]";
+		}
+		return str;
+	}
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 
 class NcTimeDimension : public std::vector<Time> {
@@ -189,7 +289,7 @@ void CopyNcVar(
 ////////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
-///		Copy a NetCDF varaible from one file to another if it exists.
+///		Copy a NetCDF variable from one file to another if it exists.
 ///	</summary>
 void CopyNcVarIfExists(
 	NcFile & ncIn,

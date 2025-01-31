@@ -118,6 +118,8 @@ bool ArgumentTree::Parse(
 
 	// Parse delimeters
 	bool fHasSubArguments = false;
+	bool fNewTerm = true;
+	int nVariableOpParenthesesLevel = (-1);
 
 	for (size_t i = 0; i <= str.length(); i++) {
 
@@ -129,8 +131,17 @@ bool ArgumentTree::Parse(
 			break;
 		}
 
+		// Variable op
+		if (fNewTerm && (str[i] == '_')) {
+			nVariableOpParenthesesLevel = 0;
+			fNewTerm = false;
+			continue;
+		}
+
 		// Comma separator
-		if (str[i] == ',') {
+		if ((str[i] == ',') && (nVariableOpParenthesesLevel <= 0)) {
+			nVariableOpParenthesesLevel = (-1);
+			fNewTerm = true;
 			SubParse(str.substr(iLast,i-iLast), '\0');
 			iLast = i+1;
 			continue;
@@ -140,6 +151,7 @@ bool ArgumentTree::Parse(
 		if (str[i] == '=') {
 			if (m_szListType != '(') {
 				SubParse(str.substr(iLast,i-iLast), '\0');
+				fNewTerm = true;
 				m_strArgumentList.push_back("=");
 				m_vecSubArguments.push_back(NULL);
 				iLast = i+1;
@@ -163,6 +175,11 @@ bool ArgumentTree::Parse(
 
 		// Open parentheses
 		if (str[i] == '(') {
+			if (nVariableOpParenthesesLevel != (-1)) {
+				nVariableOpParenthesesLevel++;
+				continue;
+			}
+
 			SubParse(str.substr(iLast,i-iLast), '\0');
 			iLast = i+1;
 
@@ -190,8 +207,12 @@ bool ArgumentTree::Parse(
 
 		// Close parentheses (unbalanced)
 		if (str[i] == ')') {
-			_EXCEPTION1("Input string \"%s\" contains unbalanced parentheses \')\'",
-				str.c_str());
+			if (nVariableOpParenthesesLevel >= 1) {
+				nVariableOpParenthesesLevel--;
+			} else {
+				_EXCEPTION1("Input string \"%s\" contains unbalanced parentheses \')\'",
+					str.c_str());
+			}
 		}
 
 		// Semi-colon (not allowed)
@@ -199,6 +220,8 @@ bool ArgumentTree::Parse(
 			_EXCEPTION1("Input string \"%s\" contains semi-colons",
 				str.c_str());
 		}
+
+		fNewTerm = false;
 	}
 
 	return (m_strArgumentList.size() > 1);

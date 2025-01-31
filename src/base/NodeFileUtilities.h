@@ -323,6 +323,83 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+class ColumnData1DArray : public ColumnData {
+public:
+	///	<summary>
+	///		Express this column data as a string.
+	///	</summary>
+	virtual std::string ToString() const {
+		char buf[100];
+		std::string strOut = "\"[";
+		for (int i = 0; i < m_dValues.size(); i++) {
+			if (i != 0) {
+				strOut += ",";
+			}
+			snprintf(buf, 100, "%3.6e", m_dValues[i]);
+			strOut += buf;
+		}
+		strOut += "]\"";
+		return strOut;
+	}
+
+	///	<summary>
+	///		Return a duplicate of this ColumnData.
+	///	</summary>
+	virtual ColumnData * Duplicate() const {
+		return new ColumnData1DArray(*this);
+	}
+
+public:
+	///	<summary>
+	///		Vector of vectors.
+	///	</summary>
+	std::vector<double> m_dValues;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class ColumnData2DArray : public ColumnData {
+public:
+	///	<summary>
+	///		Express this column data as a string.
+	///	</summary>
+	virtual std::string ToString() const {
+		char buf[100];
+		std::string strOut = "\"[";
+		for (int i = 0; i < m_dValues.size(); i++) {
+			if (i != 0) {
+				strOut += ",";
+			}
+			strOut += "[";
+			for (int j = 0; j < m_dValues[i].size(); j++) {
+				if (j != 0) {
+					strOut += ",";
+				}
+				snprintf(buf, 100, "%3.6e", m_dValues[i][j]);
+				strOut += buf;
+			}
+			strOut += "]";
+		}
+		strOut += "]\"";
+		return strOut;
+	}
+
+	///	<summary>
+	///		Return a duplicate of this ColumnData.
+	///	</summary>
+	virtual ColumnData * Duplicate() const {
+		return new ColumnData2DArray(*this);
+	}
+
+public:
+	///	<summary>
+	///		Vector of vectors.
+	///	</summary>
+	std::vector< std::vector<double> > m_dValues;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 class ColumnDataRadialProfile : public ColumnDataDoubleArrayTemplate {
 
 public:

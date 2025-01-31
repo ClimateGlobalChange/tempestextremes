@@ -167,6 +167,19 @@ size_t NcFileVector::FindContainingVariable(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+std::string NcFileVector::GetConcatenatedFilenames() const {
+	std::string strConcatFilenames;
+	for (size_t s = 0; s < m_vecFilenames.size(); s++) {
+		strConcatFilenames += m_vecFilenames[s];
+		if (s != m_vecFilenames.size()-1) {
+			strConcatFilenames += ";";
+		}
+	}
+	return strConcatFilenames;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 long NcFileVector::GetTimeIx(size_t pos) const {
 	_ASSERT(pos < m_vecTimeIxs.size());
 

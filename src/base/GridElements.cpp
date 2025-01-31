@@ -191,25 +191,17 @@ bool Face::Contains(
 		// Arcs that go from smaller z to larger z have positive parity.
 		// Arcs that go from larger z to smaller z have negative parity.
 		if (n1.z < n2.z) {
-			if ((n1.z == n0.z) || (n2.z == n0.z)) {
-				nParity++;
-			} else {
-				nParity += 2;
-			}
+			nParity++;
 
 		} else {
-			if ((n1.z == n0.z) || (n2.z == n0.z)) {
-				nParity--;
-			} else {
-				nParity -= 2;
-			}
+			nParity--;
 		}
 	}
 
-	if (nParity >= 0) {
-		return false;
+	if (nParity > 0) {
+		return true;
 	}
-	return true;
+	return false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -21,7 +21,6 @@ EXEC_FILES= GenerateNearestNeighborMap.cpp \
             Climatology.cpp \
             FourierFilter.cpp \
             VariableProcessor.cpp \
-            CompressBlobs.cpp \
             IntegrateDimension.cpp \
             LagrangianParcelTracker.cpp \
             QuantileCalculator.cpp \
