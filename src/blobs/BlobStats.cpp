@@ -545,7 +545,7 @@ try {
 
 		// Parse --time_start and --time_end
 		if ((f == 0) && ((strStartTime != "") || (strEndTime != ""))) {
-			NcVar * varInTime = vecInFiles[0]->get_var("time");
+			NcVar * varInTime = NcGetTimeVariable(*(vecInFiles[0]));
 			if (varInTime == NULL) {
 				_EXCEPTION1("File \"%s\" does not contain variable \"time\"",
 					vecInFiles.GetFilename(0).c_str());

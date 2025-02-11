@@ -329,7 +329,7 @@ try {
 		_ASSERT(vecFiles.size() > 0);
 
 		// Get time information
-		bool fFileHasTime = (vecFiles[0]->get_var("time") != NULL);
+		bool fFileHasTime = (NcGetTimeVariable(*(vecFiles[0])) != NULL);
 		NcTimeDimension vecTimes;
 		if (fFileHasTime) {
 			ReadCFTimeDataFromNcFile(
@@ -378,7 +378,7 @@ try {
 				vecOutputFileList[f],
 				vecOutputTimes);
 
-			dimTime = ncout.get_dim("time");
+			dimTime = NcGetTimeDimension(ncout);
 			_ASSERT(dimTime != NULL);
 		}
 
