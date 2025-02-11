@@ -639,7 +639,7 @@ void Climatology(
 			_ASSERT(dim0 != NULL);
 
 			std::string strDimTimeName = dim0->name();
-			if (NcIsTimeDimension(dim0)) {
+			if (!NcIsTimeDimension(dim0)) {
 				_EXCEPTION2("File \"%s\" variable \"%s\" must have leftmost dimension \"time\"",
 					vecInputFileList[0].c_str(),
 					vecVariableNames[v].c_str());

@@ -257,7 +257,7 @@ try {
 				_EXCEPTION2("Unable to open variable \"%s\" in file \"%s\"",
 					vecVariableStrings[v].c_str(), vecInputFiles[f].c_str());
 			}
-			if ((var->num_dims() == 0) || NcIsTimeDimension(var->get_dim(0))) {
+			if ((var->num_dims() == 0) || !NcIsTimeDimension(var->get_dim(0))) {
 				_EXCEPTION2("First dimension of variable \"%s\" in file \"%s\" must be \"time\"",
 					vecVariableStrings[v].c_str(), vecInputFiles[f].c_str());
 			}
