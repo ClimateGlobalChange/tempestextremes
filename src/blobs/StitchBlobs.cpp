@@ -441,8 +441,8 @@ class TagCollectiveOP {
 
 			if (rank == 0) {
 				// For Tags
-				int arrayScatterCounts[size];
-				int arrayScatterDisplacements[size];
+				std::vector<int> arrayScatterCounts(size);
+				std::vector<int> arrayScatterDisplacements(size);
 				_ASSERT(vecScatterCounts.size() > 1);
 				arrayScatterCounts[0] = vecScatterCounts[0];
 				arrayScatterDisplacements[0] = 0;		
@@ -452,8 +452,8 @@ class TagCollectiveOP {
 				}
 
 				// For Tags Index
-				int arrayScatterCounts_index[size];
-				int arrayScatterDisplacements_index[size];
+				std::vector<int> arrayScatterCounts_index(size);
+				std::vector<int> arrayScatterDisplacements_index(size);
 				_ASSERT(vecScatterCounts_index.size() > 1);
 				arrayScatterCounts_index[0] = vecScatterCounts_index[0];
 				arrayScatterDisplacements_index[0] = 0;		
@@ -467,14 +467,14 @@ class TagCollectiveOP {
 				auto scatterBuffer = this->serialVecAllBlobTags;
 				this->serialVecAllBlobTags.clear();
 				this->serialVecAllBlobTags.resize(arrayScatterCounts[rank]);
-				MPI_Scatterv(scatterBuffer.data(), arrayScatterCounts, arrayScatterDisplacements, MPI_Tag_type, 
+				MPI_Scatterv(scatterBuffer.data(), arrayScatterCounts.data(), arrayScatterDisplacements.data(), MPI_Tag_type, 
 							serialVecAllBlobTags.data(), arrayScatterCounts[rank], MPI_Tag_type, 0, m_comm);
 
 				// For index
 				auto scatterBuffer_index = this->serialVecAllBlobTags_index;
 				this->serialVecAllBlobTags_index.clear();
 				this->serialVecAllBlobTags_index.resize(arrayScatterCounts_index[rank]);
-				MPI_Scatterv(scatterBuffer_index.data(), arrayScatterCounts_index, arrayScatterDisplacements_index, 
+				MPI_Scatterv(scatterBuffer_index.data(), arrayScatterCounts_index.data(), arrayScatterDisplacements_index.data(), 
 							MPI_INT, serialVecAllBlobTags_index.data(), arrayScatterCounts_index[rank], MPI_INT, 0, m_comm);
 	
 			} else {

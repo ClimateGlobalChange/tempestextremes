@@ -44,6 +44,50 @@ Parallel compilation with MPI is enabled by default.  To compile TempestExtremes
 
 Note:  If the build fails or is cancelled part way through the process, it may be necessary to remove extraneous dependency files.  To do so run "remove_depend.sh" prior to recompiling.
 
+Installation via CMake
+=====================
+Using CMake, one can easily install TempestExtremes on different operational systems with the required compiler and dependencies. Dependencies can be downloaded and installed manually or via package management software (e.g., [Conda](https://docs.conda.io)) and specify environment variables to help CMake locate those dependencies (see CMake/FindNetCDF.cmake and [CMake help](https://cmake.org/cmake/help/latest/module/FindMPI.html)).
+
+## Unix/Linux-Based Systems
+Use the following commands to compile on Unix- or Linux-based systems ([netCDF](https://downloads.unidata.ucar.edu/netcdf/) required):
+```
+cd TEMPEST_EXTREMES_SOURCE_DIR
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=[Release/Debug] -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL -DNetCDF_PATH=NETCDF_ROOT -DCMAKE_PREFIX_PATH=MPI_ROOT ..
+make && make install
+```
+
+## Windows (Experimental)
+Follow these steps to compile on the Windows system ([Visual Studio](https://visualstudio.microsoft.com) and [CMake](https://cmake.org/download/) required):
+1. Download and install [netCDF](https://downloads.unidata.ucar.edu/netcdf/)(required) and [Microsoft MPI](https://learn.microsoft.com/en-us/message-passing-interface/microsoft-mpi)(optional but recommended).
+2. Use the following PowerShell commands to generate a Visual Studio project.
+```
+$Env:MSMPI_LIB64="MSMPI_SDK_ROOT/Lib/x64"
+$Env:MSMPI_INC="MSMPI_SDK_ROOT/Include"
+cd TEMPEST_EXTREMES_SOURCE_DIR
+mkdir build
+cd build
+cmake -G "Visual Studio 17" -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL ..
+```
+3. Build the [Visual Studio project](https://learn.microsoft.com/en-us/visualstudio/ide/building-and-cleaning-projects-and-solutions-in-visual-studio).
+
+## HPC Systems
+### NCAR Derecho
+Use the following commands to compile on [Derecho](https://ncar-hpc-docs.readthedocs.io/en/latest/compute-systems/derecho/compiling-code-on-derecho/):
+```
+module load ncarenv/23.09
+module load ncarcompilers/1.0.0
+module load intel/2023.2.1
+module load cray-mpich/8.1.27
+module load netcdf/4.9.2
+cd TEMPEST_EXTREMES_SOURCE_DIR
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=[Release/Debug] -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL ..
+make && make install
+```
+
 Usage
 =====
 Details of the various executables that are part of TempestExtremes can be found in the user guide:

@@ -7,8 +7,6 @@ src/depend/*
 
 *.nc
 
-*.txt
-
 *.o
 
 *.d
@@ -38,3 +36,5 @@ test/*.eps
 test/*.png
 
 test/statfigs/*
+
+.vscode/

@@ -108,7 +108,7 @@ try {
 
 		CommandLineString(strLongitudeName, "lonname", "lon");
 		CommandLineString(strLatitudeName, "latname", "lat");
-		CommandLineString(strLogDir, "logdir", "./");
+		CommandLineString(strLogDir, "logdir", ".");
 
 		ParseCommandLine(argc, argv);
 	EndCommandLine(argv)
@@ -308,7 +308,7 @@ try {
 			char szFileIndex[32];
 			snprintf(szFileIndex, 32, "%06lu", f);
 
-			std::string strLogFile = strLogDir + std::string("log") + szFileIndex + ".txt";
+			std::string strLogFile = strLogDir + std::string("/log") + szFileIndex + ".txt";
 
 			fpLog = fopen(strLogFile.c_str(), "w");
 			if (fpLog == NULL) {
