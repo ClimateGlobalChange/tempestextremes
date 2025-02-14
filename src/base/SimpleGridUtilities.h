@@ -27,13 +27,13 @@
 ///	<summary>
 ///		Find the minimum/maximum value of a field near the given point.
 ///	</summary>
-///	<param name="dMaxDist">
+///	<param name="dMaxDistDeg">
 ///		Maximum distance from the initial point in degrees.
 ///	</param>
 ///	<param name="ixExtremum">
 ///		Output node index at which the extremum occurs.
 ///	</param>
-///	<param name="dMaxValue">
+///	<param name="dExtremumValue">
 ///		Output value of the field taken at the extremum point.
 ///	</param>
 ///	<param name="dRMax">
@@ -46,10 +46,10 @@ void FindLocalMinMax(
 	bool fMinimum,
 	const DataArray1D<real> & data,
 	int ix0,
-	double dMaxDist,
+	double dMaxDistDeg,
 	int & ixExtremum,
-	real & dMaxValue,
-	float & dRMax
+	real & dExtremumValue,
+	float & dRMaxDeg
 );
 
 ///	<summary>
@@ -109,7 +109,7 @@ void FindLocalAverage(
 	const SimpleGrid & grid,
 	const DataArray1D<real> & data,
 	int ix0,
-	double dMaxDist,
+	double dMaxDistDeg,
 	real & dAverage
 );
 

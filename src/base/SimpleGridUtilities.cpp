@@ -28,14 +28,14 @@ void FindLocalMinMax(
 	bool fMinimum,
 	const DataArray1D<real> & data,
 	int ix0,
-	double dMaxDist,
+	double dMaxDistDeg,
 	int & ixExtremum,
-	real & dMaxValue,
-	float & dRMax
+	real & dExtremumValue,
+	float & dRMaxDeg
 ) {
 	// Verify that dMaxDist is less than 180.0
-	if (dMaxDist > 180.0) {
-		_EXCEPTIONT("MaxDist must be less than 180.0");
+	if (dMaxDistDeg > 180.0) {
+		_EXCEPTIONT("MaxDistDeg must be less than 180.0");
 	}
 	if ((ix0 < 0) || (ix0 >= data.GetRows())) {
 		_EXCEPTION2("Grid index (%i) out of range (%lu)", ix0, data.GetRows());
@@ -43,8 +43,11 @@ void FindLocalMinMax(
 
 	// Initialize the maximum to the central location
 	ixExtremum = ix0;
-	dMaxValue = data[ix0];
-	dRMax = 0.0;
+	dExtremumValue = data[ix0];
+	dRMaxDeg = 0.0;
+
+	// Check if current value is FillValue
+	bool fExtremumValueIsFillValue = data.IsFillValueAtIx(ix0);
 
 	// Queue of nodes that remain to be visited
 	std::queue<int> queueNodes;
@@ -54,8 +57,8 @@ void FindLocalMinMax(
 	std::set<int> setNodesVisited;
 
 	// Latitude and longitude at the origin
-	double dLat0 = grid.m_dLat[ix0];
-	double dLon0 = grid.m_dLon[ix0];
+	double dLatRad0 = grid.m_dLat[ix0];
+	double dLonRad0 = grid.m_dLon[ix0];
 
 	// Loop through all latlon elements
 	while (queueNodes.size() != 0) {
@@ -73,42 +76,33 @@ void FindLocalMinMax(
 
 		setNodesVisited.insert(ix);
 
-		double dLatThis = grid.m_dLat[ix];
-		double dLonThis = grid.m_dLon[ix];
+		double dLatRadThis = grid.m_dLat[ix];
+		double dLonRadThis = grid.m_dLon[ix];
 
-		// Great circle distance to this element
-		double dR =
-			sin(dLat0) * sin(dLatThis)
-			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
-
-		if (dR >= 1.0) {
-			dR = 0.0;
-		} else if (dR <= -1.0) {
-			dR = 180.0;
-		} else {
-			dR = 180.0 / M_PI * acos(dR);
-		}
-		if (dR != dR) {
-			_EXCEPTIONT("NaN value detected");
-		}
-
-		if (dR > dMaxDist) {
+		// Great circle distance to this element in degrees
+		double dRDeg = GreatCircleDistance_Deg(dLonRadThis, dLatRadThis, dLonRad0, dLatRad0);
+		if (dRDeg > dMaxDistDeg) {
 			continue;
 		}
 
 		// Check for new local extremum
-		if (fMinimum) {
-			if (data[ix] < dMaxValue) {
+		bool fIsFillValue = data.IsFillValueAtIx(ix);
+		if (!fIsFillValue) {
+			if (fExtremumValueIsFillValue) {
 				ixExtremum = ix;
-				dMaxValue = data[ix];
-				dRMax = dR;
-			}
+				dExtremumValue = data[ix];
+				dRMaxDeg = dRDeg;
+				fExtremumValueIsFillValue = false;
 
-		} else {
-			if (data[ix] > dMaxValue) {
+			} else if (fMinimum && (data[ix] < dExtremumValue)) {
 				ixExtremum = ix;
-				dMaxValue = data[ix];
-				dRMax = dR;
+				dExtremumValue = data[ix];
+				dRMaxDeg = dRDeg;
+
+			} else if (data[ix] > dExtremumValue) {
+				ixExtremum = ix;
+				dExtremumValue = data[ix];
+				dRMaxDeg = dRDeg;
 			}
 		}
 
@@ -129,15 +123,19 @@ void FindAllLocalMinima(
 ) {
 	int sFaces = grid.m_vecConnectivity.size();
 	for (int f = 0; f < sFaces; f++) {
-		
 		bool fMinimum = true;
+		if (data.IsFillValueAtIx(f)) {
+			continue;
+		}
 
 		real dValue = data[f];
 		int sNeighbors = grid.m_vecConnectivity[f].size();
 		for (int n = 0; n < sNeighbors; n++) {
 			if (data[grid.m_vecConnectivity[f][n]] < dValue) {
-				fMinimum = false;
-				break;
+				if (!data.IsFillValueAtIx(grid.m_vecConnectivity[f][n])) {
+					fMinimum = false;
+					break;
+				}
 			}
 		}
 
@@ -157,15 +155,19 @@ void FindAllLocalMaxima(
 ) {
 	int sFaces = grid.m_vecConnectivity.size();
 	for (int f = 0; f < sFaces; f++) {
-
 		bool fMaximum = true;
+		if (data.IsFillValueAtIx(f)) {
+			continue;
+		}
 
 		real dValue = data[f];
 		int sNeighbors = grid.m_vecConnectivity[f].size();
 		for (int n = 0; n < sNeighbors; n++) {
 			if (data[grid.m_vecConnectivity[f][n]] > dValue) {
-				fMaximum = false;
-				break;
+				if (!data.IsFillValueAtIx(grid.m_vecConnectivity[f][n])) {
+					fMaximum = false;
+					break;
+				}
 			}
 		}
 
@@ -238,7 +240,10 @@ void FindAllLocalMinMaxWithThreshold(
 
 	int sFaces = grid.m_vecConnectivity.size();
 	for (int f = 0; f < sFaces; f++) {
-		
+
+		if (data.IsFillValueAtIx(f)) {
+			continue;
+		}
 		real dValue = data[f];
 
 		// Check thresholds
@@ -283,8 +288,10 @@ void FindAllLocalMinMaxWithThreshold(
 		int sNeighbors = grid.m_vecConnectivity[f].size();
 		for (int n = 0; n < sNeighbors; n++) {
 			if (dSign * data[grid.m_vecConnectivity[f][n]] > dSign * dValue) {
-				fExtrema = false;
-				break;
+				if (!data.IsFillValueAtIx(grid.m_vecConnectivity[f][n])) {
+					fExtrema = false;
+					break;
+				}
 			}
 		}
 
@@ -297,120 +304,15 @@ void FindAllLocalMinMaxWithThreshold(
 ///////////////////////////////////////////////////////////////////////////////
 
 template <typename real>
-void FindAllLocalMinMaxWithGraphDistance(
-	const SimpleGrid & grid,
-	const DataArray1D<real> & data,
-	bool fMinima,
-	int nMaxGraphDistance,
-	std::set<int> & setMinMax
-) {
-	const real dSign = (fMinima)?(-1.0):(1.0);
-
-	// If max graph distance is 1 then this is just FindAllLocalMinima/Maxima
-	if (nMaxGraphDistance <= 1) {
-		if (fMinima) {
-			FindAllLocalMinima<real>(grid, data, setMinMax);
-		} else {
-			FindAllLocalMaxima<real>(grid, data, setMinMax);
-		}
-	}
-
-	// Get first pass set
-	std::set<int> setFirstPass;
-	if (fMinima) {
-		FindAllLocalMinima<real>(grid, data, setFirstPass);
-	} else {
-		FindAllLocalMaxima<real>(grid, data, setFirstPass);
-	}
-
-	// Use graph search to eliminate candidates within specified graph distance
-	for (auto it = setFirstPass.begin(); it != setFirstPass.end(); it++) {
-
-		real dValue = data[*it];
-
-		std::queue<int> queueToVisit;
-		std::set<int> setVisited;
-
-		// Insert this node and its neighbors into the "visited" set
-		setVisited.insert(*it);
-		size_t sNeighbors = grid.m_vecConnectivity[*it].size();
-		for (size_t n = 0; n < sNeighbors; n++) {
-			int ixNeighbor = grid.m_vecConnectivity[*it][n];
-			setVisited.insert(ixNeighbor);
-		}
-
-		// Insert this node's neighbor's neighbors into the "tovisit" set
-		for (size_t n = 0; n < sNeighbors; n++) {
-			int ixNeighbor = grid.m_vecConnectivity[*it][n];
-			size_t sSubNeighbors = grid.m_vecConnectivity[ixNeighbor].size();
-			for (size_t m = 0; m < sSubNeighbors; m++) {
-				int ixSubNeighbor = grid.m_vecConnectivity[*it][n];
-				if (setVisited.find(ixSubNeighbor) != setVisited.end()) {
-					queueToVisit.push(ixSubNeighbor);
-				}
-			}
-		}
-
-		// Perform breadth-first search
-		bool fExtrema = true;
-
-		int nCurrentDistance = 2;
-		int nNodesVisitedAtDist = 0;
-		int nCurrentDistanceSize = queueToVisit.size();
-		if (nCurrentDistanceSize == 0) {
-			setMinMax.insert(*it);
-			continue;
-		}
-
-		for (;;) {
-			if (nNodesVisitedAtDist == nCurrentDistanceSize) {
-				nNodesVisitedAtDist = 0;
-				nCurrentDistanceSize = queueToVisit.size();
-				nCurrentDistance++;
-
-				if (nCurrentDistanceSize == 0) {
-					break;
-				}
-			}
-
-			int ix = queueToVisit.front();
-			queueToVisit.pop();
-			nNodesVisitedAtDist++;
-
-			setVisited.insert(ix);
-
-			if (dSign * data[ix] > dSign * dValue) {
-				fExtrema = false;
-				break;
-			}
-
-			if (nCurrentDistance < nMaxGraphDistance) {
-				for (size_t n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
-					int ixNeighbor = grid.m_vecConnectivity[ix][n];
-					if (setVisited.find(ixNeighbor) == setVisited.end()) {
-						queueToVisit.push(grid.m_vecConnectivity[ix][n]);
-					}
-				}
-			}
-		}
-		if (fExtrema) {
-			setMinMax.insert(*it);
-		}
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-template <typename real>
 void FindLocalAverage(
 	const SimpleGrid & grid,
 	const DataArray1D<real> & data,
 	int ix0,
-	double dMaxDist,
+	double dMaxDistDeg,
 	real & dAverage
 ) {
 	// Verify that dMaxDist is less than 180.0
-	if (dMaxDist > 180.0) {
+	if (dMaxDistDeg > 180.0) {
 		_EXCEPTIONT("MaxDist must be less than 180.0");
 	}
 	if ((ix0 < 0) || (ix0 >= data.GetRows())) {
@@ -425,8 +327,8 @@ void FindLocalAverage(
 	std::set<int> setNodesVisited;
 
 	// Latitude and longitude at the origin
-	double dLat0 = grid.m_dLat[ix0];
-	double dLon0 = grid.m_dLon[ix0];
+	double dLatRad0 = grid.m_dLat[ix0];
+	double dLonRad0 = grid.m_dLon[ix0];
 
 	// Number of points
 	real dSum = 0.0;
@@ -448,32 +350,20 @@ void FindLocalAverage(
 
 		setNodesVisited.insert(ix);
 
-		double dLatThis = grid.m_dLat[ix];
-		double dLonThis = grid.m_dLon[ix];
+		double dLatRadThis = grid.m_dLat[ix];
+		double dLonRadThis = grid.m_dLon[ix];
 
 		// Great circle distance to this element
-		double dR =
-			sin(dLat0) * sin(dLatThis)
-			+ cos(dLat0) * cos(dLatThis) * cos(dLonThis - dLon0);
-
-		if (dR >= 1.0) {
-			dR = 0.0;
-		} else if (dR <= -1.0) {
-			dR = 180.0;
-		} else {
-			dR = 180.0 / M_PI * acos(dR);
-		}
-		if (dR != dR) {
-			_EXCEPTIONT("NaN value detected");
-		}
-
-		if (dR > dMaxDist) {
+		double dR = GreatCircleDistance_Deg(dLonRadThis, dLatRadThis, dLonRad0, dLatRad0);
+		if (dR > dMaxDistDeg) {
 			continue;
 		}
 
 		// Check for new local extremum
-		dSum += data[ix];
-		nCount++;
+		if (!data.IsFillValueAtIx(ix)) {
+			dSum += data[ix];
+			nCount++;
+		}
 
 		// Add all neighbors of this point
 		for (int n = 0; n < grid.m_vecConnectivity[ix].size(); n++) {
@@ -481,7 +371,11 @@ void FindLocalAverage(
 		}
 	}
 
-	dAverage = dSum / static_cast<float>(nCount);
+	if (nCount != 0) {
+		dAverage = dSum / static_cast<float>(nCount);
+	} else {
+		dAverage = 0.0;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -539,12 +433,18 @@ void FindMaxClosedContourDelta(
 		ix0 = ixExtremum;
 	}
 
+	// Check for FillValue at ix0
+	if (dataState.IsFillValue(dMaxValue)) {
+		dMaxClosedContourDelta = 0.0;
+		return;
+	}
+
 	// Value of the field at the index point
 	double dValue0 = dataState[ix0];
 
 	// Central lat/lon and Cartesian coord
-	double dLon0 = grid.m_dLon[ix0];
-	double dLat0 = grid.m_dLat[ix0];
+	double dLonRad0 = grid.m_dLon[ix0];
+	double dLatRad0 = grid.m_dLat[ix0];
 
 	// Initial max closed contour delta
 	dMaxClosedContourDelta = 0.0;
@@ -585,7 +485,9 @@ void FindMaxClosedContourDelta(
 			if (setNodesVisited.find(ixNeighbor) != setNodesVisited.end()) {
 				continue;
 			}
-
+			if (dataState.IsFillValueAtIx(ixNeighbor)) {
+				continue;
+			}
 			double dValue = dataState[ixNeighbor];
 			mapPriorityQueue.insert(
 				std::pair<double, int>(
@@ -598,12 +500,11 @@ void FindMaxClosedContourDelta(
 		}
 
 		// lat/lon and Cartesian coords of this point
-		double dLat = grid.m_dLat[ix];
-		double dLon = grid.m_dLon[ix];
+		double dLatRad = grid.m_dLat[ix];
+		double dLonRad = grid.m_dLon[ix];
 
 		// Great circle distance to this element (in degrees)
-		double dR = GreatCircleDistance_Deg(dLon0, dLat0, dLon, dLat);
-
+		double dR = GreatCircleDistance_Deg(dLonRad0, dLatRad0, dLonRad, dLatRad);
 		if (dR >= dDistDeg) {
 			break;
 		}
@@ -676,10 +577,12 @@ void PositiveMinusNegativeWeightedArea(
 		}
 
 		// Check positive or negative
-		if (data[ix] > 0.0) {
-			dPositiveValues += data[ix] * grid.m_dArea[ix];
-		} else {
-			dNegativeValues -= data[ix] * grid.m_dArea[ix];
+		if (!data.IsFillValueAtIx(ix)) {
+			if (data[ix] > 0.0) {
+				dPositiveValues += data[ix] * grid.m_dArea[ix];
+			} else {
+				dNegativeValues -= data[ix] * grid.m_dArea[ix];
+			}
 		}
 
 		// Add all neighbors of this point
@@ -707,6 +610,11 @@ void MaxPolewardValue(
 
 	dValue = data[ix0];
 
+	bool fValueIsFillValue = false;
+	if (data.IsFillValueAtIx(ix0)) {
+		fValueIsFillValue = true;
+	}
+
 	double dMaxDistRad = DegToRad(dMaxDistDeg);
 
 	double dLatRad0 = grid.m_dLat[ix0];
@@ -722,11 +630,18 @@ void MaxPolewardValue(
 		if ((dLatRad0 <= 0.0) && (dLatRadThis > dLatRad0)) {
 			continue;
 		}
+		if (data.IsFillValueAtIx(i)) {
+			continue;
+		}
 		if ((fabs(dLonRadThis - dLonRad0) < dMaxDistRad) ||
 		    (fabs(dLonRadThis - dLonRad0 - 2.0 * M_PI) < dMaxDistRad)
 		) {
 			if (data[i] > dValue) {
 				dValue = data[i];
+			}
+			if (fValueIsFillValue) {
+				dValue = data[i];
+				fValueIsFillValue = false;
 			}
 		}
 	}
@@ -795,22 +710,6 @@ template void FindAllLocalMinMaxWithThreshold<double>(
 	bool fMinima,
 	const std::string & strThreshold,
 	std::set<int> & setMinima
-);
-
-template void FindAllLocalMinMaxWithGraphDistance<float>(
-	const SimpleGrid & grid,
-	const DataArray1D<float> & data,
-	bool fMinima,
-	int nMaxGraphDistance,
-	std::set<int> & setMinMax
-);
-
-template void FindAllLocalMinMaxWithGraphDistance<double>(
-	const SimpleGrid & grid,
-	const DataArray1D<double> & data,
-	bool fMinima,
-	int nMaxGraphDistance,
-	std::set<int> & setMinMax
 );
 
 template void FindLocalAverage<float>(

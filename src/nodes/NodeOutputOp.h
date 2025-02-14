@@ -17,6 +17,7 @@
 #ifndef _NODEOUTPUTOP_H_
 #define _NODEOUTPUTOP_H_
 
+#include "CoordTransforms.h"
 #include "SimpleGridUtilities.h"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -348,12 +349,12 @@ void ApplyNodeOutputOp(
 		if (ixExtremum >= grid.m_dLat.GetRows()) {
 			_EXCEPTIONT("Longitude/latitude array size inconsistency in SimpleGrid");
 		}
-		snprintf(buf, 100, "%3.6f", grid.m_dLon[ixExtremum] * 180.0 / M_PI);
+		snprintf(buf, 100, "%3.6f", RadToDeg(grid.m_dLon[ixExtremum]));
 		strResult = buf;
 
 		strResult += "\t";
 
-		snprintf(buf, 100, "%3.6f", grid.m_dLat[ixExtremum] * 180.0 / M_PI);
+		snprintf(buf, 100, "%3.6f", RadToDeg(grid.m_dLat[ixExtremum]));
 		strResult += buf;
 
 	// Coordinates (lon,lat) of the minimum or maximum value within given range
