@@ -553,14 +553,13 @@ void VariableRegistry::PopulateFillValues(
 ) {
 	for (Variable * pvar : m_vecVariables) {
 		_ASSERT(pvar != NULL);
-		if ((!pvar->m_fHasExplicitFillValue) && (!pvar->IsOp())) {
+		if ((!pvar->m_data.HasFillValue()) && (!pvar->IsOp())) {
 			NcVar * ncvar = NULL;
 			vecncDataFiles.FindContainingVariable(pvar->GetName(), &ncvar);
 			if (ncvar != NULL) {
 				NcAtt * attFillValue = ncvar->get_att("_FillValue");
 				if (attFillValue != NULL) {
-					pvar->m_fHasExplicitFillValue = true;
-					pvar->m_dFillValueFloat = attFillValue->as_float(0);
+					pvar->m_data.SetFillValue(attFillValue->as_float(0));
 				}
 			}
 		}
@@ -940,22 +939,6 @@ NcVar * Variable::GetNcVarFromNcFileVector(
 		_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
 	}
 
-	// Get _FillValue
-	if (!m_fHasExplicitFillValue) {
-		NcError err(NcError::silent_nonfatal);
-		NcAtt * attFillValue = var->get_att("_FillValue");
-		if (attFillValue != NULL) {
-			m_dFillValueFloat = attFillValue->as_float(0);
-			m_fHasExplicitFillValue = true;
-		} else {
-			NcAtt * attMissingValue = var->get_att("missing_value");
-			if (attMissingValue != NULL) {
-				m_dFillValueFloat = attMissingValue->as_float(0);
-				m_fHasExplicitFillValue = true;
-			}
-		}
-	}
-
 	return var;
 }
 
@@ -1057,9 +1040,21 @@ void Variable::LoadGridData(
 		// Load the data
 		var->get(&(m_data[0]), &(nDataSize[0]));
 
+		// Turn off errors as we check attributes
 		NcError err(NcError::silent_nonfatal);
 		if (err.get_err() != NC_NOERR) {
 			_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
+		}
+
+		// Check for _FillValue
+		NcAtt * attFillValue = var->get_att("_FillValue");
+		if (attFillValue != NULL) {
+			m_data.SetFillValue(attFillValue->as_float(0));
+		} else {
+			attFillValue = var->get_att("missing_value");
+			if (attFillValue != NULL) {
+				m_data.SetFillValue(attFillValue->as_float(0));
+			}
 		}
 
 		// Check for scale_factor attribute
@@ -1070,6 +1065,9 @@ void Variable::LoadGridData(
 			for (int i = 0; i < m_data.GetRows(); i++) {
 				m_data[i] *= dScaleFactor;
 			}
+			if (m_data.HasFillValue()) {
+				m_data.SetFillValue(m_data.GetFillValue() * dScaleFactor);
+			}
 		}
 
 		// Check for add_offset attribute
@@ -1079,6 +1077,9 @@ void Variable::LoadGridData(
 
 			for (int i = 0; i < m_data.GetRows(); i++) {
 				m_data[i] += dAddOffset;
+			}
+			if (m_data.HasFillValue()) {
+				m_data.SetFillValue(m_data.GetFillValue() + dAddOffset);
 			}
 		}
 
