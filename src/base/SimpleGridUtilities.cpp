@@ -434,7 +434,7 @@ void FindMaxClosedContourDelta(
 	}
 
 	// Check for FillValue at ix0
-	if (dataState.IsFillValue(dMaxValue)) {
+	if (dataState.IsFillValueAtIx(ix0)) {
 		dMaxClosedContourDelta = 0.0;
 		return;
 	}
