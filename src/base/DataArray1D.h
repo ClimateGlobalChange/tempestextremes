@@ -23,6 +23,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
 
 template <typename T>
 class DataArray1D {
