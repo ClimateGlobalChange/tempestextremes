@@ -516,8 +516,6 @@ public:
 	Variable() :
 		m_strName(),
 		m_fOp(false),
-		m_fHasExplicitFillValue(false),
-		m_dFillValueFloat(-std::numeric_limits<float>::max()),
 		m_fNoTimeInNcFile(false),
 		m_strSourceFilenames(),
 		m_timeStored(Time::CalendarUnknown)
@@ -569,14 +567,14 @@ public:
 	///		Returns true if this Variable has an explicit _FillValue.
 	///	</summary>
 	bool HasExplicitFillValue() const {
-		return m_fHasExplicitFillValue;
+		return m_data.HasFillValue();
 	}
 
 	///	<summary>
 	///		Get the _FillValue for this variable.
 	///	</summary>
 	float GetFillValueFloat() const {
-		return m_dFillValueFloat;
+		return m_data.GetFillValue();
 	}
 
 public:
@@ -650,16 +648,6 @@ protected:
 	///		Specified operator arguments (as VariableIndex).
 	///	</summary>
 	VariableIndexVector m_varArg;
-
-	///	<summary>
-	///		Variable has an explicit _FillValue.
-	///	</summary>
-	bool m_fHasExplicitFillValue;
-
-	///	<summary>
-	///		_FillValue for this Variable.
-	///	</summary>
-	float m_dFillValueFloat;
 
 protected:
 /*

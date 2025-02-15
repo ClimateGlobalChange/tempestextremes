@@ -418,12 +418,12 @@ void PersistentBlobs(
 		vecFiles.ParseFromString(vecInputFiles[f]);
 
 		// Get time dimension
-		NcVar * varTime = vecFiles[0]->get_var("time");
+		NcVar * varTime = NcGetTimeVariable(*(vecFiles[0]));
 		if (varTime == NULL) {
 			_EXCEPTION1("File \"%s\" missing \"time\" variable",
 				vecFiles.GetFilename(0).c_str());
 		}
-		NcDim * dimTime = vecFiles[0]->get_dim("time");
+		NcDim * dimTime = NcGetTimeDimension(*(vecFiles[0]));
 		if (dimTime == NULL) {
 			if (varTime->num_dims() != 0) {
 				_EXCEPTION1("File \"%s\" missing \"time\" dimension",
@@ -489,14 +489,18 @@ void PersistentBlobs(
 		// Copy over time variable to output file
 		NcDim * dimTimeOut = NULL;
 		if ((dimTime != NULL) && (varTime != NULL)) {
+			NcDim * dimTimeIn = NcGetTimeDimension(ncInput);
+			if (dimTimeIn == NULL) {
+				_EXCEPTIONT("NetCDF file does not contain time dimension");
+			}
 			if (vecOutputTimes.size() != vecTimes.size()) {
-				CopyNcVarTimeSubset(ncInput, *(vecpncOutputFiles[f]), "time", vecOutputTimes);
+				CopyNcVarTimeSubset(ncInput, *(vecpncOutputFiles[f]), dimTimeIn->name(), vecOutputTimes);
 
 			} else {
-				CopyNcVar(ncInput, *(vecpncOutputFiles[f]), "time", true);
+				CopyNcVar(ncInput, *(vecpncOutputFiles[f]), dimTimeIn->name(), true);
 			}
 
-			dimTimeOut = vecpncOutputFiles[f]->get_dim("time");
+			dimTimeOut = NcGetTimeDimension(*(vecpncOutputFiles[f]));
 			if (dimTimeOut == NULL) {
 				_EXCEPTIONT("Error copying variable \"time\" to output file");
 			}

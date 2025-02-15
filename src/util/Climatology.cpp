@@ -558,7 +558,7 @@ void Climatology(
 
 		// Get information from the time variable
 		AnnounceStartBlock("Loading time information from input datafile");
-		NcVar * varInTime = ncinfile.get_var("time");
+		NcVar * varInTime = NcGetTimeVariable(ncinfile);
 		if (varInTime == NULL) {
 			_EXCEPTION1("File \"%s\" does not contain variable \"time\"",
 				vecInputFileList[0].c_str());
@@ -639,7 +639,7 @@ void Climatology(
 			_ASSERT(dim0 != NULL);
 
 			std::string strDimTimeName = dim0->name();
-			if (strDimTimeName != "time") {
+			if (!NcIsTimeDimension(dim0)) {
 				_EXCEPTION2("File \"%s\" variable \"%s\" must have leftmost dimension \"time\"",
 					vecInputFileList[0].c_str(),
 					vecVariableNames[v].c_str());
@@ -1057,7 +1057,7 @@ void Climatology(
 				}
 
 				// Get time information
-				NcVar * varInTime = ncinfile.get_var("time");
+				NcVar * varInTime = NcGetTimeVariable(ncinfile);
 				if (varInTime == NULL) {
 					_EXCEPTION1("Cannot load variable \"time\" from NetCDF file \"%s\"",
 						vecInputFileList[f].c_str());

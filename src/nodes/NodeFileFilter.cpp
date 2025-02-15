@@ -658,7 +658,7 @@ void NodeFileFilter(
 	//}
 
 	// Get time variable and verify calendar is compatible
-	NcVar * varTime = ncinfile.get_var("time");
+	NcVar * varTime = NcGetTimeVariable(ncinfile);
 	if (varTime == NULL) {
 		_EXCEPTION1("Missing \"time\" variable in datafile \"%s\"",
 			strInputFile.c_str());
@@ -720,7 +720,7 @@ void NodeFileFilter(
 		strOutputFile,
 		vecTimesOut);
 
-	NcDim * dimTimeOut = ncoutfile.get_dim("time");
+	NcDim * dimTimeOut = NcGetTimeDimension(ncoutfile);
 	if (dimTimeOut == NULL) {
 		_EXCEPTION1("Error writing \"time\" dimension to file \"%s\"",
 			strOutputFile.c_str());
@@ -784,7 +784,7 @@ void NodeFileFilter(
 		{
 			std::vector<NcDim *> vecDimOut;
 			for (long d = 0; d < varIn->num_dims(); d++) {
-				if (std::string(varIn->get_dim(d)->name()) == std::string("time")) {
+				if (NcIsTimeDimension(varIn->get_dim(d))) {
 					vecDimOut.push_back(dimTimeOut);
 					continue;
 				}
@@ -822,7 +822,7 @@ void NodeFileFilter(
 			_EXCEPTION2("Insufficient dimensions in variable \"%s\" in file \"%s\"",
 				strVariable.c_str(), strInputFile.c_str()); 
 		}
-		if (strcmp(varIn->get_dim(0)->name(), "time") != 0) {
+		if (NcIsTimeDimension(varIn->get_dim(0))) {
 			_EXCEPTION2("First dimension of variable \"%s\" in file \"%s\" must be \"time\"",
 				strVariable.c_str(), strInputFile.c_str());
 		}
@@ -1032,16 +1032,7 @@ void NodeFileFilter(
 			for (int d = 0; d < varIn->num_dims(); d++) {
 				vecDim.push_back(varIn->get_dim(d));
 			}
-/*
-			if (vecDim.size() < 1 + nGridDims) {
-				_EXCEPTION2("Insufficient dimensions in variable \"%s\" in file \"%s\"",
-					strVariable.c_str(), strInputFile.c_str());
-			}
-			if (strcmp(vecDim[0]->name(), "time") != 0) {
-				_EXCEPTION2("First dimension of variable \"%s\" in file \"%s\" must be \"time\"",
-					strVariable.c_str(), strInputFile.c_str());
-			}
-*/
+
 			int nVarSize = 1;
 			for (int d = 0; d < nGridDims; d++) {
 				nVarSize *= vecDim[vecDim.size()-d-1]->size();
@@ -1505,7 +1496,7 @@ try {
 				vecInputFileList[0].c_str());
 		}
 
-		NcVar * varTime = ncfile.get_var("time");
+		NcVar * varTime = NcGetTimeVariable(ncfile);
 		if (varTime == NULL) {
 			_EXCEPTION1("Missing \"time\" variable in datafile \"%s\"",
 				vecInputFileList[0].c_str());

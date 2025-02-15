@@ -102,6 +102,9 @@ bool NcIsTimeDimension(
 	if (strcmp(dim->name(), "initial_time0_hours") == 0) {
 		return true;
 	}
+	if (strcmp(dim->name(), "valid_time") == 0) {
+		return true;
+	}
 	return false;
 }
 
@@ -121,6 +124,11 @@ NcDim * NcGetTimeDimension(
 	}
 
 	dim = ncFile.get_dim("initial_time0_hours");
+	if (dim != NULL) {
+		return dim;
+	}
+
+	dim = ncFile.get_dim("valid_time");
 	if (dim != NULL) {
 		return dim;
 	}
@@ -149,6 +157,11 @@ NcVar * NcGetTimeVariable(
 	}
 
 	var = ncFile.get_var("initial_time0_hours");
+	if (var != NULL) {
+		return var;
+	}
+
+	var = ncFile.get_var("valid_time");
 	if (var != NULL) {
 		return var;
 	}

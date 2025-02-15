@@ -215,7 +215,7 @@ void Time::NormalizeTime() {
 			nAddedSeconds = m_iMicroSecond / 1000000;
 
 		} else if (m_iMicroSecond < 0) {
-			nAddedSeconds = - (1000000 - m_iSecond) / 1000000;
+			nAddedSeconds = - (1000000 - m_iSecond - 1) / 1000000;
 		}
 		m_iMicroSecond -= nAddedSeconds * 1000000;
 		m_iSecond += nAddedSeconds;
@@ -226,7 +226,7 @@ void Time::NormalizeTime() {
 			nAddedDays = m_iSecond / 86400;
 
 		} else if (m_iSecond < 0) {
-			nAddedDays = - (86400 - m_iSecond) / 86400;
+			nAddedDays = - (86400 - m_iSecond - 1) / 86400;
 		}
 
 		m_iSecond -= nAddedDays * 86400;
@@ -237,7 +237,7 @@ void Time::NormalizeTime() {
 		if (m_iMonth >= 12) {
 			nAddedYears = m_iMonth / 12;
 		} else if (m_iMonth < 0) {
-			nAddedYears = - (12 - m_iMonth) / 12;
+			nAddedYears = - (12 - m_iMonth - 1) / 12;
 		}
 		m_iMonth -= nAddedYears * 12;
 		m_iYear += nAddedYears;

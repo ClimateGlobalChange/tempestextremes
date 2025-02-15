@@ -2818,7 +2818,7 @@ try {
 		_ASSERT(vecNcFiles.size() > 0);
 
 		// Get the time variable
-		NcVar * varTime = vecNcFiles[0]->get_var("time");
+		NcVar * varTime = NcGetTimeVariable(*(vecNcFiles[0]));
 		if (varTime == NULL) {
 			_EXCEPTION1("File \"%s\" does not contain \"time\" variable",
 				vecNcFiles.GetFilename(0).c_str());
