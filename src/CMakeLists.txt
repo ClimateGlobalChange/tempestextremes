@@ -5,8 +5,8 @@
 
 add_subdirectory(netcdf-cxx-4.2)
 add_subdirectory(base)
-add_subdirectory(atmrivers)
 add_subdirectory(blobs)
 add_subdirectory(blocking)
 add_subdirectory(nodes)
+add_subdirectory(sandbox)
 add_subdirectory(util)

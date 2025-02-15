@@ -38,3 +38,14 @@ test/*.png
 test/statfigs/*
 
 .vscode/
+
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+src/base/cmake_install.cmake
+src/blobs/cmake_install.cmake
+src/blocking/cmake_install.cmake
+src/netcdf-cxx-4.2/cmake_install.cmake
+src/nodes/cmake_install.cmake
+src/sandbox/cmake_install.cmake
+src/util/cmake_install.cmake

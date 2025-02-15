@@ -19,10 +19,6 @@ list(APPEND CLIMATOLOGY_FILES
   Climatology.cpp
 )
 
-list(APPEND COMPRESS_BLOBS_FILES
-  CompressBlobs.cpp
-)
-
 list(APPEND FOURIER_FILTER_FILES
   FourierFilter.cpp
 )
@@ -76,9 +72,6 @@ target_link_libraries(AutoCuratorTool PUBLIC extremesbase netcdf_c++ ${MPI_CXX_L
 add_executable(Climatology ${CLIMATOLOGY_FILES})
 target_link_libraries(Climatology PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
 
-add_executable(CompressBlobs ${COMPRESS_BLOBS_FILES})
-target_link_libraries(CompressBlobs PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
-
 add_executable(FourierFilter ${FOURIER_FILTER_FILES})
 target_link_libraries(FourierFilter PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
 
@@ -106,7 +99,7 @@ target_link_libraries(VariableProcessor PUBLIC extremesbase netcdf_c++ ${MPI_CXX
 install(
   TARGETS
   AccumulateData AccumulateERA5Forecast AutoCuratorTool Climatology
-  CompressBlobs FourierFilter GenerateConnectivityFile GenerateNearestNeighborMap
+  FourierFilter GenerateConnectivityFile GenerateNearestNeighborMap
   IntegrateDimension LagrangianParcelTracker QuantileCalculator ShapefileMask
   VariableProcessor
 )
