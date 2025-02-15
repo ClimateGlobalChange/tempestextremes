@@ -555,6 +555,9 @@ void PositiveMinusNegativeWeightedArea(
 	real dPositiveValues = 0.0;
 	real dNegativeValues = 0.0;
 
+	// Flag indicating that at least one element is included in the calculation
+	bool fIncludesAtLeastOneNode = false;
+
 	// Loop through all elements
 	while (queueNodes.size() != 0) {
 		int ix = queueNodes.front();
@@ -582,6 +585,7 @@ void PositiveMinusNegativeWeightedArea(
 
 		// Check positive or negative
 		if (!data.IsFillValueAtIx(ix)) {
+			fIncludesAtLeastOneNode = true;
 			if (data[ix] > 0.0) {
 				dPositiveValues += data[ix] * grid.m_dArea[ix];
 			} else {
@@ -595,7 +599,15 @@ void PositiveMinusNegativeWeightedArea(
 		}
 	}
 
-	dValue = dPositiveValues - dNegativeValues;
+	if (fIncludesAtLeastOneNode) {
+		dValue = dPositiveValues - dNegativeValues;
+	} else {
+		if (data.HasFillValue()) {
+			dValue = data.GetFillValue();
+		} else {
+			dValue = std::numeric_limits<real>::quiet_NaN();
+		}
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
