@@ -374,7 +374,11 @@ void FindLocalAverage(
 	if (nCount != 0) {
 		dAverage = dSum / static_cast<float>(nCount);
 	} else {
-		dAverage = 0.0;
+		if (data.HasFillValue()) {
+			dAverage = data.GetFillValue();
+		} else {
+			dAverage = std::numeric_limits<real>::quiet_NaN();
+		}
 	}
 }
 
