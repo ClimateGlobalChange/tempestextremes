@@ -19,6 +19,10 @@ list(APPEND NODE_FILE_EDITOR_FILES
   NodeFileEditor.cpp
 )
 
+list(APPEND NODE_FILE_FILTER_FILES
+  NodeFileFilter.cpp
+)
+
 list(APPEND STITCH_NODES_FILES
   StitchNodes.cpp
 )
@@ -43,11 +47,14 @@ target_link_libraries(NodeFileCompose PUBLIC extremesbase netcdf_c++ ${MPI_CXX_L
 add_executable(NodeFileEditor ${NODE_FILE_EDITOR_FILES})
 target_link_libraries(NodeFileEditor PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
 
+add_executable(NodeFileFilter ${NODE_FILE_FILTER_FILES})
+target_link_libraries(NodeFileFilter PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
+
 add_executable(StitchNodes ${STITCH_NODES_FILES})
 target_link_libraries(StitchNodes PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
 
 install(
   TARGETS
-  DetectNodes HistogramNodes NodeFileCompose NodeFileEditor
+  DetectNodes HistogramNodes NodeFileCompose NodeFileEditor NodeFileFilter
   StitchNodes
 )
