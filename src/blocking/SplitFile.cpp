@@ -24,7 +24,7 @@ int vspfunc(char * buffer, char *format, ...)
    int ret;
 
    va_start(aptr, format);
-   ret = vsprintf(buffer, format, aptr);
+   ret = vsnprintf(buffer, 24, format, aptr);
    va_end(aptr);
 
    return(ret);

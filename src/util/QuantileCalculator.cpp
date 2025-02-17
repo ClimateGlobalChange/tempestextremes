@@ -300,6 +300,7 @@ try {
 	}
 
 	// Initialize first pass bin sizes from first file
+	// TODO: What if first file doesn't contain any time slices?
 	{
 		AnnounceStartBlock("Using first file to set array bounds");
 		NcFileVector ncfilevec;
@@ -308,7 +309,7 @@ try {
 			_EXCEPTION1("No NetCDF files found in \"%s\"", vecInputFiles[0].c_str());
 		}
 
-		NcDim * dimTime = ncfilevec[0]->get_dim(strDimensionName.c_str());
+		NcDim * dimTime = NcGetTimeDimension(*(ncfilevec[0]));
 		if (dimTime == NULL) {
 			_EXCEPTION2("Unable to load dimension \"%s\" from \"%s\"",
 				strDimensionName.c_str(),
@@ -386,6 +387,13 @@ try {
 			ncfilevec.SetConstantTimeIx(t);
 			varQuantile.LoadGridData(varreg, ncfilevec, grid);
 
+			// Get _FillValue if it exists
+			if (dFillValue == std::numeric_limits<float>::max()) {
+				if (varQuantile.HasExplicitFillValue()) {
+					dFillValue = varQuantile.GetFillValueFloat();
+				}
+			}
+
 #ifndef TEMPEST_NOREGEX
 			// Time filter
 			if (fTimeFilterSpecified) {
@@ -399,35 +407,34 @@ try {
 				}
 			}
 #endif
+
 			// Apply time bounds
 			if ((strStartTime != "") || (strEndTime != "")) {
 				const NcTimeDimension & vecTimes = ncfilevec.GetNcTimeDimension(0);
 				_ASSERT(vecTimes.size() == dimTime->size());
+
+				// Initialize timeStartTime and timeEndTime
+				if ((timeStartTime.GetCalendarType() == Time::CalendarUnknown) && (strStartTime != "")) {
+					timeStartTime = Time(vecTimes[0].GetCalendarType());
+					timeStartTime.FromFormattedString(strStartTime);
+				}
+				if ((timeEndTime.GetCalendarType() == Time::CalendarUnknown) && (strEndTime != "")) {
+					timeEndTime = Time(vecTimes[0].GetCalendarType());
+					timeEndTime.FromFormattedString(strEndTime);
+				}
+
 				if (strStartTime != "") {
-					if (timeStartTime.GetCalendarType() == Time::CalendarUnknown) {
-						timeStartTime = Time(vecTimes[0].GetCalendarType());
-						timeStartTime.FromFormattedString(strStartTime);
-					}
 					double dDeltaSeconds = timeStartTime - vecTimes[t];
 					if (dDeltaSeconds > 0.0) {
 						continue;
 					}
 				}
 				if (strEndTime != "") {
-					if (timeEndTime.GetCalendarType() == Time::CalendarUnknown) {
-						timeEndTime = Time(vecTimes[0].GetCalendarType());
-						timeEndTime.FromFormattedString(strEndTime);
-					}
 					double dDeltaSeconds = vecTimes[t] - timeEndTime;
 					if (dDeltaSeconds > 0.0) {
 						continue;
 					}
 				}
-			}
-
-			// Get _FillValue if it exists
-			if (dFillValue == std::numeric_limits<float>::max()) {
-				dFillValue = varQuantile.GetFillValueFloat();
 			}
 
 			// Load data
@@ -541,7 +548,7 @@ try {
 				_EXCEPTION1("No NetCDF files found in \"%s\"", vecInputFiles[f].c_str());
 			}
 
-			NcDim * dimTime = ncfilevec[0]->get_dim(strDimensionName.c_str());
+			NcDim * dimTime = NcGetTimeDimension(*(ncfilevec[0]));
 			if (dimTime == NULL) {
 				_EXCEPTION2("Unable to load dimension \"%s\" from \"%s\"",
 					strDimensionName.c_str(),
@@ -595,7 +602,9 @@ try {
 				// Get _FillValue if it exists
 				float dLocalFillValue = varQuantile.GetFillValueFloat();
 				if (dLocalFillValue != dFillValue) {
-					_EXCEPTIONT("_FillValue attribute appears to change across files");
+					if (!std::isnan(dLocalFillValue) || !std::isnan(dFillValue)) {
+						_EXCEPTIONT("_FillValue attribute appears to change across files");
+					}
 				}
 
 				// Build histograms with missing data
