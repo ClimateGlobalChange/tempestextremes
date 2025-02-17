@@ -308,7 +308,7 @@ try {
 	AnnounceEndBlock("Done");
 
 	// Get time information
-	bool fFileHasTime = (ncInput.get_var("time") != NULL);
+	bool fFileHasTime = (NcGetTimeVariable(ncInput) != NULL);
 	NcTimeDimension vecTimes;
 	NcDim * dimTime = NULL;
 	if (fFileHasTime) {
@@ -323,7 +323,7 @@ try {
 			strOutputData,
 			vecTimes);
 
-		dimTime = ncOutput.get_dim("time");
+		dimTime = NcGetTimeDimension(ncOutput);
 		_ASSERT(dimTime != NULL);
 
 	} else {
@@ -546,7 +546,7 @@ try {
 	
 					for (size_t k = 0; k < nShpMap.size(); k++) {
 						if ((!std::isnan(dataState[k])) && (dataState[k] != vecVarFillValues[v])) {
-							if (nShpMap[k] != static_cast<size_t>(-1)) {
+							if (nShpMap[k] != (-1)) {
 								vecShpData[nShpMap[k]].push_back(dataState[k]);
 							}
 						}
@@ -568,7 +568,7 @@ try {
 	
 						std::sort(vecShpData[s].begin(), vecShpData[s].end());
 /*
-						if (s == 0) {
+						if (s == 2) {
 							FILE * fpx = fopen("test.txt", "w");
 							for (size_t i = 0; i < vecShpData[s].size(); i++) {
 								fprintf(fpx, "%1.5f\n", vecShpData[s][i]);

@@ -2398,9 +2398,10 @@ try {
 	// Parse input file list
 	FilenameList vecInputFileList;
 	if (strInputFile.length() != 0) {
-		vecInputFileList.push_back(strInputFile);
-		if (strInputFile.find(';') != std::string::npos) {
-			_EXCEPTIONT("Only one filename allowed in --in_data");
+		std::vector<std::string> vecInputFilesParsed;
+		STLStringHelper::ParseVariableList(strInputFile, vecInputFilesParsed, ";");
+		for (auto & strInputFileParsed : vecInputFilesParsed) {
+			vecInputFileList.push_back(strInputFileParsed);
 		}
 	} else {
 		vecInputFileList.FromFile(strInputFileList, false);

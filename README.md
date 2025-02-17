@@ -4,7 +4,7 @@ TempestExtremes
 Author:  Paul Ullrich
 Email:   paullrich@ucdavis.edu
 
-Copyright 2022 Paul Ullrich
+Copyright 2025 Paul Ullrich
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
