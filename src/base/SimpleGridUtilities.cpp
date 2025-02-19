@@ -94,15 +94,21 @@ void FindLocalMinMax(
 				dRMaxDeg = dRDeg;
 				fExtremumValueIsFillValue = false;
 
-			} else if (fMinimum && (data[ix] < dExtremumValue)) {
-				ixExtremum = ix;
-				dExtremumValue = data[ix];
-				dRMaxDeg = dRDeg;
+			} else {
+				if (fMinimum) {
+					if (data[ix] < dExtremumValue) {
+						ixExtremum = ix;
+						dExtremumValue = data[ix];
+						dRMaxDeg = dRDeg;
+					}
 
-			} else if (data[ix] > dExtremumValue) {
-				ixExtremum = ix;
-				dExtremumValue = data[ix];
-				dRMaxDeg = dRDeg;
+				} else {
+					if (data[ix] > dExtremumValue) {
+						ixExtremum = ix;
+						dExtremumValue = data[ix];
+						dRMaxDeg = dRDeg;
+					}
+				}
 			}
 		}
 
