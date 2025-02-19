@@ -1125,8 +1125,11 @@ NcBool NcVar::put( const TYPE* vals, const long* count )		      \
     size_t start[NC_MAX_DIMS];						      \
     for (int i = 0; i < num_dims(); i++)				      \
       start[i] = the_cur[i];						      \
+    size_t count_convert[NC_MAX_DIMS];						      \
+    for (int i = 0; i < num_dims(); i++)				      \
+      count_convert[i] = count[i];						      \
     return NcError::set_err(                                                  \
-			    makename2(nc_put_vara_,NCTYPE) (the_file->id(), the_id, start, (const size_t *) count, vals) \
+			    makename2(nc_put_vara_,NCTYPE) (the_file->id(), the_id, start, count_convert, vals) \
 			    ) == NC_NOERR;                                    \
 }
 
@@ -1140,8 +1143,11 @@ NcBool NcVar::put( const ncbyte* vals, const long* count )
     size_t start[NC_MAX_DIMS];
     for (int i = 0; i < num_dims(); i++)
       start[i] = the_cur[i];
+    size_t count_convert[NC_MAX_DIMS];
+    for (int i = 0; i < num_dims(); i++)
+      count_convert[i] = count[i];	
     return NcError::set_err(
-			    nc_put_vara_schar (the_file->id(), the_id, start, (const size_t *)count, vals)
+			    nc_put_vara_schar (the_file->id(), the_id, start, count_convert, vals)
 			    ) == NC_NOERR;
 }
 
@@ -1153,8 +1159,11 @@ NcBool NcVar::put( const char* vals, const long* count )
     size_t start[NC_MAX_DIMS];
     for (int i = 0; i < num_dims(); i++)
       start[i] = the_cur[i];
+    size_t count_convert[NC_MAX_DIMS];
+    for (int i = 0; i < num_dims(); i++)
+      count_convert[i] = count[i];	
     return NcError::set_err(
-			    nc_put_vara_text (the_file->id(), the_id, start, (const size_t *)count, vals)
+			    nc_put_vara_text (the_file->id(), the_id, start, count_convert, vals)
 			    ) == NC_NOERR;
 }
 
@@ -1278,8 +1287,11 @@ NcBool NcVar::get( TYPE* vals, const long* count ) const		      \
     size_t start[NC_MAX_DIMS];						      \
     for (int i = 0; i < num_dims(); i++)				      \
 	start[i] = the_cur[i];						      \
+    size_t count_convert[NC_MAX_DIMS];						      \
+    for (int i = 0; i < num_dims(); i++)						      \
+      count_convert[i] = count[i];						      \
     return NcError::set_err(                                                  \
-			    makename2(nc_get_vara_,NCTYPE) (the_file->id(), the_id, start,  (const size_t *) count, vals) \
+			    makename2(nc_get_vara_,NCTYPE) (the_file->id(), the_id, start,  count_convert, vals) \
 			    ) == NC_NOERR;     \
 }
 
@@ -1292,7 +1304,10 @@ NcBool NcVar::get( ncbyte* vals, const long* count ) const
     size_t start[NC_MAX_DIMS];
     for (int i = 0; i < num_dims(); i++)
 	start[i] = the_cur[i];
-    return nc_get_vara_schar (the_file->id(), the_id, start,  (const size_t *) count, vals) == NC_NOERR;
+    size_t count_convert[NC_MAX_DIMS];
+    for (int i = 0; i < num_dims(); i++)
+      count_convert[i] = count[i];
+    return nc_get_vara_schar (the_file->id(), the_id, start,  count_convert, vals) == NC_NOERR;
 }
 
 NcBool NcVar::get( char* vals, const long* count ) const
@@ -1302,7 +1317,10 @@ NcBool NcVar::get( char* vals, const long* count ) const
     size_t start[NC_MAX_DIMS];
     for (int i = 0; i < num_dims(); i++)
 	start[i] = the_cur[i];
-    return nc_get_vara_text (the_file->id(), the_id, start, (const size_t*) count, vals) == NC_NOERR;
+    size_t count_convert[NC_MAX_DIMS];
+    for (int i = 0; i < num_dims(); i++)
+      count_convert[i] = count[i];
+    return nc_get_vara_text (the_file->id(), the_id, start, count_convert, vals) == NC_NOERR;
 }
 
 NcVar_get_nd_array(short)

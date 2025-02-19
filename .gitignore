@@ -7,8 +7,6 @@ src/depend/*
 
 *.nc
 
-*.txt
-
 *.o
 
 *.d
@@ -38,3 +36,27 @@ test/*.eps
 test/*.png
 
 test/statfigs/*
+
+.vscode/
+
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+src/base/cmake_install.cmake
+src/blobs/cmake_install.cmake
+src/blocking/cmake_install.cmake
+src/netcdf-cxx-4.2/cmake_install.cmake
+src/nodes/cmake_install.cmake
+src/sandbox/cmake_install.cmake
+Makefile
+src/Makefile
+src/util/cmake_install.cmake
+src/base/Makefile
+src/blobs/Makefile
+src/blocking/Makefile
+src/netcdf-cxx-4.2/Makefile
+src/nodes/Makefile
+src/sandbox/Makefile
+src/util/Makefile
+install_manifest.txt
+

@@ -1,0 +1,2 @@
+#!/bin/bash
+cmake -D CMAKE_INSTALL_PREFIX:PATH=. CMAKE_CXX_COMPILER=CC .
