@@ -132,11 +132,92 @@ void Face::RemoveZeroEdges() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+const double DOUBLE_EPS = std::numeric_limits<double>::epsilon();
+
+
+// Function to classify the location of the face
+const int ClassifyFaceLocation(const NodeVector &faceNodes) {
+    bool hasNorth = false;
+    bool hasSouth = false;
+
+    for (const auto &node : faceNodes) {
+        if (node.z > 0) {
+            hasNorth = true;
+        } else if (node.z < 0) {
+            hasSouth = true;
+        }
+
+        // If both are true, the face crosses hemispheres
+        if (hasNorth && hasSouth) {
+            return 0; 
+        }
+    }
+
+    // Determine if entirely in one hemisphere
+    if (hasNorth) {
+        return 1; 
+    } 
+    if (hasSouth) {
+        return -1; 
+    }
+
+    
+    return 0; 
+}
+
+
+
 bool Face::Contains(
 	const Node & n0,
 	const NodeVector & nodevec
 ) const {
 	int nParity = 0;
+
+	// First check if the query point N0 is around pole area. The following check base on the assumption that a face will not contains both ppole points
+	// Check if the query point is the pole point
+	if (std::abs(std::abs(n0.z) - 1.0) <= DOUBLE_EPS) {
+		int face_location = ClassifyFaceLocation(nodevec);
+
+
+		if (face_location * n0.z >= 0 ) {// Same hemisphere
+			
+			// Check it's intersection with plane [1,0,0]
+			// TODO: is the Parity test same for the south hemisphere and cross the equator?
+			for (size_t i1 = 0; i1 < edges.size(); i1++) {
+				size_t i2 = (i1 + 1) % edges.size();
+				
+				const Node & n1 = nodevec[(*this)[i1]];
+				const Node & n2 = nodevec[(*this)[i2]];
+
+				// Arcs that go from smaller y to larger y have positive parity.
+				// Arcs that go from larger y to smaller y have negative parity.
+				if (n1.y < n2.y) {
+					nParity++;
+
+				} else {
+					nParity--;
+				}
+
+			}
+
+			if (nParity > 0) {
+				return true;
+			} else {
+				return false;
+			}
+
+
+		} else {
+			return false;// Different hemisphere
+
+		} 
+
+
+	}
+
+
+
+
 
 	for (size_t i1 = 0; i1 < edges.size(); i1++) {
 		size_t i2 = (i1 + 1) % edges.size();
@@ -144,15 +225,28 @@ bool Face::Contains(
 		const Node & n1 = nodevec[(*this)[i1]];
 		const Node & n2 = nodevec[(*this)[i2]];
 
-		// If both nodes are on the same size of n0.z then there will be no
-		// intersection with the plane z=n0.z. If nodes are on opposite sides
-		// of this plane then they must have an intersection.
-		if ((n1.z > n0.z) && (n2.z > n0.z)) {
-			continue;
-		}
-		if ((n1.z < n0.z) && (n2.z < n0.z)) {
-			continue;
-		}
+
+
+		// Removed the "quick check" that attempted to rule out cases based on both nodes 
+		// being on the same side of n0.z. This approach is not robust and cannot reliably rule out any scenarios.
+		// In the following, maxLat(n1, n2) refers to the actual maximum latitude along the Great Circle Arc (GCA)
+		// formed by n1 and n2, including cases where the arc "arches up."
+
+		// 1. If n1.z > n0.z && n2.z > n0.z:
+		//    1.1 Even if both nodes are above the plane (n0.z),at least one intersection can still occur 
+		//        if maxLat(n1, n2) >= n0.z >= minLat(n1, n2). 
+		//
+		// 2. If n1.z > n0.z > n2.z:
+		//    2.1 If the GCA does not "arc up," there will be exactly one intersection.
+		//    2.2 If the GCA "arcs up," and maxLat(n1, n2) occurs due to this arc, then maxLat(n1, n2) > n0.z > n2.z > n1.z.
+		//        In this case, there will be two intersection points.
+
+		// Conclusion:
+		// The original statement:
+		// "If both nodes are on the same side of n0.z, then there will be no intersection 
+		// with the plane z = n0.z. If nodes are on opposite sides, they must have an intersection."
+		// is incorrect and cannot reliably rule out any cases.
+
 
 		// Arcs of constant z aren't informative for determining inside/outside
 		if (n1.z == n2.z) {
@@ -163,6 +257,9 @@ bool Face::Contains(
 		// Branch here to ensure result is the same regardless of n1-n2 ordering
 		// Under the rules of floating point arithmetic, dA should always be
 		// in the range [0,1].
+
+		//TODO: Consider incoporate the relative error tolerance from the s2geometry
+		// https://github.com/google/s2geometry/blob/d36a49afd22a58be27163d3c835b1e86d312e322/src/s2/s2latlng_rect_bounder.cc#L159
 		Node nx;
 		if (n1.z < n2.z) {
 			double dA = (n0.z - n1.z) / (n2.z - n1.z);
