@@ -321,12 +321,14 @@ void AutoCurator::IndexFiles(
 				strFile.c_str());
 		}
 
-		// Check if this file is a daily mean climatology
+		// Check if this file is a daily climatology
 		bool fDailyMeanClimatology = false;
 		NcAtt * attType = varTime->get_att("type");
 		if (attType != NULL) {
 			std::string strType = attType->as_string(0);
-			if (strType == "daily mean climatology") {
+			if ((strType.find("daily") != std::string::npos) &&
+			    (strType.find("climatology") != std::string::npos)
+			) {
 				fDailyMeanClimatology = true;
 			}
 		}
@@ -460,7 +462,7 @@ bool AutoCurator::FindFilesAtTime(
 		}
 	}
 
-	// Get daily mean climatology at this time
+	// Get daily climatology at this time
 	{
 		Time timeDailyMean(m_acdDailyMean.m_eCalendarType);
 		timeDailyMean.SetYear(1);
@@ -475,7 +477,7 @@ bool AutoCurator::FindFilesAtTime(
 		FilenameTimePairVector vec = m_acdDailyMean.Find(timeDailyMean);
 
 		for (int i = 0; i < vec.size(); i++) {
-			Announce("Using daily mean climatology from %s (index %i)",
+			Announce("Using daily climatology from %s (index %i)",
 				time.ToDateString().c_str(),
 				vec[i].second);
 

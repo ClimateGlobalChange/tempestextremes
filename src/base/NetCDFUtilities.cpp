@@ -724,14 +724,16 @@ void ReadCFTimeDataFromNcFile(
 	NcAtt * attTimeType = varTime->get_att("type");
 	if (attTimeType != NULL) {
 		std::string strTimeType = attTimeType->as_string(0);
-		if (strTimeType == "daily mean climatology") {
-			vecTimes.m_dimtype = NcTimeDimension::TimeDimType_DailyMean;
-		} else if (strTimeType == "monthly mean climatology") {
-			vecTimes.m_dimtype = NcTimeDimension::TimeDimType_MonthlyMean;
-		} else if (strTimeType == "seasonal mean climatology") {
-			vecTimes.m_dimtype = NcTimeDimension::TimeDimType_SeasonalMean;
-		} else if (strTimeType == "annual mean climatology") {
-			vecTimes.m_dimtype = NcTimeDimension::TimeDimType_AnnualMean;
+		if (strTimeType.find("climatology") != std::string::npos) {
+			if (strTimeType.find("daily") != std::string::npos) {
+				vecTimes.m_dimtype = NcTimeDimension::TimeDimType_DailyMean;
+			} else if (strTimeType.find("monthly") != std::string::npos) {
+				vecTimes.m_dimtype = NcTimeDimension::TimeDimType_MonthlyMean;
+			} else if (strTimeType.find("seasonal") != std::string::npos) {
+				vecTimes.m_dimtype = NcTimeDimension::TimeDimType_SeasonalMean;
+			} else if (strTimeType.find("annual") != std::string::npos) {
+				vecTimes.m_dimtype = NcTimeDimension::TimeDimType_AnnualMean;
+			}
 		}
 	}
 
@@ -887,13 +889,13 @@ void WriteCFTimeDataToNcFile(
 
 	if (vecTimes.dimtype() != NcTimeDimension::TimeDimType_Standard) {
 		if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_DailyMean) {
-			varTime->add_att("type", "daily mean climatology");
+			varTime->add_att("type", "daily climatology");
 		} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_MonthlyMean) {
-			varTime->add_att("type", "monthly mean climatology");
+			varTime->add_att("type", "monthly climatology");
 		} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_SeasonalMean) {
-			varTime->add_att("type", "seasonal mean climatology");
+			varTime->add_att("type", "seasonal climatology");
 		} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_AnnualMean) {
-			varTime->add_att("type", "annual mean climatology");
+			varTime->add_att("type", "annual climatology");
 		}
 	}
 }
