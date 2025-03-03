@@ -287,6 +287,7 @@ try {
 	NcVar * varOutputQuantile = NULL;
 
 	// Fill value
+	bool fFirstFileHasFillValue = false;
 	float dFillValue = std::numeric_limits<float>::max();
 
 	// Allocate space for counts
@@ -388,8 +389,9 @@ try {
 			varQuantile.LoadGridData(varreg, ncfilevec, grid);
 
 			// Get _FillValue if it exists
-			if (dFillValue == std::numeric_limits<float>::max()) {
+			if ((t == 0) && (!fFirstFileHasFillValue)) {
 				if (varQuantile.HasExplicitFillValue()) {
+					fFirstFileHasFillValue = true;
 					dFillValue = varQuantile.GetFillValueFloat();
 				}
 			}
@@ -444,7 +446,7 @@ try {
 			if (fMissingData) {
 				if (nRetainedTimeSlices == 0) {
 					for (size_t i = 0; i < sGridSize; i++) {
-						if ((data[i] == dFillValue) || (data[i] != data[i])) {
+						if ((data[i] == dFillValue) || std::isnan(data[i])) {
 							dBinEdges(i,0) = dFillValue;
 						} else if ((data[i] < dMinThreshold) || (data[i] > dMaxThreshold)) {
 							dBinEdges(i,0) = dFillValue;
@@ -456,7 +458,7 @@ try {
 
 				} else {
 					for (size_t i = 0; i < sGridSize; i++) {
-						if ((data[i] == dFillValue) || (data[i] != data[i])) {
+						if ((data[i] == dFillValue) || std::isnan(data[i])) {
 							continue;
 						}
 						if ((data[i] < dMinThreshold) || (data[i] > dMaxThreshold)) {
@@ -599,16 +601,27 @@ try {
 
 				const DataArray1D<float> & data = varQuantile.GetData();
 
-				// Get _FillValue if it exists
-				float dLocalFillValue = varQuantile.GetFillValueFloat();
-				if (dLocalFillValue != dFillValue) {
-					if (!std::isnan(dLocalFillValue) || !std::isnan(dFillValue)) {
-						_EXCEPTIONT("_FillValue attribute appears to change across files");
-					}
-				}
-
 				// Build histograms with missing data
 				if (fMissingData) {
+
+					// Check _FillValue if it exists
+					if (t == 0) {
+						if (!varQuantile.HasExplicitFillValue() && fFirstFileHasFillValue) {
+							_EXCEPTION2("_FillValue attribute is present in \"%s\" but not present in \"%s\"",
+								vecInputFiles[f].c_str(), vecInputFiles[0].c_str());
+						}
+						if (varQuantile.HasExplicitFillValue()) {
+							if (!fFirstFileHasFillValue) {
+								_EXCEPTION2("_FillValue attribute is not present in \"%s\" but present in \"%s\"",
+									vecInputFiles[f].c_str(), vecInputFiles[0].c_str());
+							}
+							if (varQuantile.GetFillValueFloat() != dFillValue) {
+								_EXCEPTION4("_FillValue attribute present in \"%s\" (%f) is not equal to value present in \"%s\" (%f)",
+									vecInputFiles[f].c_str(), varQuantile.GetFillValueFloat(),
+									vecInputFiles[0].c_str(), dFillValue);
+							}
+						}
+					}
 
 					// On first iteration expand bins if needed
 					if (it == 0) {
