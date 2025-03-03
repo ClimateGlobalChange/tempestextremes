@@ -607,12 +607,12 @@ try {
 					// Check _FillValue if it exists
 					if (t == 0) {
 						if (!varQuantile.HasExplicitFillValue() && fFirstFileHasFillValue) {
-							_EXCEPTION2("_FillValue attribute is present in \"%s\" but not present in \"%s\"",
+							_EXCEPTION2("_FillValue attribute is not present in \"%s\" but present in \"%s\"",
 								vecInputFiles[f].c_str(), vecInputFiles[0].c_str());
 						}
 						if (varQuantile.HasExplicitFillValue()) {
 							if (!fFirstFileHasFillValue) {
-								_EXCEPTION2("_FillValue attribute is not present in \"%s\" but present in \"%s\"",
+								_EXCEPTION2("_FillValue attribute is present in \"%s\" but not present in \"%s\"",
 									vecInputFiles[f].c_str(), vecInputFiles[0].c_str());
 							}
 							if (varQuantile.GetFillValueFloat() != dFillValue) {
