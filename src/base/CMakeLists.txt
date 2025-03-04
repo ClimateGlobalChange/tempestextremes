@@ -92,5 +92,3 @@ set_target_properties(
   extremesbase PROPERTIES
   LINKER_LANGUAGE CXX
 )
-
-install(TARGETS extremesbase)

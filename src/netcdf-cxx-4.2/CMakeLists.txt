@@ -27,5 +27,3 @@ target_link_libraries(
   NetCDF::NetCDF_C
   ${MPI_CXX_LIBRARIES}
 )
-
-install(TARGETS netcdf_c++)
