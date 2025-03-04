@@ -38,6 +38,15 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+enum AccumulationFrequency {
+	AccumulationFrequency_1h,
+	AccumulationFrequency_3h,
+	AccumulationFrequency_6h,
+	AccumulationFrequency_24h
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 int main(int argc, char** argv) {
 
 	// Turn off fatal errors in NetCDF
@@ -71,6 +80,9 @@ try {
 	// Accumulation frequency
 	std::string strAccumFrequency;
 
+	// Accumulate from previous times
+	bool fAccumBackward;
+
 	// Check for missing data
 	bool fMissingData;
 
@@ -90,7 +102,8 @@ try {
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineString(strOutputDataList, "out_data_list", "");
 		CommandLineStringD(strOp, "op", "sum", "[sum|avg|min|max]");
-		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|6h|daily]");
+		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|3h|6h|daily]");
+		CommandLineBool(fAccumBackward, "accumbackward");
 		CommandLineBool(fMissingData, "missingdata");
 		CommandLineString(strVariable, "var", "");
 		CommandLineString(strVariableOut, "varout", "");
@@ -186,19 +199,18 @@ try {
 	}
 
 	// Accumulation frequency (--accumfreq)
-	double dAccumulationSeconds = 0;
+	AccumulationFrequency eAccumulationFreq;
 	if (strAccumFrequency == "1h") {
-		dAccumulationSeconds = 3600.0;
+		eAccumulationFreq = AccumulationFrequency_1h;
+	} else if (strAccumFrequency == "3h") {
+		eAccumulationFreq = AccumulationFrequency_3h;
 	} else if (strAccumFrequency == "6h") {
-		dAccumulationSeconds = 3600.0 * 6.0;
+		eAccumulationFreq = AccumulationFrequency_6h;
 	} else if ((strAccumFrequency == "daily") || (strAccumFrequency == "24h")) {
-		dAccumulationSeconds = 3600.0 * 24.0;
+		eAccumulationFreq = AccumulationFrequency_24h;
 	} else {
-		_EXCEPTIONT("--accumfreq must be \"1h\", \"6h\" or \"daily\"");
+		_EXCEPTIONT("--accumfreq must be \"1h\", \"3h\", \"6h\" or \"daily\"");
 	}
-
-	// Current time
-	Time timeNext;
 
 	// Data
 	size_t sTotalSize = 1;
@@ -262,7 +274,7 @@ try {
 					vecVariableStrings[v].c_str(), vecInputFiles[f].c_str());
 			}
 	
-			// Get fillvalue
+			// Get FillValu
 			float dFillValue = std::numeric_limits<float>::max();
 			if (fMissingData) {
 				NcAtt * attFillValue = var->get_att("_FillValue");
@@ -298,29 +310,41 @@ try {
 				_EXCEPTION1("Time variable in file \"%s\" has zero length",
 					vecInputFiles[f].c_str());
 			}
-	
-			// First file, set start of accumulation period
-			if (f == 0) {
-				timeNext = vecTimes[0];
-			}
-	
-			// Write times
+
+			// Get output times
+			std::vector<int> iAccumIndex(vecTimes.size());
+
 			NcTimeDimension vecTimesOut;
 			vecTimesOut.m_nctype = vecTimes.m_nctype;
 			vecTimesOut.m_units = vecTimes.m_units;
 			vecTimesOut.m_dimtype = vecTimes.m_dimtype;
-	
-			Time timeNextTemp = timeNext;
-			for (size_t t = 0; t < vecTimes.size(); ) {
-				if (timeNextTemp <= vecTimes[t]) {
-					vecTimesOut.push_back(timeNextTemp);
-					timeNextTemp.AddSeconds(dAccumulationSeconds);
-				} else {
-					t++;
+			for (size_t t = 0; t < vecTimes.size(); t++) {
+				if ((t != 0) && (vecTimes[t] <= vecTimes[t-1])) {
+					_EXCEPTION1("Time values in file \"%s\" are not monotone increasing",
+						vecInputFiles[f].c_str());
 				}
+
+				Time timeRounded = vecTimes[t];
+				if (eAccumulationFreq == AccumulationFrequency_1h) {
+					timeRounded.SetSecond((timeRounded.GetSecond() / 3600) * 3600);
+				} else if (eAccumulationFreq == AccumulationFrequency_3h) {
+					timeRounded.SetSecond((timeRounded.GetSecond() / 10800) * 10800);
+				} else if (eAccumulationFreq == AccumulationFrequency_6h) {
+					timeRounded.SetSecond((timeRounded.GetSecond() / 21600) * 21600);
+				} else if (eAccumulationFreq == AccumulationFrequency_24h) {
+					timeRounded.SetSecond(0);
+				}
+				if (vecTimesOut.size() == 0) {
+					vecTimesOut.push_back(timeRounded);
+				} else if (timeRounded != vecTimesOut[vecTimesOut.size()-1]) {
+					vecTimesOut.push_back(timeRounded);
+				}
+				iAccumIndex[t] = vecTimesOut.size()-1;
 			}
-	
-			if ((v == 0) && (vecTimesOut.size() != 0)) {
+
+			iAccumIndex.push_back(-1);
+
+			if (v == 0) {
 				WriteCFTimeDataToNcFile(&ncfileout, vecOutputFiles[f], vecTimesOut);
 			}
 	
@@ -385,16 +409,59 @@ try {
 			}
 	
 			// Loop through all input times
-			int tout = 0;
-			for (size_t t = 0; t < vecTimes.size();) {
+			int iCurrentAccumIndex = iAccumIndex[0];
+			for (size_t t = 0; t < iAccumIndex.size(); t++) {
 	
-				// Accumulate data
-				if (timeNext >= vecTimes[t]) {
-					if (timeNext == vecTimes[t]) {
-						Announce("%s (accumulating & writing)", vecTimes[t].ToString().c_str());
-					} else {
-						Announce("%s %s (accumulating)", vecTimes[t].ToString().c_str(), timeNext.ToString().c_str());
+				// Write to file
+				if (iCurrentAccumIndex != iAccumIndex[t]) {
+					Announce("%s (writing)", vecTimesOut[iCurrentAccumIndex].ToString().c_str());
+	
+					if (m_eAccumOp == AccumulateDataOp_Avg) {
+						if (!fMissingData) {
+							for (size_t i = 0; i < sTotalSize; i++) {
+								dataAccum[i] /= static_cast<float>(nAccumulatedTimesteps);
+							}
+						} else {
+							for (size_t i = 0; i < sTotalSize; i++) {
+								dataAccum[i] /= static_cast<float>(dataAccumCount[i]);
+							}
+						}
 					}
+	
+					vecPos[0] = iCurrentAccumIndex;
+					varout->set_cur(&(vecPos[0]));
+					varout->put(&(dataAccum[0]), &(vecSize[0]));
+	
+					// Reset accumulation arrays
+					if ((m_eAccumOp == AccumulateDataOp_Sum) ||
+					    (m_eAccumOp == AccumulateDataOp_Avg)
+					) {
+						dataAccum.Zero();
+	
+						if (dataAccumCount.IsAttached()) {
+							dataAccumCount.Zero();
+						}
+	
+					} else if (m_eAccumOp == AccumulateDataOp_Min) {
+						for (size_t i = 0; i < sTotalSize; i++) {
+							dataAccum[i] = std::numeric_limits<float>::max();
+						}
+	
+					} else if (m_eAccumOp == AccumulateDataOp_Max) {
+						for (size_t i = 0; i < sTotalSize; i++) {
+							dataAccum[i] = -std::numeric_limits<float>::max();
+						}
+					}
+
+					iCurrentAccumIndex = iAccumIndex[t];
+					nAccumulatedTimesteps = 0;
+				}
+
+				// Accumulate data
+				if (iCurrentAccumIndex != (-1)) {
+					Announce("%s => %s (accumulating)",
+						vecTimes[t].ToString().c_str(),
+						vecTimesOut[iCurrentAccumIndex].ToString().c_str());
 	
 					nAccumulatedTimesteps++;
 	
@@ -464,57 +531,6 @@ try {
 							}
 						}
 					}
-				}
-	
-				// Write to file
-				if (timeNext <= vecTimes[t]) {
-					if (timeNext != vecTimes[t]) {
-						Announce("%s (writing)", timeNext.ToString().c_str());
-					} else {
-						t++;
-					}
-	
-					if ((m_eAccumOp == AccumulateDataOp_Avg) && (nAccumulatedTimesteps != 0)) {
-						if (!fMissingData) {
-							for (size_t i = 0; i < sTotalSize; i++) {
-								dataAccum[i] /= static_cast<float>(nAccumulatedTimesteps);
-							}
-						} else {
-							for (size_t i = 0; i < sTotalSize; i++) {
-								dataAccum[i] /= static_cast<float>(dataAccumCount[i]);
-							}
-						}
-					}
-	
-					vecPos[0] = tout;
-					varout->set_cur(&(vecPos[0]));
-					varout->put(&(dataAccum[0]), &(vecSize[0]));
-	
-					if ((m_eAccumOp == AccumulateDataOp_Sum) ||
-					    (m_eAccumOp == AccumulateDataOp_Avg)
-					) {
-						dataAccum.Zero();
-	
-						if (dataAccumCount.IsAttached()) {
-							dataAccumCount.Zero();
-						}
-	
-					} else if (m_eAccumOp == AccumulateDataOp_Min) {
-						for (size_t i = 0; i < sTotalSize; i++) {
-							dataAccum[i] = std::numeric_limits<float>::max();
-						}
-	
-					} else if (m_eAccumOp == AccumulateDataOp_Max) {
-						for (size_t i = 0; i < sTotalSize; i++) {
-							dataAccum[i] = -std::numeric_limits<float>::max();
-						}
-					}
-	
-					timeNext.AddSeconds(dAccumulationSeconds);
-					tout++;
-	
-				} else {
-					t++;
 				}
 			}
 	
