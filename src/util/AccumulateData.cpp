@@ -237,8 +237,23 @@ try {
 		vecSize.clear();
 
 		if (dataAccum.IsAttached()) {
-			dataAccum.Zero();
+			if ((m_eAccumOp == AccumulateDataOp_Sum) ||
+			    (m_eAccumOp == AccumulateDataOp_Avg)
+			) {
+				dataAccum.Zero();
+	
+			} else if (m_eAccumOp == AccumulateDataOp_Min) {
+				for (size_t i = 0; i < sTotalSize; i++) {
+					dataAccum[i] = std::numeric_limits<float>::max();
+				}
+	
+			} else if (m_eAccumOp == AccumulateDataOp_Max) {
+				for (size_t i = 0; i < sTotalSize; i++) {
+					dataAccum[i] = -std::numeric_limits<float>::max();
+				}
+			}
 		}
+
 		if (dataAccumCount.IsAttached()) {
 			dataAccumCount.Zero();
 		}
