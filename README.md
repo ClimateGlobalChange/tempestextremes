@@ -48,6 +48,13 @@ Installation via CMake
 =====================
 Using CMake, one can easily install TempestExtremes on different operational systems with the required compiler and dependencies. Dependencies can be downloaded and installed manually or via package management software (e.g., [Conda](https://docs.conda.io)) and specify environment variables to help CMake locate those dependencies (see CMake/FindNetCDF.cmake and [CMake help](https://cmake.org/cmake/help/latest/module/FindMPI.html)).
 
+General CMake configuration details:
+- **Install Prefix:** Specify an installation prefix via `-DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL` if desired.
+- **Build Type:** Manually set the build type ("Release" or "Debug") via `-DCMAKE_BUILD_TYPE=[Release/Debug]`.
+- **MPI Enable:** Manually enable or disable MPI support using `-DENABLE_MPI=ON` or `-DENABLE_MPI=OFF`.
+- **Out-of-Source Build:** For best practices, build files are written to `./build/bin` by default.
+- **Installation Locations:** Executables are installed to `./bin` and libraries/archives to `./lib`.
+
 ## Unix/Linux-Based Systems
 Use the following commands to compile on Unix- or Linux-based systems ([netCDF](https://downloads.unidata.ucar.edu/netcdf/) required):
 ```
@@ -73,6 +80,30 @@ cmake -G "Visual Studio 17" -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL ..
 3. Build the [Visual Studio project](https://learn.microsoft.com/en-us/visualstudio/ide/building-and-cleaning-projects-and-solutions-in-visual-studio).
 
 ## HPC Systems
+
+### NERSC Perlmutter
+Use the following commands to compile on [Perlmutter](https://docs.nersc.gov/systems/perlmutter/running-jobs/):
+```
+module load cray-hdf5
+module load cray-netcdf
+
+cd TEMPEST_EXTREMES_SOURCE_DIR
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=[Release/Debug] -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL ..
+make && make install
+```
+
+
+Also, a ready-to-run bash script (`./quick_make_perlmutter.sh`) is provided for building TempestExtremes on NERSC Perlmutter. This script automatically builds the project. One just needs to modify the following configuration options in the script into the desired one to run:
+```
+BUILD_TYPE="Debug"          # "Debug" or "Release"
+ENABLE_MPI="ON"             # "ON" or "OFF"
+OPTIMIZATION_LEVEL="-O0"    # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
+DEBUG_SYMBOLS="ON"          # "ON" to include debug symbols (-g), "OFF" to exclude
+```
+After setting the desired options, simply execute: `./quick_make_perlmutter.sh` to configure, build, and install TempestExtremes on Perlmutter.
+
 ### NCAR Derecho
 Use the following commands to compile on [Derecho](https://ncar-hpc-docs.readthedocs.io/en/latest/compute-systems/derecho/compiling-code-on-derecho/):
 ```
