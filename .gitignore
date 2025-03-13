@@ -1,56 +1,59 @@
+# Top-level build and binary directories
+/bin/
+/build/
 
+# Build directories
 src/build/*
 
+# Dependency directories
 src/depend/*
 
+# Temporary and swap files
 *.swp
 
+# NetCDF and object files
 *.nc
-
 *.o
-
 *.d
 
+# Static libraries and archives
 *.a
-
 *.tar.gz
 
-bin/*
-
-test
-
+# Test data and directories
+test/
 test/*.nc
-
 test/*.nc4
-
 test/*.dat
-
 test/*.txt
-
 test/*.g
-
 test/cfsr_tests
-
 test/*.eps
-
 test/*.png
-
 test/statfigs/*
 
+# Editor settings
 .vscode/
 
+# CMake generated files (top-level)
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+Makefile
+install_manifest.txt
+
+# CMake generated files in src
+src/Makefile
+
+# CMake generated files in subdirectories
 src/base/cmake_install.cmake
 src/blobs/cmake_install.cmake
 src/blocking/cmake_install.cmake
 src/netcdf-cxx-4.2/cmake_install.cmake
 src/nodes/cmake_install.cmake
 src/sandbox/cmake_install.cmake
-Makefile
-src/Makefile
 src/util/cmake_install.cmake
+
 src/base/Makefile
 src/blobs/Makefile
 src/blocking/Makefile
@@ -58,5 +61,3 @@ src/netcdf-cxx-4.2/Makefile
 src/nodes/Makefile
 src/sandbox/Makefile
 src/util/Makefile
-install_manifest.txt
-
