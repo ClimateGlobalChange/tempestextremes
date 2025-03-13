@@ -1,4 +1,4 @@
-# Copyright (c) 2025      Kian Huang
+# Copyright (c) 2025      Kian Huang, Hongyu Chen
 #
 # Distributed under the Boost Software License, Version 1.0. (See accompanying
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -98,8 +98,18 @@ target_link_libraries(VariableProcessor PUBLIC extremesbase netcdf_c++ ${MPI_CXX
 
 install(
   TARGETS
-  AccumulateData AccumulateERA5Forecast AutoCuratorTool Climatology
-  FourierFilter GenerateConnectivityFile GenerateNearestNeighborMap
-  IntegrateDimension LagrangianParcelTracker QuantileCalculator ShapefileMask
-  VariableProcessor
+    AccumulateData
+    AccumulateERA5Forecast
+    AutoCuratorTool
+    Climatology
+    FourierFilter
+    GenerateConnectivityFile
+    GenerateNearestNeighborMap
+    IntegrateDimension
+    LagrangianParcelTracker
+    QuantileCalculator
+    ShapefileMask
+    VariableProcessor
+  RUNTIME DESTINATION bin
 )
+

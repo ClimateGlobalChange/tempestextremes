@@ -1,4 +1,4 @@
-# Copyright (c) 2025      Kian Huang
+# Copyright (c) 2025      Kian Huang, Hongyu Chen
 #
 # Distributed under the Boost Software License, Version 1.0. (See accompanying
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -26,4 +26,10 @@ target_link_libraries(
   PUBLIC
   NetCDF::NetCDF_C
   ${MPI_CXX_LIBRARIES}
+)
+
+# Install the static library to the "lib" folder
+install(
+  TARGETS netcdf_c++
+  ARCHIVE DESTINATION lib
 )

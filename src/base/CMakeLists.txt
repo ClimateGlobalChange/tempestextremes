@@ -1,4 +1,4 @@
-# Copyright (c) 2025      Kian Huang
+# Copyright (c) 2025      Kian Huang, Hongyu Chen
 #
 # Distributed under the Boost Software License, Version 1.0. (See accompanying
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -91,4 +91,10 @@ target_include_directories(extremesbase
 set_target_properties(
   extremesbase PROPERTIES
   LINKER_LANGUAGE CXX
+)
+
+# Install the static library to the "./lib" folder
+install(
+  TARGETS extremesbase
+  ARCHIVE DESTINATION lib
 )

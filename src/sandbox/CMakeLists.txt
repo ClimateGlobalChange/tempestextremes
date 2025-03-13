@@ -1,4 +1,4 @@
-# Copyright (c) 2025      Kian Huang
+# Copyright (c) 2025      Kian Huang, Hongyu Chen
 #
 # Distributed under the Boost Software License, Version 1.0. (See accompanying
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -26,6 +26,6 @@ add_executable(CompressBlobs ${COMPRESS_BLOBS_FILES})
 target_link_libraries(CompressBlobs PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
 
 install(
-  TARGETS
-  SpineARs CompressBlobs
+  TARGETS SpineARs CompressBlobs
+  RUNTIME DESTINATION bin
 )
