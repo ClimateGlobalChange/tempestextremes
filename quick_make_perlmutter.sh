@@ -4,10 +4,10 @@
 #This script should always be run under the root directory of the project
 
 # Configuration Options
-BUILD_TYPE="Debug"          # "Debug" or "Release"
+BUILD_TYPE="Release"          # "Debug" or "Release"
 ENABLE_MPI="ON"             # "ON" or "OFF"
 OPTIMIZATION_LEVEL="-O0"    # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
-DEBUG_SYMBOLS="ON"          # "ON" to include debug symbols (-g), "OFF" to exclude
+DEBUG_SYMBOLS="OFF"          # "ON" to include debug symbols (-g), "OFF" to exclude
 
 ./remove_depend.sh
 

@@ -97,10 +97,10 @@ make && make install
 
 Also, a ready-to-run bash script (`./quick_make_perlmutter.sh`) is provided for building TempestExtremes on NERSC Perlmutter. This script automatically builds the project. One just needs to modify the following configuration options in the script into the desired one to run:
 ```
-BUILD_TYPE="Debug"          # "Debug" or "Release"
+BUILD_TYPE="Release"          # "Debug" or "Release"
 ENABLE_MPI="ON"             # "ON" or "OFF"
 OPTIMIZATION_LEVEL="-O0"    # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
-DEBUG_SYMBOLS="ON"          # "ON" to include debug symbols (-g), "OFF" to exclude
+DEBUG_SYMBOLS="OFF"          # "ON" to include debug symbols (-g), "OFF" to exclude
 ```
 After setting the desired options, simply execute: `./quick_make_perlmutter.sh` to configure, build, and install TempestExtremes on Perlmutter.
 
