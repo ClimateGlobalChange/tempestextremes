@@ -1,5 +1,5 @@
-TempestExtremes
-================
+# TempestExtremes
+
 
 Author:  Paul Ullrich
 Email:   paullrich@ucdavis.edu
@@ -14,8 +14,8 @@ Redistribution and use in source and binary forms, with or without modification,
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Installation via conda
-======================
+# Installation via conda
+
 TempestExtremes can be found on conda-forge here:
 
 https://anaconda.org/conda-forge/tempest-extremes
@@ -24,40 +24,21 @@ To install from conda use the command line:
 
 ```conda install -c conda-forge tempest-extremes```
 
-Installation via make
-=====================
-TempestExtremes uses a basic make-based build system that has been tested in multiple Unix and Linux based environments.  TempestExtremes currently only requires the NetCDF C library provided as an external dependency.  Linker commands needed to include -lnetcdf must be specified in a system makefile found in mk/system/.  Once the compiler executable and flags have been set, executing "make" in the tempestextremes directory will perform the build, storing binaries in the "bin" directory.
 
-To compile on NERSC Cori:
-Execute "module load cray-netcdf" prior to compilation.  Compiler executable and flags are specified in mk/system/cori.make.
+# Installation via CMake
 
-To compile on NCAR systems, including Cheyenne and Casper:
-No modifications are needed.  Compiler executable and flags are specified in mk/system/cheyenne.make.
-
-To prepare compilation on MacOSX:
-Modify mk/system/macosx.make to specify desired compiler executable and flags.
-
-To prepare compilation on another Unix- or Linux-based system:
-Modify mk/system/default.make to specify appropriate compiler executable and flags.
-
-Parallel compilation with MPI is enabled by default.  To compile TempestExtremes as a serial product edit "mk/config.mk" and change "PARALLEL= MPIOMP" to "PARALLEL=NONE".
-
-Note:  If the build fails or is cancelled part way through the process, it may be necessary to remove extraneous dependency files.  To do so run "remove_depend.sh" prior to recompiling.
-
-Installation via CMake
-=====================
 TempestExtremes can be built and installed on various systems using CMake. Our new script, `./quick_make_general.sh`, automatically detects your system and loads any required modules before building.
 
-General CMake Configuration
-----------------------------
+## General CMake Configuration
+
 - **Install Prefix:** Set with `-DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL`. By default, it installs to the project root, with executables placed in `TEMPEST_EXTREMES_SOURCE_DIR/bin`.
 - **Build Type:** Specify via `-DCMAKE_BUILD_TYPE=[Release/Debug]`.
 - **MPI Support:** Enable or disable using `-DENABLE_MPI=ON` or `-DENABLE_MPI=OFF`.
 - **Out-of-Source Build:** Build files are generated in `./build/bin` (keeping the source directory clean).
 - **Installation Locations:** Final executables are installed to `./bin` and libraries/archives to `./lib`.
 
-Quick-Make Scripts
-----------------------------
+## Quick-Make Scripts
+
 ### System Detection in `quick_make_general.sh`
 - **MacOS/Linux (Generic):** The script runs the default commands.
 - **NERSC Perlmutter:** The script automatically loads `cray-hdf5` and `cray-netcdf` modules before building.
