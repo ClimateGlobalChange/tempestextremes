@@ -46,40 +46,45 @@ Note:  If the build fails or is cancelled part way through the process, it may b
 
 Installation via CMake
 =====================
-Using CMake, one can easily install TempestExtremes on different operational systems with the required compiler and dependencies. Dependencies can be downloaded and installed manually or via package management software (e.g., [Conda](https://docs.conda.io)) and environment variables can be set to help CMake locate those dependencies (see CMake/FindNetCDF.cmake and [CMake help](https://cmake.org/cmake/help/latest/module/FindMPI.html)).
+TempestExtremes can be built and installed on various systems using CMake. Our new script, `./quick_make_general.sh`, automatically detects your system and loads any required modules before building.
 
-General CMake configuration details:
-- **Install Prefix:** Specify an installation prefix via `-DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL` if desired. The default will be at the source directory of the project.
-- **Build Type:** Manually set the build type ("Release" or "Debug") via `-DCMAKE_BUILD_TYPE=[Release/Debug]`.
-- **MPI Enable:** Manually enable or disable MPI support using `-DENABLE_MPI=ON` or `-DENABLE_MPI=OFF`.
-- **Out-of-Source Build:** For best practices, build files are written to `./build/bin` by default.
-- **Installation Locations:** Executables are installed to `./bin` and libraries/archives to `./lib`.
+General CMake Configuration
+----------------------------
+- **Install Prefix:** Set with `-DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL`. By default, it installs to the project root, with executables placed in `TEMPEST_EXTREMES_SOURCE_DIR/bin`.
+- **Build Type:** Specify via `-DCMAKE_BUILD_TYPE=[Release/Debug]`.
+- **MPI Support:** Enable or disable using `-DENABLE_MPI=ON` or `-DENABLE_MPI=OFF`.
+- **Out-of-Source Build:** Build files are generated in `./build/bin` (keeping the source directory clean).
+- **Installation Locations:** Final executables are installed to `./bin` and libraries/archives to `./lib`.
+
+Quick-Make Scripts
+----------------------------
+### System Detection in `quick_make_general.sh`
+- **MacOS/Linux (Generic):** The script runs the default commands.
+- **NERSC Perlmutter:** The script automatically loads `cray-hdf5` and `cray-netcdf` modules before building.
+- **NCAR Derecho:** The script loads required modules such as `ncarenv`, `ncarcompilers`, `intel`, `cray-mpich`, and `netcdf`.
+- **Windows:** The script prompts you to follow the Windows instructions (see **Windows (Experimental)** below).
+- **Unknown/Other:** If your system isn’t recognized or errors occur (often due to non-standard dependency paths), don’t panic—simply run the commands manually starting from `./remove_depend.sh`.
 
 Notes:
 - **For End Users:**  
-  If you are an end user and want a clean structure with only the final deliverables, simply run the provided "quick make" scripts. The executables will be copied to `./bin`, and the script will remove the build directory after installation by default.
+  If you only need the final deliverables, run the quick-make script. It will install executables to `./bin` and (by default) remove the build directory for a clean structure.
 
 - **For Developers:**  
-  The `./build` directory is used for development and debugging—it holds all intermediate build files, which helps with faster incremental builds. It is recommended to keep the build directory intact during development and comment out any cleanup steps that remove it if you are running one of those provided "quick make" scripts.
+  The `./build` directory is used for development and debugging. It contains all intermediate files, which helps speed up incremental builds. Developers should keep the build directory intact (by commenting out the cleanup step) for faster rebuilds.  
 
-Quick-Make Scripts
-------------------
-Two scripts are provided:
-- `./quick_make_general.sh` for general systems.
-- `./quick_make_perlmutter.sh` for NERSC Perlmutter.
 
-To use them, update the configuration options in the script:
+To use `./quick_make_general.sh` , update the configuration options in the script:
 ```bash
 # Configuration Options
 BUILD_TYPE="Release"          # "Debug" or "Release"
 ENABLE_MPI="ON"               # "ON" or "OFF"
-OPTIMIZATION_LEVEL="-O0"      # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
+OPTIMIZATION_LEVEL="-O3"      # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
 DEBUG_SYMBOLS="OFF"           # "ON" to include debug symbols (-g), "OFF" to exclude
 INSTALL_PREFIX=""             # Specify the installation directory. If left blank, it defaults to 
                               # the project root (TEMPEST_EXTREMES_SOURCE_DIR) and final executables 
                               # will be installed in TEMPEST_EXTREMES_SOURCE_DIR/bin.
 ```
-The run `./quick_make_general.sh` or `./quick_make_perlmutter.sh` for NERSC Perlmutter.
+The run `./quick_make_general.sh`.
 
 ## Unix/Linux-Based Systems
 Use the following commands to compile on Unix- or Linux-based systems ([netCDF](https://downloads.unidata.ucar.edu/netcdf/) required):
@@ -119,7 +124,6 @@ cd build
 cmake -DCMAKE_BUILD_TYPE=[Release/Debug] -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL ..
 make && make install
 ```
-Additionally, a ready-to-run script (`./quick_make_perlmutter.sh`) is provided for Perlmutter. Simply update its configuration options and run `./quick_make_perlmutter.sh`
 
 ### NCAR Derecho
 Use the following commands to compile on [Derecho](https://ncar-hpc-docs.readthedocs.io/en/latest/compute-systems/derecho/compiling-code-on-derecho/):
@@ -135,6 +139,63 @@ cd build
 cmake -DCMAKE_BUILD_TYPE=[Release/Debug] -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL ..
 make && make install
 ```
+
+## Developer Notes
+
+
+1. **Using the Quick Make Script:**  
+   If you are a developer using `./quick_make_general.sh`, remember to comment out or remove the cleanup step at the end (e.g. `make clean`). It's not efficient to rebuild the entire project every time you make changes—this script is mainly for a full rebuild or for end users who want a clean install. For faster incremental builds during development, build manually so that intermediate files are preserved.
+
+2. **Adding New Executables:**  
+   To add a new executable to the project, follow these steps:
+
+   **Example: Adding a New Executable**  
+   For example, to add `NewBlobsFeature`:
+   1. **Edit the CMakeLists.txt File:**  
+      Open the appropriate file (e.g., `src/blobs/CMakeLists.txt`) and add:
+      ```cmake
+      add_executable(NewBlobsFeature NewBlobsFeature.cpp)
+      target_link_libraries(NewBlobsFeature PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
+      ```
+   2. **Update the Install Rule:**  
+      Modify the install command in the same CMakeLists.txt to include the new executable:
+      ```cmake
+      install(
+        TARGETS BlobStats DetectBlobs PersistentBlobs StitchBlobs NewBlobsFeature
+        RUNTIME DESTINATION bin
+      )
+      ```
+      This ensures that `NewBlobsFeature` will be copied to `./bin` when you run `make install`.
+
+3. **Combining Multiple Files into One Executable:**  
+   If your new executable requires multiple source files, do the following:
+
+   **Example: Combining Multiple Files into One Executable**  
+   For instance, to create an executable named `BlockingUtilities` from multiple files:
+   1. **Edit the CMakeLists.txt File:**  
+      Open `src/blocking/CMakeLists.txt` and add:
+      ```cmake
+      list(APPEND BLOCKINGUTILITIES
+        BlockingUtilities.h
+        BlockingUtilities.cpp
+        MoreBlockingUtilities.cpp
+      )
+
+      add_executable(BlockingUtilities ${BLOCKINGUTILITIES})
+      target_link_libraries(BlockingUtilities PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
+      ```
+   2. **Update the Install Rule:**  
+      Ensure that the new target is included in the install command:
+      ```cmake
+      install(
+        TARGETS BlockingUtilities
+        RUNTIME DESTINATION bin
+      )
+      ```
+
+By following these guidelines, you can efficiently develop and extend TempestExtremes while keeping a clean separation between the build artifacts and the final deliverables.
+
+
 
 Usage
 =====

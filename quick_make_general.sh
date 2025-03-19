@@ -1,10 +1,12 @@
 #!/bin/bash
 # 2025, Hongyu Chen
 
+
+
+
 # This script should always be run under the root directory of the project.
 # It provides a general, quick command to build the project.
-# Please ensure the required NetCDF and HDF5 (and MPI, if needed) modules are loaded.
-# For specific systems like NERSC Perlmutter, use the dedicated script (./quick_make_perlmutter.sh).
+# Please ensure the required NetCDF and HDF5 (and MPI, if needed) are available.
 
 # Configuration Options
 BUILD_TYPE="Release"          # "Debug" or "Release"
@@ -14,6 +16,57 @@ DEBUG_SYMBOLS="OFF"           # "ON" to include debug symbols (-g), "OFF" to exc
 INSTALL_PREFIX=""             # Specify the installation directory.
                               # If left blank, it defaults to the project root (TEMPEST_EXTREMES_SOURCE_DIR)
                               # and final executables will be installed in TEMPEST_EXTREMES_SOURCE_DIR/bin.
+
+./remove_depend.sh
+
+
+
+# Detect system type
+OS_TYPE="$(uname -s)"
+SYSTEM_TYPE=""
+
+if [ "$OS_TYPE" == "Darwin" ]; then
+    SYSTEM_TYPE="MacOS/Linux"
+elif [ "$OS_TYPE" == "Linux" ]; then
+    # Check for NERSC Perlmutter: expect NERSC_HOST set to "perlmutter"
+    if [ -n "$NERSC_HOST" ] && [ "$NERSC_HOST" = "perlmutter" ]; then
+        SYSTEM_TYPE="NERSC Perlmutter"
+    # Check if hostname contains "derecho" (case-insensitive)
+    elif echo "$HOSTNAME" | grep -qi "derecho"; then
+        SYSTEM_TYPE="NCAR Derecho"
+    else
+        SYSTEM_TYPE="MacOS/Linux"
+    fi
+elif [[ "$OS_TYPE" == *"CYGWIN"* || "$OS_TYPE" == *"MINGW"* || "$OS_TYPE" == *"MSYS"* ]]; then
+    SYSTEM_TYPE="Windows"
+else
+    SYSTEM_TYPE="Unknown"
+fi
+
+echo "Detected system: ${SYSTEM_TYPE}"
+
+# System-specific module loading
+if [ "$SYSTEM_TYPE" = "MacOS/Linux" ]; then
+    echo "Running on MacOS/Linux. Proceeding with default configuration..."
+    # No additional module load commands needed.
+elif [ "$SYSTEM_TYPE" = "NERSC Perlmutter" ]; then
+    echo "Loading modules for NERSC Perlmutter..."
+    module load cray-hdf5
+    module load cray-netcdf
+elif [ "$SYSTEM_TYPE" = "NCAR Derecho" ]; then
+    echo "Loading modules for NCAR Derecho..."
+    module load ncarenv/23.09
+    module load ncarcompilers/1.0.0
+    module load intel/2023.2.1
+    module load cray-mpich/8.1.27
+    module load netcdf/4.9.2
+elif [ "$SYSTEM_TYPE" = "Windows" ]; then
+    echo "Windows detected. Please follow the README instructions for Windows build."
+    exit 1
+else
+    echo "Unable to detect the system. Please refer to the README instructions or mannually try commands in ./quick_make_general.sh."
+    exit 1
+fi
 
 ./remove_depend.sh
 
@@ -81,3 +134,4 @@ echo "Build and installation completed successfully."
 # Developers or those debugging might prefer to keep it for faster incremental builds.
 make clean
 echo "Cleaned up the ${SRC_DIR}/build directory. All executables are located in ${INSTALL_PREFIX}/bin."
+
