@@ -93,7 +93,7 @@ make && make install
 
 ## Windows (Experimental)
 Follow these steps to compile on the Windows system ([Visual Studio](https://visualstudio.microsoft.com) and [CMake](https://cmake.org/download/) required):
-1. Download and install [netCDF](https://downloads.unidata.ucar.edu/netcdf/)(required) and [Microsoft MPI](https://learn.microsoft.com/en-us/message-passing-interface/microsoft-mpi)(optional but recommended).
+1. Download and install [netCDF](https://downloads.unidata.ucar.edu/netcdf/) and [Microsoft MPI](https://learn.microsoft.com/en-us/message-passing-interface/microsoft-mpi). Select "Add netCDF to the system PATH for the current user" when instaling netCDF.
 2. Use the following PowerShell commands to generate a Visual Studio project.
 ```
 $Env:MSMPI_LIB64="MSMPI_SDK_ROOT/Lib/x64"
@@ -101,9 +101,9 @@ $Env:MSMPI_INC="MSMPI_SDK_ROOT/Include"
 cd TEMPEST_EXTREMES_SOURCE_DIR
 mkdir build
 cd build
-cmake -G "Visual Studio 17" -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL ..
+cmake -G "Visual Studio 17" -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL -DNetCDF_ROOT=YOUR_NETCDF_INSTALLATION_PATH ..
 ```
-3. Build the [Visual Studio project](https://learn.microsoft.com/en-us/visualstudio/ide/building-and-cleaning-projects-and-solutions-in-visual-studio).
+3. Open the `tempestextremes.sln` file in the `./build` directory with Visual Studio and Build the software by clicking "Build" and "Build INSTALL" at the top menu bar. [Learn more about building Visual Studio projects](https://learn.microsoft.com/en-us/visualstudio/ide/building-and-cleaning-projects-and-solutions-in-visual-studio). 
 
 ## HPC Systems
 

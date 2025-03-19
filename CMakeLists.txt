@@ -40,4 +40,10 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
-# Remove add_subdirectory(src)
+add_subdirectory(src)
+
+# Ensure the runtime output directory exists.
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
+# Install rule: copy all files from the build's bin directory to the install prefix's bin directory.
+install(DIRECTORY "${CMAKE_BINARY_DIR}/bin/" DESTINATION bin)

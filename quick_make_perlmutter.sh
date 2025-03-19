@@ -76,9 +76,8 @@ echo "Build and installation completed successfully."
 # It contains all intermediate build files and temporary artifacts.
 # The final, user-deliverable executables are installed to ./bin.
 # It is not recommended to mix these directories.
-#
+
 # For end users who want a clean structure, you can remove the build directory.
 # Developers or those debugging might prefer to keep it for faster incremental builds.
-BUILD_DIR="${SRC_DIR}/build"
-rm -rf "$BUILD_DIR"
+make clean
 echo "Cleaned up the ${SRC_DIR}/build directory. All executables are located in ${INSTALL_PREFIX}/bin."
