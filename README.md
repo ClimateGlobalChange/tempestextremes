@@ -68,13 +68,23 @@ INSTALL_PREFIX=""             # Specify the installation directory. If left blan
 ```
 The run `./quick_make_unix.sh`.
 
-## Unix/Linux-Based Systems
-Use the following commands to compile on Unix- or Linux-based systems ([netCDF](https://downloads.unidata.ucar.edu/netcdf/) required):
+## Unix/Linux-Based Systems (Manual Install)
+
+If you are using Nersc Permultter, you will need to run this first:
+```
+module load cray-hdf5
+module load cray-netcdf
+```
+If you are using NCAR Derecho, you will need to run this first:
+```
+module load cmake ncarenv gcc craype cray-mpich hdf5 netcdf
+```
+Use the following commands to compile on Unix- or Linux-based systems ):
 ```
 cd TEMPEST_EXTREMES_SOURCE_DIR
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=[Release/Debug] -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL -DNetCDF_PATH=NETCDF_ROOT -DCMAKE_PREFIX_PATH=MPI_ROOT ..
+cmake -DCMAKE_BUILD_TYPE=[Release/Debug] -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL -DCMAKE_PREFIX_PATH=MPI_ROOT ..
 make && make install
 ```
 
@@ -92,34 +102,6 @@ cmake -G "Visual Studio 17" -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL -DNetCDF_ROOT
 ```
 3. Open the `tempestextremes.sln` file in the `./build` directory with Visual Studio and Build the software by clicking "Build" and "Build INSTALL" at the top menu bar. [Learn more about building Visual Studio projects](https://learn.microsoft.com/en-us/visualstudio/ide/building-and-cleaning-projects-and-solutions-in-visual-studio). 
 
-## HPC Systems
-
-### NERSC Perlmutter
-Use the following commands to compile on [Perlmutter](https://docs.nersc.gov/systems/perlmutter/running-jobs/):
-```
-# Load required modules
-module load cray-hdf5
-module load cray-netcdf
-
-cd TEMPEST_EXTREMES_SOURCE_DIR
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=[Release/Debug] -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL ..
-make && make install
-```
-
-### NCAR Derecho
-Use the following commands to compile on [Derecho](https://ncar-hpc-docs.readthedocs.io/en/latest/compute-systems/derecho/compiling-code-on-derecho/):
-```
-# Load required modules
-module load cmake ncarenv gcc craype cray-mpich hdf5 netcdf
-
-cd TEMPEST_EXTREMES_SOURCE_DIR
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=[Release/Debug] -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL ..
-make && make install
-```
 
 ## Developer Notes
 
