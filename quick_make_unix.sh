@@ -55,11 +55,12 @@ elif [ "$SYSTEM_TYPE" = "NERSC Perlmutter" ]; then
     module load cray-netcdf
 elif [ "$SYSTEM_TYPE" = "NCAR Derecho" ]; then
     echo "Loading modules for NCAR Derecho..."
-    module load ncarenv/23.09
-    module load ncarcompilers/1.0.0
-    module load intel/2023.2.1
-    module load cray-mpich/8.1.27
-    module load netcdf/4.9.2
+    module load cmake
+    module load ncarenv
+    module load ncarcompilers
+    module load intel
+    module load cray-mpich
+    module load netcdf
 elif [ "$SYSTEM_TYPE" = "Windows" ]; then
     echo "Windows detected. Please follow the README instructions for Windows build or manually run the commands in your bash enviroment."
     exit 1
