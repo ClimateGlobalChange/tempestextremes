@@ -97,6 +97,7 @@ cmake -G "Visual Studio 17" -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL -DNetCDF_ROOT
 ### NERSC Perlmutter
 Use the following commands to compile on [Perlmutter](https://docs.nersc.gov/systems/perlmutter/running-jobs/):
 ```
+# Load required modules
 module load cray-hdf5
 module load cray-netcdf
 
@@ -110,11 +111,9 @@ make && make install
 ### NCAR Derecho
 Use the following commands to compile on [Derecho](https://ncar-hpc-docs.readthedocs.io/en/latest/compute-systems/derecho/compiling-code-on-derecho/):
 ```
-module load ncarenv/23.09
-module load ncarcompilers/1.0.0
-module load intel/2023.2.1
-module load cray-mpich/8.1.27
-module load netcdf/4.9.2
+# Load required modules
+module load cmake ncarenv gcc craype cray-mpich hdf5 netcdf
+
 cd TEMPEST_EXTREMES_SOURCE_DIR
 mkdir build
 cd build
