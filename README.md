@@ -128,7 +128,7 @@ make && make install
    If you are a developer using `./quick_make_general.sh`, remember to comment out or remove the cleanup step at the end (e.g. `make clean`). It's not efficient to rebuild the entire project every time you make changes—this script is mainly for a full rebuild or for end users who want a clean install. For faster incremental builds during development, build manually so that intermediate files are preserved.
 
 2. **Adding New Executables:**  
-   To add a new executable to the project, follow these steps:
+   To add a new executable to the project, refer to following examples:
 
    **Example: Adding a New Executable**  
    For example, to add `NewBlobsFeature`:
