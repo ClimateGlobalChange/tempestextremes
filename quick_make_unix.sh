@@ -61,7 +61,7 @@ elif [ "$SYSTEM_TYPE" = "NCAR Derecho" ]; then
     module load cray-mpich/8.1.27
     module load netcdf/4.9.2
 elif [ "$SYSTEM_TYPE" = "Windows" ]; then
-    echo "Windows detected. Please follow the README instructions for Windows build."
+    echo "Windows detected. Please follow the README instructions for Windows build or manually run the commands in your bash enviroment."
     exit 1
 else
     echo "Unable to detect the system. Please refer to the README instructions or mannually try commands in ./quick_make_general.sh."

@@ -37,14 +37,15 @@ TempestExtremes can be built and installed on various systems using CMake. Our n
 - **Out-of-Source Build:** Build files are generated in `./build/bin` (keeping the source directory clean).
 - **Installation Locations:** Final executables are installed to `./bin` and libraries/archives to `./lib`.
 
-## Quick-Make Scripts
-
-### System Detection in `quick_make_general.sh`
+## Quick-Make Scripts for generic Linux/Unix based systems
+A ready-to-use `./quick_make_unix.sh` script is available for end users to run on common UNIX-based platforms such as MacOS and Linux, as well as on command HPC systems like NERSC Perlmutter and NCAR Derecho.
+### System/Platforms Detection in `quick_make_unix.sh`
 - **MacOS/Linux (Generic):** The script runs the default commands.
 - **NERSC Perlmutter:** The script automatically loads `cray-hdf5` and `cray-netcdf` modules before building.
 - **NCAR Derecho:** The script loads required modules such as `ncarenv`, `ncarcompilers`, `intel`, `cray-mpich`, and `netcdf`.
-- **Windows:** The script prompts you to follow the Windows instructions (see **Windows (Experimental)** below).
-- **Unknown/Other:** If your system isn’t recognized or errors occur (often due to non-standard dependency paths), don’t panic—simply run the commands manually starting from `./remove_depend.sh`.
+- **Windows:** This bash script is prepared for UNIX-like environments. If you're on Windows, please refer to the Windows instructions below. If you have a bash environment on Windows but the script fails to run automatically, simply run the commands manually starting from `./remove_depend.sh`.
+- **Unknown/Other:** If your system isn’t recognized or errors occur (often due to non-standard dependency paths), don’t panic—simply run the commands manually starting from `./remove_depend.sh` and fix the related errors shown in the terminal.
+
 
 Notes:
 - **For End Users:**  
@@ -54,7 +55,7 @@ Notes:
   The `./build` directory is used for development and debugging. It contains all intermediate files, which helps speed up incremental builds. Developers should keep the build directory intact (by commenting out the cleanup step) for faster rebuilds.  
 
 
-To use `./quick_make_general.sh` , update the configuration options in the script:
+To use `./quick_make_unix.sh` , update the configuration options in the script:
 ```bash
 # Configuration Options
 BUILD_TYPE="Release"          # "Debug" or "Release"
@@ -65,7 +66,7 @@ INSTALL_PREFIX=""             # Specify the installation directory. If left blan
                               # the project root (TEMPEST_EXTREMES_SOURCE_DIR) and final executables 
                               # will be installed in TEMPEST_EXTREMES_SOURCE_DIR/bin.
 ```
-The run `./quick_make_general.sh`.
+The run `./quick_make_unix.sh`.
 
 ## Unix/Linux-Based Systems
 Use the following commands to compile on Unix- or Linux-based systems ([netCDF](https://downloads.unidata.ucar.edu/netcdf/) required):
