@@ -27,7 +27,7 @@ To install from conda use the command line:
 
 # Installation via CMake
 
-TempestExtremes can be built and installed on various systems using CMake. Our new script, `./quick_make_general.sh`, automatically detects your system and loads any required modules before building.
+TempestExtremes can be built and installed on various systems using CMake. Our new script, `./quick_make_unix.sh`, automatically detects your platform(UNIX-based systems only) and loads any required modules before building.
 
 ## General CMake Configuration
 
