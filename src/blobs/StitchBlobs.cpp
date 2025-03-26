@@ -22,6 +22,7 @@
 #include "CoordTransforms.h"
 #include "BlobUtilities.h"
 #include <cmath>
+#include <memory>
 
 #include "CommandLine.h"
 #include "Exception.h"
@@ -441,8 +442,8 @@ class TagCollectiveOP {
 
 			if (rank == 0) {
 				// For Tags
-				std::vector<int> arrayScatterCounts(size);
-				std::vector<int> arrayScatterDisplacements(size);
+				int arrayScatterCounts[size];
+				int arrayScatterDisplacements[size];
 				_ASSERT(vecScatterCounts.size() > 1);
 				arrayScatterCounts[0] = vecScatterCounts[0];
 				arrayScatterDisplacements[0] = 0;		
@@ -452,8 +453,8 @@ class TagCollectiveOP {
 				}
 
 				// For Tags Index
-				std::vector<int> arrayScatterCounts_index(size);
-				std::vector<int> arrayScatterDisplacements_index(size);
+				int arrayScatterCounts_index[size];
+				int arrayScatterDisplacements_index[size];
 				_ASSERT(vecScatterCounts_index.size() > 1);
 				arrayScatterCounts_index[0] = vecScatterCounts_index[0];
 				arrayScatterDisplacements_index[0] = 0;		
@@ -467,14 +468,14 @@ class TagCollectiveOP {
 				auto scatterBuffer = this->serialVecAllBlobTags;
 				this->serialVecAllBlobTags.clear();
 				this->serialVecAllBlobTags.resize(arrayScatterCounts[rank]);
-				MPI_Scatterv(scatterBuffer.data(), arrayScatterCounts.data(), arrayScatterDisplacements.data(), MPI_Tag_type, 
+				MPI_Scatterv(scatterBuffer.data(), arrayScatterCounts, arrayScatterDisplacements, MPI_Tag_type, 
 							serialVecAllBlobTags.data(), arrayScatterCounts[rank], MPI_Tag_type, 0, m_comm);
 
 				// For index
 				auto scatterBuffer_index = this->serialVecAllBlobTags_index;
 				this->serialVecAllBlobTags_index.clear();
 				this->serialVecAllBlobTags_index.resize(arrayScatterCounts_index[rank]);
-				MPI_Scatterv(scatterBuffer_index.data(), arrayScatterCounts_index.data(), arrayScatterDisplacements_index.data(), 
+				MPI_Scatterv(scatterBuffer_index.data(), arrayScatterCounts_index, arrayScatterDisplacements_index, 
 							MPI_INT, serialVecAllBlobTags_index.data(), arrayScatterCounts_index[rank], MPI_INT, 0, m_comm);
 	
 			} else {
@@ -1166,30 +1167,70 @@ class BlobsExchangeOp {
   		std::vector<MPI_Status> MPIstatuses;
 
 
-		///	<summary>
-		///		Serialize the vector<IndicatorSet> and generate the sendBlobsIndx array
-		///	</summary>
+		/// <summary>
+		/// 	Serialize the boundary core column from _vecAllBlobsWithGhosts and generate the sendBlobsIndx array.
+		/// 	For DIR_LEFT, we serialize the first core column; for DIR_RIGHT, we serialize the last core column.
+		/// 	Note: This function is only used on odd-numbered processors, where _vecAllBlobsWithGhosts holds only core data.
+		/// </summary>
 		void Serialize(){
+			// Get MPI rank and size.
+			int rank, size;
+			MPI_Comm_rank(m_comm, &rank);
+			MPI_Comm_size(m_comm, &size);
 
-			sendBlobs.clear();sendBlobsIndx.clear();
+			// For odd-numbered processors, no ghost columns exist.
+			int ghostLeft, ghostRight;
+			if (rank % 2 != 0) {
+				ghostLeft = 0;
+				ghostRight = 0;
+			} else {
+				// For even-numbered processors (which have been resized to include ghost cells):
+				// Include this implementation here just in case
+				ghostLeft = (rank == 0) ? 0 : 1;
+				ghostRight = (rank == size - 1) ? 0 : 1;
+			}
 			
-			sendBlobs.resize(2);sendBlobsIndx.resize(2);
-
+			// _vecAllBlobsWithGhosts is allocated to have:
+			// totalColumns = ghostLeft + coreColumns + ghostRight.
+			int totalColumns = static_cast<int>(_vecAllBlobsWithGhosts.size());
+			// Determine the number of core columns.
+			int coreColumns = totalColumns - ghostLeft - ghostRight;
+			
+			// Calculate indices of the core boundary columns.
+			int leftCoreIndex = ghostLeft;                // first core column.
+			int rightCoreIndex = ghostLeft + coreColumns - 1; // last core column.
+			
+			// Clear previous serialization data.
+			sendBlobs.clear();
+			sendBlobsIndx.clear();
+			sendBlobs.resize(2);
+			sendBlobsIndx.resize(2);
+			
+			// Iterate over both directions.
 			for (auto dir : {DIR_LEFT, DIR_RIGHT}) {
-				int curIndx = 0;//Point to the next empty slot for inserting a new set
-				std::vector<IndicatorSet> sendVecBlobs = (dir == DIR_LEFT)? _vecAllBlobs[0]:_vecAllBlobs[_vecAllBlobs.size()-1];//the vector of set that needs to be serialized
+				int curIndx = 0; // Next empty slot for serialized data.
+				
+				// For odd processors, the container holds core data only.
+				std::vector<IndicatorSet> sendVecBlobs = (dir == DIR_LEFT) ?
+					_vecAllBlobsWithGhosts[leftCoreIndex] :
+					_vecAllBlobsWithGhosts[rightCoreIndex];
+				
+				// Record the starting index.
 				sendBlobsIndx[dir].push_back(curIndx);
-
-				for (int i = 0; i < sendVecBlobs.size(); i++) {
+				
+				// Serialize each IndicatorSet from the selected column.
+				for (size_t i = 0; i < sendVecBlobs.size(); i++) {
 					IndicatorSet curSet = sendVecBlobs[i];
-					for (auto it = curSet.begin(); it != curSet.end(); it++) {
+					for (auto it = curSet.begin(); it != curSet.end(); ++it) {
 						sendBlobs[dir].push_back(*it);
 						curIndx++;
 					}
-					sendBlobsIndx[dir].push_back(curIndx);//Now it records the starting position of the next IndicatorSet
+					// Record the boundary index after each set.
+					sendBlobsIndx[dir].push_back(curIndx);
 				}
 			}
 		}
+
 
 		///	<summary>
 		///		Deserialize the received vector<int>recvBlobs into vector<IndicatorSet> and clear the recvBlobsIndx array
@@ -1231,16 +1272,15 @@ class BlobsExchangeOp {
 		}
 	protected:
 
-		///	<summary>
-		///		The initial local vecAllBlobs before the exchange
-		///	</summary>
-		std::vector<std::vector<IndicatorSet>> _vecAllBlobs;
-
-		///	<summary>
-		///		The vecAllBlobs that is after the exchange. it's column number is _vecAllAllBlobs' column number plus 2 (left and right) 
-		///		except for p0 and pn-1 (for these two processors, the column number is _vecAllAllBlobs' column number plus 1).
-		///	</summary>
-		std::vector<std::vector<IndicatorSet>> exchangedVecAllBlobs;
+		/// <summary>
+		/// 	The local vecAllBlobs including ghost cells.
+		/// 	This container stores both the original (core) data and the extra columns for ghost cells.
+		/// 	The core region corresponds to the original unexchanged data, while the ghost cells (left and right)
+		/// 	are reserved for the exchanged boundary data.
+		/// 	For interior processors, the total number of columns is coreColumns + 2 (one ghost column on each side).
+		/// 	For boundary processors, it may be coreColumns + 1.
+		/// </summary>
+		std::vector<std::vector<IndicatorSet>> _vecAllBlobsWithGhosts;
 
 		///	<summary>
 		///		The buffer for vecBlobs that is serialized and will be sent
@@ -1275,14 +1315,16 @@ class BlobsExchangeOp {
 
 
 	public:
-		///	<summary>
-		///		Construct the Operator with BlobsExchangeOp
-		///		It will contruct the this->m_comm and this->_vecAllBlobs based on the input communicator and vecAllBlobs	
-		///	</summary>
+		/// <summary>
+		/// 	Construct the Operator with BlobsExchangeOp.
+		/// 	Simply save the original core data (vecAllBlobs) in _vecAllBlobsWithGhosts.
+		/// 	No extra ghost cell allocation is done at this stage.
+		/// </summary>
 		BlobsExchangeOp(MPI_Comm communicator, 
-						const std::vector< std::vector<IndicatorSet> > & vecAllBlobs){
-			this->_vecAllBlobs = vecAllBlobs;
+			const std::vector< std::vector<IndicatorSet> > & vecAllBlobs) {
 			this->m_comm = communicator;
+			// Save the core data as-is.
+			_vecAllBlobsWithGhosts = vecAllBlobs;
 		}
 
 
@@ -1297,9 +1339,11 @@ class BlobsExchangeOp {
 
 
 		///	<summary>
-		///		Start the exchange process.
-		/// 	this function is non-blocking and the data values in the BlobsExchangeOp should not be modified
-		/// 	The exchange values are not guaranteed to be current when this function returns and need to be used with the EndExchange()
+		/// 	Start the exchange process (non-blocking).
+		/// 	This function initiates the halo exchange by sending out the serialized boundary (core) data
+		/// 	from _vecAllBlobsWithGhosts and posting receives for ghost data from neighbors.
+		/// 	The received data (still serialized) will later be integrated directly into the ghost cell regions
+		/// 	of _vecAllBlobsWithGhosts in EndExchange().
 		///	</summary>
 		void StartExchange() {			
 			int rank, size;
@@ -1308,13 +1352,29 @@ class BlobsExchangeOp {
 			recvBlobs.resize(2);
 			recvBlobsIndx.resize(2);
 
-			//Merge the received vecBlobs into the new vecAllBlobs
-			if (rank == 0 || rank == size - 1) {
-				exchangedVecAllBlobs.resize(_vecAllBlobs.size() + 1);
+			// Only even-numbered (prime) processors RECIEVE ghost data and need to expand the container.
+			if (rank % 2 == 0) {
+				// Determine ghost offsets.
+				int ghostLeft  = (rank == 0) ? 0 : 1;
+				int ghostRight = (rank == size - 1) ? 0 : 1;
+				// Core data columns count (the current size of _vecAllBlobsWithGhosts).
+				int coreColumns = static_cast<int>(_vecAllBlobsWithGhosts.size());
+				// Total columns after adding ghost columns.
+				int newTotalColumns = ghostLeft + coreColumns + ghostRight;
 
-			}else{
-				exchangedVecAllBlobs.resize(_vecAllBlobs.size() + 2);
+				// Allocate a temporary container for the expanded data.
+				std::vector<std::vector<IndicatorSet>> ghostContainer;
+				ghostContainer.resize(newTotalColumns);
+
+				// Copy the core data into the new container at the proper offset.
+				for (int i = 0; i < coreColumns; i++) {
+					ghostContainer[i + ghostLeft] = _vecAllBlobsWithGhosts[i];
+				}
+				
+				// Replace the in-place container with the expanded one.
+				_vecAllBlobsWithGhosts = std::move(ghostContainer);
 			}
+			// For odd-number processors, no resizing is done; _vecAllBlobsWithGhosts remains as the original core data.
 
 
 			//----------------------Send sendBlobs/sendBlobsIndx data----------------------
@@ -1461,46 +1521,88 @@ class BlobsExchangeOp {
 			MPI_Comm_size(m_comm, &size);
 			MPI_Comm_rank(m_comm, &rank);
 
+			// Compute ghost offsets based on processor rank.
+			int ghostLeft  = (rank == 0) ? 0 : 1;
+			int ghostRight = (rank == size - 1) ? 0 : 1;
+			
+			// Total number of columns in our in-place container.
+			int totalColumns = static_cast<int>(_vecAllBlobsWithGhosts.size());
+			// Core columns are the original columns (without ghost cells).
+			int coreColumns = totalColumns - ghostLeft - ghostRight;
+
+			// For odd processors, _vecAllBlobsWithGhosts remains at core size.
+				
+
 			// Only the even number processors need deserialize
 			if (rank % 2 == 0) {
 				this->Deserialize();
 
 				if (rank == 0) {
-					for (int i = 0; i < exchangedVecAllBlobs.size() - 1; i++) {
-						exchangedVecAllBlobs[i] = _vecAllBlobs[i];
+					// Rank 0 has no left ghost cell; update right ghost column (if exists).
+					if (ghostRight == 1) {
+						// Right ghost column is at index ghostLeft + coreColumns.
+						_vecAllBlobsWithGhosts[ghostLeft + coreColumns] = recvBlobsUnserial[1];
 					}
-					exchangedVecAllBlobs[exchangedVecAllBlobs.size() - 1] = recvBlobsUnserial[1];
 
 				} else if (rank == size - 1) {
-					exchangedVecAllBlobs[0] = recvBlobsUnserial[0];
-					for (int i = 1; i < exchangedVecAllBlobs.size(); i++) {
-						exchangedVecAllBlobs[i] = _vecAllBlobs[i-1];
+					// The last processor has no right ghost cell; update left ghost column.
+					if (ghostLeft == 1) {
+						_vecAllBlobsWithGhosts[0] = recvBlobsUnserial[0];
 					}
 				} else {
-					exchangedVecAllBlobs[0] = recvBlobsUnserial[0];				
-					for (int i = 1; i < exchangedVecAllBlobs.size() - 1; i++) {
-						exchangedVecAllBlobs[i] = _vecAllBlobs[i-1];
-					}
-					exchangedVecAllBlobs[exchangedVecAllBlobs.size() - 1] = recvBlobsUnserial[1];
+					// Interior processors update both ghost columns.
+					_vecAllBlobsWithGhosts[0] = recvBlobsUnserial[0];
+					_vecAllBlobsWithGhosts[ghostLeft + coreColumns] = recvBlobsUnserial[1];
 				}
-			} else {
-				// For odd number processors, nothing is modified.
-				exchangedVecAllBlobs = _vecAllBlobs;
+			} 
+			// Odd-numbered processors did not expand their container; no modifications are needed.
+			// They already hold exactly the original core data.
+		}
+
+		/// <summary>
+		/// 	Return the exchanged vecAllBlobs.
+		/// 	For even-numbered processors, this is the expanded container with ghost cells;
+		/// 	for odd-numbered processors, it is the same as the original core data.
+		/// </summary>
+		std::vector<std::vector<IndicatorSet>> GetExchangedVecAllBlobs() {
+			// Simply return the container as it stands after EndExchange.
+			// Even processors have ghost cells; odd processors have core data.
+			return _vecAllBlobsWithGhosts;
+		}
+
+		/// <summary>
+		/// 	Return the original (core) vecAllBlobs without ghost cells.
+		/// 	For even-numbered processors, we extract the core region from the expanded container;
+		/// 	for odd-numbered processors, the container already holds exactly the core data.
+		/// </summary>
+		std::vector<std::vector<IndicatorSet>> GetOriginalVecAllBlobs() {
+			int rank, size;
+			MPI_Comm_rank(m_comm, &rank);
+			MPI_Comm_size(m_comm, &size);
+			
+			int ghostLeft  = (rank == 0) ? 0 : 1;
+			int ghostRight = (rank == size - 1) ? 0 : 1;
+			
+			// For even processors, _vecAllBlobsWithGhosts is expanded:
+			// total columns = coreColumns + ghostLeft + ghostRight.
+			// For odd processors, _vecAllBlobsWithGhosts is exactly the core data.
+			std::vector<std::vector<IndicatorSet>> coreData;
+			
+			if (rank % 2 == 0) {
+				// Even processor: extract the core region.
+				int totalColumns = static_cast<int>(_vecAllBlobsWithGhosts.size());
+				int coreColumns = totalColumns - ghostLeft - ghostRight;
+				coreData.resize(coreColumns);
+				for (int i = 0; i < coreColumns; i++) {
+					coreData[i] = _vecAllBlobsWithGhosts[i + ghostLeft];
+				}
 			}
-		}
-
-		///	<summary>
-		///		Return the exchanged VecAllBlobs
-		///	</summary>
-		std::vector<std::vector<IndicatorSet>> GetExchangedVecAllBlobs(){
-			return this->exchangedVecAllBlobs;
-		}
-
-		///	<summary>
-		///		Return the unexchanged VecAllBlobs
-		///	</summary>
-		std::vector<std::vector<IndicatorSet>> GetOriginalVecAllBlobs(){
-			return this->_vecAllBlobs;
+			else {
+				// Odd processors: the container is already core data.
+				coreData = _vecAllBlobsWithGhosts;
+			}
+			
+			return coreData;
 		}
 
 };
@@ -2372,11 +2474,11 @@ struct Node3 {
 	//    their reponsible input files and do the exchange with the neighbor
 	//    processors.
 	// 6. The each processor will build the multigraph locally and then gather
-	//    it to the root processor.
+	//    it to the root processor. (I should only gather the multigraph to P0, all others remains at local)
 	// 7. The root processor will build the connectivity graph based on the
 	//    gathered multigraph and then reassign tag numbers
 	// 8. Then root processor will scatter out the updated vecAllBlobTags to
-	//    each processor.
+	//    each processor. (should The time.localTagId only update the id, not entire tag)
 	// 9. Each processor will write their local vecAllBlobTags to the output
 	//    file individually. The time of the output file will be identical to
 	//    the input file.
@@ -2704,7 +2806,7 @@ try {
 
 		// Load in the benchmark file
 		NcFileVector vecNcFiles;
-		vecNcFiles.ParseFromString(vecInputFiles[0]);
+		vecNcFiles.ParseFromString(vecInputFiles[0]);//[HC] What is stored at vecInputFiles[0]?
 
 		_ASSERT(vecNcFiles.size() > 0);
 
@@ -2867,6 +2969,11 @@ try {
 
 	int nGlobalTimes = 0;
 	for (int f = 0; f < vecGlobalTimes.size(); f++) {
+		#if defined(TEMPEST_MPIOMP)
+			if ((f >= processorResponsibalForFile_UB) || f < processorResponsibalForFile_LB) {
+				continue;
+			}
+		#endif 
 		nGlobalTimes += vecGlobalTimes[f].size();
 	}
 	_ASSERT(nGlobalTimes > 0);
@@ -2889,7 +2996,7 @@ try {
 	std::vector< std::vector< LatLonBox<double> > > vecAllBlobBoxesDeg;//[Halo Var]
 	vecAllBlobBoxesDeg.resize(nGlobalTimes);
 
-	// Time index across all files
+	// Time index across all (local) files
 	int iTime = 0;
 
 	// Loop through all files
@@ -2905,7 +3012,7 @@ try {
 		varreg.UnloadAllGridData();
 
 		// Load in the benchmark file
-		NcFileVector vecNcFiles;
+		NcFileVector vecNcFiles; //[HC] Why it is called "vecNcFiles" what information does it have? Coz u can have multiple files at one line
 		vecNcFiles.ParseFromString(vecInputFiles[f]);
 		_ASSERT(vecNcFiles.size() > 0);
 		
@@ -2919,9 +3026,9 @@ try {
 		}
 		int nLocalTimes = dimTimeInput->size();
 
-		// Loop through all times
+		// Loop through all loacal time
 		for (int t = 0; t < nLocalTimes; t++, iTime++) {
-
+			
 			// Get the current patch vector
 			std::vector<IndicatorSet> & vecBlobs = vecAllBlobs[iTime];
 			
@@ -2947,10 +3054,12 @@ try {
 					vecGlobalTimes[f][t].ToString().c_str());
 			}
 
-			// Load the search variable data
+			// Load the search variable data [HC] What does the following block do exactly, how does it read through the time slice? What does the following i mean?
 			Variable & var = varreg.Get(varix);
 			vecNcFiles.SetConstantTimeIx(t);
-			var.LoadGridData(varreg, vecNcFiles, grid);
+			// [HC] Check in every loop how does thedata change
+			// Memeory scale by the number of the threads used
+			var.LoadGridData(varreg, vecNcFiles, grid); //
 			const DataArray1D<float> & dataIndicator = var.GetData();
 /*
 			float dChecksum = 0.0;
@@ -3359,25 +3468,32 @@ try {
 #if defined(TEMPEST_MPIOMP)
 
 	//We still need the original unexchanged data for these two variables later
-	GlobalTimesExchangeOp MPI_exchangedGlobalTimes(MPI_REAL_COMM,vecGlobalTimes, processorResponsibalForFile_LB, processorResponsibalForFile_UB);//Declare here since it needs to be reverted later
-	TagExchangeOP MPI_exchangedTags(MPI_REAL_COMM, vecAllBlobTags);
-	BlobsExchangeOp MPI_exchangedBlobs(MPI_REAL_COMM, vecAllBlobs);
+	std::unique_ptr<GlobalTimesExchangeOp> MPI_exchangedGlobalTimes;
+	std::unique_ptr<TagExchangeOP>       MPI_exchangedTags;
+	std::unique_ptr<BlobsExchangeOp>       MPI_exchangedBlobs;
 	if (nMPISize > 1 && valid_flag) {
 
-		//Exchange vecGlobalTimes (will be reverted after the connectivity graph is built)		
-		MPI_exchangedGlobalTimes.StartExchange();
-		MPI_exchangedGlobalTimes.EndExchange();
-		vecGlobalTimes = MPI_exchangedGlobalTimes.GetExchangedVecGlobalTimes();
+    // Now allocate the objects.
+		MPI_exchangedGlobalTimes.reset(new GlobalTimesExchangeOp(MPI_REAL_COMM, vecGlobalTimes,
+				processorResponsibalForFile_LB,
+				processorResponsibalForFile_UB));
+		MPI_exchangedTags.reset(new TagExchangeOP(MPI_REAL_COMM, vecAllBlobTags));
+		MPI_exchangedBlobs.reset(new BlobsExchangeOp(MPI_REAL_COMM, vecAllBlobs));
 
-		//Exchange vecAllBlobTags			
-		MPI_exchangedTags.StartExchange();
-		MPI_exchangedTags.EndExchange();
-		vecAllBlobTags = MPI_exchangedTags.GetExchangedVecAllBlobTags();
+		// Exchange vecGlobalTimes.
+		MPI_exchangedGlobalTimes->StartExchange();
+		MPI_exchangedGlobalTimes->EndExchange();
+		vecGlobalTimes = MPI_exchangedGlobalTimes->GetExchangedVecGlobalTimes();
 
-		//Exchange vecAllBlobs
-		MPI_exchangedBlobs.StartExchange();
-		MPI_exchangedBlobs.EndExchange();
-		vecAllBlobs = MPI_exchangedBlobs.GetExchangedVecAllBlobs();
+		// Exchange vecAllBlobTags.
+		MPI_exchangedTags->StartExchange();
+		MPI_exchangedTags->EndExchange();
+		vecAllBlobTags = MPI_exchangedTags->GetExchangedVecAllBlobTags();
+
+		// Exchange vecAllBlobs.
+		MPI_exchangedBlobs->StartExchange();
+		MPI_exchangedBlobs->EndExchange();
+		vecAllBlobs = MPI_exchangedBlobs->GetExchangedVecAllBlobs();
 
 		//Exchange vecPrevBlobBoxesDeg
 		BlobBoxesDegExchangeOP MPI_exchangedBlobBoxesDeg(MPI_REAL_COMM, vecAllBlobBoxesDeg);
@@ -3403,8 +3519,10 @@ try {
 	// Loop through all remaining time steps
 	int iFileLocal = 0;
 	int iTimeLocal = 0;
+	
 	#if defined(TEMPEST_MPIOMP)
-		//recalculate the nGlobalTimes here based on the updated vecGlobalTimes file (will be inverted after the connectivity graph is built)	
+		//recalculate the nGlobalTimes here based on the updated vecGlobalTimes file (will be inverted after the connectivity graph is built)
+		//[HC] Isn't the original one the same as the following one?[Answer: it should be, but need double check]
 		int original_nGlobalTimes = nGlobalTimes;
 			
 		if (nMPISize > 1 && valid_flag) {
@@ -3599,12 +3717,12 @@ try {
 				multimapTagGraph = MPI_MapGraph.GetGatheredTagGraph();
 			}
 
-			//Gather the setAllTags to P0
-			TagCollectiveOP MPI_TagsGather(MPI_REAL_COMM, MPI_exchangedTags.GetOriginalVecAllBlobTags());
+			//Gather the setAllTags to P0 (Set All Tags can remain at local)
+			TagCollectiveOP MPI_TagsGather(MPI_REAL_COMM, MPI_exchangedTags->GetOriginalVecAllBlobTags());
 			MPI_TagsGather.Gather();
 
 
-			//And then reduced the original global time to P0 for next step:
+			//And then reduced the original global time (At this point, the "local" Global Times) to P0 for next step:
 			int reducedNGlobalTimes = 0;
 			MPI_Reduce(&original_nGlobalTimes, &reducedNGlobalTimes, 1, MPI_INT, MPI_SUM, 0, MPI_REAL_COMM);
 			if (nMPIRank == 0) {
@@ -3767,8 +3885,8 @@ try {
 				break;
 			}
 		#endif
-		_ASSERT(nGlobalTimes == vecAllBlobTags.size());
-		std::vector<Tag> & vecBlobTags = vecAllBlobTags[t];
+		_ASSERT(nGlobalTimes == vecAllBlobTags.size());//[HC] This might need to update for the MPI optimization purpose
+		std::vector<Tag> & vecBlobTags = vecAllBlobTags[t];//[HC] So we actually use the vecAllBlobTags at P0
 
 		for (int p = 0; p < vecBlobTags.size(); p++) {
 			std::map<Tag, Tag>::const_iterator iterTagPair =
@@ -3899,27 +4017,35 @@ try {
 		#if defined(TEMPEST_MPIOMP)
 			// Processor 0 scatter the updated vecAllBlobsTag to other processors
 			if (nMPISize > 1 && valid_flag) {
-				// Revert the exchanged vecGlobalTimes and nGlobalTimes for output:
-				vecGlobalTimes = MPI_exchangedGlobalTimes.GetUnExchangedVecGlobalTimes();
+				// Restore the original vecGlobalTimes and nGlobalTimes values for correct output,
+				// undoing any modifications made during MPI data exchange.
+				vecGlobalTimes = MPI_exchangedGlobalTimes->GetUnExchangedVecGlobalTimes();
 				nGlobalTimes = original_nGlobalTimes;
 
-
-
-				//The vecAllBlobTags on processor 0 need to be scatter. And it only has valid meaning on P0 for this constructor.
+				// Create a TagCollectiveOP object for MPI collective operations on vecAllBlobTags.
+				// Note: The vecAllBlobTags is only meaningful on processor 0 in this constructor context.
 				TagCollectiveOP MPI_TagScatter(MPI_REAL_COMM, vecAllBlobTags);
 
-				// Then every processor will gather their original
-				//  vecAllGlobsTags information to P0
-				// Calling the GatherTagCounts() will update the _vecAlllBlobTags
-				//  inside the TagCollectiveOP to the input one for all processors
-				//  except P0
-				MPI_TagScatter.GatherTagCounts(MPI_exchangedTags.GetOriginalVecAllBlobTags());
-				// Make sure all the gather process is finished
+				// Each processor sends its original vecAllBlobTags size/count information to processor 0.
+				// The GatherTagCounts() function gathers this metadata from all processors,
+				// updating the local _vecAllBlobTags within the TagCollectiveOP instance for every processor
+				// except processor 0, which uses the combined information to build the global vecAllBlobTags.
+				MPI_TagScatter.GatherTagCounts(MPI_exchangedTags->GetOriginalVecAllBlobTags());
+
+				// Synchronize all processors to ensure that the gathering process is complete.
 				MPI_Barrier(MPI_REAL_COMM);
+
+				// Scatter the combined global vecAllBlobTags data from processor 0 to all processors.
 				MPI_TagScatter.Scatter();
+
+				// Synchronize again to ensure the scattering process is complete.
 				MPI_Barrier(MPI_REAL_COMM);
+
+				// Retrieve the deserialized vecAllBlobTags on processor 0 (global view) after scattering.
 				vecAllBlobTags = MPI_TagScatter.GetUnserialVecAllTags(0);
-				vecAllBlobs = MPI_exchangedBlobs.GetOriginalVecAllBlobs();
+
+				// Also restore the original vecAllBlobs data from the exchanged blobs.
+				vecAllBlobs = MPI_exchangedBlobs->GetOriginalVecAllBlobs();
 
 			}
 		#endif
@@ -4149,4 +4275,3 @@ try {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
