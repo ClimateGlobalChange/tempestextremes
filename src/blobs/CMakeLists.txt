@@ -40,8 +40,11 @@ target_link_libraries(PersistentBlobs PUBLIC extremesbase netcdf_c++ ${MPI_CXX_L
 add_executable(StitchBlobs ${STITCH_BLOBS_FILES})
 target_link_libraries(StitchBlobs PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
 
+add_executable(StitchBlobs_old StitchBlobs_old.cpp)
+target_link_libraries(StitchBlobs_old PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
+
 # Install executables to the "bin" directory under the installation prefix.
 install(
-  TARGETS BlobStats DetectBlobs PersistentBlobs StitchBlobs
+  TARGETS BlobStats DetectBlobs PersistentBlobs StitchBlobs StitchBlobs_old
   RUNTIME DESTINATION bin
 )

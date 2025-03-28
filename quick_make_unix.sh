@@ -9,10 +9,10 @@
 # Please ensure the required NetCDF and HDF5 (and MPI, if needed) are available.
 
 # Configuration Options
-BUILD_TYPE="Release"          # "Debug" or "Release"
+BUILD_TYPE="Debug"          # "Debug" or "Release"
 ENABLE_MPI="ON"               # "ON" or "OFF"
-OPTIMIZATION_LEVEL="-O0"      # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
-DEBUG_SYMBOLS="OFF"           # "ON" to include debug symbols (-g), "OFF" to exclude
+OPTIMIZATION_LEVEL="-O1"      # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
+DEBUG_SYMBOLS="ON"           # "ON" to include debug symbols (-g), "OFF" to exclude
 INSTALL_PREFIX=""             # Specify the installation directory.
                               # If left blank, it defaults to the project root (TEMPEST_EXTREMES_SOURCE_DIR)
                               # and final executables will be installed in TEMPEST_EXTREMES_SOURCE_DIR/bin.
@@ -133,6 +133,6 @@ echo "Build and installation completed successfully."
 
 # For end users who want a clean structure, you can remove the build directory.
 # Developers or those debugging might prefer to keep it for faster incremental builds.
-make clean
-echo "Cleaned up the ${SRC_DIR}/build directory. All executables are located in ${INSTALL_PREFIX}/bin."
+# make clean
+# echo "Cleaned up the ${SRC_DIR}/build directory. All executables are located in ${INSTALL_PREFIX}/bin."
 

@@ -1,0 +1,1371 @@
+
+RANKS: <0..3>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by Detach (in DataArray1D.h:163)
+  by ~DataArray1D (in DataArray1D.h:78)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:745)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:2809)
+Address is 0 bytes inside a block of size 496 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:751)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:2809)
+
+
+RANKS: <0..3>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by Detach (in DataArray1D.h:163)
+  by ~DataArray1D (in DataArray1D.h:78)
+  by SimpleGrid::GenerateLatitudeLongitude(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, bool, bool) (in SimpleGrid.cpp:448)
+  by main (in StitchBlobs.cpp:2817)
+Address is 0 bytes inside a block of size 11,520 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by DataArray1D (in DataArray1D.h:59)
+  by SimpleGrid::GenerateLatitudeLongitude(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, bool, bool) (in SimpleGrid.cpp:448)
+  by main (in StitchBlobs.cpp:2817)
+
+
+RANKS: <0..3>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by Detach (in DataArray1D.h:163)
+  by ~DataArray1D (in DataArray1D.h:78)
+  by SimpleGrid::GenerateLatitudeLongitude(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, bool, bool) (in SimpleGrid.cpp:441)
+  by main (in StitchBlobs.cpp:2817)
+Address is 0 bytes inside a block of size 5,768 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by DataArray1D (in DataArray1D.h:59)
+  by SimpleGrid::GenerateLatitudeLongitude(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, bool, bool) (in SimpleGrid.cpp:441)
+  by main (in StitchBlobs.cpp:2817)
+
+
+RANKS: <0..3>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by DataArray1D<float>::Detach() (in DataArray1D.h:163)
+  by Allocate (in DataArray1D.h:105)
+  by Variable::LoadGridData(VariableRegistry&, NcFileVector const&, SimpleGrid const&) (in Variable.cpp:977)
+  by main (in StitchBlobs.cpp:3062)
+Address is 0 bytes inside a block of size 4,152,960 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by Variable::LoadGridData(VariableRegistry&, NcFileVector const&, SimpleGrid const&) (in Variable.cpp:977)
+  by main (in StitchBlobs.cpp:3062)
+
+
+RANKS: <0..3>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by Detach (in DataArray1D.h:163)
+  by ~DataArray1D (in DataArray1D.h:78)
+  by CopyNcVar(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool) (in NetCDFUtilities.cpp:505)
+  by CopyNcVarIfExists(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool) (in NetCDFUtilities.cpp:554)
+  by PrepareBlobOutputVar(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, SimpleGrid const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcType, NcDim*, NcDim**, NcDim**, NcVar**) (in BlobUtilities.h:104)
+  by main (in StitchBlobs.cpp:4112)
+Address is 0 bytes inside a block of size 5,768 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by DataArray1D (in DataArray1D.h:59)
+  by CopyNcVar(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool) (in NetCDFUtilities.cpp:505)
+  by CopyNcVarIfExists(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool) (in NetCDFUtilities.cpp:554)
+  by PrepareBlobOutputVar(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, SimpleGrid const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcType, NcDim*, NcDim**, NcDim**, NcVar**) (in BlobUtilities.h:104)
+  by main (in StitchBlobs.cpp:4112)
+
+
+RANKS: <0..3>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by Detach (in DataArray1D.h:163)
+  by ~DataArray1D (in DataArray1D.h:78)
+  by CopyNcVar(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool) (in NetCDFUtilities.cpp:505)
+  by CopyNcVarIfExists(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool) (in NetCDFUtilities.cpp:554)
+  by PrepareBlobOutputVar(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, SimpleGrid const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcType, NcDim*, NcDim**, NcDim**, NcVar**) (in BlobUtilities.h:105)
+  by main (in StitchBlobs.cpp:4112)
+Address is 0 bytes inside a block of size 11,520 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by DataArray1D (in DataArray1D.h:59)
+  by CopyNcVar(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool) (in NetCDFUtilities.cpp:505)
+  by CopyNcVarIfExists(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool) (in NetCDFUtilities.cpp:554)
+  by PrepareBlobOutputVar(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, SimpleGrid const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcType, NcDim*, NcDim**, NcDim**, NcVar**) (in BlobUtilities.h:105)
+  by main (in StitchBlobs.cpp:4112)
+
+
+RANKS: <0..3>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by Detach (in DataArray1D.h:163)
+  by ~DataArray1D (in DataArray1D.h:78)
+  by main (in StitchBlobs.cpp:4139)
+Address is 0 bytes inside a block of size 4,152,960 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by DataArray1D (in DataArray1D.h:59)
+  by main (in StitchBlobs.cpp:4139)
+
+
+RANKS: <0..3>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by Detach (in DataArray1D.h:163)
+  by ~DataArray1D (in DataArray1D.h:78)
+  by SimpleGrid::~SimpleGrid() (in SimpleGrid.cpp:43)
+  by main (in StitchBlobs.cpp:2795)
+Address is 0 bytes inside a block of size 8,305,920 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by SimpleGrid::GenerateLatitudeLongitude(DataArray1D<double> const&, DataArray1D<double> const&, bool, bool, bool) (in SimpleGrid.cpp:264)
+  by SimpleGrid::GenerateLatitudeLongitude(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, bool, bool) (in SimpleGrid.cpp:456)
+  by main (in StitchBlobs.cpp:2817)
+
+
+RANKS: <0..3>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by Detach (in DataArray1D.h:163)
+  by ~DataArray1D (in DataArray1D.h:78)
+  by SimpleGrid::~SimpleGrid() (in SimpleGrid.cpp:43)
+  by main (in StitchBlobs.cpp:2795)
+Address is 0 bytes inside a block of size 8,305,920 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by SimpleGrid::GenerateLatitudeLongitude(DataArray1D<double> const&, DataArray1D<double> const&, bool, bool, bool) (in SimpleGrid.cpp:262)
+  by SimpleGrid::GenerateLatitudeLongitude(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, bool, bool) (in SimpleGrid.cpp:456)
+  by main (in StitchBlobs.cpp:2817)
+
+
+RANKS: <0..3>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by Detach (in DataArray1D.h:163)
+  by ~DataArray1D (in DataArray1D.h:78)
+  by SimpleGrid::~SimpleGrid() (in SimpleGrid.cpp:43)
+  by main (in StitchBlobs.cpp:2795)
+Address is 0 bytes inside a block of size 8,305,920 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by SimpleGrid::GenerateLatitudeLongitude(DataArray1D<double> const&, DataArray1D<double> const&, bool, bool, bool) (in SimpleGrid.cpp:263)
+  by SimpleGrid::GenerateLatitudeLongitude(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, bool, bool) (in SimpleGrid.cpp:456)
+  by main (in StitchBlobs.cpp:2817)
+
+
+RANKS: <0..3>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by Detach (in DataArray1D.h:163)
+  by ~DataArray1D (in DataArray1D.h:78)
+  by ~Variable (in Variable.h:508)
+  by VariableRegistry::~VariableRegistry() (in Variable.cpp:54)
+  by main (in StitchBlobs.cpp:2634)
+Address is 0 bytes inside a block of size 4,152,960 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by Variable::LoadGridData(VariableRegistry&, NcFileVector const&, SimpleGrid const&) (in Variable.cpp:977)
+  by main (in StitchBlobs.cpp:3062)
+
+
+RANKS: <0..3>
+
+10 bytes in 1 blocks are definitely lost
+  at operator new[](unsigned long) (in vg_replace_malloc.c:725)
+  by NcValues_char::as_string(long) const (in ncvalues.cpp:354)
+  by NcTypedComponent::as_string(long) const (in netcdf.cpp:557)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:711)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:2809)
+
+
+RANKS: <0..3>
+
+10 bytes in 1 blocks are definitely lost
+  at operator new[](unsigned long) (in vg_replace_malloc.c:725)
+  by NcValues_char::as_string(long) const (in ncvalues.cpp:354)
+  by NcTypedComponent::as_string(long) const (in netcdf.cpp:557)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:711)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:4055)
+
+
+RANKS: <0..3>
+
+30 bytes in 3 blocks are definitely lost
+  at operator new[](unsigned long) (in vg_replace_malloc.c:725)
+  by NcValues_char::as_string(long) const (in ncvalues.cpp:354)
+  by NcTypedComponent::as_string(long) const (in netcdf.cpp:557)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:711)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:2919)
+
+
+RANKS: <0..3>
+
+30 bytes in 3 blocks are definitely lost
+  at operator new[](unsigned long) (in vg_replace_malloc.c:725)
+  by NcValues_char::as_string(long) const (in ncvalues.cpp:354)
+  by NcTypedComponent::as_string(long) const (in netcdf.cpp:557)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:711)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:3016)
+
+
+RANKS: <0..3>
+
+32 bytes in 1 blocks are definitely lost
+  at operator new[](unsigned long) (in vg_replace_malloc.c:725)
+  by NcValues_char::as_string(long) const (in ncvalues.cpp:354)
+  by NcTypedComponent::as_string(long) const (in netcdf.cpp:557)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:742)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:2809)
+
+
+RANKS: <0..3>
+
+32 bytes in 1 blocks are definitely lost
+  at operator new[](unsigned long) (in vg_replace_malloc.c:725)
+  by NcValues_char::as_string(long) const (in ncvalues.cpp:354)
+  by NcTypedComponent::as_string(long) const (in netcdf.cpp:557)
+  by main (in StitchBlobs.cpp:2939)
+
+
+RANKS: <0..3>
+
+32 bytes in 1 blocks are definitely lost
+  at operator new[](unsigned long) (in vg_replace_malloc.c:725)
+  by NcValues_char::as_string(long) const (in ncvalues.cpp:354)
+  by NcTypedComponent::as_string(long) const (in netcdf.cpp:557)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:742)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:4055)
+
+
+RANKS: <0..3>
+
+38 (32 direct, 6 indirect) bytes in 1 blocks are definitely lost
+  at operator new(unsigned long) (in vg_replace_malloc.c:483)
+  by NcVar::get_att(char const*) const (in netcdf.cpp:677)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:717)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:2809)
+
+
+RANKS: <0..3>
+
+38 (32 direct, 6 indirect) bytes in 1 blocks are definitely lost
+  at operator new(unsigned long) (in vg_replace_malloc.c:483)
+  by NcVar::get_att(char const*) const (in netcdf.cpp:677)
+  by main (in StitchBlobs.cpp:2933)
+
+
+RANKS: <0..3>
+
+38 (32 direct, 6 indirect) bytes in 1 blocks are definitely lost
+  at operator new(unsigned long) (in vg_replace_malloc.c:483)
+  by NcVar::get_att(char const*) const (in netcdf.cpp:677)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:717)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:4055)
+
+
+RANKS: <0..3>
+
+41 (32 direct, 9 indirect) bytes in 1 blocks are definitely lost
+  at operator new(unsigned long) (in vg_replace_malloc.c:483)
+  by NcVar::get_att(char const*) const (in netcdf.cpp:677)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:703)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:2809)
+
+
+RANKS: <0..3>
+
+41 (32 direct, 9 indirect) bytes in 1 blocks are definitely lost
+  at operator new(unsigned long) (in vg_replace_malloc.c:483)
+  by NcVar::get_att(char const*) const (in netcdf.cpp:677)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:703)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:4055)
+
+
+RANKS: <0..3>
+
+96 bytes in 3 blocks are definitely lost
+  at operator new[](unsigned long) (in vg_replace_malloc.c:725)
+  by NcValues_char::as_string(long) const (in ncvalues.cpp:354)
+  by NcTypedComponent::as_string(long) const (in netcdf.cpp:557)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:742)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:2919)
+
+
+RANKS: <0..3>
+
+96 bytes in 3 blocks are definitely lost
+  at operator new[](unsigned long) (in vg_replace_malloc.c:725)
+  by NcValues_char::as_string(long) const (in ncvalues.cpp:354)
+  by NcTypedComponent::as_string(long) const (in netcdf.cpp:557)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:742)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:3016)
+
+
+RANKS: <0..3>
+
+114 (96 direct, 18 indirect) bytes in 3 blocks are definitely lost
+  at operator new(unsigned long) (in vg_replace_malloc.c:483)
+  by NcVar::get_att(char const*) const (in netcdf.cpp:677)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:717)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:2919)
+
+
+RANKS: <0..3>
+
+114 (96 direct, 18 indirect) bytes in 3 blocks are definitely lost
+  at operator new(unsigned long) (in vg_replace_malloc.c:483)
+  by NcVar::get_att(char const*) const (in netcdf.cpp:677)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:717)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:3016)
+
+
+RANKS: <0..3>
+
+123 (96 direct, 27 indirect) bytes in 3 blocks are definitely lost
+  at operator new(unsigned long) (in vg_replace_malloc.c:483)
+  by NcVar::get_att(char const*) const (in netcdf.cpp:677)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:703)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:2919)
+
+
+RANKS: <0..3>
+
+123 (96 direct, 27 indirect) bytes in 3 blocks are definitely lost
+  at operator new(unsigned long) (in vg_replace_malloc.c:483)
+  by NcVar::get_att(char const*) const (in netcdf.cpp:677)
+  by ReadCFTimeDataFromNcFile(NcFile*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcTimeDimension&, bool) (in NetCDFUtilities.cpp:703)
+  by NcFileVector::InsertFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, long) (in NcFileVector.cpp:87)
+  by NcFileVector::ParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool) (in NcFileVector.cpp:138)
+  by main (in StitchBlobs.cpp:3016)
+
+
+RANKS: <0..3>
+
+369 (288 direct, 81 indirect) bytes in 9 blocks are definitely lost
+  at operator new(unsigned long) (in vg_replace_malloc.c:483)
+  by NcVar::get_att(char const*) const (in netcdf.cpp:677)
+  by NcVar::get_att(int) const (in netcdf.cpp:690)
+  by CopyNcVarAttributes(NcVar*, NcVar*) (in NetCDFUtilities.cpp:235)
+  by CopyNcVar(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool) (in NetCDFUtilities.cpp:501)
+  by CopyNcVarIfExists(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool) (in NetCDFUtilities.cpp:554)
+  by PrepareBlobOutputVar(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, SimpleGrid const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcType, NcDim*, NcDim**, NcDim**, NcVar**) (in BlobUtilities.h:105)
+  by main (in StitchBlobs.cpp:4112)
+
+
+RANKS: <0..3>
+
+495 (384 direct, 111 indirect) bytes in 12 blocks are definitely lost
+  at operator new(unsigned long) (in vg_replace_malloc.c:483)
+  by NcVar::get_att(char const*) const (in netcdf.cpp:677)
+  by NcVar::get_att(int) const (in netcdf.cpp:690)
+  by CopyNcVarAttributes(NcVar*, NcVar*) (in NetCDFUtilities.cpp:235)
+  by CopyNcVar(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool) (in NetCDFUtilities.cpp:501)
+  by CopyNcVarIfExists(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool) (in NetCDFUtilities.cpp:554)
+  by PrepareBlobOutputVar(NcFile&, NcFile&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, SimpleGrid const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, NcType, NcDim*, NcDim**, NcDim**, NcVar**) (in BlobUtilities.h:104)
+  by main (in StitchBlobs.cpp:4112)
+
+
+RANKS: <0,2,3>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by Detach (in DataArray1D.h:163)
+  by ~DataArray1D (in DataArray1D.h:78)
+  by main (in StitchBlobs.cpp:4095)
+Address is 0 bytes inside a block of size 992 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by DataArray1D (in DataArray1D.h:59)
+  by main (in StitchBlobs.cpp:4095)
+
+
+RANKS: <1>
+
+Mismatched free() / delete / delete []
+  at operator delete[](void*) (in vg_replace_malloc.c:1330)
+  by Detach (in DataArray1D.h:163)
+  by ~DataArray1D (in DataArray1D.h:78)
+  by main (in StitchBlobs.cpp:4095)
+Address is 0 bytes inside a block of size 960 alloc'd
+  at malloc (in vg_replace_malloc.c:442)
+  by Allocate (in DataArray1D.h:115)
+  by DataArray1D (in DataArray1D.h:59)
+  by main (in StitchBlobs.cpp:4095)
+
+
+RANKS: <0..3>
+
+HEAP SUMMARY:
+  in use at exit: 1902 bytes in 55 blocks
+
+LEAK SUMMARY:
+   definitely lost: 1902 bytes in 55 blocks
+   indirectly lost: 0 bytes in 0 blocks
+     possibly lost: 0 bytes in 0 blocks
+   still reachable: 0 bytes in 0 blocks
+
+ERROR SUMMARY: 13 errors from 782 contexts (suppressed 614)
+
+-27 12:00:00)
+....Finding blobs (27240 tagged points)
+....Blobs detected: 10
+....Done
+..Time 231 (1984-02-27 18:00:00)
+....Finding blobs (24863 tagged points)
+....Blobs detected: 9
+....Done
+..Time 232 (1984-02-28 00:00:00)
+....Finding blobs (24748 tagged points)
+....Blobs detected: 9
+....Done
+..Time 233 (1984-02-28 06:00:00)
+....Finding blobs (27704 tagged points)
+....Blobs detected: 9
+....Done
+..Time 234 (1984-02-28 12:00:00)
+....Finding blobs (29296 tagged points)
+....Blobs detected: 9
+....Done
+..Time 235 (1984-02-28 18:00:00)
+....Finding blobs (28987 tagged points)
+....Blobs detected: 9
+....Done
+..Time 236 (1984-02-29 00:00:00)
+....Finding blobs (27746 tagged points)
+....Blobs detected: 8
+....Done
+..Time 237 (1984-02-29 06:00:00)
+....Finding blobs (28229 tagged points)
+....Blobs detected: 9
+....Done
+..Time 238 (1984-02-29 12:00:00)
+....Finding blobs (28217 tagged points)
+....Blobs detected: 11
+....Done
+..Time 239 (1984-02-29 18:00:00)
+....Finding blobs (17092 tagged points)
+....Blobs detected: 6
+....Done
+..Time 240 (1984-03-01 00:00:00)
+....Finding blobs (19194 tagged points)
+....Blobs detected: 7
+....Done
+..Time 241 (1984-03-01 06:00:00)
+....Finding blobs (15367 tagged points)
+....Blobs detected: 5
+....Done
+..Time 242 (1984-03-01 12:00:00)
+....Finding blobs (20424 tagged points)
+....Blobs detected: 7
+....Done
+..Time 243 (1984-03-01 18:00:00)
+....Finding blobs (21687 tagged points)
+....Blobs detected: 7
+....Done
+..Time 244 (1984-03-02 00:00:00)
+....Finding blobs (22284 tagged points)
+....Blobs detected: 7
+....Done
+..Time 245 (1984-03-02 06:00:00)
+....Finding blobs (19513 tagged points)
+....Blobs detected: 8
+....Done
+..Time 246 (1984-03-02 12:00:00)
+....Finding blobs (21390 tagged points)
+....Blobs detected: 8
+....Done
+..Time 247 (1984-03-02 18:00:00)
+....Finding blobs (18817 tagged points)
+....Blobs detected: 6
+....Done
+..Time 248 (1984-03-03 00:00:00)
+....Finding blobs (19053 tagged points)
+....Blobs detected: 5
+....Done
+..Time 249 (1984-03-03 06:00:00)
+....Finding blobs (18196 tagged points)
+....Blobs detected: 5
+....Done
+..Time 250 (1984-03-03 12:00:00)
+....Finding blobs (19707 tagged points)
+....Blobs detected: 6
+....Done
+..Time 251 (1984-03-03 18:00:00)
+....Finding blobs (17657 tagged points)
+....Blobs detected: 5
+....Done
+..Time 252 (1984-03-04 00:00:00)
+....Finding blobs (15880 tagged points)
+....Blobs detected: 5
+....Done
+..Time 253 (1984-03-04 06:00:00)
+....Finding blobs (17112 tagged points)
+....Blobs detected: 7
+....Done
+..Time 254 (1984-03-04 12:00:00)
+....Finding blobs (15414 tagged points)
+....Blobs detected: 6
+....Done
+..Time 255 (1984-03-04 18:00:00)
+....Finding blobs (21129 tagged points)
+....Blobs detected: 8
+....Done
+..Time 256 (1984-03-05 00:00:00)
+....Finding blobs (19678 tagged points)
+....Blobs detected: 8
+....Done
+..Time 257 (1984-03-05 06:00:00)
+....Finding blobs (17705 tagged points)
+....Blobs detected: 8
+....Done
+..Time 258 (1984-03-05 12:00:00)
+....Finding blobs (16858 tagged points)
+....Blobs detected: 7
+....Done
+..Time 259 (1984-03-05 18:00:00)
+....Finding blobs (14389 tagged points)
+....Blobs detected: 6
+....Done
+..Time 260 (1984-03-06 00:00:00)
+....Finding blobs (13564 tagged points)
+....Blobs detected: 6
+....Done
+..Time 261 (1984-03-06 06:00:00)
+....Finding blobs (18739 tagged points)
+....Blobs detected: 7
+....Done
+..Time 262 (1984-03-06 12:00:00)
+....Finding blobs (20360 tagged points)
+....Blobs detected: 6
+....Done
+..Time 263 (1984-03-06 18:00:00)
+....Finding blobs (20562 tagged points)
+....Blobs detected: 6
+....Done
+..Time 264 (1984-03-07 00:00:00)
+....Finding blobs (20460 tagged points)
+....Blobs detected: 7
+....Done
+..Time 265 (1984-03-07 06:00:00)
+....Finding blobs (20876 tagged points)
+....Blobs detected: 7
+....Done
+..Time 266 (1984-03-07 12:00:00)
+....Finding blobs (24122 tagged points)
+....Blobs detected: 9
+....Done
+..Time 267 (1984-03-07 18:00:00)
+....Finding blobs (21158 tagged points)
+....Blobs detected: 8
+....Done
+..Time 268 (1984-03-08 00:00:00)
+....Finding blobs (20563 tagged points)
+....Blobs detected: 7
+....Done
+..Time 269 (1984-03-08 06:00:00)
+....Finding blobs (22288 tagged points)
+....Blobs detected: 8
+....Done
+..Time 270 (1984-03-08 12:00:00)
+....Finding blobs (21289 tagged points)
+....Blobs detected: 8
+....Done
+..Time 271 (1984-03-08 18:00:00)
+....Finding blobs (20220 tagged points)
+....Blobs detected: 8
+....Done
+..Time 272 (1984-03-09 00:00:00)
+....Finding blobs (22326 tagged points)
+....Blobs detected: 9
+....Done
+..Time 273 (1984-03-09 06:00:00)
+....Finding blobs (20809 tagged points)
+....Blobs detected: 9
+....Done
+..Time 274 (1984-03-09 12:00:00)
+....Finding blobs (19595 tagged points)
+....Blobs detected: 8
+....Done
+..Time 275 (1984-03-09 18:00:00)
+....Finding blobs (18674 tagged points)
+....Blobs detected: 8
+....Done
+..Time 276 (1984-03-10 00:00:00)
+....Finding blobs (20263 tagged points)
+....Blobs detected: 8
+....Done
+..Time 277 (1984-03-10 06:00:00)
+....Finding blobs (24291 tagged points)
+....Blobs detected: 11
+....Done
+..Time 278 (1984-03-10 12:00:00)
+....Finding blobs (19730 tagged points)
+....Blobs detected: 8
+....Done
+..Time 279 (1984-03-10 18:00:00)
+....Finding blobs (19824 tagged points)
+....Blobs detected: 8
+....Done
+..Time 280 (1984-03-11 00:00:00)
+....Finding blobs (23040 tagged points)
+....Blobs detected: 8
+....Done
+..Time 281 (1984-03-11 06:00:00)
+....Finding blobs (21641 tagged points)
+....Blobs detected: 7
+....Done
+..Time 282 (1984-03-11 12:00:00)
+....Finding blobs (25338 tagged points)
+....Blobs detected: 9
+....Done
+..Time 283 (1984-03-11 18:00:00)
+....Finding blobs (24547 tagged points)
+....Blobs detected: 8
+....Done
+..Time 284 (1984-03-12 00:00:00)
+....Finding blobs (26187 tagged points)
+....Blobs detected: 9
+....Done
+..Time 285 (1984-03-12 06:00:00)
+....Finding blobs (27505 tagged points)
+....Blobs detected: 9
+....Done
+..Time 286 (1984-03-12 12:00:00)
+....Finding blobs (24133 tagged points)
+....Blobs detected: 8
+....Done
+..Time 287 (1984-03-12 18:00:00)
+....Finding blobs (20621 tagged points)
+....Blobs detected: 7
+....Done
+..Time 288 (1984-03-13 00:00:00)
+....Finding blobs (23760 tagged points)
+....Blobs detected: 8
+....Done
+..Time 289 (1984-03-13 06:00:00)
+....Finding blobs (24043 tagged points)
+....Blobs detected: 8
+....Done
+..Time 290 (1984-03-13 12:00:00)
+....Finding blobs (23215 tagged points)
+....Blobs detected: 8
+....Done
+..Time 291 (1984-03-13 18:00:00)
+....Finding blobs (19934 tagged points)
+....Blobs detected: 7
+....Done
+..Time 292 (1984-03-14 00:00:00)
+....Finding blobs (18258 tagged points)
+....Blobs detected: 7
+....Done
+..Time 293 (1984-03-14 06:00:00)
+....Finding blobs (17664 tagged points)
+....Blobs detected: 7
+....Done
+..Time 294 (1984-03-14 12:00:00)
+....Finding blobs (17289 tagged points)
+....Blobs detected: 6
+....Done
+..Time 295 (1984-03-14 18:00:00)
+....Finding blobs (14555 tagged points)
+....Blobs detected: 6
+....Done
+..Time 296 (1984-03-15 00:00:00)
+....Finding blobs (13010 tagged points)
+....Blobs detected: 5
+....Done
+..Time 297 (1984-03-15 06:00:00)
+....Finding blobs (12824 tagged points)
+....Blobs detected: 6
+....Done
+..Time 298 (1984-03-15 12:00:00)
+....Finding blobs (16845 tagged points)
+....Blobs detected: 8
+....Done
+..Time 299 (1984-03-15 18:00:00)
+....Finding blobs (16618 tagged points)
+....Blobs detected: 7
+....Done
+..Time 300 (1984-03-16 00:00:00)
+....Finding blobs (13392 tagged points)
+....Blobs detected: 5
+....Done
+..Time 301 (1984-03-16 06:00:00)
+....Finding blobs (13671 tagged points)
+....Blobs detected: 5
+....Done
+..Time 302 (1984-03-16 12:00:00)
+....Finding blobs (11444 tagged points)
+....Blobs detected: 4
+....Done
+..Time 303 (1984-03-16 18:00:00)
+....Finding blobs (10949 tagged points)
+....Blobs detected: 3
+....Done
+..Time 304 (1984-03-17 00:00:00)
+....Finding blobs (10719 tagged points)
+....Blobs detected: 3
+....Done
+..Time 305 (1984-03-17 06:00:00)
+....Finding blobs (10115 tagged points)
+....Blobs detected: 3
+....Done
+..Time 306 (1984-03-17 12:00:00)
+....Finding blobs (9132 tagged points)
+....Blobs detected: 3
+....Done
+..Time 307 (1984-03-17 18:00:00)
+....Finding blobs (11419 tagged points)
+....Blobs detected: 5
+....Done
+..Time 308 (1984-03-18 00:00:00)
+....Finding blobs (10234 tagged points)
+....Blobs detected: 4
+....Done
+..Time 309 (1984-03-18 06:00:00)
+....Finding blobs (13469 tagged points)
+....Blobs detected: 5
+....Done
+..Time 310 (1984-03-18 12:00:00)
+....Finding blobs (11705 tagged points)
+....Blobs detected: 4
+....Done
+..Time 311 (1984-03-18 18:00:00)
+....Finding blobs (13590 tagged points)
+....Blobs detected: 5
+....Done
+..Time 312 (1984-03-19 00:00:00)
+....Finding blobs (19821 tagged points)
+....Blobs detected: 8
+....Done
+..Time 313 (1984-03-19 06:00:00)
+....Finding blobs (23481 tagged points)
+....Blobs detected: 9
+....Done
+..Time 314 (1984-03-19 12:00:00)
+....Finding blobs (23486 tagged points)
+....Blobs detected: 9
+....Done
+..Time 315 (1984-03-19 18:00:00)
+....Finding blobs (21504 tagged points)
+....Blobs detected: 8
+....Done
+..Time 316 (1984-03-20 00:00:00)
+....Finding blobs (21190 tagged points)
+....Blobs detected: 8
+....Done
+..Time 317 (1984-03-20 06:00:00)
+....Finding blobs (21244 tagged points)
+....Blobs detected: 8
+....Done
+..Time 318 (1984-03-20 12:00:00)
+....Finding blobs (22350 tagged points)
+....Blobs detected: 8
+....Done
+..Time 319 (1984-03-20 18:00:00)
+....Finding blobs (22315 tagged points)
+....Blobs detected: 9
+....Done
+..Time 320 (1984-03-21 00:00:00)
+....Finding blobs (24677 tagged points)
+....Blobs detected: 10
+....Done
+..Time 321 (1984-03-21 06:00:00)
+....Finding blobs (25760 tagged points)
+....Blobs detected: 11
+....Done
+..Time 322 (1984-03-21 12:00:00)
+....Finding blobs (24262 tagged points)
+....Blobs detected: 11
+....Done
+..Time 323 (1984-03-21 18:00:00)
+....Finding blobs (24104 tagged points)
+....Blobs detected: 10
+....Done
+..Time 324 (1984-03-22 00:00:00)
+....Finding blobs (27109 tagged points)
+....Blobs detected: 11
+....Done
+..Time 325 (1984-03-22 06:00:00)
+....Finding blobs (26233 tagged points)
+....Blobs detected: 10
+....Done
+..Time 326 (1984-03-22 12:00:00)
+....Finding blobs (25713 tagged points)
+....Blobs detected: 9
+....Done
+..Time 327 (1984-03-22 18:00:00)
+....Finding blobs (24188 tagged points)
+....Blobs detected: 8
+....Done
+..Time 328 (1984-03-23 00:00:00)
+....Finding blobs (22354 tagged points)
+....Blobs detected: 8
+....Done
+..Time 329 (1984-03-23 06:00:00)
+....Finding blobs (24259 tagged points)
+....Blobs detected: 8
+....Done
+..Time 330 (1984-03-23 12:00:00)
+....Finding blobs (22195 tagged points)
+....Blobs detected: 7
+....Done
+..Time 331 (1984-03-23 18:00:00)
+....Finding blobs (22248 tagged points)
+....Blobs detected: 7
+....Done
+..Time 332 (1984-03-24 00:00:00)
+....Finding blobs (22458 tagged points)
+....Blobs detected: 7
+....Done
+..Time 333 (1984-03-24 06:00:00)
+....Finding blobs (21502 tagged points)
+....Blobs detected: 6
+....Done
+..Time 334 (1984-03-24 12:00:00)
+....Finding blobs (22051 tagged points)
+....Blobs detected: 6
+....Done
+..Time 335 (1984-03-24 18:00:00)
+....Finding blobs (22575 tagged points)
+....Blobs detected: 6
+....Done
+..Time 336 (1984-03-25 00:00:00)
+....Finding blobs (25952 tagged points)
+....Blobs detected: 8
+....Done
+..Time 337 (1984-03-25 06:00:00)
+....Finding blobs (27421 tagged points)
+....Blobs detected: 9
+....Done
+..Time 338 (1984-03-25 12:00:00)
+....Finding blobs (27201 tagged points)
+....Blobs detected: 9
+....Done
+..Time 339 (1984-03-25 18:00:00)
+....Finding blobs (28074 tagged points)
+....Blobs detected: 9
+....Done
+..Time 340 (1984-03-26 00:00:00)
+....Finding blobs (27643 tagged points)
+....Blobs detected: 9
+....Done
+..Time 341 (1984-03-26 06:00:00)
+....Finding blobs (24872 tagged points)
+....Blobs detected: 8
+....Done
+..Time 342 (1984-03-26 12:00:00)
+....Finding blobs (22006 tagged points)
+....Blobs detected: 7
+....Done
+..Time 343 (1984-03-26 18:00:00)
+....Finding blobs (21258 tagged points)
+....Blobs detected: 7
+....Done
+..Time 344 (1984-03-27 00:00:00)
+....Finding blobs (17485 tagged points)
+....Blobs detected: 6
+....Done
+..Time 345 (1984-03-27 06:00:00)
+....Finding blobs (17085 tagged points)
+....Blobs detected: 5
+....Done
+..Time 346 (1984-03-27 12:00:00)
+....Finding blobs (18677 tagged points)
+....Blobs detected: 5
+....Done
+..Time 347 (1984-03-27 18:00:00)
+....Finding blobs (23802 tagged points)
+....Blobs detected: 8
+....Done
+..Time 348 (1984-03-28 00:00:00)
+....Finding blobs (26125 tagged points)
+....Blobs detected: 8
+....Done
+..Time 349 (1984-03-28 06:00:00)
+....Finding blobs (28384 tagged points)
+....Blobs detected: 9
+....Done
+..Time 350 (1984-03-28 12:00:00)
+....Finding blobs (24919 tagged points)
+....Blobs detected: 8
+....Done
+..Time 351 (1984-03-28 18:00:00)
+....Finding blobs (26448 tagged points)
+....Blobs detected: 8
+....Done
+..Time 352 (1984-03-29 00:00:00)
+....Finding blobs (28627 tagged points)
+....Blobs detected: 9
+....Done
+..Time 353 (1984-03-29 06:00:00)
+....Finding blobs (27447 tagged points)
+....Blobs detected: 10
+....Done
+..Time 354 (1984-03-29 12:00:00)
+....Finding blobs (25954 tagged points)
+....Blobs detected: 9
+....Done
+..Time 355 (1984-03-29 18:00:00)
+....Finding blobs (25768 tagged points)
+....Blobs detected: 10
+....Done
+..Time 356 (1984-03-30 00:00:00)
+....Finding blobs (24412 tagged points)
+....Blobs detected: 9
+....Done
+..Time 357 (1984-03-30 06:00:00)
+....Finding blobs (19005 tagged points)
+....Blobs detected: 7
+....Done
+..Time 358 (1984-03-30 12:00:00)
+....Finding blobs (21362 tagged points)
+....Blobs detected: 7
+....Done
+..Time 359 (1984-03-30 18:00:00)
+....Finding blobs (21116 tagged points)
+....Blobs detected: 7
+....Done
+..Time 360 (1984-03-31 00:00:00)
+....Finding blobs (24469 tagged points)
+....Blobs detected: 7
+....Done
+..Time 361 (1984-03-31 06:00:00)
+....Finding blobs (22039 tagged points)
+....Blobs detected: 6
+....Done
+..Time 362 (1984-03-31 12:00:00)
+....Finding blobs (21489 tagged points)
+....Blobs detected: 6
+....Done
+..Time 363 (1984-03-31 18:00:00)
+....Finding blobs (21961 tagged points)
+....Blobs detected: 7
+....Done
+..Done
+Assign local tags to each blob.. Done
+Building connectivity graph
+..Time 1 (1984-01-01 06:00:00)
+..Time 2 (1984-01-01 12:00:00)
+..Time 3 (1984-01-01 18:00:00)
+..Time 4 (1984-01-02 00:00:00)
+..Time 5 (1984-01-02 06:00:00)
+..Time 6 (1984-01-02 12:00:00)
+..Time 7 (1984-01-02 18:00:00)
+..Time 8 (1984-01-03 00:00:00)
+..Time 9 (1984-01-03 06:00:00)
+..Time 10 (1984-01-03 12:00:00)
+..Time 11 (1984-01-03 18:00:00)
+..Time 12 (1984-01-04 00:00:00)
+..Time 13 (1984-01-04 06:00:00)
+..Time 14 (1984-01-04 12:00:00)
+..Time 15 (1984-01-04 18:00:00)
+..Time 16 (1984-01-05 00:00:00)
+..Time 17 (1984-01-05 06:00:00)
+..Time 18 (1984-01-05 12:00:00)
+..Time 19 (1984-01-05 18:00:00)
+..Time 20 (1984-01-06 00:00:00)
+..Time 21 (1984-01-06 06:00:00)
+..Time 22 (1984-01-06 12:00:00)
+..Time 23 (1984-01-06 18:00:00)
+..Time 24 (1984-01-07 00:00:00)
+..Time 25 (1984-01-07 06:00:00)
+..Time 26 (1984-01-07 12:00:00)
+..Time 27 (1984-01-07 18:00:00)
+..Time 28 (1984-01-08 00:00:00)
+..Time 29 (1984-01-08 06:00:00)
+..Time 30 (1984-01-08 12:00:00)
+..Time 31 (1984-01-08 18:00:00)
+..Time 32 (1984-01-09 00:00:00)
+..Time 33 (1984-01-09 06:00:00)
+..Time 34 (1984-01-09 12:00:00)
+..Time 35 (1984-01-09 18:00:00)
+..Time 36 (1984-01-10 00:00:00)
+..Time 37 (1984-01-10 06:00:00)
+..Time 38 (1984-01-10 12:00:00)
+..Time 39 (1984-01-10 18:00:00)
+..Time 40 (1984-01-11 00:00:00)
+..Time 41 (1984-01-11 06:00:00)
+..Time 42 (1984-01-11 12:00:00)
+..Time 43 (1984-01-11 18:00:00)
+..Time 44 (1984-01-12 00:00:00)
+..Time 45 (1984-01-12 06:00:00)
+..Time 46 (1984-01-12 12:00:00)
+..Time 47 (1984-01-12 18:00:00)
+..Time 48 (1984-01-13 00:00:00)
+..Time 49 (1984-01-13 06:00:00)
+..Time 50 (1984-01-13 12:00:00)
+..Time 51 (1984-01-13 18:00:00)
+..Time 52 (1984-01-14 00:00:00)
+..Time 53 (1984-01-14 06:00:00)
+..Time 54 (1984-01-14 12:00:00)
+..Time 55 (1984-01-14 18:00:00)
+..Time 56 (1984-01-15 00:00:00)
+..Time 57 (1984-01-15 06:00:00)
+..Time 58 (1984-01-15 12:00:00)
+..Time 59 (1984-01-15 18:00:00)
+..Time 60 (1984-01-16 00:00:00)
+..Time 61 (1984-01-16 06:00:00)
+..Time 62 (1984-01-16 12:00:00)
+..Time 63 (1984-01-16 18:00:00)
+..Time 64 (1984-01-17 00:00:00)
+..Time 65 (1984-01-17 06:00:00)
+..Time 66 (1984-01-17 12:00:00)
+..Time 67 (1984-01-17 18:00:00)
+..Time 68 (1984-01-18 00:00:00)
+..Time 69 (1984-01-18 06:00:00)
+..Time 70 (1984-01-18 12:00:00)
+..Time 71 (1984-01-18 18:00:00)
+..Time 72 (1984-01-19 00:00:00)
+..Time 73 (1984-01-19 06:00:00)
+..Time 74 (1984-01-19 12:00:00)
+..Time 75 (1984-01-19 18:00:00)
+..Time 76 (1984-01-20 00:00:00)
+..Time 77 (1984-01-20 06:00:00)
+..Time 78 (1984-01-20 12:00:00)
+..Time 79 (1984-01-20 18:00:00)
+..Time 80 (1984-01-21 00:00:00)
+..Time 81 (1984-01-21 06:00:00)
+..Time 82 (1984-01-21 12:00:00)
+..Time 83 (1984-01-21 18:00:00)
+..Time 84 (1984-01-22 00:00:00)
+..Time 85 (1984-01-22 06:00:00)
+..Time 86 (1984-01-22 12:00:00)
+..Time 87 (1984-01-22 18:00:00)
+..Time 88 (1984-01-23 00:00:00)
+..Time 89 (1984-01-23 06:00:00)
+..Time 90 (1984-01-23 12:00:00)
+..Time 91 (1984-01-23 18:00:00)
+..Time 92 (1984-01-24 00:00:00)
+..Time 93 (1984-01-24 06:00:00)
+..Time 94 (1984-01-24 12:00:00)
+..Time 95 (1984-01-24 18:00:00)
+..Time 96 (1984-01-25 00:00:00)
+..Time 97 (1984-01-25 06:00:00)
+..Time 98 (1984-01-25 12:00:00)
+..Time 99 (1984-01-25 18:00:00)
+..Time 100 (1984-01-26 00:00:00)
+..Time 101 (1984-01-26 06:00:00)
+..Time 102 (1984-01-26 12:00:00)
+..Time 103 (1984-01-26 18:00:00)
+..Time 104 (1984-01-27 00:00:00)
+..Time 105 (1984-01-27 06:00:00)
+..Time 106 (1984-01-27 12:00:00)
+..Time 107 (1984-01-27 18:00:00)
+..Time 108 (1984-01-28 00:00:00)
+..Time 109 (1984-01-28 06:00:00)
+..Time 110 (1984-01-28 12:00:00)
+..Time 111 (1984-01-28 18:00:00)
+..Time 112 (1984-01-29 00:00:00)
+..Time 113 (1984-01-29 06:00:00)
+..Time 114 (1984-01-29 12:00:00)
+..Time 115 (1984-01-29 18:00:00)
+..Time 116 (1984-01-30 00:00:00)
+..Time 117 (1984-01-30 06:00:00)
+..Time 118 (1984-01-30 12:00:00)
+..Time 119 (1984-01-30 18:00:00)
+..Time 120 (1984-01-31 00:00:00)
+..Time 121 (1984-01-31 06:00:00)
+..Time 122 (1984-01-31 12:00:00)
+..Time 123 (1984-01-31 18:00:00)
+..Time 124 (1984-02-01 00:00:00)
+..Time 125 (1984-02-01 06:00:00)
+..Time 126 (1984-02-01 12:00:00)
+..Time 127 (1984-02-01 18:00:00)
+..Time 128 (1984-02-02 00:00:00)
+..Time 129 (1984-02-02 06:00:00)
+..Time 130 (1984-02-02 12:00:00)
+..Time 131 (1984-02-02 18:00:00)
+..Time 132 (1984-02-03 00:00:00)
+..Time 133 (1984-02-03 06:00:00)
+..Time 134 (1984-02-03 12:00:00)
+..Time 135 (1984-02-03 18:00:00)
+..Time 136 (1984-02-04 00:00:00)
+..Time 137 (1984-02-04 06:00:00)
+..Time 138 (1984-02-04 12:00:00)
+..Time 139 (1984-02-04 18:00:00)
+..Time 140 (1984-02-05 00:00:00)
+..Time 141 (1984-02-05 06:00:00)
+..Time 142 (1984-02-05 12:00:00)
+..Time 143 (1984-02-05 18:00:00)
+..Time 144 (1984-02-06 00:00:00)
+..Time 145 (1984-02-06 06:00:00)
+..Time 146 (1984-02-06 12:00:00)
+..Time 147 (1984-02-06 18:00:00)
+..Time 148 (1984-02-07 00:00:00)
+..Time 149 (1984-02-07 06:00:00)
+..Time 150 (1984-02-07 12:00:00)
+..Time 151 (1984-02-07 18:00:00)
+..Time 152 (1984-02-08 00:00:00)
+..Time 153 (1984-02-08 06:00:00)
+..Time 154 (1984-02-08 12:00:00)
+..Time 155 (1984-02-08 18:00:00)
+..Time 156 (1984-02-09 00:00:00)
+..Time 157 (1984-02-09 06:00:00)
+..Time 158 (1984-02-09 12:00:00)
+..Time 159 (1984-02-09 18:00:00)
+..Time 160 (1984-02-10 00:00:00)
+..Time 161 (1984-02-10 06:00:00)
+..Time 162 (1984-02-10 12:00:00)
+..Time 163 (1984-02-10 18:00:00)
+..Time 164 (1984-02-11 00:00:00)
+..Time 165 (1984-02-11 06:00:00)
+..Time 166 (1984-02-11 12:00:00)
+..Time 167 (1984-02-11 18:00:00)
+..Time 168 (1984-02-12 00:00:00)
+..Time 169 (1984-02-12 06:00:00)
+..Time 170 (1984-02-12 12:00:00)
+..Time 171 (1984-02-12 18:00:00)
+..Time 172 (1984-02-13 00:00:00)
+..Time 173 (1984-02-13 06:00:00)
+..Time 174 (1984-02-13 12:00:00)
+..Time 175 (1984-02-13 18:00:00)
+..Time 176 (1984-02-14 00:00:00)
+..Time 177 (1984-02-14 06:00:00)
+..Time 178 (1984-02-14 12:00:00)
+..Time 179 (1984-02-14 18:00:00)
+..Time 180 (1984-02-15 00:00:00)
+..Time 181 (1984-02-15 06:00:00)
+..Time 182 (1984-02-15 12:00:00)
+..Time 183 (1984-02-15 18:00:00)
+..Time 184 (1984-02-16 00:00:00)
+..Time 185 (1984-02-16 06:00:00)
+..Time 186 (1984-02-16 12:00:00)
+..Time 187 (1984-02-16 18:00:00)
+..Time 188 (1984-02-17 00:00:00)
+..Time 189 (1984-02-17 06:00:00)
+..Time 190 (1984-02-17 12:00:00)
+..Time 191 (1984-02-17 18:00:00)
+..Time 192 (1984-02-18 00:00:00)
+..Time 193 (1984-02-18 06:00:00)
+..Time 194 (1984-02-18 12:00:00)
+..Time 195 (1984-02-18 18:00:00)
+..Time 196 (1984-02-19 00:00:00)
+..Time 197 (1984-02-19 06:00:00)
+..Time 198 (1984-02-19 12:00:00)
+..Time 199 (1984-02-19 18:00:00)
+..Time 200 (1984-02-20 00:00:00)
+..Time 201 (1984-02-20 06:00:00)
+..Time 202 (1984-02-20 12:00:00)
+..Time 203 (1984-02-20 18:00:00)
+..Time 204 (1984-02-21 00:00:00)
+..Time 205 (1984-02-21 06:00:00)
+..Time 206 (1984-02-21 12:00:00)
+..Time 207 (1984-02-21 18:00:00)
+..Time 208 (1984-02-22 00:00:00)
+..Time 209 (1984-02-22 06:00:00)
+..Time 210 (1984-02-22 12:00:00)
+..Time 211 (1984-02-22 18:00:00)
+..Time 212 (1984-02-23 00:00:00)
+..Time 213 (1984-02-23 06:00:00)
+..Time 214 (1984-02-23 12:00:00)
+..Time 215 (1984-02-23 18:00:00)
+..Time 216 (1984-02-24 00:00:00)
+..Time 217 (1984-02-24 06:00:00)
+..Time 218 (1984-02-24 12:00:00)
+..Time 219 (1984-02-24 18:00:00)
+..Time 220 (1984-02-25 00:00:00)
+..Time 221 (1984-02-25 06:00:00)
+..Time 222 (1984-02-25 12:00:00)
+..Time 223 (1984-02-25 18:00:00)
+..Time 224 (1984-02-26 00:00:00)
+..Time 225 (1984-02-26 06:00:00)
+..Time 226 (1984-02-26 12:00:00)
+..Time 227 (1984-02-26 18:00:00)
+..Time 228 (1984-02-27 00:00:00)
+..Time 229 (1984-02-27 06:00:00)
+..Time 230 (1984-02-27 12:00:00)
+..Time 231 (1984-02-27 18:00:00)
+..Time 232 (1984-02-28 00:00:00)
+..Time 233 (1984-02-28 06:00:00)
+..Time 234 (1984-02-28 12:00:00)
+..Time 235 (1984-02-28 18:00:00)
+..Time 236 (1984-02-29 00:00:00)
+..Time 237 (1984-02-29 06:00:00)
+..Time 238 (1984-02-29 12:00:00)
+..Time 239 (1984-02-29 18:00:00)
+..Time 240 (1984-03-01 00:00:00)
+..Time 241 (1984-03-01 06:00:00)
+..Time 242 (1984-03-01 12:00:00)
+..Time 243 (1984-03-01 18:00:00)
+..Time 244 (1984-03-02 00:00:00)
+..Time 245 (1984-03-02 06:00:00)
+..Time 246 (1984-03-02 12:00:00)
+..Time 247 (1984-03-02 18:00:00)
+..Time 248 (1984-03-03 00:00:00)
+..Time 249 (1984-03-03 06:00:00)
+..Time 250 (1984-03-03 12:00:00)
+..Time 251 (1984-03-03 18:00:00)
+..Time 252 (1984-03-04 00:00:00)
+..Time 253 (1984-03-04 06:00:00)
+..Time 254 (1984-03-04 12:00:00)
+..Time 255 (1984-03-04 18:00:00)
+..Time 256 (1984-03-05 00:00:00)
+..Time 257 (1984-03-05 06:00:00)
+..Time 258 (1984-03-05 12:00:00)
+..Time 259 (1984-03-05 18:00:00)
+..Time 260 (1984-03-06 00:00:00)
+..Time 261 (1984-03-06 06:00:00)
+..Time 262 (1984-03-06 12:00:00)
+..Time 263 (1984-03-06 18:00:00)
+..Time 264 (1984-03-07 00:00:00)
+..Time 265 (1984-03-07 06:00:00)
+..Time 266 (1984-03-07 12:00:00)
+..Time 267 (1984-03-07 18:00:00)
+..Time 268 (1984-03-08 00:00:00)
+..Time 269 (1984-03-08 06:00:00)
+..Time 270 (1984-03-08 12:00:00)
+..Time 271 (1984-03-08 18:00:00)
+..Time 272 (1984-03-09 00:00:00)
+..Time 273 (1984-03-09 06:00:00)
+..Time 274 (1984-03-09 12:00:00)
+..Time 275 (1984-03-09 18:00:00)
+..Time 276 (1984-03-10 00:00:00)
+..Time 277 (1984-03-10 06:00:00)
+..Time 278 (1984-03-10 12:00:00)
+..Time 279 (1984-03-10 18:00:00)
+..Time 280 (1984-03-11 00:00:00)
+..Time 281 (1984-03-11 06:00:00)
+..Time 282 (1984-03-11 12:00:00)
+..Time 283 (1984-03-11 18:00:00)
+..Time 284 (1984-03-12 00:00:00)
+..Time 285 (1984-03-12 06:00:00)
+..Time 286 (1984-03-12 12:00:00)
+..Time 287 (1984-03-12 18:00:00)
+..Time 288 (1984-03-13 00:00:00)
+..Time 289 (1984-03-13 06:00:00)
+..Time 290 (1984-03-13 12:00:00)
+..Time 291 (1984-03-13 18:00:00)
+..Time 292 (1984-03-14 00:00:00)
+..Time 293 (1984-03-14 06:00:00)
+..Time 294 (1984-03-14 12:00:00)
+..Time 295 (1984-03-14 18:00:00)
+..Time 296 (1984-03-15 00:00:00)
+..Time 297 (1984-03-15 06:00:00)
+..Time 298 (1984-03-15 12:00:00)
+..Time 299 (1984-03-15 18:00:00)
+..Time 300 (1984-03-16 00:00:00)
+..Time 301 (1984-03-16 06:00:00)
+..Time 302 (1984-03-16 12:00:00)
+..Time 303 (1984-03-16 18:00:00)
+..Time 304 (1984-03-17 00:00:00)
+..Time 305 (1984-03-17 06:00:00)
+..Time 306 (1984-03-17 12:00:00)
+..Time 307 (1984-03-17 18:00:00)
+..Time 308 (1984-03-18 00:00:00)
+..Time 309 (1984-03-18 06:00:00)
+..Time 310 (1984-03-18 12:00:00)
+..Time 311 (1984-03-18 18:00:00)
+..Time 312 (1984-03-19 00:00:00)
+..Time 313 (1984-03-19 06:00:00)
+..Time 314 (1984-03-19 12:00:00)
+..Time 315 (1984-03-19 18:00:00)
+..Time 316 (1984-03-20 00:00:00)
+..Time 317 (1984-03-20 06:00:00)
+..Time 318 (1984-03-20 12:00:00)
+..Time 319 (1984-03-20 18:00:00)
+..Time 320 (1984-03-21 00:00:00)
+..Time 321 (1984-03-21 06:00:00)
+..Time 322 (1984-03-21 12:00:00)
+..Time 323 (1984-03-21 18:00:00)
+..Time 324 (1984-03-22 00:00:00)
+..Time 325 (1984-03-22 06:00:00)
+..Time 326 (1984-03-22 12:00:00)
+..Time 327 (1984-03-22 18:00:00)
+..Time 328 (1984-03-23 00:00:00)
+..Time 329 (1984-03-23 06:00:00)
+..Time 330 (1984-03-23 12:00:00)
+..Time 331 (1984-03-23 18:00:00)
+..Time 332 (1984-03-24 00:00:00)
+..Time 333 (1984-03-24 06:00:00)
+..Time 334 (1984-03-24 12:00:00)
+..Time 335 (1984-03-24 18:00:00)
+..Time 336 (1984-03-25 00:00:00)
+..Time 337 (1984-03-25 06:00:00)
+..Time 338 (1984-03-25 12:00:00)
+..Time 339 (1984-03-25 18:00:00)
+..Time 340 (1984-03-26 00:00:00)
+..Time 341 (1984-03-26 06:00:00)
+..Time 342 (1984-03-26 12:00:00)
+..Time 343 (1984-03-26 18:00:00)
+..Time 344 (1984-03-27 00:00:00)
+..Time 345 (1984-03-27 06:00:00)
+..Time 346 (1984-03-27 12:00:00)
+..Time 347 (1984-03-27 18:00:00)
+..Time 348 (1984-03-28 00:00:00)
+..Time 349 (1984-03-28 06:00:00)
+..Time 350 (1984-03-28 12:00:00)
+..Time 351 (1984-03-28 18:00:00)
+..Time 352 (1984-03-29 00:00:00)
+..Time 353 (1984-03-29 06:00:00)
+..Time 354 (1984-03-29 12:00:00)
+..Time 355 (1984-03-29 18:00:00)
+..Time 356 (1984-03-30 00:00:00)
+..Time 357 (1984-03-30 06:00:00)
+..Time 358 (1984-03-30 12:00:00)
+..Time 359 (1984-03-30 18:00:00)
+..Time 360 (1984-03-31 00:00:00)
+..Time 361 (1984-03-31 06:00:00)
+..Time 362 (1984-03-31 12:00:00)
+..Time 363 (1984-03-31 18:00:00)
+..Time 364 (1984-04-01 00:00:00)
+..Done
+Identify components in connectivity graph.. Done
+Reassign blob tags
+..Unique tags found: 1052
+..Done
+Output blobs
+..Writing file "/global/cfs/projectdirs/m2637/hyvchen/test/ERA5_AR_test/e5.oper.an.vinteg.ar_tags.ll025sc.1984010100_1984013123_output.nc"
+..Writing file "/global/cfs/projectdirs/m2637/hyvchen/test/ERA5_AR_test/e5.oper.an.vinteg.ar_tags.ll025sc.1984020100_1984022923_output.nc"
+..Writing file "/global/cfs/projectdirs/m2637/hyvchen/test/ERA5_AR_test/e5.oper.an.vinteg.ar_tags.ll025sc.1984030100_1984033123_output.nc"
+..Done
+------------------------------------------------------------
+==564935== xtree memory report: /global/u1/h/hyvchen/tempestextremes/xtmemory_mpi_new_4.0.kcg
+==564934== xtree memory report: /global/u1/h/hyvchen/tempestextremes/xtmemory_mpi_new_4.0.kcg
+==564936== xtree memory report: /global/u1/h/hyvchen/tempestextremes/xtmemory_mpi_new_4.0.kcg
+==564937== xtree memory report: /global/u1/h/hyvchen/tempestextremes/xtmemory_mpi_new_4.0.kcg
