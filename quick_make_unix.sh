@@ -10,7 +10,7 @@
 
 # Configuration Options
 BUILD_TYPE="Debug"          # "Debug" or "Release"
-ENABLE_MPI="ON"               # "ON" or "OFF"
+ENABLE_MPI="OFF"               # "ON" or "OFF"
 OPTIMIZATION_LEVEL="-O1"      # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
 DEBUG_SYMBOLS="ON"           # "ON" to include debug symbols (-g), "OFF" to exclude
 INSTALL_PREFIX=""             # Specify the installation directory.
