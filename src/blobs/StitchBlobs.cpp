@@ -513,11 +513,18 @@ typedef enum {
 	DIR_RIGHT = 1
 } CommDirection;
 
-///	<summary>
-///		A Class used for exchanging vecAllBlobsTag between processors
-///		The exchange process will first update the exchanged Tags.time to the actual global time
-///		And then start the exchange process.
-///	</summary>
+/// <summary>
+/// 	A Class used for exchanging vecAllBlobsTag between processors.
+/// 
+///		The exchange process will first update the exchanged Tags.time to reflect the actual global time,
+/// 	and then begin the exchange process. Unlike BlobExchangeOP, this operator does not implement a ghost cell
+/// 	mechanism. This design choice was made for two reasons:
+/// 	1. The Tag exchange requires updating the GlobalTime for each Tag, so maintaining a separate, clean copy 
+///    		of the core data simplifies the update process and minimizes potential errors.
+/// 	2. The memory footprint of Tag data is relatively small compared to Blob data, reducing the need for
+///    		the memory savings and performance benefits that ghost cell implementations provide.
+/// </summary>
+
 class TagExchangeOP {
 	private:
 
@@ -882,16 +889,17 @@ class BlobBoxesDegExchangeOP {
   		std::vector<MPI_Status> MPIstatuses;
 
 	protected:
-		///	<summary>
-		///		The initial vecAllBlobBoxesDeg that will be sent
-		///	</summary>
-		std::vector< std::vector< LatLonBox<double> > > _vecAllBlobBoxesDeg;
-
-		///	<summary>
-		///		The vecAllBlobBoxesDeg that is after the exchange. it's column number is _vecAllBlobBoxesDegs' column number plus 2 (left and right) 
-		///		except for p0 and pn-1 (for these two processors, the column number is _vecAllBBlobBoxesDegs' column number plus 1).
-		///	</summary>
-		std::vector< std::vector< LatLonBox<double> > > exchangedvecAllBlobBoxesDeg;
+		/// <summary>
+		/// 	The container for vecAllBlobBoxesDeg with ghost cells.
+		/// 	Initially, it holds only the core data provided in the input.
+		/// 	On processors that require ghost cells (even-numbered processors), 
+		/// 	it is lazily expanded (in EndExchange) to include extra ghost columns:
+		///   	- Interior processors: one extra ghost column on the left and one on the right.
+		///   	- Rank 0: one extra ghost column on the right only.
+		///   	- Last rank: one extra ghost column on the left only.
+		/// 	For odd-numbered processors, no expansion is performed, and the container remains as the core data.
+		/// </summary>
+		std::vector< std::vector< LatLonBox<double> > > _vecAllBlobBoxesDegWithGhosts;
 
 		///	<summary>
 		///		The buffer for vecAllBlobBoxesDeg that will be sent
@@ -913,7 +921,7 @@ class BlobBoxesDegExchangeOP {
 		///	</summary>
 		BlobBoxesDegExchangeOP(MPI_Comm communicator, 
 							   const std::vector< std::vector< LatLonBox<double> > > & vecAllBlobBoxesDeg){
-			this->_vecAllBlobBoxesDeg = vecAllBlobBoxesDeg;
+			_vecAllBlobBoxesDegWithGhosts = vecAllBlobBoxesDeg;
 			this->m_comm = communicator;
 
 		//########################### Notes for  derived MPI datatype of the LatLonBox<double>(Hongyu Chen) ############################################################################ 
@@ -974,9 +982,35 @@ class BlobBoxesDegExchangeOP {
 			MPI_Comm_rank(m_comm, &rank);
 
 			//----------------------Send data first----------------------
-			// Pack data into the send buffer
-			sendBlobBoxesDeg[0] = _vecAllBlobBoxesDeg[0];
-			sendBlobBoxesDeg[1] = _vecAllBlobBoxesDeg[_vecAllBlobBoxesDeg.size()-1];
+			// Pack data into the send buffers from the core container.
+			// Since _vecAllBlobBoxesDegWithGhosts initially holds only the core data,
+			// the left boundary is at index 0 and the right boundary is at the last index.
+			sendBlobBoxesDeg[0] = _vecAllBlobBoxesDegWithGhosts[0];
+			sendBlobBoxesDeg[1] = _vecAllBlobBoxesDegWithGhosts[_vecAllBlobBoxesDegWithGhosts.size()-1];
+
+			// Only even-numbered processors (prime processors) will receive ghost data.
+			// They need to expand their container to include ghost columns.
+			if (rank % 2 == 0) {
+				// Determine ghost offsets.
+				int ghostLeft  = (rank == 0) ? 0 : 1;
+				int ghostRight = (rank == size - 1) ? 0 : 1;
+				// Core data columns count (the current size of _vecAllBlobBoxesDegWithGhosts).
+				int coreColumns = static_cast<int>(_vecAllBlobBoxesDegWithGhosts.size());
+				// Total columns after adding ghost columns.
+				int newTotalColumns = ghostLeft + coreColumns + ghostRight;
+
+				// Allocate a temporary container for the expanded data.
+				std::vector<std::vector<LatLonBox<double>>> ghostContainer;
+				ghostContainer.resize(newTotalColumns);
+
+				// Copy the core data into the new container at the proper offset.
+				for (int i = 0; i < coreColumns; i++) {
+					ghostContainer[i + ghostLeft] = _vecAllBlobBoxesDegWithGhosts[i];
+				}
+				
+				// Replace the in-place container with the expanded one.
+				_vecAllBlobBoxesDegWithGhosts = std::move(ghostContainer);
+			}
 
 			// Send data
 			for (auto dir: {DIR_LEFT, DIR_RIGHT}) {
@@ -1061,14 +1095,13 @@ class BlobBoxesDegExchangeOP {
 			}
 		}
 
-		///	<summary>
-		///		End the exchange process.
-		// 		this function is blocking until:
-		// 		- it is safe to modify the values in the BlobBoxesDegExchangeOP data without
-		//   		affecting the exchange values for other processes
-		// 		- the exchange values can be read: they contain to up-to-date values
-		//   		from other processes
-		///	</summary>
+		/// <summary>
+		/// 	End the exchange process.
+		/// 	This function blocks until all non-blocking communications complete.
+		/// 	Then, on even-numbered processors (which expanded _vecAllBlobBoxesDegWithGhosts to include ghost columns),
+		/// 	it inserts the received ghost data into the proper ghost cell positions.
+		/// 	On odd-numbered processors, the container remains unchanged.
+		/// </summary>
 		void EndExchange() {
 			// Wait for all Irecv to complete
 
@@ -1083,42 +1116,46 @@ class BlobBoxesDegExchangeOP {
 			MPI_Comm_size(m_comm, &size);
 			MPI_Comm_rank(m_comm, &rank);
 
+			// Compute ghost offsets.
+			// For even-numbered processors, the container was expanded in StartExchange.
+			int ghostLeft  = (rank == 0) ? 0 : 1;
+			int ghostRight = (rank == size - 1) ? 0 : 1;
+
 			// Pack the data into the vecAllBlobBoxesDeg
 			// The std::move() here is to avoid the possible errors in LatLonBox<double> default copy constructor
 			// Only the prime number processors need to pack the data
 			if (rank % 2 == 0) {
+				int totalColumns = static_cast<int>(_vecAllBlobBoxesDegWithGhosts.size());
+				int coreColumns = totalColumns - ghostLeft - ghostRight;
 				if (rank == 0) {
-					for (int i = 0; i < _vecAllBlobBoxesDeg.size();i++) {
-						exchangedvecAllBlobBoxesDeg.emplace_back(std::move(_vecAllBlobBoxesDeg[i]));
+					if (ghostRight == 1) {
+						// The right ghost column is at index ghostLeft + coreColumns.
+						_vecAllBlobBoxesDegWithGhosts[ghostLeft + coreColumns] = recvBlobBoxesDeg[1];
 					}
-					exchangedvecAllBlobBoxesDeg.emplace_back(std::move(recvBlobBoxesDeg[1]));
-
 				} else if (rank == size - 1) {
-					exchangedvecAllBlobBoxesDeg.emplace_back(std::move(recvBlobBoxesDeg[0]));
-					for (int i = 0; i < _vecAllBlobBoxesDeg.size(); i++) {
-						exchangedvecAllBlobBoxesDeg.emplace_back(std::move(_vecAllBlobBoxesDeg[i]));
+					if (ghostLeft == 1) {
+						_vecAllBlobBoxesDegWithGhosts[0] = recvBlobBoxesDeg[0];
 					}
 
 				} else {
-					exchangedvecAllBlobBoxesDeg.emplace_back(std::move(recvBlobBoxesDeg[0]));
-					for (int i = 0; i < _vecAllBlobBoxesDeg.size(); i++) {
-						exchangedvecAllBlobBoxesDeg.emplace_back(std::move(_vecAllBlobBoxesDeg[i]));
-					}
-					exchangedvecAllBlobBoxesDeg.emplace_back(std::move(recvBlobBoxesDeg[1]));
+					_vecAllBlobBoxesDegWithGhosts[0] = recvBlobBoxesDeg[0];
+					_vecAllBlobBoxesDegWithGhosts[ghostLeft + coreColumns] = recvBlobBoxesDeg[1];
 				}
 
-			} else {
-				exchangedvecAllBlobBoxesDeg = _vecAllBlobBoxesDeg;
-			}
-
+			} 
+			// Odd-numbered processors do not expand their container; no ghost data is inserted.
+    
 
 		}
 
-		///	<summary>
-		///		Return the exchanged vecAllBlobTags
-		///	</summary>
-		std::vector< std::vector< LatLonBox<double> > > GetExchangedVecAllBlobBoxesDeg(){
-			return this->exchangedvecAllBlobBoxesDeg;
+		/// <summary>
+		/// 	Return the exchanged vecAllBlobBoxesDeg.
+		/// 	This function returns the unified container that holds the core data and,
+		/// 	for even-numbered processors, the additional ghost columns after the exchange.
+		/// 	For odd-numbered processors, the container remains as the core data only.
+		/// </summary>
+		std::vector< std::vector< LatLonBox<double> > > GetExchangedVecAllBlobBoxesDeg() {
+			return _vecAllBlobBoxesDegWithGhosts;
 		}
 };
 
@@ -2806,7 +2843,7 @@ try {
 
 		// Load in the benchmark file
 		NcFileVector vecNcFiles;
-		vecNcFiles.ParseFromString(vecInputFiles[0]);//[HC] What is stored at vecInputFiles[0]?
+		vecNcFiles.ParseFromString(vecInputFiles[0]);
 
 		_ASSERT(vecNcFiles.size() > 0);
 
@@ -3012,7 +3049,7 @@ try {
 		varreg.UnloadAllGridData();
 
 		// Load in the benchmark file
-		NcFileVector vecNcFiles; //[HC] Why it is called "vecNcFiles" what information does it have? Coz u can have multiple files at one line
+		NcFileVector vecNcFiles; 
 		vecNcFiles.ParseFromString(vecInputFiles[f]);
 		_ASSERT(vecNcFiles.size() > 0);
 		
@@ -3054,11 +3091,9 @@ try {
 					vecGlobalTimes[f][t].ToString().c_str());
 			}
 
-			// Load the search variable data [HC] What does the following block do exactly, how does it read through the time slice? What does the following i mean?
+			// Load the search variable data 
 			Variable & var = varreg.Get(varix);
 			vecNcFiles.SetConstantTimeIx(t);
-			// [HC] Check in every loop how does thedata change
-			// Memeory scale by the number of the threads used
 			var.LoadGridData(varreg, vecNcFiles, grid); //
 			const DataArray1D<float> & dataIndicator = var.GetData();
 /*
@@ -3522,7 +3557,6 @@ try {
 	
 	#if defined(TEMPEST_MPIOMP)
 		//recalculate the nGlobalTimes here based on the updated vecGlobalTimes file (will be inverted after the connectivity graph is built)
-		//[HC] Isn't the original one the same as the following one?[Answer: it should be, but need double check]
 		int original_nGlobalTimes = nGlobalTimes;
 			
 		if (nMPISize > 1 && valid_flag) {
@@ -3885,8 +3919,8 @@ try {
 				break;
 			}
 		#endif
-		_ASSERT(nGlobalTimes == vecAllBlobTags.size());//[HC] This might need to update for the MPI optimization purpose
-		std::vector<Tag> & vecBlobTags = vecAllBlobTags[t];//[HC] So we actually use the vecAllBlobTags at P0
+		_ASSERT(nGlobalTimes == vecAllBlobTags.size());
+		std::vector<Tag> & vecBlobTags = vecAllBlobTags[t];
 
 		for (int p = 0; p < vecBlobTags.size(); p++) {
 			std::map<Tag, Tag>::const_iterator iterTagPair =
