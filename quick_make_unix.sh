@@ -9,10 +9,10 @@
 # Please ensure the required NetCDF and HDF5 (and MPI, if needed) are available.
 
 # Configuration Options
-BUILD_TYPE="Debug"          # "Debug" or "Release"
-ENABLE_MPI="OFF"               # "ON" or "OFF"
-OPTIMIZATION_LEVEL="-O1"      # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
-DEBUG_SYMBOLS="ON"           # "ON" to include debug symbols (-g), "OFF" to exclude
+BUILD_TYPE="Release"          # "Debug" or "Release"
+ENABLE_MPI="ON"               # "ON" or "OFF"
+OPTIMIZATION_LEVEL="-O3"      # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
+DEBUG_SYMBOLS="OFF"           # "ON" to include debug symbols (-g), "OFF" to exclude
 INSTALL_PREFIX=""             # Specify the installation directory.
                               # If left blank, it defaults to the project root (TEMPEST_EXTREMES_SOURCE_DIR)
                               # and final executables will be installed in TEMPEST_EXTREMES_SOURCE_DIR/bin.
