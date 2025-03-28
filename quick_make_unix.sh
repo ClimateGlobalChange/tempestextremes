@@ -133,6 +133,6 @@ echo "Build and installation completed successfully."
 
 # For end users who want a clean structure, you can remove the build directory.
 # Developers or those debugging might prefer to keep it for faster incremental builds.
-# make clean
-# echo "Cleaned up the ${SRC_DIR}/build directory. All executables are located in ${INSTALL_PREFIX}/bin."
+make clean
+echo "Cleaned up the ${SRC_DIR}/build directory. All executables are located in ${INSTALL_PREFIX}/bin."
 
