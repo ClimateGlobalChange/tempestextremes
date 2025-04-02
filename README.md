@@ -1,5 +1,5 @@
-TempestExtremes
-================
+# TempestExtremes
+
 
 Author:  Paul Ullrich
 Email:   paullrich@ucdavis.edu
@@ -14,8 +14,8 @@ Redistribution and use in source and binary forms, with or without modification,
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Installation via conda
-======================
+# Installation via conda
+
 TempestExtremes can be found on conda-forge here:
 
 https://anaconda.org/conda-forge/tempest-extremes
@@ -24,43 +24,73 @@ To install from conda use the command line:
 
 ```conda install -c conda-forge tempest-extremes```
 
-Installation via make
-=====================
-TempestExtremes uses a basic make-based build system that has been tested in multiple Unix and Linux based environments.  TempestExtremes currently only requires the NetCDF C library provided as an external dependency.  Linker commands needed to include -lnetcdf must be specified in a system makefile found in mk/system/.  Once the compiler executable and flags have been set, executing "make" in the tempestextremes directory will perform the build, storing binaries in the "bin" directory.
 
-To compile on NERSC Cori:
-Execute "module load cray-netcdf" prior to compilation.  Compiler executable and flags are specified in mk/system/cori.make.
+# Installation via CMake
 
-To compile on NCAR systems, including Cheyenne and Casper:
-No modifications are needed.  Compiler executable and flags are specified in mk/system/cheyenne.make.
+TempestExtremes can be built and installed on various systems using CMake. Our new script, `./quick_make_unix.sh`, automatically detects your platform(UNIX-based systems only) and loads any required modules before building.
 
-To prepare compilation on MacOSX:
-Modify mk/system/macosx.make to specify desired compiler executable and flags.
+## General CMake Configuration
 
-To prepare compilation on another Unix- or Linux-based system:
-Modify mk/system/default.make to specify appropriate compiler executable and flags.
+- **Install Prefix:** Set with `-DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL`. By default, it installs to the project root, with executables placed in `TEMPEST_EXTREMES_SOURCE_DIR/bin`.
+- **Build Type:** Specify via `-DCMAKE_BUILD_TYPE=[Release/Debug]`.
+- **MPI Support:** Enable or disable using `-DENABLE_MPI=ON` or `-DENABLE_MPI=OFF`.
+- **Out-of-Source Build:** Build files are generated in `./build/bin` (keeping the source directory clean).
+- **Installation Locations:** Final executables are installed to `./bin` and libraries/archives to `./lib`.
 
-Parallel compilation with MPI is enabled by default.  To compile TempestExtremes as a serial product edit "mk/config.mk" and change "PARALLEL= MPIOMP" to "PARALLEL=NONE".
+## Quick-Make Scripts for generic Linux/Unix based systems
+A ready-to-use `./quick_make_unix.sh` script is available for end users to run on common UNIX-based platforms such as MacOS and Linux, as well as on command HPC systems like NERSC Perlmutter and NCAR Derecho.
+### System/Platforms Detection in `quick_make_unix.sh`
+- **MacOS/Linux (Generic):** The script runs the default commands.
+- **NERSC Perlmutter:** The script automatically loads `cray-hdf5` and `cray-netcdf` modules before building.
+- **NCAR Derecho:** The script loads required modules such as `ncarenv`, `ncarcompilers`, `intel`, `cray-mpich`, and `netcdf`.
+- **Windows:** This bash script is prepared for UNIX-like environments. If you're on Windows, please refer to the Windows instructions below. If you have a bash environment on Windows but the script fails to run automatically, simply run the commands manually starting from `./remove_depend.sh`.
+- **Unknown/Other:** If your system isn’t recognized or errors occur (often due to non-standard dependency paths), don’t panic—simply run the commands manually starting from `./remove_depend.sh` and fix the related errors shown in the terminal.
 
-Note:  If the build fails or is cancelled part way through the process, it may be necessary to remove extraneous dependency files.  To do so run "remove_depend.sh" prior to recompiling.
 
-Installation via CMake
-=====================
-Using CMake, one can easily install TempestExtremes on different operational systems with the required compiler and dependencies. Dependencies can be downloaded and installed manually or via package management software (e.g., [Conda](https://docs.conda.io)) and specify environment variables to help CMake locate those dependencies (see CMake/FindNetCDF.cmake and [CMake help](https://cmake.org/cmake/help/latest/module/FindMPI.html)).
+Notes:
+- **For End Users:**  
+  If you only need the final deliverables, run the quick-make script. It will install executables to `./bin` and (by default) remove the build directory for a clean structure.
 
-## Unix/Linux-Based Systems
-Use the following commands to compile on Unix- or Linux-based systems ([netCDF](https://downloads.unidata.ucar.edu/netcdf/) required):
+- **For Developers:**  
+  The `./build` directory is used for development and debugging. It contains all intermediate files, which helps speed up incremental builds. Developers should keep the build directory intact (by commenting out the cleanup step) for faster rebuilds.  
+
+
+To use `./quick_make_unix.sh` , update the configuration options in the script:
+```bash
+# Configuration Options
+BUILD_TYPE="Release"          # "Debug" or "Release"
+ENABLE_MPI="ON"               # "ON" or "OFF"
+OPTIMIZATION_LEVEL="-O3"      # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
+DEBUG_SYMBOLS="OFF"           # "ON" to include debug symbols (-g), "OFF" to exclude
+INSTALL_PREFIX=""             # Specify the installation directory. If left blank, it defaults to 
+                              # the project root (TEMPEST_EXTREMES_SOURCE_DIR) and final executables 
+                              # will be installed in TEMPEST_EXTREMES_SOURCE_DIR/bin.
+```
+The run `./quick_make_unix.sh`.
+
+## Unix/Linux-Based Systems (Manual Install)
+
+If you are using Nersc Permultter, you will need to run this first:
+```
+module load cray-hdf5
+module load cray-netcdf
+```
+If you are using NCAR Derecho, you will need to run this first:
+```
+module load cmake ncarenv gcc craype cray-mpich hdf5 netcdf
+```
+Use the following commands to compile on Unix- or Linux-based systems ):
 ```
 cd TEMPEST_EXTREMES_SOURCE_DIR
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=[Release/Debug] -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL -DNetCDF_PATH=NETCDF_ROOT -DCMAKE_PREFIX_PATH=MPI_ROOT ..
+cmake -DCMAKE_BUILD_TYPE=[Release/Debug] -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL -DCMAKE_PREFIX_PATH=MPI_ROOT ..
 make && make install
 ```
 
 ## Windows (Experimental)
 Follow these steps to compile on the Windows system ([Visual Studio](https://visualstudio.microsoft.com) and [CMake](https://cmake.org/download/) required):
-1. Download and install [netCDF](https://downloads.unidata.ucar.edu/netcdf/)(required) and [Microsoft MPI](https://learn.microsoft.com/en-us/message-passing-interface/microsoft-mpi)(optional but recommended).
+1. Download and install [netCDF](https://downloads.unidata.ucar.edu/netcdf/) and [Microsoft MPI](https://learn.microsoft.com/en-us/message-passing-interface/microsoft-mpi). Select "Add netCDF to the system PATH for the current user" when instaling netCDF.
 2. Use the following PowerShell commands to generate a Visual Studio project.
 ```
 $Env:MSMPI_LIB64="MSMPI_SDK_ROOT/Lib/x64"
@@ -68,25 +98,67 @@ $Env:MSMPI_INC="MSMPI_SDK_ROOT/Include"
 cd TEMPEST_EXTREMES_SOURCE_DIR
 mkdir build
 cd build
-cmake -G "Visual Studio 17" -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL ..
+cmake -G "Visual Studio 17" -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL -DNetCDF_ROOT=YOUR_NETCDF_INSTALLATION_PATH ..
 ```
-3. Build the [Visual Studio project](https://learn.microsoft.com/en-us/visualstudio/ide/building-and-cleaning-projects-and-solutions-in-visual-studio).
+3. Open the `tempestextremes.sln` file in the `./build` directory with Visual Studio and Build the software by clicking "Build" and "Build INSTALL" at the top menu bar. [Learn more about building Visual Studio projects](https://learn.microsoft.com/en-us/visualstudio/ide/building-and-cleaning-projects-and-solutions-in-visual-studio). 
 
-## HPC Systems
-### NCAR Derecho
-Use the following commands to compile on [Derecho](https://ncar-hpc-docs.readthedocs.io/en/latest/compute-systems/derecho/compiling-code-on-derecho/):
-```
-module load ncarenv/23.09
-module load ncarcompilers/1.0.0
-module load intel/2023.2.1
-module load cray-mpich/8.1.27
-module load netcdf/4.9.2
-cd TEMPEST_EXTREMES_SOURCE_DIR
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=[Release/Debug] -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL ..
-make && make install
-```
+
+## Developer Notes
+
+
+1. **Using the Quick Make Script:**  
+   If you are a developer using `./quick_make_general.sh`, remember to comment out or remove the cleanup step at the end (e.g. `make clean`). It's not efficient to rebuild the entire project every time you make changes—this script is mainly for a full rebuild or for end users who want a clean install. For faster incremental builds during development, build manually so that intermediate files are preserved.
+
+2. **Adding New Executables:**  
+   To add a new executable to the project, refer to following examples:
+
+   **Example: Adding a New Executable**  
+   For example, to add `NewBlobsFeature`:
+   1. **Edit the CMakeLists.txt File:**  
+      Open the appropriate file (e.g., `src/blobs/CMakeLists.txt`) and add:
+      ```cmake
+      add_executable(NewBlobsFeature NewBlobsFeature.cpp)
+      target_link_libraries(NewBlobsFeature PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
+      ```
+   2. **Update the Install Rule:**  
+      Modify the install command in the same CMakeLists.txt to include the new executable:
+      ```cmake
+      install(
+        TARGETS BlobStats DetectBlobs PersistentBlobs StitchBlobs NewBlobsFeature
+        RUNTIME DESTINATION bin
+      )
+      ```
+      This ensures that `NewBlobsFeature` will be copied to `./bin` when you run `make install`.
+
+3. **Combining Multiple Files into One Executable:**  
+   If your new executable requires multiple source files, do the following:
+
+   **Example: Combining Multiple Files into One Executable**  
+   For instance, to create an executable named `BlockingUtilities` from multiple files:
+   1. **Edit the CMakeLists.txt File:**  
+      Open `src/blocking/CMakeLists.txt` and add:
+      ```cmake
+      list(APPEND BLOCKINGUTILITIES
+        BlockingUtilities.h
+        BlockingUtilities.cpp
+        MoreBlockingUtilities.cpp
+      )
+
+      add_executable(BlockingUtilities ${BLOCKINGUTILITIES})
+      target_link_libraries(BlockingUtilities PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
+      ```
+   2. **Update the Install Rule:**  
+      Ensure that the new target is included in the install command:
+      ```cmake
+      install(
+        TARGETS BlockingUtilities
+        RUNTIME DESTINATION bin
+      )
+      ```
+
+By following these guidelines, you can efficiently develop and extend TempestExtremes while keeping a clean separation between the build artifacts and the final deliverables.
+
+
 
 Usage
 =====
