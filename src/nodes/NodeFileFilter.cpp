@@ -822,7 +822,7 @@ void NodeFileFilter(
 			_EXCEPTION2("Insufficient dimensions in variable \"%s\" in file \"%s\"",
 				strVariable.c_str(), strInputFile.c_str()); 
 		}
-		if (NcIsTimeDimension(varIn->get_dim(0))) {
+		if (!NcIsTimeDimension(varIn->get_dim(0))) {
 			_EXCEPTION2("First dimension of variable \"%s\" in file \"%s\" must be \"time\"",
 				strVariable.c_str(), strInputFile.c_str());
 		}
