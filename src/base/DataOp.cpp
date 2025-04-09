@@ -421,6 +421,7 @@ bool DataOp_VECMAG::Apply(
 	const SimpleGrid & grid,
 	const std::vector<std::string> & strArg,
 	const std::vector<DataArray1D<float> const *> & vecArgData,
+	// const DataArray1D<real> & dataout
 	DataArray1D<float> & dataout
 ) {
 	if (strArg.size() != 2) {
@@ -436,9 +437,16 @@ bool DataOp_VECMAG::Apply(
 	const DataArray1D<float> & dataRight = *(vecArgData[1]);
 
 	for (int i = 0; i < dataout.GetRows(); i++) {
-		dataout[i] =
-			sqrt(dataLeft[i] * dataLeft[i]
-				+ dataRight[i] * dataRight[i]);
+		bool fIsFillValue = dataLeft.IsFillValueAtIx(i);
+		if (!fIsFillValue){
+			dataout[i] =
+				sqrt(dataLeft[i] * dataLeft[i]
+					+ dataRight[i] * dataRight[i]);
+		} else {
+				dataout[i]=std::numeric_limits<double>::quiet_NaN();
+				// dataout[i]=dataLeft.GetFillValue();
+				// printf("%f\n",dataout[i]);
+				}
 	}
 
 	return true;
@@ -699,7 +707,12 @@ bool DataOp_DIFF::Apply(
 		const DataArray1D<float> & dataRight = *(vecArgData[1]);
 
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = dataLeft[i] - dataRight[i];
+			bool fIsFillValue = (dataLeft.IsFillValueAtIx(i) || dataRight.IsFillValueAtIx(i));
+			if (!fIsFillValue){
+				dataout[i] = dataLeft[i] - dataRight[i];
+			} else {
+				dataout[i]=std::numeric_limits<double>::quiet_NaN();
+			}
 		}
 	}
 
@@ -1702,7 +1715,6 @@ void BuildCurlOperator(
 ) {
 	opCurlE.Clear();
 	opCurlN.Clear();
-
 	int iRef = 0;
 
 	// Scaling factor used in Curl calculation
@@ -1896,11 +1908,14 @@ void BuildCurlOperator(
 			double dAzLatCoeffK = - sin(dLatRadK) * (cos(dLonRadK) * dAxK + sin(dLonRadK) * dAyK) + cos(dLatRadK) * dAzK;
 
 			// Add contributions to sparse matrix operator
+			
 			opCurlE(i,i) += dScale * dCoeff0 * dAzLonCoeffI;
 			opCurlN(i,i) += dScale * dCoeff0 * dAzLatCoeffI;
+			// printf("%.6e\n",opCurlE(i,k));
 
 			opCurlE(i,k) += dScale * dCoeff1 * dAzLonCoeffK;
 			opCurlN(i,k) += dScale * dCoeff1 * dAzLatCoeffK;
+			// printf("%.6e\n",opCurlE(i,k));
 		}
 
 		if (setPoints.size() < 4) {
@@ -1955,7 +1970,7 @@ bool DataOp_CURL::Apply(
 
 		m_fInitialized = true;
 	}
-
+	
 	m_opCurlE.Apply(*(vecArgData[0]), dataout, true);
 	m_opCurlN.Apply(*(vecArgData[1]), dataout, false); 
 
