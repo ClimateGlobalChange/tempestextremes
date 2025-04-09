@@ -18,7 +18,6 @@
 #define _SPARSEMATRIX_H_
 
 #include "DataArray1D.h"
-
 #include <map>
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -190,8 +189,13 @@ public:
 
 		SparseMapConstIterator iter = m_mapEntries.begin();
 		for (; iter != m_mapEntries.end(); iter++) {
-			dataVectorOut[iter->first.first] +=
+			if (dataVectorIn[iter->first.second]>1e19){
+				// dataVectorOut[iter->first.first] += std::numeric_limits<double>::quiet_NaN();
+				continue;
+			} else {
+				dataVectorOut[iter->first.first] +=
 				iter->second * dataVectorIn[iter->first.second];
+			}
 		}
 	}
 
