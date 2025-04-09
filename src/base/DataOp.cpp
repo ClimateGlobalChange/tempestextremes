@@ -1905,7 +1905,6 @@ void BuildCurlOperator(
 			double dAzLatCoeffK = - sin(dLatRadK) * (cos(dLonRadK) * dAxK + sin(dLonRadK) * dAyK) + cos(dLatRadK) * dAzK;
 
 			// Add contributions to sparse matrix operator
-			
 			opCurlE(i,i) += dScale * dCoeff0 * dAzLonCoeffI;
 			opCurlN(i,i) += dScale * dCoeff0 * dAzLatCoeffI;
 
