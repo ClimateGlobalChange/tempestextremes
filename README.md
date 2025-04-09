@@ -25,7 +25,7 @@ To install from conda use the command line:
 ```conda install -c conda-forge tempest-extremes```
 
 
-# Installation via CMake
+# Installation via CMake (Recommended)
 
 TempestExtremes can be built and installed on various systems using CMake. Our new script, `./quick_make_unix.sh`, automatically detects your platform(UNIX-based systems only) and loads any required modules before building.
 
@@ -37,25 +37,27 @@ TempestExtremes can be built and installed on various systems using CMake. Our n
 - **Out-of-Source Build:** Build files are generated in `./build/bin` (keeping the source directory clean).
 - **Installation Locations:** Final executables are installed to `./bin` and libraries/archives to `./lib`.
 
-## Quick-Make Scripts for generic Linux/Unix based systems
+## Quick-Make Scripts for generic Linux/Unix-based systems
 A ready-to-use `./quick_make_unix.sh` script is available for end users to run on common UNIX-based platforms such as MacOS and Linux, as well as on command HPC systems like NERSC Perlmutter and NCAR Derecho.
+```
+cd TEMPEST_EXTREMES_SOURCE_DIR
+sh quick_make_unix.sh
+```
 ### System/Platforms Detection in `quick_make_unix.sh`
 - **MacOS/Linux (Generic):** The script runs the default commands.
 - **NERSC Perlmutter:** The script automatically loads `cray-hdf5` and `cray-netcdf` modules before building.
 - **NCAR Derecho:** The script loads required modules such as `ncarenv`, `ncarcompilers`, `intel`, `cray-mpich`, and `netcdf`.
-- **Windows:** This bash script is prepared for UNIX-like environments. If you're on Windows, please refer to the Windows instructions below. If you have a bash environment on Windows but the script fails to run automatically, simply run the commands manually starting from `./remove_depend.sh`.
+- **Windows:** This bash script is prepared for UNIX-like environments. If you're on Windows, please refer to the Windows instructions below.
 - **Unknown/Other:** If your system isn’t recognized or errors occur (often due to non-standard dependency paths), don’t panic—simply run the commands manually starting from `./remove_depend.sh` and fix the related errors shown in the terminal.
-
 
 Notes:
 - **For End Users:**  
-  If you only need the final deliverables, run the quick-make script. It will install executables to `./bin` and (by default) remove the build directory for a clean structure.
+  If you only need the final deliverables, you only need to run the quick-make script. It will install executables to `./bin` and (by default) remove the build directory for a clean structure.
 
 - **For Developers:**  
   The `./build` directory is used for development and debugging. It contains all intermediate files, which helps speed up incremental builds. Developers should keep the build directory intact (by commenting out the cleanup step) for faster rebuilds.  
 
-
-To use `./quick_make_unix.sh` , update the configuration options in the script:
+In `./quick_make_unix.sh`, update the configuration options in the script if needed:
 ```bash
 # Configuration Options
 BUILD_TYPE="Release"          # "Debug" or "Release"
@@ -66,8 +68,6 @@ INSTALL_PREFIX=""             # Specify the installation directory. If left blan
                               # the project root (TEMPEST_EXTREMES_SOURCE_DIR) and final executables 
                               # will be installed in TEMPEST_EXTREMES_SOURCE_DIR/bin.
 ```
-The run `./quick_make_unix.sh`.
-
 ## Unix/Linux-Based Systems (Manual Install)
 
 If you are using Nersc Permultter, you will need to run this first:
@@ -107,10 +107,10 @@ cmake -G "Visual Studio 17" -DCMAKE_INSTALL_PREFIX=PATH_TO_INSTALL -DNetCDF_ROOT
 
 
 1. **Using the Quick Make Script:**  
-   If you are a developer using `./quick_make_general.sh`, remember to comment out or remove the cleanup step at the end (e.g. `make clean`). It's not efficient to rebuild the entire project every time you make changes—this script is mainly for a full rebuild or for end users who want a clean install. For faster incremental builds during development, build manually so that intermediate files are preserved.
+   If you are a developer using `./quick_make_general.sh`, remember to comment out or remove the cleanup step at the end (e.g., `make clean`). It's not efficient to rebuild the entire project every time you make changes—this script is mainly for a full rebuild or for end users who want a clean install. For faster incremental builds during development, build manually so that intermediate files are preserved.
 
 2. **Adding New Executables:**  
-   To add a new executable to the project, refer to following examples:
+   To add a new executable to the project, refer to the following examples:
 
    **Example: Adding a New Executable**  
    For example, to add `NewBlobsFeature`:
