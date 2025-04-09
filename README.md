@@ -38,7 +38,7 @@ TempestExtremes can be built and installed on various systems using CMake. Our n
 - **Installation Locations:** Final executables are installed to `./bin` and libraries/archives to `./lib`.
 
 ## Quick-Make Scripts for generic Linux/Unix-based systems
-A ready-to-use `./quick_make_unix.sh` script is available for end users to run on common UNIX-based platforms such as MacOS and Linux, as well as on command HPC systems like NERSC Perlmutter and NCAR Derecho.
+A ready-to-use `./quick_make_unix.sh` script is available for end users to run on common UNIX-based platforms such as MacOS and Linux, as well as on command HPC systems like NERSC Perlmutter and NCAR Derecho. To start the installation:
 ```
 cd TEMPEST_EXTREMES_SOURCE_DIR
 sh quick_make_unix.sh
