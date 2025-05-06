@@ -301,7 +301,6 @@ try {
 	}
 
 	// Initialize first pass bin sizes from first file
-	// TODO: What if first file doesn't contain any time slices?
 	{
 		AnnounceStartBlock("Using first file to set array bounds");
 		NcFileVector ncfilevec;
@@ -394,6 +393,17 @@ try {
 					fFirstFileHasFillValue = true;
 					dFillValue = varQuantile.GetFillValueFloat();
 				}
+				if (varOutputQuantile->get_att("_FillValue") == NULL) {
+					varOutputQuantile->add_att("_FillValue", dFillValue);
+				}
+			}
+
+			// Set bin edges to undefined
+			if (fMissingData) {
+				for (size_t i = 0; i < sGridSize; i++) {
+					dBinEdges(i,0) = dFillValue;
+					dBinEdges(i,nQuantileBins) = dFillValue;
+				}
 			}
 
 #ifndef TEMPEST_NOREGEX
@@ -444,47 +454,33 @@ try {
 
 			// Estimate first bin edges with missing data
 			if (fMissingData) {
-				if (nRetainedTimeSlices == 0) {
-					for (size_t i = 0; i < sGridSize; i++) {
-						if ((data[i] == dFillValue) || std::isnan(data[i])) {
-							dBinEdges(i,0) = dFillValue;
-						} else if ((data[i] < dMinThreshold) || (data[i] > dMaxThreshold)) {
-							dBinEdges(i,0) = dFillValue;
-						} else {
-							dBinEdges(i,0) = data[i];
-						}
-						dBinEdges(i,nQuantileBins) = dFillValue;
+				for (size_t i = 0; i < sGridSize; i++) {
+					if ((data[i] == dFillValue) || std::isnan(data[i])) {
+						continue;
 					}
-
-				} else {
-					for (size_t i = 0; i < sGridSize; i++) {
-						if ((data[i] == dFillValue) || std::isnan(data[i])) {
-							continue;
-						}
-						if ((data[i] < dMinThreshold) || (data[i] > dMaxThreshold)) {
-							continue;
-						}
-						if ((dBinEdges(i,0) == dFillValue) || (dBinEdges(i,0) != dBinEdges(i,0))) {
+					if ((data[i] < dMinThreshold) || (data[i] > dMaxThreshold)) {
+						continue;
+					}
+					if ((dBinEdges(i,0) == dFillValue) || (dBinEdges(i,0) != dBinEdges(i,0))) {
+						dBinEdges(i,0) = data[i];
+						continue;
+					}
+					if ((dBinEdges(i,nQuantileBins) == dFillValue) ||
+					    (dBinEdges(i,nQuantileBins) != dBinEdges(i,nQuantileBins))
+					) {
+						if (data[i] < dBinEdges(i,0)) {
+							dBinEdges(i,nQuantileBins) = dBinEdges(i,0);
 							dBinEdges(i,0) = data[i];
-							continue;
-						}
-						if ((dBinEdges(i,nQuantileBins) == dFillValue) ||
-						    (dBinEdges(i,nQuantileBins) != dBinEdges(i,nQuantileBins))
-						) {
-							if (data[i] < dBinEdges(i,0)) {
-								dBinEdges(i,nQuantileBins) = dBinEdges(i,0);
-								dBinEdges(i,0) = data[i];
-							} else {
-								dBinEdges(i,nQuantileBins) = data[i];
-							}
-							continue;
-						}
-						if (dBinEdges(i,0) > data[i]) {
-							dBinEdges(i,0) = data[i];
-						}
-						if (dBinEdges(i,nQuantileBins) < data[i]) {
+						} else {
 							dBinEdges(i,nQuantileBins) = data[i];
 						}
+						continue;
+					}
+					if (dBinEdges(i,0) > data[i]) {
+						dBinEdges(i,0) = data[i];
+					}
+					if (dBinEdges(i,nQuantileBins) < data[i]) {
+						dBinEdges(i,nQuantileBins) = data[i];
 					}
 				}
 
@@ -626,7 +622,7 @@ try {
 					// On first iteration expand bins if needed
 					if (it == 0) {
 						for (size_t i = 0; i < sGridSize; i++) {
-							if ((data[i] == dFillValue) || (data[i] != data[i])) {
+							if ((data[i] == dFillValue) || std::isnan(data[i])) {
 								continue;
 							}
 							if ((data[i] < dMinThreshold) || (data[i] > dMaxThreshold)) {
@@ -688,7 +684,7 @@ try {
 					// ..otherwise discard values outside of histogram range
 					} else {
 						for (size_t i = 0; i < sGridSize; i++) {
-							if ((data[i] == dFillValue) || (data[i] != data[i])) {
+							if ((data[i] == dFillValue) || std::isnan(data[i])) {
 								continue;
 							}
 							if ((data[i] < dMinThreshold) || (data[i] > dMaxThreshold)) {
