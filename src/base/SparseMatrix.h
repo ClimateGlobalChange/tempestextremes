@@ -189,7 +189,7 @@ public:
 
 		SparseMapConstIterator iter = m_mapEntries.begin();
 		for (; iter != m_mapEntries.end(); iter++) {
-			if (dataVectorIn[iter->first.second]>1e19){
+			if (dataVectorIn[iter->first.second]>1e14){
 				// dataVectorOut[iter->first.first] += std::numeric_limits<double>::quiet_NaN();
 				continue;
 			} else {
