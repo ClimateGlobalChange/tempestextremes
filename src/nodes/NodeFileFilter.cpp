@@ -67,10 +67,10 @@ public:
 	///	</summary>
 	NearbyBlobsOp() :
 		m_varix(InvalidVariableIndex),
-		m_dDistance(0.0),
+		m_dDistanceDeg(0.0),
 		m_eOp(GreaterThan),
 		m_dValue(0.0),
-		m_dMaxDist(180.0)
+		m_dMaxDistDeg(180.0)
 	{ }
 
 public:
@@ -104,7 +104,7 @@ public:
 
 				// Read in distance
 				if (eReadMode == ReadMode_Distance) {
-					m_dDistance = atof(strSubStr.c_str());
+					m_dDistanceDeg = atof(strSubStr.c_str());
 
 					iLast = i + 1;
 					eReadMode = ReadMode_Op;
@@ -140,7 +140,7 @@ public:
 
 				// Read in maximum distance
 				} else if (eReadMode == ReadMode_MaxDist) {
-					m_dMaxDist = atof(strSubStr.c_str());
+					m_dMaxDistDeg = atof(strSubStr.c_str());
 
 					iLast = i + 1;
 					eReadMode = ReadMode_Invalid;
@@ -160,20 +160,20 @@ public:
 					strOp.c_str());
 		}
 
-		if (m_dDistance < 0.0) {
-			_EXCEPTION1("For --nearbyblobs, distance (%2.6f) must be nonnegative", m_dDistance);
+		if (m_dDistanceDeg < 0.0) {
+			_EXCEPTION1("For --nearbyblobs, distance (%2.6f) must be nonnegative", m_dDistanceDeg);
 		}
-		if (m_dMaxDist < 0.0) {
-			_EXCEPTION1("For --nearbyblobs, max distance (%2.6f) must be nonnegative", m_dMaxDist);
+		if (m_dMaxDistDeg < 0.0) {
+			_EXCEPTION1("For --nearbyblobs, max distance (%2.6f) must be nonnegative", m_dMaxDistDeg);
 		}
-		if (m_dDistance > m_dMaxDist) {
-			_EXCEPTION2("For --nearbyblobs, distance (%2.6f) must be less than or equal to max distance (%2.6f)", m_dDistance, m_dMaxDist);
+		if (m_dDistanceDeg > m_dMaxDistDeg) {
+			_EXCEPTION2("For --nearbyblobs, distance (%2.6f) must be less than or equal to max distance (%2.6f)", m_dDistanceDeg, m_dMaxDistDeg);
 		}
 
 		// Output announcement
 		char szBuffer[128];
 
-		snprintf(szBuffer, 128, "%f", m_dDistance);
+		snprintf(szBuffer, 128, "%f", m_dDistanceDeg);
 		std::string strDescription =
 			std::string("Include blobs with at least 1 point within ") + szBuffer
 			+ std::string(" degrees where ") + varreg.GetVariableString(m_varix);
@@ -198,7 +198,7 @@ public:
 		}
 		strDescription += szBuffer;
 
-		snprintf(szBuffer, 128, "%f", m_dMaxDist);
+		snprintf(szBuffer, 128, "%f", m_dMaxDistDeg);
 		strDescription += std::string(" (max dist ") + szBuffer + " degrees)";
 
 		Announce("%s", strDescription.c_str());
@@ -255,9 +255,9 @@ public:
 	VariableIndex m_varix;
 
 	///	<summary>
-	///		Distance to search for blob.
+	///		Distance to search for blob in degrees.
 	///	</summary>
-	double m_dDistance;
+	double m_dDistanceDeg;
 
 	///	<summary>
 	///		Operation.
@@ -270,9 +270,9 @@ public:
 	double m_dValue;
 
 	///	<summary>
-	///		Maximum distance.
+	///		Maximum distance in degrees.
 	///	</summary>
-	double m_dMaxDist;
+	double m_dMaxDistDeg;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -448,15 +448,15 @@ void BuildMask_NearbyBlobs(
 	DataArray1D<double> & dataMask
 ) {
 	// Get the variable
-	const double dDist = nearbyblobsop.m_dDistance;
-	const double dMaxDist = nearbyblobsop.m_dMaxDist;
+	const double dDistDeg = nearbyblobsop.m_dDistanceDeg;
+	const double dMaxDistDeg = nearbyblobsop.m_dMaxDistDeg;
 
 	_ASSERT(vecLonRad.size() == vecLatRad.size());
 	_ASSERT(dataState.GetRows() == grid.GetSize());
-	_ASSERT(dDist >= 0.0);
-	_ASSERT(dDist <= 180.0);
-	_ASSERT(dMaxDist >= dDist);
-	_ASSERT(dMaxDist <= 180.0);
+	_ASSERT(dDistDeg >= 0.0);
+	_ASSERT(dDistDeg <= 180.0);
+	_ASSERT(dMaxDistDeg >= dDistDeg);
+	_ASSERT(dMaxDistDeg <= 180.0);
 
 	// Loop through all PathNodes
 	for (int j = 0; j < vecLonRad.size(); j++) {
@@ -489,13 +489,13 @@ void BuildMask_NearbyBlobs(
 			// Great circle distance to this dof
 			_ASSERT((ix >= 0) && (ix < grid.GetSize()));
 
-			double dR =
-				GreatCircleDistance_Rad(
+			double dRDeg =
+				GreatCircleDistance_Deg(
 					dLon0, dLat0,
 					grid.m_dLon[ix], grid.m_dLat[ix]);
 
 			// Check if we have exceeded the maximum distance to find blobs
-			if ((ix != ix0) && (dR > dDist)) {
+			if ((ix != ix0) && (dRDeg > dDistDeg)) {
 				continue;
 			}
 
@@ -533,12 +533,12 @@ void BuildMask_NearbyBlobs(
 				// Make sure great circle distance to this dof is closer than dMaxDist
 				_ASSERT((ixblob >= 0) && (ixblob < grid.GetSize()));
 
-				double dRblob =
+				double dRblobDeg =
 					GreatCircleDistance_Deg(
 						dLon0, dLat0,
 						grid.m_dLon[ixblob], grid.m_dLat[ixblob]);
 
-				if ((ix != ixblob) && (dRblob > dMaxDist)) {
+				if ((ix != ixblob) && (dRblobDeg > dMaxDistDeg)) {
 					continue;
 				}
 
@@ -547,7 +547,7 @@ void BuildMask_NearbyBlobs(
 
 					// Isn't part of the blob, but add it to the list of
 					// nodes to visit.
-					if (dRblob <= dDist) {
+					if (dRblobDeg <= dDistDeg) {
 						queueNodes.push(ixblob);
 					}
 					continue;
