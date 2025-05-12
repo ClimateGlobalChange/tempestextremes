@@ -663,6 +663,20 @@ public:
 		} \
 	}
 
+///	<summary>
+///		Concatenate the command line into a string.
+///	</summary>
+inline std::string GetCommandLineAsString(int argc, char ** argv) {
+	std::string strCommandLine;
+	for (int i = 0; i < argc; i++) {
+		strCommandLine += argv[i];
+		if (i != argc-1) {
+			strCommandLine += " ";
+		}
+	}
+	return strCommandLine;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #endif
