@@ -4104,10 +4104,13 @@ try {
 					}
 				}
 
+				std::cout << "Rank " << nMPIRank
+				<< " writing " << vecOutputFiles[f].c_str()
+				<< std::endl;  
 
 			#endif //[Commented out for auto-complete, need to uncomment later]
 
-			Announce("Writing file \"%s\"", vecOutputFiles[f].c_str());
+			// Announce("Writing file \"%s\"", vecOutputFiles[f].c_str());
 
 			// Open output file
 			NcFile ncOutput(vecOutputFiles[f].c_str(), NcFile::Replace);
