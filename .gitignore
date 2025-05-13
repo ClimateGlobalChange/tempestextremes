@@ -63,7 +63,7 @@ src/sandbox/Makefile
 src/util/Makefile
 
 # IDE settings
-.vscode/
-.idea/
+.vscode
+.idea
 
 
