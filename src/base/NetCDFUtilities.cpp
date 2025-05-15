@@ -123,12 +123,22 @@ NcDim * NcGetTimeDimension(
 		return dim;
 	}
 
+	dim = ncFile.get_dim("xtime");
+	if (dim != NULL) {
+		return dim;
+	}
+
 	dim = ncFile.get_dim("initial_time0_hours");
 	if (dim != NULL) {
 		return dim;
 	}
 
 	dim = ncFile.get_dim("valid_time");
+	if (dim != NULL) {
+		return dim;
+	}
+
+	dim = ncFile.get_dim("day");
 	if (dim != NULL) {
 		return dim;
 	}
@@ -162,6 +172,11 @@ NcVar * NcGetTimeVariable(
 	}
 
 	var = ncFile.get_var("valid_time");
+	if (var != NULL) {
+		return var;
+	}
+
+	var = ncFile.get_var("day");
 	if (var != NULL) {
 		return var;
 	}
