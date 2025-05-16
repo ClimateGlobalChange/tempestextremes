@@ -99,10 +99,16 @@ bool NcIsTimeDimension(
 	if (strcmp(dim->name(), "Time") == 0) {
 		return true;
 	}
+	if (strcmp(dim->name(), "xtime") == 0) {
+		return true;
+	}
 	if (strcmp(dim->name(), "initial_time0_hours") == 0) {
 		return true;
 	}
 	if (strcmp(dim->name(), "valid_time") == 0) {
+		return true;
+	}
+	if (strcmp(dim->name(), "day") == 0) {
 		return true;
 	}
 	return false;
