@@ -190,7 +190,7 @@ NcVar* NcFile::add_var(NcToken name, NcType type, int ndims, const NcDim** dims)
 	}
     int n = num_vars();
     int varid;
-    if(NcError::set_err( nc_def_var(the_id, name, (nc_type) type, ndims, dimids, &varid)) != NC_NOERR) {
+    if (NcError::set_err( nc_def_var(the_id, name, (nc_type) type, ndims, dimids, &varid)) != NC_NOERR) {
 		return 0;
 	}
     NcVar* varp = new NcVar(this, varid);
@@ -328,26 +328,27 @@ NcBool NcFile::define_mode( void )
 	if (! is_valid()) {
 		return FALSE;
 	}
-	if (in_define_mode)
-	  return TRUE;
-	if (NcError::set_err(
-			 nc_redef(the_id)
-			 ) != NC_NOERR)
-	  return FALSE;
+	if (in_define_mode) {
+		return TRUE;
+	}
+	if (NcError::set_err( nc_redef(the_id)) != NC_NOERR) {
+		return FALSE;
+	}
 	in_define_mode = 1;
 	return TRUE;
 }
 
 NcBool NcFile::data_mode( void )
 {
-	if (! is_valid())
-	  return FALSE;
-	if (! in_define_mode)
-	  return TRUE;
-	if (NcError::set_err(
-			 nc_enddef(the_id)
-			 ) != NC_NOERR)
-	  return FALSE;
+	if (! is_valid()) {
+		return FALSE;
+	}
+	if (! in_define_mode) {
+		return TRUE;
+	}
+	if (NcError::set_err( nc_enddef(the_id)) != NC_NOERR) {
+		return FALSE;
+	}
 	in_define_mode = 0;
 	return TRUE;
 }
@@ -357,8 +358,13 @@ int NcFile::id( void ) const
 	return the_id;
 }
 
-NcFile::NcFile( const char* path, FileMode fmode, 
-		size_t* bufrsizeptr, size_t initialsize, FileFormat fformat  )
+NcFile::NcFile(
+	const char* path,
+	FileMode fmode, 
+	size_t* bufrsizeptr,
+	size_t initialsize,
+	FileFormat fformat
+)
 {
 	NcError err(NcError::silent_nonfatal); // constructor must not fail
 
@@ -561,40 +567,46 @@ NcTypedComponent::NcTypedComponent ( NcFile* nc )
 
 NcValues* NcTypedComponent::get_space( long numVals ) const
 {
-    NcValues* valp;
-    if (numVals < 1)
+	NcValues* valp;
+	if (numVals < 1)
 	numVals = num_vals();
-    switch (type()) {
-      case ncFloat:
-	valp = new NcValues_float(numVals);
-	break;
-      case ncDouble:
-	valp = new NcValues_double(numVals);
-	break;
-	  case ncInt64:
-	valp = new NcValues_ncint64(numVals);
-	break;
-	  case ncUInt64:
-	valp = new NcValues_ncuint64(numVals);
-	break;
-      case ncInt:
-	valp = new NcValues_int(numVals);
-	break;
-      case ncShort:
-	valp = new NcValues_short(numVals);
-	break;
-      case ncByte:
-      case ncChar:
-	valp = new NcValues_char(numVals);
-	break;
-	  case ncString:
-	valp = new NcValues_ncstring(numVals);
-	break;
-      case ncNoType:
-      default:
-	valp = 0;
-    }
-    return valp;
+	switch (type()) {
+	case ncFloat:
+		valp = new NcValues_float(numVals);
+		break;
+	case ncDouble:
+		valp = new NcValues_double(numVals);
+		break;
+	case ncInt64:
+		valp = new NcValues_ncint64(numVals);
+		break;
+	case ncUInt64:
+		valp = new NcValues_ncuint64(numVals);
+		break;
+	case ncInt:
+		valp = new NcValues_int(numVals);
+		break;
+	case ncShort:
+		valp = new NcValues_short(numVals);
+		break;
+	case ncByte:
+	case ncChar:
+		valp = new NcValues_char(numVals);
+		break;
+	case ncUInt:
+		valp = new NcValues_uint(numVals);
+		break;
+	case ncUShort:
+		valp = new NcValues_ushort(numVals);
+		break;
+	case ncString:
+		valp = new NcValues_ncstring(numVals);
+		break;
+	case ncNoType:
+	default:
+		valp = 0;
+	}
+	return valp;
 }
 
 NcVar::~NcVar( void )
@@ -702,8 +714,8 @@ NcValues* NcVar::values( void ) const
     size_t crnr[NC_MAX_DIMS];
     size_t edgs[NC_MAX_DIMS];
     for (int i = 0; i < ndims; i++) {
-	crnr[i] = 0;
-	edgs[i] = get_dim(i)->size();
+		crnr[i] = 0;
+		edgs[i] = get_dim(i)->size();
     }
     NcValues* valp = get_space();
     int status;
