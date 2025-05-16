@@ -34,6 +34,8 @@ typedef int nclong;
 
 typedef long long ncint64;
 typedef unsigned long long ncuint64;
+typedef unsigned short ushort;
+typedef unsigned int uint;
 
 enum NcType 
 {
@@ -63,8 +65,8 @@ static const long ncBad_long = FILL_LONG;              // deprecated
 static const float ncBad_float = NC_FILL_FLOAT;
 static const double ncBad_double = NC_FILL_DOUBLE;
 static const ncubyte ncBad_ubyte = NC_FILL_UBYTE;
-static const unsigned short ncBad_ushort = NC_FILL_USHORT;
-static const unsigned int ncBad_uint = NC_FILL_UINT;
+static const ushort ncBad_ushort = NC_FILL_USHORT;
+static const uint ncBad_uint = NC_FILL_UINT;
 static const ncint64 ncBad_ncint64 = NC_FILL_INT64;
 static const ncuint64 ncBad_ncuint64 = NC_FILL_UINT64;
 static const ncstring ncBad_ncstring = NC_FILL_CHAR;
@@ -102,6 +104,8 @@ public:                                                        \
     virtual long as_long( long n ) const;                      \
     virtual float as_float( long n ) const;                    \
     virtual double as_double( long n ) const;                  \
+	virtual ushort as_ushort( long n ) const;                  \
+	virtual uint as_uint( long n ) const;                      \
     virtual ncint64 as_ncint64( long n ) const;                \
     virtual ncuint64 as_ncuint64( long n ) const;              \
     virtual char* as_string( long n ) const;                   \
@@ -120,6 +124,8 @@ private:                                                       \
 #define _nc__long ncLong
 #define _nc__float ncFloat
 #define _nc__double ncDouble
+#define _nc__ushort ncUShort
+#define _nc__uint ncUInt
 #define _nc__ncint64 ncInt64
 #define _nc__ncuint64 ncUInt64
 #define _nc__ncstring ncString
@@ -252,6 +258,18 @@ inline double NcVal(TYPE)::as_double( long n ) const                \
     return (double) the_values[n];                                  \
 }
 
+#define as_ushort_implement(TYPE)                                   \
+inline ushort NcVal(TYPE)::as_ushort( long n ) const                \
+{                                                                   \
+    return (ushort) the_values[n];                                  \
+}
+
+#define as_uint_implement(TYPE)                                     \
+inline uint NcVal(TYPE)::as_uint( long n ) const                    \
+{                                                                   \
+    return (uint) the_values[n];                                    \
+}
+
 #define as_ncint64_implement(TYPE)                                  \
 inline ncint64 NcVal(TYPE)::as_ncint64( long n ) const              \
 {                                                                   \
@@ -299,6 +317,8 @@ public:
 	virtual long as_long( long n ) const = 0;         // nth value as long
 	virtual float as_float( long n ) const = 0;       // nth value as floating-point
 	virtual double as_double( long n ) const = 0;     // nth value as double
+	virtual ushort as_ushort( long n ) const = 0;     // nth value as unsigned short
+	virtual uint as_uint( long n ) const = 0;         // nth value as unsigned int
 	virtual ncint64 as_ncint64( long n ) const = 0;   // nth value as ncint64
 	virtual ncuint64 as_ncuint64( long n ) const = 0; // nth value as ncuint64
 	virtual char* as_string( long n ) const = 0;      // nth value as string
@@ -317,6 +337,8 @@ declare(NcValues,nclong)
 declare(NcValues,long)
 declare(NcValues,float)
 declare(NcValues,double)
+declare(NcValues,ushort)
+declare(NcValues,uint)
 declare(NcValues,ncint64)
 declare(NcValues,ncuint64)
 declare(NcValues,ncstring)

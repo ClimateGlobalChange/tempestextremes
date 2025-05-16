@@ -99,10 +99,16 @@ bool NcIsTimeDimension(
 	if (strcmp(dim->name(), "Time") == 0) {
 		return true;
 	}
+	if (strcmp(dim->name(), "xtime") == 0) {
+		return true;
+	}
 	if (strcmp(dim->name(), "initial_time0_hours") == 0) {
 		return true;
 	}
 	if (strcmp(dim->name(), "valid_time") == 0) {
+		return true;
+	}
+	if (strcmp(dim->name(), "day") == 0) {
 		return true;
 	}
 	return false;
@@ -123,12 +129,22 @@ NcDim * NcGetTimeDimension(
 		return dim;
 	}
 
+	dim = ncFile.get_dim("xtime");
+	if (dim != NULL) {
+		return dim;
+	}
+
 	dim = ncFile.get_dim("initial_time0_hours");
 	if (dim != NULL) {
 		return dim;
 	}
 
 	dim = ncFile.get_dim("valid_time");
+	if (dim != NULL) {
+		return dim;
+	}
+
+	dim = ncFile.get_dim("day");
 	if (dim != NULL) {
 		return dim;
 	}
@@ -162,6 +178,11 @@ NcVar * NcGetTimeVariable(
 	}
 
 	var = ncFile.get_var("valid_time");
+	if (var != NULL) {
+		return var;
+	}
+
+	var = ncFile.get_var("day");
 	if (var != NULL) {
 		return var;
 	}
@@ -209,9 +230,21 @@ void CopyNcFileAttributes(
 			fileOut->add_att(att->name(), num_vals,
 				(const double*)(pValues->base()));
 
+		} else if (att->type() == ncUShort) {
+			fileOut->add_att(att->name(), num_vals,
+				(const ushort*)(pValues->base()));
+
+		} else if (att->type() == ncUInt) {
+			fileOut->add_att(att->name(), num_vals,
+				(const uint*)(pValues->base()));
+
 		} else if (att->type() == ncInt64) {
 			fileOut->add_att(att->name(), num_vals,
-				(const int64_t*)(pValues->base()));
+				(const ncint64*)(pValues->base()));
+
+		} else if (att->type() == ncUInt64) {
+			fileOut->add_att(att->name(), num_vals,
+				(const ncuint64*)(pValues->base()));
 
 		} else if (att->type() == ncString) {
 			fileOut->add_att(att->name(), strlen((const char *)pValues->base()),
@@ -278,9 +311,21 @@ void CopyNcVarAttributes(
 			varOut->add_att(att->name(), num_vals,
 				(const double*)(pValues->base()));
 
+		} else if (att->type() == ncUShort) {
+			varOut->add_att(att->name(), num_vals,
+				(const ushort*)(pValues->base()));
+
+		} else if (att->type() == ncUInt) {
+			varOut->add_att(att->name(), num_vals,
+				(const uint*)(pValues->base()));
+
 		} else if (att->type() == ncInt64) {
 			varOut->add_att(att->name(), num_vals,
-				(const int64_t*)(pValues->base()));
+				(const ncint64*)(pValues->base()));
+
+		} else if (att->type() == ncUInt64) {
+			varOut->add_att(att->name(), num_vals,
+				(const ncuint64*)(pValues->base()));
 
 		} else if (att->type() == ncString) {
 			varOut->add_att(att->name(), strlen((const char *)pValues->base()),
@@ -508,6 +553,50 @@ void CopyNcVar(
 		}
 	}
 
+	// ncUShort type
+	if (var->type() == ncUShort) {
+		varOut =
+			ncOut.add_var(
+				var->name(), var->type(),
+				dimOut.size(), (const NcDim**)&(dimOut[0]));
+
+		if (varOut == NULL) {
+			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
+		}
+
+		if (fCopyAttributes) {
+			CopyNcVarAttributes(var, varOut);
+		}
+
+		if (fCopyData) {
+			DataArray1D<ushort> data(nDataSize);
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
+	}
+
+	// ncInt type
+	if (var->type() == ncUInt) {
+		varOut =
+			ncOut.add_var(
+				var->name(), var->type(),
+				dimOut.size(), (const NcDim**)&(dimOut[0]));
+
+		if (varOut == NULL) {
+			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
+		}
+
+		if (fCopyAttributes) {
+			CopyNcVarAttributes(var, varOut);
+		}
+
+		if (fCopyData) {
+			DataArray1D<uint> data(nDataSize);
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
+	}
+
 	// ncInt64 type
 	if (var->type() == ncInt64) {
 		varOut =
@@ -525,6 +614,28 @@ void CopyNcVar(
 
 		if (fCopyData) {
 			DataArray1D<ncint64> data(nDataSize);
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
+	}
+
+	// ncUInt64 type
+	if (var->type() == ncUInt64) {
+		varOut =
+			ncOut.add_var(
+				var->name(), var->type(),
+				dimOut.size(), (const NcDim**)&(dimOut[0]));
+
+		if (varOut == NULL) {
+			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
+		}
+
+		if (fCopyAttributes) {
+			CopyNcVarAttributes(var, varOut);
+		}
+
+		if (fCopyData) {
+			DataArray1D<ncuint64> data(nDataSize);
 			var->get(&(data[0]), &(counts[0]));
 			varOut->put(&(data[0]), &(counts[0]));
 		}
