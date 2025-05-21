@@ -34,6 +34,7 @@
 #include <set>
 #include <map>
 #include <cmath>
+#include <ctime>
 
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
@@ -330,7 +331,8 @@ enum ClimatologyType {
 	ClimatologyType_AvgMin,
 	ClimatologyType_AvgMax,
 	ClimatologyType_AvgCount,
-	ClimatologyType_ThreshSum
+	ClimatologyType_ThreshSum,
+	ClimatologyType_TimeUntil
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -431,19 +433,10 @@ void ParseClimatologyThreshold(
 		_EXCEPTION1("Invalid threshold operator in string \"%s\": operator must be one of >,>=,<,<=,=,!=",
 			strThreshold.c_str());
 	}
-	int nThresholdValueLength = 0;
-	for (int i = 0; i < strThreshold.length(); i++) {
-		if (!std::isdigit(strThreshold[i]) && (strThreshold[i] != '.')) {
-			break;
-		}
-		nThresholdValueLength++;
-	}
-	if (nThresholdValueLength == 0) {
-		_EXCEPTION1("Invalid threshold operator in string \"%s\": value must be a floating point number",
-			strThreshold.c_str());
-	}
-	dThreshValue = std::stof(strThreshold.substr(0,nThresholdValueLength));
-	strThreshUnits = strThreshold.substr(nThresholdValueLength);
+
+	std::string strThreshValue;
+	SplitIntoValueAndUnits(strThreshold, strThreshValue, strThreshUnits);
+	dThreshValue = std::stof(strThreshValue);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -467,6 +460,7 @@ public:
 	ThresholdType threshtype;
 	float threshvalue;
 	std::string threshunits;
+	std::string threshstring;
 };
 
 ///	<summary>
@@ -484,7 +478,14 @@ void ParseClimatologyTypes(
 
 	for (int i = 0; i < vecParsedClimatologyList.size(); i++) {
 		STLStringHelper::RemoveWhitespaceInPlace(vecParsedClimatologyList[i]);
-		STLStringHelper::ToLower(vecParsedClimatologyList[i]);
+
+		for (int j = 0; j < vecParsedClimatologyList[i].length(); j++) {
+			if (std::isalpha(vecParsedClimatologyList[i][j])) {
+				vecParsedClimatologyList[i][j] = std::tolower(vecParsedClimatologyList[i][j]);
+			} else {
+				break;
+			}
+		}
 
 		const std::string & strClimoType = vecParsedClimatologyList[i];
 
@@ -521,18 +522,18 @@ void ParseClimatologyTypes(
 
 		} else if ((strClimoType.length() >= 10) && (strClimoType.substr(0,8) == "avgcount")) {
 			climoinfo.type = ClimatologyType_AvgCount;
-			std::string strThreshold = strClimoType.substr(8);
+			climoinfo.threshstring = strClimoType.substr(8);
 			ParseClimatologyThreshold(
-				strThreshold,
+				climoinfo.threshstring,
 				climoinfo.threshtype,
 				climoinfo.threshvalue,
 				climoinfo.threshunits);
 
 		} else if ((strClimoType.length() >= 11) && (strClimoType.substr(0,9) == "threshsum")) {
 			climoinfo.type = ClimatologyType_ThreshSum;
-			std::string strThreshold = strClimoType.substr(9);
+			climoinfo.threshstring = strClimoType.substr(9);
 			ParseClimatologyThreshold(
-				strThreshold,
+				climoinfo.threshstring,
 				climoinfo.threshtype,
 				climoinfo.threshvalue,
 				climoinfo.threshunits);
@@ -543,8 +544,17 @@ void ParseClimatologyTypes(
 				_EXCEPTIONT("--type \"threshsum\" can only be combined with > or < operators");
 			}
 
+		} else if ((strClimoType.length() >= 11) && (strClimoType.substr(0,9) == "timeuntil")) {
+			climoinfo.type = ClimatologyType_TimeUntil;
+			climoinfo.threshstring = strClimoType.substr(9);
+			ParseClimatologyThreshold(
+				climoinfo.threshstring,
+				climoinfo.threshtype,
+				climoinfo.threshvalue,
+				climoinfo.threshunits);
+
 		} else {
-			_EXCEPTIONT("--type invalid; expected \"mean\", \"meansq\", \"stddev\", \"autocor:<lag>\", \"min\", \"max\", \"avgmin\", \"avgmax\", \"avgcount<op><value>\", \"threshsum<op><value>\"");
+			_EXCEPTIONT("--type invalid; expected \"mean\", \"meansq\", \"stddev\", \"autocor:<lag>\", \"min\", \"max\", \"avgmin\", \"avgmax\", \"avgcount<op><value>\", \"threshsum<op><value>\", \"timeuntil<op><value>\"");
 		}
 
 		vecClimatologyInfo.push_back(climoinfo);
@@ -591,12 +601,15 @@ std::string ClimoVariablePrefix(
 	} else if (eClimoType == ClimatologyType_AvgMax) {
 		strVariablePrefix += "avgmax_";
 	} else if ((eClimoType == ClimatologyType_AvgCount) ||
-	           (eClimoType == ClimatologyType_ThreshSum)
+	           (eClimoType == ClimatologyType_ThreshSum) ||
+			   (eClimoType == ClimatologyType_TimeUntil)
 	) {
 		if (eClimoType == ClimatologyType_AvgCount) {
 			strVariablePrefix += "avgcount_";
-		} else {
+		} else if (eClimoType == ClimatologyType_ThreshSum) {
 			strVariablePrefix += "threshsum_";
+		} else {
+			strVariablePrefix += "timeuntil_";
 		}
 
 		if (aClimoInfo.threshtype == ThresholdType_GreaterThan) {
@@ -677,7 +690,8 @@ void Climatology(
 			(vecClimoInfo[ct].type != ClimatologyType_AvgMax) &&
 	   		(vecClimoInfo[ct].type != ClimatologyType_AutoCor) &&
 			(vecClimoInfo[ct].type != ClimatologyType_AvgCount) &&
-			(vecClimoInfo[ct].type != ClimatologyType_ThreshSum)
+			(vecClimoInfo[ct].type != ClimatologyType_ThreshSum) &&
+			(vecClimoInfo[ct].type != ClimatologyType_TimeUntil)
 		) {
 			_EXCEPTIONT("Invalid eClimoType");
 		}
@@ -719,6 +733,7 @@ void Climatology(
 		    (vecClimoInfo[ct].type == ClimatologyType_AvgMax) ||
 		    (vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
 		    (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) ||
+		    (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) ||
 		    ((vecClimoInfo[ct].type == ClimatologyType_AutoCor) && (eClimoPeriod != ClimatologyPeriod_All))
 		) {
 			fPeriodAccumulationNeeded = true;
@@ -1141,6 +1156,14 @@ void Climatology(
 				_ASSERT(varIn != NULL);
 				CopyNcVarAttributes(varIn, varOut);
 
+				// Add threshold attribute
+				if ((vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
+				    (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) ||
+				    (vecClimoInfo[ct].type == ClimatologyType_TimeUntil)
+				) {
+					varOut->add_att("threshold", vecClimoInfo[ct].threshstring.c_str());
+				}
+
 				// Store output variable
 				vecNcVarOut[v * vecClimoInfo.size() + ct] = varOut;
 			}
@@ -1281,6 +1304,12 @@ void Climatology(
 				} else if (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) {
 					dScratchData.Allocate(1, 1, vecOutputAuxSize[v]);
 
+				} else if (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) {
+					dScratchData.Allocate(1, 1, vecOutputAuxSize[v]);
+					for (size_t i = 0; i < vecOutputAuxSize[v]; i++) {
+						dScratchData(0,0,i) = -1.0;
+					}
+
 				} else if (vecClimoInfo[ct].type == ClimatologyType_AutoCor) {
 					dScratchData.Allocate(5, 1, vecOutputAuxSize[v]);
 					dScratchDataFloat.Allocate(vecClimoInfo[ct].lag, 1, vecOutputAuxSize[v]);
@@ -1394,12 +1423,48 @@ void Climatology(
 						dFillValue = attFillValue->as_float(0);
 					}
 					if ((f != 0) && (dPrevFillValue != dFillValue)) {
-						printf("WARNING: _FillValue has changed across files (%f != %f); results may be unexpected",
+						Announce("WARNING: _FillValue has changed across files (%f != %f); results may be unexpected",
 							dFillValue, dPrevFillValue);
 					}
 				}
 
 				// TODO: Verify variable dimensionality
+
+				// Convert threshold units, if appropriate
+				std::string strVarInUnits = "";
+				{
+					NcAtt * attVarInUnits = varIn->get_att("units");
+					if (attVarInUnits != NULL) {
+						strVarInUnits = attVarInUnits->as_string(0);
+
+						// Loop through all climatology types
+						for (int ct = 0; ct < vecClimoInfo.size(); ct++) {
+							if (vecClimoInfo[ct].threshunits == "") {
+								continue;
+							}
+							if (vecClimoInfo[ct].threshunits != strVarInUnits) {
+								float dThreshValueBak = vecClimoInfo[ct].threshvalue;
+
+								bool fSuccess =
+									ConvertUnits(
+										vecClimoInfo[ct].threshvalue,
+										vecClimoInfo[ct].threshunits,
+										strVarInUnits);
+
+								if (!fSuccess) {
+									_EXCEPTION2("Unable to convert threshold from units %s to %s: No known conversion",
+										vecClimoInfo[ct].threshunits.c_str(), strVarInUnits.c_str());
+								}
+
+								Announce("Converted threshold %g %s to %g %s",
+									dThreshValueBak, vecClimoInfo[ct].threshunits.c_str(),
+									vecClimoInfo[ct].threshvalue, strVarInUnits.c_str());
+
+								vecClimoInfo[ct].threshunits = strVarInUnits;
+							}
+						}
+					}
+				}
 
 				// Loop through all times
 				for (int t = 0; t < vecTimes.size(); t++) {
@@ -1578,7 +1643,7 @@ void Climatology(
 								DataArray3D<double> & dScratchData = vecScratchData[ct];
 								DataArray2D<double> & dAccumulatedData = vecAccumulatedData[ct];
 
-								// Accumulate avgmin, avgmax and avgcount
+								// Accumulate avgmin, avgmax, avgcount and threshsum
 								if ((vecClimoInfo[ct].type == ClimatologyType_AvgMin) ||
 								    (vecClimoInfo[ct].type == ClimatologyType_AvgMax) ||
 								    (vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
@@ -1625,6 +1690,16 @@ void Climatology(
 									}
 								}
 
+								// Accumulate timeuntil
+								if (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+										}
+										dAccumulatedData(iCurrentTimeIndex,i) += dScratchData(0,0,i);
+									}
+								}
+
 								// Reset scratch data
 								if (vecClimoInfo[ct].type == ClimatologyType_AvgMin) {
 									for (size_t i = 0; i < sGetRows; i++) {
@@ -1645,6 +1720,11 @@ void Climatology(
 									dScratchData.Zero();
 									iScratchIndex = 0;
 									nTimeSlices[0] = 0;
+								}
+								if (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) {
+									for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
+										dScratchData(0,0,i) = -1.0;
+									}
 								}
 							}
 
@@ -1843,6 +1923,101 @@ void Climatology(
 										}
 									}
 								}
+
+							// Time until a condition is met
+							// + dScratchData(0) stores -1.0 minus the count over the current period
+							} else if (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) {
+								if (vecClimoInfo[ct].threshtype == ThresholdType_GreaterThan) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											if ((dDataIn[i] != dFillValue) && (!std::isnan(dDataIn[i]))) {
+											
+												if (dDataIn[i] > dClimoThreshold) {
+													dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+												} else {
+													dScratchData(0,0,i) -= 1.0;
+												}
+											} else {
+												dScratchData(0,0,i) -= 1.0;
+											}
+										}
+									}
+
+								} else if (vecClimoInfo[ct].threshtype == ThresholdType_GreaterThanOrEqualTo) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											if ((dDataIn[i] != dFillValue) && (!std::isnan(dDataIn[i]))) {
+												if (dDataIn[i] >= dClimoThreshold) {
+													dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+												} else {
+													dScratchData(0,0,i) -= 1.0;
+												}
+											} else {
+												dScratchData(0,0,i) -= 1.0;
+											}
+										}
+									}
+
+								} else if (vecClimoInfo[ct].threshtype == ThresholdType_LessThan) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											if ((dDataIn[i] != dFillValue) && (!std::isnan(dDataIn[i]))) {
+												if (dDataIn[i] < dClimoThreshold) {
+													dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+												} else {
+													dScratchData(0,0,i) -= 1.0;
+												}
+											} else {
+												dScratchData(0,0,i) -= 1.0;
+											}
+										}
+									}
+
+								} else if (vecClimoInfo[ct].threshtype == ThresholdType_LessThanOrEqualTo) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											if ((dDataIn[i] != dFillValue) && (!std::isnan(dDataIn[i]))) {
+												if (dDataIn[i] <= dClimoThreshold) {
+													dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+												} else {
+													dScratchData(0,0,i) -= 1.0;
+												}
+											} else {
+												dScratchData(0,0,i) -= 1.0;
+											}
+										}
+									}
+
+								} else if (vecClimoInfo[ct].threshtype == ThresholdType_EqualTo) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											if ((dDataIn[i] != dFillValue) && (!std::isnan(dDataIn[i]))) {
+												if (dDataIn[i] == dClimoThreshold) {
+													dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+												} else {
+													dScratchData(0,0,i) -= 1.0;
+												}
+											} else {
+												dScratchData(0,0,i) -= 1.0;
+											}
+										}
+									}
+
+								} else if (vecClimoInfo[ct].threshtype == ThresholdType_NotEqualTo) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											if ((dDataIn[i] != dFillValue) && (!std::isnan(dDataIn[i]))) {
+												if (dDataIn[i] != dClimoThreshold) {
+													dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+												} else {
+													dScratchData(0,0,i) -= 1.0;
+												}
+											} else {
+												dScratchData(0,0,i) -= 1.0;
+											}
+										}
+									}
+								}
 							}
 
 						// Count number of time slices at each time and accumulate data
@@ -2006,6 +2181,76 @@ void Climatology(
 										}
 									}
 								}
+
+							// Time until a condition is met
+							// + dScratchData(0) stores -1.0 minus the count over the current period
+							} else if (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) {
+								if (vecClimoInfo[ct].threshtype == ThresholdType_GreaterThan) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											if (dDataIn[i] > dClimoThreshold) {
+												dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+											} else {
+												dScratchData(0,0,i) -= 1.0;
+											}
+										}
+									}
+
+								} else if (vecClimoInfo[ct].threshtype == ThresholdType_GreaterThanOrEqualTo) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											if (dDataIn[i] >= dClimoThreshold) {
+												dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+											} else {
+												dScratchData(0,0,i) -= 1.0;
+											}
+										}
+									}
+
+								} else if (vecClimoInfo[ct].threshtype == ThresholdType_LessThan) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											if (dDataIn[i] < dClimoThreshold) {
+												dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+											} else {
+												dScratchData(0,0,i) -= 1.0;
+											}
+										}
+									}
+
+								} else if (vecClimoInfo[ct].threshtype == ThresholdType_LessThanOrEqualTo) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											if (dDataIn[i] <= dClimoThreshold) {
+												dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+											} else {
+												dScratchData(0,0,i) -= 1.0;
+											}
+										}
+									}
+
+								} else if (vecClimoInfo[ct].threshtype == ThresholdType_EqualTo) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											if (dDataIn[i] == dClimoThreshold) {
+												dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+											} else {
+												dScratchData(0,0,i) -= 1.0;
+											}
+										}
+									}
+
+								} else if (vecClimoInfo[ct].threshtype == ThresholdType_NotEqualTo) {
+									for (size_t i = 0; i < sGetRows; i++) {
+										if (dScratchData(0,0,i) < 0.0) {
+											if (dDataIn[i] != dClimoThreshold) {
+												dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+											} else {
+												dScratchData(0,0,i) -= 1.0;
+											}
+										}
+									}
+								}
 							}
 						}
 					}
@@ -2060,10 +2305,19 @@ void Climatology(
 				if ((vecClimoInfo[ct].type == ClimatologyType_AvgMin) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_AvgMax) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
-				    (vecClimoInfo[ct].type == ClimatologyType_ThreshSum)
+				    (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) ||
+					(vecClimoInfo[ct].type == ClimatologyType_TimeUntil)
 				) {
 					if (timeCurrent.GetCalendarType() == Time::CalendarUnknown) {
 						_EXCEPTIONT("Data contains no valid time steps given command-line constraints");
+					}
+
+					if (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) {
+						for (size_t i = 0; i < vecOutputAuxSize[v]; i++) {
+							if (dScratchData(0,0,i) < 0.0) {
+								dScratchData(0,0,i) = -1.0 - dScratchData(0,0,i);
+							}
+						}
 					}
 
 					int iCurrentTimeIndex = GetClimatologyTimeIndex(timeCurrent, eClimoPeriod);
@@ -2170,7 +2424,8 @@ void Climatology(
 				    (vecClimoInfo[ct].type == ClimatologyType_AvgMin) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_AvgMax) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
-				    (vecClimoInfo[ct].type == ClimatologyType_ThreshSum)
+				    (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) || 
+				    (vecClimoInfo[ct].type == ClimatologyType_TimeUntil)
 				) {
 					for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
 
@@ -2887,6 +3142,9 @@ try {
 	// Verbose
 	bool fVerbose;
 
+	// Command line
+	std::string strCommandLine = GetCommandLineAsString(argc, argv);
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputFile, "in_data", "");
@@ -2896,7 +3154,7 @@ try {
 		CommandLineString(strVariableOut, "varout", "");
 		CommandLineStringD(strMemoryMax, "memmax", "8G", "[#K,#M,#G]");
 		CommandLineStringD(strClimoPeriod, "period", "daily", "[daily|monthly|seasonal|annual|all]");
-		CommandLineStringD(strClimoType, "type", "mean", "[mean|meansq|stddev|autocor|min|max|avgmin|avgmax|avgcount|threshsum]");
+		CommandLineStringD(strClimoType, "type", "mean", "[mean|meansq|stddev|autocor|min|max|avgmin|avgmax|avgcount|threshsum|timeuntil]");
 		CommandLineBool(fIncludeLeapDays, "include_leap_days");
 		CommandLineString(strStartTime, "time_start", "");
 		CommandLineString(strEndTime, "time_end", "");
@@ -3132,6 +3390,20 @@ try {
 		}
 	}
 #endif
+
+	// Add provenance information
+	if (nMPIRank == 0) {
+		const std::time_t timetNow = std::time(nullptr);
+		std::string strProvenance = std::asctime(std::localtime(&timetNow));
+		strProvenance += ": " + strCommandLine;
+
+		NcFile ncoutfile(strOutputFile.c_str(), NcFile::Write);
+		if (!ncoutfile.is_valid()) {
+			_EXCEPTION1("Unable to open output datafile \"%s\"",
+				strOutputFile.c_str());
+		}
+		ncoutfile.add_att("history", strProvenance.c_str());
+	}
 
 	AnnounceBanner();
 
