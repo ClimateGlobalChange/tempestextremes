@@ -479,7 +479,7 @@ void BuildMask_NearbyBlobs(
 		std::queue<int> queueNodes;
 		queueNodes.push(ix0);
 
-		// Set of nodes that have already beenvisited
+		// Set of nodes that have already been visited
 		std::set<int> setNodesVisited;
 
 		// Loop through all elements
@@ -573,9 +573,9 @@ void BuildMask_NearbyBlobs(
 					queueThresholdedNodes.push(grid.m_vecConnectivity[ixblob][n]);
 				}
 
-				dataMask[ixblob] = 1.0;
+				dataMask[ixblob] += 1.0;
 			}
-		}
+		}			
 	}
 }
 
@@ -987,24 +987,36 @@ void NodeFileFilter(
 
 			AnnounceEndBlock("Done");
 		}
+		int tc = 0;
+
 		if (vecNearbyBlobsOp.size() != 0) {
 			AnnounceStartBlock("Building mask (nearbyblobs)");
-			Variable & varOp = varreg.Get(vecNearbyBlobsOp[0].m_varix);
-			vecInFiles.SetConstantTimeIx(t);
-			varOp.LoadGridData(varreg, vecInFiles, grid);
-			const DataArray1D<float> & dataState = varOp.GetData();
-			_ASSERT(dataState.GetRows() == grid.GetSize());
-
-			BuildMask_NearbyBlobs<float>(
-				grid,
-                nodefile,
-				dataState,
-				vecLonRad,
-				vecLatRad,
-				vecNearbyBlobsOp[0],
-				dataMask);
-
-			AnnounceEndBlock("Done");
+			for (tc = 0; tc < vecNearbyBlobsOp.size(); tc++) {
+				Variable & varOp = varreg.Get(vecNearbyBlobsOp[tc].m_varix);
+				vecInFiles.SetConstantTimeIx(t);
+				varOp.LoadGridData(varreg, vecInFiles, grid);
+				const DataArray1D<float> & dataState = varOp.GetData();
+				_ASSERT(dataState.GetRows() == grid.GetSize());
+				int vecsize = vecNearbyBlobsOp.size();
+				BuildMask_NearbyBlobs<float>(
+					grid,
+					nodefile,
+					dataState,
+					vecLonRad,
+					vecLatRad,
+					vecNearbyBlobsOp[tc],
+					dataMask);
+	
+				AnnounceEndBlock("Done");
+			}
+        }
+		
+		if (tc > 1){
+			for (int i = 0; i < dataMask.GetRows(); i++) {
+				if(dataMask[i] > 0){
+					dataMask[i] = dataMask[i] - (tc-1);
+				}
+			}
 		}
 
 		if (fInvert) {
@@ -1393,9 +1405,23 @@ try {
 
 	if (strNearbyBlobs != "") {
 		AnnounceStartBlock("Parsing --nearbyblobs");
-		NearbyBlobsOp op;
-		op.Parse(varreg, strNearbyBlobs);
-		vecNearbyBlobsOp.push_back(op);
+        int iLast = 0;
+		for (int i = 0; i <= strNearbyBlobs.length(); i++) {
+
+			if ((i == strNearbyBlobs.length()) ||
+				(strNearbyBlobs[i] == ';') ||
+				(strNearbyBlobs[i] == ':')
+			) {
+				std::string strSubStr =
+					strNearbyBlobs.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecNearbyBlobsOp.size());
+				vecNearbyBlobsOp.resize(iNextOp + 1);
+				vecNearbyBlobsOp[iNextOp].Parse(varreg, strSubStr);
+
+				iLast = i + 1;
+			}
+		}
 		AnnounceEndBlock(NULL);
 	}
 
