@@ -262,7 +262,8 @@ void CopyNcFileAttributes(
 
 void CopyNcVarAttributes(
 	NcVar * varIn,
-	NcVar * varOut
+	NcVar * varOut,
+	bool fCopyFillValue
 ) {
 	for (int a = 0; a < varIn->num_atts(); a++) {
 		NcAtt * att = varIn->get_att(a);
@@ -281,6 +282,9 @@ void CopyNcVarAttributes(
 
 		// Do not copy over _FillValue if input/output variable types are different
 		if (std::string(att->name()) == "_FillValue") {
+			if (fCopyFillValue) {
+				continue;
+			}
 			if (varIn->type() != varOut->type()) {
 				continue;
 			}

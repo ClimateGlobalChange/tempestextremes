@@ -259,7 +259,8 @@ void CopyNcFileAttributes(
 ///	</summary>
 void CopyNcVarAttributes(
 	NcVar * varIn,
-	NcVar * varOut
+	NcVar * varOut,
+	bool fCopyFillValue = true
 );
 
 ////////////////////////////////////////////////////////////////////////////////
