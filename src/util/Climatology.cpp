@@ -1433,10 +1433,13 @@ void Climatology(
 					} else {
 						NcAtt * attFillValue = varIn->get_att("_FillValue");
 						if (attFillValue == NULL) {
-							_EXCEPTION2("Variable \"%s\" missing _FillValue attribute, "
-								"needed for --missingdata in NetCDF file \"%s\"",
-								vecVariableNames[v].c_str(),
-								vecInputFileList[f].c_str());
+							attFillValue = varIn->get_att("missing_value");
+							if (attFillValue == NULL) {
+								_EXCEPTION2("Variable \"%s\" missing _FillValue attribute, "
+									"needed for --missingdata in NetCDF file \"%s\"",
+									vecVariableNames[v].c_str(),
+									vecInputFileList[f].c_str());
+							}
 						}
 
 						dFillValue = attFillValue->as_float(0);
@@ -2872,10 +2875,13 @@ void AverageOverNcFiles(
 
 				} else {
 					NcAtt * attFill = var->get_att("_FillValue");
+					if (attFill == NULL) {
+						attFill = var->get_att("missing_value");
+					}
 					if (attFill != NULL) {
 						if (attFill->type() != nctype) {
-							_EXCEPTION1("Variable \"%s\" attribute \"_FillValue\" has incompatible type",
-								vecVariableNames[v].c_str());
+							_EXCEPTION2("Variable \"%s\" attribute \"%s\" has incompatible type",
+								vecVariableNames[v].c_str(), attFill->name());
 						}
 						if (nctype == ncFloat) {
 							dFillValueFloat = attFill->as_float(0);
