@@ -268,6 +268,7 @@ void CopyNcVarAttributes(
 	for (int a = 0; a < varIn->num_atts(); a++) {
 		NcAtt * att = varIn->get_att(a);
 		long num_vals = att->num_vals();
+		std::string strAttName = att->name();
 
 		// Sometimes we can have strings of length zero.  It seems that this
 		// check isn't actually necessary to prevent segfaults, so it's
@@ -281,13 +282,21 @@ void CopyNcVarAttributes(
 		}
 
 		// Do not copy over _FillValue if input/output variable types are different
-		if (std::string(att->name()) == "_FillValue") {
+		if (strAttName == "_FillValue") {
 			if (fCopyFillValue) {
 				continue;
 			}
 			if (varIn->type() != varOut->type()) {
 				continue;
 			}
+		}
+
+		// Do not copy over add_offset or scale_factor
+		if (strAttName == "add_offset") {
+			continue;
+		}
+		if (strAttName == "scale_factor") {
+			continue;
 		}
 
 		// Otherwise copy over attributes

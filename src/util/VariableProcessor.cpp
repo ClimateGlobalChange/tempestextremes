@@ -488,6 +488,16 @@ try {
 			if (strFillValue != "") {
 				vecNcVarOut[v]->add_att("_FillValue", dFillValue);
 			}
+
+			// Copy attributes
+			Variable & var = varreg.Get(vecVarIxIn[v]);
+			if (!var.IsOp()) {
+				NcVar * ncvarIn = NULL;
+				size_t sFileIx = vecFiles.FindContainingVariable(var.GetName(), &ncvarIn);
+				if (ncvarIn != NULL) {
+					CopyNcVarAttributes(ncvarIn, vecNcVarOut[v], (strFillValue == ""));
+				}
+			}
 		}
 
 		// Loop through all times in this file
