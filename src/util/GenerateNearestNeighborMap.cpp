@@ -63,6 +63,9 @@ try {
 	// Target variable (used for masking)
 	std::string strTargetVar;
 
+	// Target lonlat coords
+	std::string strTargetLonLat;
+
 	// Regional
 	bool fRegional = true;
 
@@ -92,6 +95,7 @@ try {
 		CommandLineString(strTargetData, "tgt_data", "");
 		CommandLineString(strTargetConnect, "tgt_connect", "");
 		CommandLineString(strTargetVar, "tgt_var", "");
+		CommandLineStringD(strTargetLonLat, "tgt_lonlat", "", "\"lon0,lon1,lat0,lat1,nlon,nlat\" (in degrees)");
 		CommandLineString(strOutputMap, "out_map", "");
 		CommandLineString(strSourceLongitudeName, "src_lonname", "lon");
 		CommandLineString(strSourceLatitudeName, "src_latname", "lat");
@@ -114,11 +118,17 @@ try {
 	if ((strSourceData.length() == 0) && (strSourceVar.length() != 0)) {
 		_EXCEPTIONT("Argument (--src_var) must be combined with (--src_data)");
 	}
-	if ((strTargetData.length() == 0) && (strTargetConnect.length() == 0)) {
-		_EXCEPTIONT("No target data file (--tgt_data) or target connectivity file (--tgt_connect) specified");
+	if ((strTargetData.length() == 0) && (strTargetConnect.length() == 0) && (strTargetLonLat.length() == 0)) {
+		_EXCEPTIONT("No target data file (--tgt_data), connectivity file (--tgt_connect) or lonlat count (--tgt_lonlat) specified");
 	}
-	if ((strTargetData.length() != 0) && (strTargetConnect.length() != 0)) {
-		_EXCEPTIONT("Only one target data file (--tgt_data) or target connectivity file (--tgt_connect) may be specified");
+
+	int nTgtArgCount = 
+		  ((strTargetData.length() != 0)?(1):(0))
+		+ ((strTargetConnect.length() != 0)?(1):(0))
+		+ ((strTargetLonLat.length() != 0)?(1):(0));
+
+	if (nTgtArgCount > 1) {
+		_EXCEPTIONT("Only one target data file (--tgt_data), target connectivity file (--tgt_connect) or lonlat count (--tgt_lonlat) may be specified");
 	}
 	if ((strTargetData.length() == 0) && (strTargetVar.length() != 0)) {
 		_EXCEPTIONT("Argument (--tgt_var) must be combined with (--tgt_data)");
@@ -163,8 +173,72 @@ try {
 
 	// Check for connectivity file
 	if (strTargetConnect != "") {
-		AnnounceStartBlock("Generating source grid information from connectivity file");
+		AnnounceStartBlock("Generating target grid information from connectivity file");
 		gridTarget.FromFile(strTargetConnect);
+		AnnounceEndBlock("Done");
+
+	// No connectivity file; target grid is a regular latitude longitude patch
+	} else if (strTargetLonLat != "") {
+		AnnounceStartBlock("Generating target grid information from --tgt_lonlat");
+
+		std::vector<std::string> vecTgtLonLatArg;
+		STLStringHelper::ParseVariableList(strTargetLonLat, vecTgtLonLatArg,",;");
+		if (vecTgtLonLatArg.size() != 6) {
+			_EXCEPTIONT("Malformed --tgt_lonlat: expected form \"lon0,lat0,lon1,lat1,nlon,nlat\"");
+		}
+		if (!STLStringHelper::IsFloat(vecTgtLonLatArg[0]) ||
+		    !STLStringHelper::IsFloat(vecTgtLonLatArg[1]) ||
+		    !STLStringHelper::IsFloat(vecTgtLonLatArg[2]) ||
+		    !STLStringHelper::IsFloat(vecTgtLonLatArg[3]) ||
+		    !STLStringHelper::IsInteger(vecTgtLonLatArg[4]) ||
+		    !STLStringHelper::IsInteger(vecTgtLonLatArg[5])
+		) {
+			_EXCEPTIONT("Malformed --tgt_lonlat: expected form \"lon0,lat0,lon1,lat1,nlon,nlat\"");
+		}
+
+		double dLon0 = std::stof(vecTgtLonLatArg[0]);
+		double dLat0 = std::stof(vecTgtLonLatArg[1]);
+		double dLon1 = std::stof(vecTgtLonLatArg[2]);
+		double dLat1 = std::stof(vecTgtLonLatArg[3]);
+		int nNLon = std::stoi(vecTgtLonLatArg[4]);
+		int nNLat = std::stoi(vecTgtLonLatArg[5]);
+
+		bool fRegional = true;
+
+		if ((nNLon < 2) || (nNLat < 2)) {
+			_EXCEPTIONT("Malformed --tgt_lonlat: nlon and nlat must be >= 2");
+		}
+		if ((fabs(dLat0) > 90.0) || (fabs(dLat1) > 90.0)) {
+			_EXCEPTIONT("Malformed --tgt_lonlat: lat0 and lat1 must be in range [-90,90]");
+		}
+
+		// Initialize longitude coordinates
+		DataArray1D<double> vecLon(nNLon);
+		if (fabs(dLon1 - dLon0) > 360.0) {
+			_EXCEPTIONT("Malformed --tgt_lonlat: lon1 - lon0 must not exceed 360 degrees");
+		}
+		if (fabs(dLon1 - dLon0) == 360.0) {
+			fRegional = false;
+			for (int i = 0; i < nNLon; i++) {
+				vecLon[i] = dLon0 + (dLon1 - dLon0) * static_cast<double>(i) / static_cast<double>(nNLon);
+				vecLon[i] = DegToRad(vecLon[i]);
+			}
+		} else {
+			for (int i = 0; i < nNLon; i++) {
+				vecLon[i] = dLon0 + (dLon1 - dLon0) * static_cast<double>(i) / static_cast<double>(nNLon - 1);
+				vecLon[i] = DegToRad(vecLon[i]);
+			}
+		}
+
+		// Initialize latitude coordinates
+		DataArray1D<double> vecLat(nNLat);
+		for (int j = 0; j < nNLat; j++) {
+			vecLat[j] = dLat0 + (dLat1 - dLat0) * static_cast<double>(j) / static_cast<double>(nNLat - 1);
+			vecLat[j] = DegToRad(vecLat[j]);
+		}
+
+		gridTarget.GenerateLatitudeLongitude(vecLat, vecLon, fRegional, true, false);
+
 		AnnounceEndBlock("Done");
 
 	// No connectivity file; check for latitude/longitude dimension
