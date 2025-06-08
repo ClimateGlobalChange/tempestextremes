@@ -495,7 +495,12 @@ try {
 				NcVar * ncvarIn = NULL;
 				size_t sFileIx = vecFiles.FindContainingVariable(var.GetName(), &ncvarIn);
 				if (ncvarIn != NULL) {
-					CopyNcVarAttributes(ncvarIn, vecNcVarOut[v], (strFillValue == ""));
+					std::vector<std::string> vecDoNotCopyNames;
+					if (strFillValue != "") {
+						vecDoNotCopyNames.push_back("_FillValue");
+						vecDoNotCopyNames.push_back("missing_value");
+					}
+					CopyNcVarAttributes(ncvarIn, vecNcVarOut[v], vecDoNotCopyNames);
 				}
 			}
 		}

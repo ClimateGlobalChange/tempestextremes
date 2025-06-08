@@ -259,8 +259,18 @@ void CopyNcFileAttributes(
 ///	</summary>
 void CopyNcVarAttributes(
 	NcVar * varIn,
+	NcVar * varOut
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Copy NetCDF attribute metadata from one variable to another.
+///	</summary>
+void CopyNcVarAttributes(
+	NcVar * varIn,
 	NcVar * varOut,
-	bool fCopyFillValue = true
+	const std::vector<std::string> & vecDoNotCopyNames
 );
 
 ////////////////////////////////////////////////////////////////////////////////

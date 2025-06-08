@@ -262,13 +262,42 @@ void CopyNcFileAttributes(
 
 void CopyNcVarAttributes(
 	NcVar * varIn,
+	NcVar * varOut
+) {
+	std::vector<std::string> vecDoNotCopyNames;
+	CopyNcVarAttributes(varIn, varOut, vecDoNotCopyNames);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void CopyNcVarAttributes(
+	NcVar * varIn,
 	NcVar * varOut,
-	bool fCopyFillValue
+	const std::vector<std::string> & vecDoNotCopyNames
 ) {
 	for (int a = 0; a < varIn->num_atts(); a++) {
 		NcAtt * att = varIn->get_att(a);
 		long num_vals = att->num_vals();
 		std::string strAttName = att->name();
+
+		// Check names against list of attributes not to copy
+		bool fSkipAttribute = false;
+		for (int b = 0; b < vecDoNotCopyNames.size(); b++) {
+			if (strAttName == vecDoNotCopyNames[b]) {
+				fSkipAttribute = true;
+			}
+		}
+		if (fSkipAttribute) {
+			continue;
+		}
+
+		// Do not copy over add_offset or scale_factor
+		if (strAttName == "add_offset") {
+			continue;
+		}
+		if (strAttName == "scale_factor") {
+			continue;
+		}
 
 		// Sometimes we can have strings of length zero.  It seems that this
 		// check isn't actually necessary to prevent segfaults, so it's
@@ -283,20 +312,9 @@ void CopyNcVarAttributes(
 
 		// Do not copy over _FillValue if input/output variable types are different
 		if (strAttName == "_FillValue") {
-			if (fCopyFillValue) {
-				continue;
-			}
 			if (varIn->type() != varOut->type()) {
 				continue;
 			}
-		}
-
-		// Do not copy over add_offset or scale_factor
-		if (strAttName == "add_offset") {
-			continue;
-		}
-		if (strAttName == "scale_factor") {
-			continue;
 		}
 
 		// Otherwise copy over attributes

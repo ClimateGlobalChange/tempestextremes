@@ -1169,7 +1169,74 @@ void Climatology(
 				// Copy attributes from input variable to output variable
 				NcVar * varIn = ncinfile.get_var(vecVariableNames[v].c_str());
 				_ASSERT(varIn != NULL);
-				CopyNcVarAttributes(varIn, varOut);
+				std::vector<std::string> vecDoNotCopyNames;
+				if ((vecClimoInfo[ct].type == ClimatologyType_MeanSq) ||
+				    (vecClimoInfo[ct].type == ClimatologyType_AutoCor) ||
+				    (vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
+				    (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) ||
+				    (vecClimoInfo[ct].type == ClimatologyType_MaxConsec)
+				) {
+					vecDoNotCopyNames.push_back("units");
+					vecDoNotCopyNames.push_back("standard_name");
+					vecDoNotCopyNames.push_back("long_name");
+					vecDoNotCopyNames.push_back("original_units");
+
+					std::string strUnits;
+					NcAtt * attUnits = varIn->get_att("units");
+					if (attUnits != NULL) {
+						strUnits = attUnits->as_string(0);
+					} else {
+						strUnits = "unknown";
+					}
+					std::string strStandardName;
+					NcAtt * attStandardName = varIn->get_att("standard_name");
+					if (attStandardName != NULL) {
+						strStandardName = attStandardName->as_string(0);
+					} else {
+						strStandardName = "variable";
+					}
+					std::string strLongName;
+					NcAtt * attLongName = varIn->get_att("long_name");
+					if (attLongName != NULL) {
+						strLongName = attLongName->as_string(0);
+					} else {
+						strLongName = "variable";
+					}
+
+					varOut->add_att("original_units", strUnits.c_str());
+
+					if (vecClimoInfo[ct].type == ClimatologyType_MeanSq) {
+						strUnits = std::string("(") + strUnits + std::string(")2");
+						strStandardName = strStandardName + std::string(" squared");
+						strLongName = strLongName + std::string(" squared");
+
+					} else if (vecClimoInfo[ct].type == ClimatologyType_AutoCor) {
+						strUnits = "unitless";
+						strStandardName = std::string("autocorrelation of ") + strStandardName;
+						strLongName = std::string("autocorrelation of ") + strLongName;
+
+					} else if (vecClimoInfo[ct].type == ClimatologyType_AvgCount) {
+						strUnits = "times";
+						strStandardName = "average count of " + strStandardName + " satisfying threshold";
+						strLongName = "average count of " + strLongName + " satisfying threshold";
+
+					} else if (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) {
+						strUnits = "times";
+						strStandardName = "average time until " + strStandardName + " satisfies threshold";
+						strLongName = "average time until " + strLongName + " satisfies threshold";
+
+					} else if (vecClimoInfo[ct].type == ClimatologyType_MaxConsec) {
+						strUnits = "times";
+						strStandardName = "average max consecutive times " + strStandardName + " satisfies threshold";
+						strLongName = "average max consecutive times " + strLongName + " satisfies threshold";
+					}
+
+					varOut->add_att("units", strUnits.c_str());
+					varOut->add_att("standard_name", strStandardName.c_str());
+					varOut->add_att("long_name", strLongName.c_str());
+				}
+
+				CopyNcVarAttributes(varIn, varOut, vecDoNotCopyNames);
 
 				// Add threshold attribute
 				if ((vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
@@ -1665,12 +1732,11 @@ void Climatology(
 								DataArray3D<double> & dScratchData = vecScratchData[ct];
 								DataArray2D<double> & dAccumulatedData = vecAccumulatedData[ct];
 
-								// Accumulate avgmin, avgmax, avgcount, threshsum and maxconsec
+								// Accumulate avgmin, avgmax, avgcount and threshsum
 								if ((vecClimoInfo[ct].type == ClimatologyType_AvgMin) ||
 								    (vecClimoInfo[ct].type == ClimatologyType_AvgMax) ||
 								    (vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
-								    (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) ||
-								    (vecClimoInfo[ct].type == ClimatologyType_MaxConsec)
+								    (vecClimoInfo[ct].type == ClimatologyType_ThreshSum)
 								) {
 									for (size_t i = 0; i < sGetRows; i++) {
 										if (fabs(dScratchData(0,0,i)) == std::numeric_limits<double>::max()) {
@@ -2069,8 +2135,10 @@ void Climatology(
 										}
 										if (fSatisfiesThreshold) {
 											dScratchData(1,0,i) += 1.0;
-										} else if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
-											dScratchData(0,0,i) = dScratchData(1,0,i);
+										} else {
+											if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
+												dScratchData(0,0,i) = dScratchData(1,0,i);
+											}
 											dScratchData(1,0,i) = 0.0;
 										}
 									}
@@ -2085,8 +2153,10 @@ void Climatology(
 										}
 										if (fSatisfiesThreshold) {
 											dScratchData(1,0,i) += 1.0;
-										} else if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
-											dScratchData(0,0,i) = dScratchData(1,0,i);
+										} else {
+											if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
+												dScratchData(0,0,i) = dScratchData(1,0,i);
+											}
 											dScratchData(1,0,i) = 0.0;
 										}
 									}
@@ -2101,8 +2171,10 @@ void Climatology(
 										}
 										if (fSatisfiesThreshold) {
 											dScratchData(1,0,i) += 1.0;
-										} else if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
-											dScratchData(0,0,i) = dScratchData(1,0,i);
+										} else {
+											if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
+												dScratchData(0,0,i) = dScratchData(1,0,i);
+											}
 											dScratchData(1,0,i) = 0.0;
 										}
 									}
@@ -2117,8 +2189,10 @@ void Climatology(
 										}
 										if (fSatisfiesThreshold) {
 											dScratchData(1,0,i) += 1.0;
-										} else if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
-											dScratchData(0,0,i) = dScratchData(1,0,i);
+										} else {
+											if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
+												dScratchData(0,0,i) = dScratchData(1,0,i);
+											}
 											dScratchData(1,0,i) = 0.0;
 										}
 									}
@@ -2133,8 +2207,10 @@ void Climatology(
 										}
 										if (fSatisfiesThreshold) {
 											dScratchData(1,0,i) += 1.0;
-										} else if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
-											dScratchData(0,0,i) = dScratchData(1,0,i);
+										} else {
+											if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
+												dScratchData(0,0,i) = dScratchData(1,0,i);
+											}
 											dScratchData(1,0,i) = 0.0;
 										}
 									}
@@ -2149,8 +2225,10 @@ void Climatology(
 										}
 										if (fSatisfiesThreshold) {
 											dScratchData(1,0,i) += 1.0;
-										} else if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
-											dScratchData(0,0,i) = dScratchData(1,0,i);
+										} else {
+											if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
+												dScratchData(0,0,i) = dScratchData(1,0,i);
+											}
 											dScratchData(1,0,i) = 0.0;
 										}
 									}
@@ -2397,8 +2475,10 @@ void Climatology(
 									for (size_t i = 0; i < sGetRows; i++) {
 										if (dDataIn[i] > dClimoThreshold) {
 											dScratchData(1,0,i) += 1.0;
-										} else if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
-											dScratchData(0,0,i) = dScratchData(1,0,i);
+										} else {
+											if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
+												dScratchData(0,0,i) = dScratchData(1,0,i);
+											}
 											dScratchData(1,0,i) = 0.0;
 										}
 									}
@@ -2407,8 +2487,10 @@ void Climatology(
 									for (size_t i = 0; i < sGetRows; i++) {
 										if (dDataIn[i] >= dClimoThreshold) {
 											dScratchData(1,0,i) += 1.0;
-										} else if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
-											dScratchData(0,0,i) = dScratchData(1,0,i);
+										} else {
+											if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
+												dScratchData(0,0,i) = dScratchData(1,0,i);
+											}
 											dScratchData(1,0,i) = 0.0;
 										}
 									}
@@ -2417,8 +2499,10 @@ void Climatology(
 									for (size_t i = 0; i < sGetRows; i++) {
 										if (dDataIn[i] < dClimoThreshold) {
 											dScratchData(1,0,i) += 1.0;
-										} else if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
-											dScratchData(0,0,i) = dScratchData(1,0,i);
+										} else {
+											if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
+												dScratchData(0,0,i) = dScratchData(1,0,i);
+											}
 											dScratchData(1,0,i) = 0.0;
 										}
 									}
@@ -2427,8 +2511,10 @@ void Climatology(
 									for (size_t i = 0; i < sGetRows; i++) {
 										if (dDataIn[i] <= dClimoThreshold) {
 											dScratchData(1,0,i) += 1.0;
-										} else if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
-											dScratchData(0,0,i) = dScratchData(1,0,i);
+										} else {
+											if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
+												dScratchData(0,0,i) = dScratchData(1,0,i);
+											}
 											dScratchData(1,0,i) = 0.0;
 										}
 									}
@@ -2447,8 +2533,10 @@ void Climatology(
 									for (size_t i = 0; i < sGetRows; i++) {
 										if (dDataIn[i] != dClimoThreshold) {
 											dScratchData(1,0,i) += 1.0;
-										} else if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
-											dScratchData(0,0,i) = dScratchData(1,0,i);
+										} else {
+											if (dScratchData(1,0,i) > dScratchData(0,0,i)) {
+												dScratchData(0,0,i) = dScratchData(1,0,i);
+											}
 											dScratchData(1,0,i) = 0.0;
 										}
 									}
@@ -2503,7 +2591,8 @@ void Climatology(
 					}
 				}
 
-				// AvgMin, AvgMax and AvgCount: Perform one final accumulation of scratch data into accumulated data
+				// AvgMin, AvgMax, AvgCount, ThreshSum, TimeUntil, MaxConsec:
+				// Perform one final accumulation of scratch data into accumulated data
 				if ((vecClimoInfo[ct].type == ClimatologyType_AvgMin) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_AvgMax) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
@@ -2634,7 +2723,8 @@ void Climatology(
 				    (vecClimoInfo[ct].type == ClimatologyType_AvgMax) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) || 
-				    (vecClimoInfo[ct].type == ClimatologyType_TimeUntil)
+				    (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) ||
+				    (vecClimoInfo[ct].type == ClimatologyType_MaxConsec)
 				) {
 					for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
 
