@@ -452,7 +452,9 @@ public:
 		lag(0),
 		threshtype(ThresholdType_GreaterThan),
 		threshvalue(0.0),
-		threshunits("")
+		threshunits(""),
+		threshorigunits(""),
+		threshstring("")
 	{ }
 
 public:
@@ -461,6 +463,7 @@ public:
 	ThresholdType threshtype;
 	float threshvalue;
 	std::string threshunits;
+	std::string threshorigunits;
 	std::string threshstring;
 };
 
@@ -567,6 +570,7 @@ void ParseClimatologyTypes(
 			_EXCEPTIONT("--type invalid; expected \"mean\", \"meansq\", \"stddev\", \"autocor:<lag>\", \"min\", \"max\", \"avgmin\", \"avgmax\", \"avgcount<op><value>\", \"threshsum<op><value>\", \"timeuntil<op><value>\", \"maxconsec<op><value>\"");
 		}
 
+		climoinfo.threshorigunits = climoinfo.threshunits;
 		vecClimatologyInfo.push_back(climoinfo);
 	}
 }
@@ -1174,6 +1178,7 @@ void Climatology(
 				    (vecClimoInfo[ct].type == ClimatologyType_AutoCor) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) ||
+				    (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_MaxConsec)
 				) {
 					vecDoNotCopyNames.push_back("units");
@@ -1224,6 +1229,11 @@ void Climatology(
 						strUnits = "times";
 						strStandardName = "average time until " + strStandardName + " satisfies threshold";
 						strLongName = "average time until " + strLongName + " satisfies threshold";
+
+					} else if (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) {
+						strUnits = vecClimoInfo[ct].threshorigunits;
+						strStandardName = "threshold sum of " + strStandardName;
+						strLongName = "threshold sum of " + strLongName;
 
 					} else if (vecClimoInfo[ct].type == ClimatologyType_MaxConsec) {
 						strUnits = "times";
@@ -2788,6 +2798,39 @@ void Climatology(
 					timeProcessingStart = Time(Time::CalendarUnknown);
 					timeProcessingLast = Time(Time::CalendarUnknown);
 					nProcessingTimes = 0;
+				}
+
+				// Convert threshold sum back to original units
+				if (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) {
+					if (vecClimoInfo[ct].threshorigunits != vecClimoInfo[ct].threshunits) {
+						Announce("Converting data units from \"%s\" to \"%s\"",
+							vecClimoInfo[ct].threshunits.c_str(), 
+							vecClimoInfo[ct].threshorigunits.c_str());
+
+						if (fMissingData) {
+							for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
+							for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
+								if (!std::isnan(dAccumulatedData(t,i)) && (dAccumulatedData(t,i) != dFillValue)) {
+									ConvertUnits(
+										dAccumulatedData(t,i),
+										vecClimoInfo[ct].threshunits,
+										vecClimoInfo[ct].threshorigunits,
+										true);
+								}
+							}
+							}
+						} else {
+							for (size_t t = 0; t < dAccumulatedData.GetRows(); t++) {
+							for (size_t i = 0; i < dAccumulatedData.GetColumns(); i++) {
+								ConvertUnits(
+									dAccumulatedData(t,i),
+									vecClimoInfo[ct].threshunits,
+									vecClimoInfo[ct].threshorigunits,
+									true);
+							}
+							}
+						}
+					}
 				}
 
 				// Write data
