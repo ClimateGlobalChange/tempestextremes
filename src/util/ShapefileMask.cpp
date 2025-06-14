@@ -382,17 +382,6 @@ try {
 		}
 	}
 
-	// Add FillValue attributes
-	std::vector<float> vecVarFillValues(vecVarIxIn.size(), 0.0f);
-	varreg.PopulateFillValues(vecFiles);
-	for (int v = 0; v < vecNcVarOut.size(); v++) {
-		const Variable & var = varreg.Get(vecVarIxIn[v]);
-		if (var.HasExplicitFillValue()) {
-			vecNcVarOut[v]->add_att("_FillValue", var.GetFillValueFloat());
-			vecVarFillValues[v] = var.GetFillValueFloat();
-		}
-	}
-
 	// Build the map from the input data to the shapefiles
 	AnnounceStartBlock("Building map");
 
@@ -470,6 +459,15 @@ try {
 			var.LoadGridData(varreg, vecFiles, grid);
 			const DataArray1D<float> & dataState = var.GetData();
 
+			// Check _FillValue
+			float dFillValue = var.GetFillValueFloat();
+			if (var.HasExplicitFillValue()) {
+				NcAtt * attFillValue = vecNcVarOut[v]->get_att("_FillValue");
+				if (attFillValue == NULL) {
+					vecNcVarOut[v]->add_att("_FillValue", dFillValue);
+				}
+			}
+
 			// Get the output position and size
 			VariableAuxIndex lPos = varreg.GetProcessingQueueAuxIx();
 			if (fFileHasTime) {
@@ -492,7 +490,7 @@ try {
 				}
 
 				for (int s = 0; s < static_cast<int>(sShpRegionCount); s++) {
-					std::vector<float> dataOut(dataState.GetRows(), vecVarFillValues[v]);
+					std::vector<float> dataOut(dataState.GetRows(), dFillValue);
 					for (size_t k = 0; k < nShpMap.size(); k++) {
 						if (nShpMap[k] == s) {
 							dataOut[k] = dataState[k];
@@ -511,7 +509,7 @@ try {
 				lSize.push_back(sShpRegionCount);
 		
 				// Allocate output data
-				std::vector<float> dataOut(sShpRegionCount, vecVarFillValues[v]);
+				std::vector<float> dataOut(sShpRegionCount, dFillValue);
 
 				if (fpCSV != NULL) {
 					if (fFileHasTime) {
@@ -524,7 +522,7 @@ try {
 				// Calculate the mean within all shapes
 				if (strOperation == "mean") {
 					for (size_t k = 0; k < nShpMap.size(); k++) {
-						if ((!std::isnan(dataState[k])) && (dataState[k] != vecVarFillValues[v])) {
+						if ((!std::isnan(dataState[k])) && (dataState[k] != dFillValue)) {
 							if (nShpMap[k] != static_cast<size_t>(-1)) {
 								dataOut[nShpMap[k]] += static_cast<double>(dataState[k]);
 							}
@@ -545,7 +543,7 @@ try {
 					vecShpData.resize(sShpRegionCount);
 	
 					for (size_t k = 0; k < nShpMap.size(); k++) {
-						if ((!std::isnan(dataState[k])) && (dataState[k] != vecVarFillValues[v])) {
+						if ((!std::isnan(dataState[k])) && (dataState[k] != dFillValue)) {
 							if (nShpMap[k] != (-1)) {
 								vecShpData[nShpMap[k]].push_back(dataState[k]);
 							}
