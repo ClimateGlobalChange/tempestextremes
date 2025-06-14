@@ -95,7 +95,7 @@ try {
 		CommandLineString(strTargetData, "tgt_data", "");
 		CommandLineString(strTargetConnect, "tgt_connect", "");
 		CommandLineString(strTargetVar, "tgt_var", "");
-		CommandLineStringD(strTargetLonLat, "tgt_lonlat", "", "\"lon0,lon1,lat0,lat1,nlon,nlat\" (in degrees)");
+		CommandLineStringD(strTargetLonLat, "tgt_lonlat", "", "\"lon0,lat0,lon1,lat1,nlon,nlat\" (in degrees)");
 		CommandLineString(strOutputMap, "out_map", "");
 		CommandLineString(strSourceLongitudeName, "src_lonname", "lon");
 		CommandLineString(strSourceLatitudeName, "src_latname", "lat");
