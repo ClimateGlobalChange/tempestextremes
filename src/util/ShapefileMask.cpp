@@ -323,7 +323,7 @@ try {
 			strOutputData,
 			vecTimes);
 
-		dimTime = ncOutput.add_dim("time", vecTimes.size());
+		dimTime = NcGetTimeDimension(ncOutput);
 		_ASSERT(dimTime != NULL);
 
 	} else {
@@ -526,6 +526,7 @@ try {
 
 				// Calculate the mean within all shapes
 				if (strOperation == "mean") {
+					std::fill(dataOut.begin(), dataOut.end(), 0.0f);
 					for (size_t k = 0; k < nShpMap.size(); k++) {
 						if ((!std::isnan(dataState[k])) && (dataState[k] != dFillValue)) {
 							if (nShpMap[k] != static_cast<size_t>(-1)) {
