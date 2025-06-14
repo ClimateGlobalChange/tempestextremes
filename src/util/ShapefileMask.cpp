@@ -323,18 +323,67 @@ try {
 			strOutputData,
 			vecTimes);
 
-		dimTime = NcGetTimeDimension(ncOutput);
+		dimTime = ncOutput.add_dim("time", vecTimes.size());
 		_ASSERT(dimTime != NULL);
 
 	} else {
 		vecTimes.push_back(Time(Time::CalendarNone));
 	}
 
+	// Build the map from the input data to the shapefiles
+	AnnounceStartBlock("Building map");
+
+	std::vector<int> nShpMap;
+	std::vector<size_t> sDataCount(sShpRegionCount, 0);
+
+	nShpMap.resize(grid.m_dLat.GetRows(), static_cast<int>(-1));
+	for (size_t k = 0; k < grid.m_dLat.GetRows(); k++) {
+		double dLatDeg = RadToDeg(grid.m_dLat[k]);
+		double dStandardLonDeg = LonDegToStandardRange(RadToDeg(grid.m_dLon[k]));
+		for (size_t s = 0; s < sShpRegionCount; s++) {
+			if (vecLatLonBox[s].contains(dLatDeg, dStandardLonDeg)) {
+				if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg, dStandardLonDeg)) {
+					nShpMap[k] = static_cast<int>(s);
+					sDataCount[s]++;
+					break;
+				}
+			}
+		}
+	}
+
+	AnnounceEndBlock("Done");
+
+	// Write the shape ids to a file
+	if (fWriteShapeIds) {
+		AnnounceStartBlock("Writing to file");
+
+		NcVar * varShapeIds = NULL;
+		if (grid.m_nGridDim.size() == 1) {
+			varShapeIds = ncOutput.add_var("shapeid", ncInt, dim0);
+			varShapeIds->add_att("_FillValue", (int)(-1));
+			if (varShapeIds == NULL) {
+				_EXCEPTION1("Unable to create variable \"shapeid\" in NetCDF file \"%s\"", strOutputData.c_str());
+			}
+			varShapeIds->set_cur((long)0);
+			varShapeIds->put(&(nShpMap[0]), dim0->size());
+
+		} else {
+			varShapeIds = ncOutput.add_var("shapeid", ncInt, dim0, dim1);
+			varShapeIds->add_att("_FillValue", (int)(-1));
+			if (varShapeIds == NULL) {
+				_EXCEPTION1("Unable to create variable \"shapeid\" in NetCDF file \"%s\"", strOutputData.c_str());
+			}
+			varShapeIds->set_cur(0, 0);
+			varShapeIds->put(&(nShpMap[0]), dim0->size(), dim1->size());
+		}
+
+		AnnounceEndBlock("Done");
+	}
+
 	// Build up the processing queue and define output variables
 	varreg.ClearProcessingQueue();
 
 	std::vector<NcVar *> vecNcVarOut(vecVarIxIn.size());
-	std::vector<bool> vecNcVarOutFillValueCheck(vecVarIxIn.size(), false);
 	for (int v = 0; v < vecVarIxIn.size(); v++) {
 		NcVar * varOut = NULL;
 
@@ -375,62 +424,24 @@ try {
 			vecDimOut.size(),
 			const_cast<const NcDim**>(&(vecDimOut[0])));
 
+		// TODO: Probably should fix this
+		NcVar * ncvarIn = ncInput.get_var(vecVariableNamesIn[v].c_str());
+		if (ncvarIn != NULL) {
+			NcAtt * attFillValue = ncvarIn->get_att("_FillValue");
+			if (attFillValue == NULL) {
+				attFillValue = ncvarIn->get_att("missing_value");
+			}
+			if (attFillValue != NULL) {
+				vecNcVarOut[v]->add_att("_FillValue", attFillValue->as_float(0));
+			}
+		}
+
 		if (vecNcVarOut[v] == NULL) {
 			_EXCEPTION2("Error creating variable \"%s\" in file \"%s\"",
 				vecVariableNamesOut[v].c_str(),
 				strOutputData.c_str());
 		}
 	}
-
-	// Build the map from the input data to the shapefiles
-	AnnounceStartBlock("Building map");
-
-	std::vector<int> nShpMap;
-	std::vector<size_t> sDataCount(sShpRegionCount, 0);
-
-	nShpMap.resize(grid.m_dLat.GetRows(), static_cast<int>(-1));
-	for (size_t k = 0; k < grid.m_dLat.GetRows(); k++) {
-		double dLatDeg = RadToDeg(grid.m_dLat[k]);
-		double dStandardLonDeg = LonDegToStandardRange(RadToDeg(grid.m_dLon[k]));
-		for (size_t s = 0; s < sShpRegionCount; s++) {
-			if (vecLatLonBox[s].contains(dLatDeg, dStandardLonDeg)) {
-				if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg, dStandardLonDeg)) {
-					nShpMap[k] = static_cast<int>(s);
-					sDataCount[s]++;
-					break;
-				}
-			}
-		}
-	}
-
-	// Write the shape ids to a file
-	if (fWriteShapeIds) {
-		AnnounceStartBlock("Writing to file");
-
-		NcVar * varShapeIds = NULL;
-		if (grid.m_nGridDim.size() == 1) {
-			varShapeIds = ncOutput.add_var("shapeid", ncInt, dim0);
-			varShapeIds->add_att("_FillValue", (int)(-1));
-			if (varShapeIds == NULL) {
-				_EXCEPTION1("Unable to create variable \"shapeid\" in NetCDF file \"%s\"", strOutputData.c_str());
-			}
-			varShapeIds->set_cur((long)0);
-			varShapeIds->put(&(nShpMap[0]), dim0->size());
-
-		} else {
-			varShapeIds = ncOutput.add_var("shapeid", ncInt, dim0, dim1);
-			varShapeIds->add_att("_FillValue", (int)(-1));
-			if (varShapeIds == NULL) {
-				_EXCEPTION1("Unable to create variable \"shapeid\" in NetCDF file \"%s\"", strOutputData.c_str());
-			}
-			varShapeIds->set_cur(0, 0);
-			varShapeIds->put(&(nShpMap[0]), dim0->size(), dim1->size());
-		}
-
-		AnnounceEndBlock("Done");
-	}
-
-	AnnounceEndBlock("Done");
 
 	// Loop through all times in this file
 	for (int t = 0; t < vecTimes.size(); t++) {
@@ -461,12 +472,6 @@ try {
 
 			// Check _FillValue
 			float dFillValue = var.GetFillValueFloat();
-			if (var.HasExplicitFillValue()) {
-				NcAtt * attFillValue = vecNcVarOut[v]->get_att("_FillValue");
-				if (attFillValue == NULL) {
-					vecNcVarOut[v]->add_att("_FillValue", dFillValue);
-				}
-			}
 
 			// Get the output position and size
 			VariableAuxIndex lPos = varreg.GetProcessingQueueAuxIx();
@@ -642,6 +647,7 @@ try {
 			AnnounceEndBlock(NULL);
 		}
 	}
+
 /*
 // Loop through all variables
 	AnnounceStartBlock("Processing data");
