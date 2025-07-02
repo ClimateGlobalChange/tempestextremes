@@ -307,12 +307,27 @@ void CopyNcVar(
 ///	<summary>
 ///		Copy a NetCDF variable from one file to another if it exists.
 ///	</summary>
-void CopyNcVarIfExists(
+bool CopyNcVarIfExists(
 	NcFile & ncIn,
 	NcFile & ncOut,
 	const std::string & strVarName,
 	bool fCopyAttributes = true,
 	bool fCopyData = true
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Copy latitude and longitude variables over and check for consistency.
+///	</summary>
+void CopyNcLatitudeLongitude(
+	NcFile & ncIn,
+	NcFile & ncOut,
+	const std::string & strLatitudeName,
+	const std::string & strLongitudeName,
+	const std::vector<size_t> & nGridDim,
+	NcDim ** pdimGrid0 = NULL,
+	NcDim ** pdimGrid1 = NULL
 );
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -681,7 +681,7 @@ void CopyNcVar(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void CopyNcVarIfExists(
+bool CopyNcVarIfExists(
 	NcFile & ncIn,
 	NcFile & ncOut,
 	const std::string & strVarName,
@@ -692,8 +692,105 @@ void CopyNcVarIfExists(
 	NcError error(NcError::silent_nonfatal);
 
 	NcVar * var = ncIn.get_var(strVarName.c_str());
-	if (var != NULL) {
+	if (var == NULL) {
+		return false;
+	} else {
 		CopyNcVar(ncIn, ncOut, strVarName, fCopyAttributes, fCopyData);
+		return true;
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void CopyNcLatitudeLongitude(
+	NcFile & ncIn,
+	NcFile & ncOut,
+	const std::string & strLatitudeName,
+	const std::string & strLongitudeName,
+	const std::vector<size_t> & nGridDim,
+	NcDim ** pdimGrid0,
+	NcDim ** pdimGrid1
+) {
+	// Copy latitude and longitude variables, if they exist
+	bool fLatVarExists =
+		CopyNcVarIfExists(
+			ncIn,
+			ncOut,
+			strLatitudeName,
+			true,
+			true);
+
+	bool fLonVarExists =
+		CopyNcVarIfExists(
+			ncIn,
+			ncOut,
+			strLongitudeName,
+			true,
+			true);
+
+	// No latitude or longitude variable in file
+	if (!fLatVarExists && !fLonVarExists) {
+		if ((pdimGrid0 != NULL) && (nGridDim.size() >= 1)) {
+			*pdimGrid0 = ncOut.add_dim(strLatitudeName.c_str(), nGridDim[0]);
+		}
+		if ((pdimGrid1 != NULL) && (nGridDim.size() >= 2)) {
+			*pdimGrid1 = ncOut.add_dim(strLongitudeName.c_str(), nGridDim[1]);
+		}
+		return;
+	}
+
+	// Only one of latitude or longitude in file
+	if (!fLatVarExists) {
+		_EXCEPTION2("Longitude variable \"%s\" present but latitude variable \"%s\" is missing in file",
+			strLongitudeName.c_str(), strLatitudeName.c_str());
+	}
+	if (!fLonVarExists) {
+		_EXCEPTION2("Latitude variable \"%s\" present but longitude variable \"%s\" is missing in file",
+			strLatitudeName.c_str(), strLongitudeName.c_str());
+	}
+
+	// Verify consistency of latitude and longitude variables
+	NcVar * varLatOut = ncOut.get_var(strLatitudeName.c_str());
+	NcVar * varLonOut = ncOut.get_var(strLongitudeName.c_str());
+	_ASSERT(varLatOut != NULL);
+	_ASSERT(varLonOut != NULL);
+
+	if ((varLatOut->num_dims() != 1) && (varLatOut->num_dims() != 2)) {
+		_EXCEPTION1("Latitude variable \"%s\" must have dimension 1 or 2", strLatitudeName.c_str());
+	}
+	if ((varLonOut->num_dims() != 1) && (varLonOut->num_dims() != 2)) {
+		_EXCEPTION1("Longitude variable \"%s\" must have dimension 1 or 2", strLongitudeName.c_str());
+	}
+
+	if (varLatOut->num_dims() != varLonOut->num_dims()) {
+		_EXCEPTION4("Inconsistent number of dimensions between latitude "
+			"variable \"%s\" (%li) and longitude variable \"%s\" (%li)",
+			strLatitudeName.c_str(), varLatOut->num_dims(),
+			strLongitudeName.c_str(), varLonOut->num_dims());
+	}
+
+	// Grid dim 0
+	if (std::string(varLatOut->get_dim(0)->name()) != std::string(varLonOut->get_dim(0)->name())) {
+		_EXCEPTION4("Inconsistent first dimension between latitude "
+			"variable \"%s\" (%s) and longitude variable \"%s\" (%s)",
+			strLatitudeName.c_str(), varLatOut->get_dim(0)->name(),
+			strLongitudeName.c_str(), varLonOut->get_dim(0)->name());
+	}
+	if (pdimGrid0 != NULL) {
+		*pdimGrid0 = varLatOut->get_dim(0);
+	}
+
+	// Grid dim 1
+	if (varLatOut->num_dims() == 2) {
+		if (std::string(varLatOut->get_dim(1)->name()) != std::string(varLonOut->get_dim(1)->name())) {
+			_EXCEPTION4("Inconsistent second dimension between latitude "
+				"variable \"%s\" (%s) and longitude variable \"%s\" (%s)",
+				strLatitudeName.c_str(), varLatOut->get_dim(1)->name(),
+				strLongitudeName.c_str(), varLonOut->get_dim(1)->name());
+		}
+		if (pdimGrid1 != NULL) {
+			*pdimGrid1 = varLatOut->get_dim(1);
+		}
 	}
 }
 

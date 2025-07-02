@@ -394,14 +394,14 @@ try {
 			CopyNcVarIfExists(
 				*(vecFiles[0]),
 				ncout,
-				strLatitudeName.c_str(),
+				strLatitudeName,
 				true,
 				true);
 
 			CopyNcVarIfExists(
 				*(vecFiles[0]),
 				ncout,
-				strLongitudeName.c_str(),
+				strLongitudeName,
 				true,
 				true);
 

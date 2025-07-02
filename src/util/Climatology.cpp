@@ -641,23 +641,17 @@ void Climatology(
 		// Write grid information to output file
 		if (grid.m_nGridDim.size() == 1) {
 			dimGrid0 = ncoutfile.add_dim("ncol", grid.m_nGridDim[0]);
+
 		} else if (grid.m_nGridDim.size() == 2) {
-			dimGrid0 = ncoutfile.add_dim(strLatitudeName.c_str(), grid.m_nGridDim[0]);
-			dimGrid1 = ncoutfile.add_dim(strLongitudeName.c_str(), grid.m_nGridDim[1]);
-
-			CopyNcVarIfExists(
+			CopyNcLatitudeLongitude(
 				ncinfile,
 				ncoutfile,
-				strLatitudeName.c_str(),
-				true,
-				true);
-
-			CopyNcVarIfExists(
-				ncinfile,
-				ncoutfile,
-				strLongitudeName.c_str(),
-				true,
-				true);
+				strLatitudeName,
+				strLongitudeName,
+				grid.m_nGridDim,
+				&dimGrid0,
+				&dimGrid1
+			);
 
 		} else {
 			_EXCEPTIONT("Only 1D or 2D spatial data supported");
