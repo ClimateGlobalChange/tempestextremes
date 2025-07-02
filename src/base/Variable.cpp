@@ -558,8 +558,16 @@ void VariableRegistry::PopulateFillValues(
 			vecncDataFiles.FindContainingVariable(pvar->GetName(), &ncvar);
 			if (ncvar != NULL) {
 				NcAtt * attFillValue = ncvar->get_att("_FillValue");
+				if (attFillValue == NULL) {
+					attFillValue = ncvar->get_att("missing_value");
+				}
 				if (attFillValue != NULL) {
 					pvar->m_data.SetFillValue(attFillValue->as_float(0));
+				}
+
+				NcAtt * attUnits = ncvar->get_att("units");
+				if (attUnits != NULL) {
+					pvar->m_data.SetUnits(attUnits->as_string(0));
 				}
 			}
 		}
@@ -1040,46 +1048,64 @@ void Variable::LoadGridData(
 		// Load the data
 		var->get(&(m_data[0]), &(nDataSize[0]));
 
-		// Turn off errors as we check attributes
-		NcError err(NcError::silent_nonfatal);
-		if (err.get_err() != NC_NOERR) {
-			_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
-		}
+		// Only check attributes when files are changed
+		if (m_strSourceFilenames != strSourceFilenamesArg) {
 
-		// Check for _FillValue
-		NcAtt * attFillValue = var->get_att("_FillValue");
-		if (attFillValue != NULL) {
-			m_data.SetFillValue(attFillValue->as_float(0));
-		} else {
-			attFillValue = var->get_att("missing_value");
-			if (attFillValue != NULL) {
+			// Turn off errors as we check attributes
+			NcError err(NcError::silent_nonfatal);
+			if (err.get_err() != NC_NOERR) {
+				_EXCEPTION1("NetCDF Fatal Error (%i)", err.get_err());
+			}
+
+			// Check for _FillValue
+			NcAtt * attFillValue = var->get_att("_FillValue");
+			if (attFillValue == NULL) {
+				attFillValue = var->get_att("missing_value");
+			}
+			if (attFillValue == NULL) {
+				m_data.RemoveFillValue();
+			} else {
 				m_data.SetFillValue(attFillValue->as_float(0));
 			}
+
+			// Check for units
+			NcAtt * attUnits = var->get_att("units");
+			if (attUnits == NULL) {
+				m_data.SetUnits("");
+			} else {
+				m_data.SetUnits(attUnits->as_string(0));
+			}
+
+			// Check for scale_factor attribute
+			NcAtt * attScaleFactor = var->get_att("scale_factor");
+			NcAtt * attAddOffset = var->get_att("add_offset");
+			if ((attScaleFactor == NULL) && (attAddOffset == NULL)) {
+				m_fHasScaleFactorOrAddOffset = false;
+			} else {
+				m_fHasScaleFactorOrAddOffset = true;
+				if (attScaleFactor == NULL) {
+					m_dScaleFactor = 1.0f;
+				} else {
+					m_dScaleFactor = attScaleFactor->as_float(0);
+					if (m_data.HasFillValue()) {
+						m_data.SetFillValue(m_data.GetFillValue() * m_dScaleFactor);
+					}
+				}
+				if (attAddOffset == NULL) {
+					m_dAddOffset = 0.0f;
+				} else {
+					m_dAddOffset = attAddOffset->as_float(0);
+					if (m_data.HasFillValue()) {
+						m_data.SetFillValue(m_data.GetFillValue() + m_dAddOffset);
+					}
+				}
+			}
 		}
 
-		// Check for scale_factor attribute
-		NcAtt * attScaleFactor = var->get_att("scale_factor");
-		if (attScaleFactor != NULL) {
-			float dScaleFactor = attScaleFactor->as_float(0);
-
+		// Apply scale_factor and add_offset
+		if (m_fHasScaleFactorOrAddOffset) {
 			for (int i = 0; i < m_data.GetRows(); i++) {
-				m_data[i] *= dScaleFactor;
-			}
-			if (m_data.HasFillValue()) {
-				m_data.SetFillValue(m_data.GetFillValue() * dScaleFactor);
-			}
-		}
-
-		// Check for add_offset attribute
-		NcAtt * attAddOffset = var->get_att("add_offset");
-		if (attAddOffset != NULL) {
-			float dAddOffset = attAddOffset->as_float(0);
-
-			for (int i = 0; i < m_data.GetRows(); i++) {
-				m_data[i] += dAddOffset;
-			}
-			if (m_data.HasFillValue()) {
-				m_data.SetFillValue(m_data.GetFillValue() + dAddOffset);
+				m_data[i] = m_data[i] * m_dScaleFactor + m_dAddOffset;
 			}
 		}
 

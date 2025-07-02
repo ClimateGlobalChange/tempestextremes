@@ -518,7 +518,10 @@ public:
 		m_fOp(false),
 		m_fNoTimeInNcFile(false),
 		m_strSourceFilenames(),
-		m_timeStored(Time::CalendarUnknown)
+		m_timeStored(Time::CalendarUnknown),
+		m_fHasScaleFactorOrAddOffset(false),
+		m_dScaleFactor(1.0f),
+		m_dAddOffset(0.0f)
 	{ }
 
 public:
@@ -565,6 +568,7 @@ public:
 
 	///	<summary>
 	///		Returns true if this Variable has an explicit _FillValue.
+	///		Note that the FillValue is only set when data is loaded.
 	///	</summary>
 	bool HasExplicitFillValue() const {
 		return m_data.HasFillValue();
@@ -572,9 +576,18 @@ public:
 
 	///	<summary>
 	///		Get the _FillValue for this variable.
+	///		Note that the FillValue is only set when data is loaded.
 	///	</summary>
 	float GetFillValueFloat() const {
 		return m_data.GetFillValue();
+	}
+
+	///	<summary>
+	///		Get the units of this variable.
+	///		Note that the units are only set when data is loaded.
+	///	</summary>
+	const std::string & GetUnits() const {
+		return m_data.GetUnits();
 	}
 
 public:
@@ -692,6 +705,21 @@ public:
 	///		Time currently stored in this Variable.
 	///	</summary>
 	Time m_timeStored;
+
+	///	<summary>
+	///		Variable has scale factor and/or offset that needs to be applied when data is loaded.
+	///	</summary>
+	bool m_fHasScaleFactorOrAddOffset;
+
+	///	<summary>
+	///		Scale factor to apply whenever variable is loaded.
+	///	</summary>
+	float m_dScaleFactor;
+
+	///	<summary>
+	///		Offset to add whenever variable is loaded.
+	///	</summary>
+	float m_dAddOffset;
 
 	///	<summary>
 	///		Data associated with this Variable.
