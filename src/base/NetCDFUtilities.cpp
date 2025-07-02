@@ -770,18 +770,18 @@ void CopyNcLatitudeLongitude(
 	}
 
 	// Grid dim 0
-	if (std::string(varLatOut->get_dim(0)->name()) != std::string(varLonOut->get_dim(0)->name())) {
-		_EXCEPTION4("Inconsistent first dimension between latitude "
-			"variable \"%s\" (%s) and longitude variable \"%s\" (%s)",
-			strLatitudeName.c_str(), varLatOut->get_dim(0)->name(),
-			strLongitudeName.c_str(), varLonOut->get_dim(0)->name());
-	}
 	if (pdimGrid0 != NULL) {
 		*pdimGrid0 = varLatOut->get_dim(0);
 	}
 
-	// Grid dim 1
+	// Grid dim 1 (if present)
 	if (varLatOut->num_dims() == 2) {
+		if (std::string(varLatOut->get_dim(0)->name()) != std::string(varLonOut->get_dim(0)->name())) {
+			_EXCEPTION4("Inconsistent first dimension between latitude "
+				"variable \"%s\" (%s) and longitude variable \"%s\" (%s)",
+				strLatitudeName.c_str(), varLatOut->get_dim(0)->name(),
+				strLongitudeName.c_str(), varLonOut->get_dim(0)->name());
+		}
 		if (std::string(varLatOut->get_dim(1)->name()) != std::string(varLonOut->get_dim(1)->name())) {
 			_EXCEPTION4("Inconsistent second dimension between latitude "
 				"variable \"%s\" (%s) and longitude variable \"%s\" (%s)",
