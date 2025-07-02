@@ -36,6 +36,11 @@ typedef std::vector<long> VariableDimIndex;
 typedef VariableDimIndex VariableAuxIndex;
 
 ///	<summary>
+///		An object holding sizes for a given Variable.
+///	</summary>
+typedef VariableDimIndex VariableAuxSize;
+
+///	<summary>
 ///		A structure containing both a dimension name and size.
 ///	</summary>
 class DimInfo {
