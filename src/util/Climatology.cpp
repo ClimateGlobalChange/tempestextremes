@@ -3244,7 +3244,7 @@ try {
 			vecInputFileList.push_back(strInputFileParsed);
 		}
 	} else {
-		vecInputFileList.FromFile(strInputFileList, false);
+		vecInputFileList.FromFile(strInputFileList);
 	}
 	_ASSERT(vecInputFileList.size() != 0);
 /*
