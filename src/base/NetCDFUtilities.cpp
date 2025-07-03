@@ -774,8 +774,11 @@ void CopyNcLatitudeLongitude(
 		*pdimGrid0 = varLatOut->get_dim(0);
 	}
 
-	// Grid dim 1 (if present)
-	if (varLatOut->num_dims() == 2) {
+	// Grid dim 1
+	if (varLatOut->num_dims() == 1) {
+		*pdimGrid1 = varLonOut->get_dim(0);
+
+	} else {
 		if (std::string(varLatOut->get_dim(0)->name()) != std::string(varLonOut->get_dim(0)->name())) {
 			_EXCEPTION4("Inconsistent first dimension between latitude "
 				"variable \"%s\" (%s) and longitude variable \"%s\" (%s)",
