@@ -42,7 +42,9 @@ enum AccumulationFrequency {
 	AccumulationFrequency_1h,
 	AccumulationFrequency_3h,
 	AccumulationFrequency_6h,
-	AccumulationFrequency_24h
+	AccumulationFrequency_24h,
+	AccumulationFrequency_Monthly,
+	AccumulationFrequency_Annual
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -102,7 +104,7 @@ try {
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineString(strOutputDataList, "out_data_list", "");
 		CommandLineStringD(strOp, "op", "sum", "[sum|avg|min|max]");
-		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|3h|6h|daily]");
+		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|3h|6h|daily|monthly|annual]");
 		CommandLineBool(fAccumBackward, "accumbackward");
 		CommandLineBool(fMissingData, "missingdata");
 		CommandLineString(strVariable, "var", "");
@@ -208,8 +210,12 @@ try {
 		eAccumulationFreq = AccumulationFrequency_6h;
 	} else if ((strAccumFrequency == "daily") || (strAccumFrequency == "24h")) {
 		eAccumulationFreq = AccumulationFrequency_24h;
+	} else if (strAccumFrequency == "monthly") {
+		eAccumulationFreq = AccumulationFrequency_Monthly;
+	} else if (strAccumFrequency == "annual") {
+		eAccumulationFreq = AccumulationFrequency_Annual;
 	} else {
-		_EXCEPTIONT("--accumfreq must be \"1h\", \"3h\", \"6h\" or \"daily\"");
+		_EXCEPTIONT("--accumfreq must be \"1h\", \"3h\", \"6h\", \"daily\", \"monthly\" or \"annual\"");
 	}
 
 	// Data
@@ -348,6 +354,13 @@ try {
 					timeRounded.SetSecond((timeRounded.GetSecond() / 21600) * 21600);
 				} else if (eAccumulationFreq == AccumulationFrequency_24h) {
 					timeRounded.SetSecond(0);
+				} else if (eAccumulationFreq == AccumulationFrequency_Monthly) {
+					timeRounded.SetSecond(0);
+					timeRounded.SetDay(1);
+				} else if (eAccumulationFreq == AccumulationFrequency_Annual) {
+					timeRounded.SetSecond(0);
+					timeRounded.SetDay(1);
+					timeRounded.SetMonth(1);
 				}
 				if (vecTimesOut.size() == 0) {
 					vecTimesOut.push_back(timeRounded);
