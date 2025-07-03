@@ -295,10 +295,13 @@ try {
 					vecVariableStrings[v].c_str(), vecInputFiles[f].c_str());
 			}
 	
-			// Get FillValu
+			// Get FillValue
 			float dFillValue = std::numeric_limits<float>::max();
 			if (fMissingData) {
 				NcAtt * attFillValue = var->get_att("_FillValue");
+				if (attFillValue == NULL) {
+					attFillValue = var->get_att("missing_value");
+				}
 				if (attFillValue != NULL) {
 					dFillValue = attFillValue->as_float(0);
 				}
