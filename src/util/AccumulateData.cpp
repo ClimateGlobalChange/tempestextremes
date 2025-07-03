@@ -454,7 +454,11 @@ try {
 							}
 						} else {
 							for (size_t i = 0; i < sTotalSize; i++) {
-								dataAccum[i] /= static_cast<float>(dataAccumCount[i]);
+								if (dataAccumCount[i] == 0) {
+									dataAccum[i] = dFillValue;
+								} else {
+									dataAccum[i] /= static_cast<float>(dataAccumCount[i]);
+								}
 							}
 						}
 					}
