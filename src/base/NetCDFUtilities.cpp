@@ -1053,7 +1053,8 @@ void WriteCFTimeDataToNcFile(
 	NcFile * ncfile,
 	const std::string & strFilename,
 	NcTimeDimension & vecTimes,
-	bool fRecordDim
+	bool fRecordDim,
+	bool fAppend
 ) {
 	_ASSERT(ncfile != NULL);
 
@@ -1073,19 +1074,61 @@ void WriteCFTimeDataToNcFile(
 				strFilename.c_str());
 		}
 	} else {
-		if (dimTime->size() != vecTimes.size()) {
+		if ((!fAppend) && (dimTime->size() != vecTimes.size())) {
 			_EXCEPTION3("File \"%s\" already contains dimension \"time\" with unexpected size (%li != %li)",
 				strFilename.c_str(), dimTime->size(), vecTimes.size());
 		}
 	}
 
-	NcVar * varTime = ncfile->add_var("time", vecTimes.nctype(), dimTime);
+	// Create or obtain time variable
+	NcVar * varTime = NcGetTimeVariable(*ncfile);
 	if (varTime == NULL) {
-		NcError ncerr;
-		_EXCEPTION3("Unable to create variable \"time\" in file \"%s\" (%i: %s)",
-			strFilename.c_str(), ncerr.get_err(), ncerr.get_errmsg());
+		varTime = ncfile->add_var("time", vecTimes.nctype(), dimTime);
+		if (varTime == NULL) {
+			NcError ncerr;
+			_EXCEPTION3("Unable to create variable \"time\" in file \"%s\" (%i: %s)",
+				strFilename.c_str(), ncerr.get_err(), ncerr.get_errmsg());
+		}
+		varTime->add_att("long_name", "time");
+		varTime->add_att("calendar", vecTimes[0].GetCalendarName().c_str());
+		varTime->add_att("units", vecTimes.units().c_str());
+
+		if (vecTimes.dimtype() != NcTimeDimension::TimeDimType_Standard) {
+			if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_DailyMean) {
+				varTime->add_att("type", "daily climatology");
+			} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_MonthlyMean) {
+				varTime->add_att("type", "monthly climatology");
+			} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_SeasonalMean) {
+				varTime->add_att("type", "seasonal climatology");
+			} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_AnnualMean) {
+				varTime->add_att("type", "annual climatology");
+			}
+		}
+
+	} else {
+		if (!fAppend) {
+			_EXCEPTION1("File \"%s\" already contains variable \"time\"",
+				strFilename.c_str());
+		}
+		if (varTime->type() != vecTimes.nctype()) {
+			_EXCEPTION1("File \"%s\" time dimension incompatible type on append; "
+				"likely change in time NetCDF type across files",
+				strFilename.c_str());
+		}
+		NcAtt * attCalendar = varTime->get_att("calendar");
+		if ((attCalendar == NULL) || (vecTimes[0].GetCalendarName() != attCalendar->as_string(0))) {
+			_EXCEPTION1("File \"%s\" variable \"time\" attempting to append with different calendar attribute",
+				strFilename.c_str());
+		}
+		NcAtt * attUnits = varTime->get_att("units");
+		if ((attUnits == NULL) || (vecTimes.units() != attUnits->as_string(0))) {
+			_EXCEPTION1("File \"%s\" variable \"time\" attempting to append with different units attribute",
+				strFilename.c_str());
+		}
+		varTime->set_cur(dimTime->size());
 	}
 
+	// Write times
 	if (vecTimes.nctype() == ncInt) {
 		DataArray1D<int> nTimes(vecTimes.size());
 		for (int t = 0; t < nTimes.GetRows(); t++) {
@@ -1123,22 +1166,6 @@ void WriteCFTimeDataToNcFile(
 
 	} else {
 		_EXCEPTION1("Invalid \"time\" type (%i)", varTime->type());
-	}
-
-	varTime->add_att("long_name", "time");
-	varTime->add_att("calendar", vecTimes[0].GetCalendarName().c_str());
-	varTime->add_att("units", vecTimes.units().c_str());
-
-	if (vecTimes.dimtype() != NcTimeDimension::TimeDimType_Standard) {
-		if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_DailyMean) {
-			varTime->add_att("type", "daily climatology");
-		} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_MonthlyMean) {
-			varTime->add_att("type", "monthly climatology");
-		} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_SeasonalMean) {
-			varTime->add_att("type", "seasonal climatology");
-		} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_AnnualMean) {
-			varTime->add_att("type", "annual climatology");
-		}
 	}
 }
 

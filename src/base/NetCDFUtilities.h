@@ -363,7 +363,8 @@ void WriteCFTimeDataToNcFile(
 	NcFile * ncfile,
 	const std::string & strFilename,
 	NcTimeDimension & vecTimes,
-	bool fRecordDim = true
+	bool fRecordDim = true,
+	bool fAppend = false
 );
 
 ////////////////////////////////////////////////////////////////////////////////

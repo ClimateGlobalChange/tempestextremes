@@ -44,7 +44,8 @@ enum AccumulationFrequency {
 	AccumulationFrequency_6h,
 	AccumulationFrequency_24h,
 	AccumulationFrequency_Monthly,
-	AccumulationFrequency_Annual
+	AccumulationFrequency_Annual,
+	AccumulationFrequency_WaterYear
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -104,7 +105,7 @@ try {
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineString(strOutputDataList, "out_data_list", "");
 		CommandLineStringD(strOp, "op", "sum", "[sum|avg|min|max]");
-		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|3h|6h|daily|monthly|annual]");
+		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|3h|6h|daily|monthly|annual|wateryear]");
 		CommandLineBool(fAccumBackward, "accumbackward");
 		CommandLineBool(fMissingData, "missingdata");
 		CommandLineString(strVariable, "var", "");
@@ -131,8 +132,8 @@ try {
 	if ((strInputData.length() != 0) && (strOutputData.length() == 0)) {
 		_EXCEPTIONT("No output file (--out_data) specified");
 	}
-	if ((strInputDataList.length() != 0) && (strOutputDataList.length() == 0)) {
-		_EXCEPTIONT("No output file (--out_data_list) specified");
+	if ((strInputDataList.length() != 0) && (strOutputDataList.length() == 0) && (strOutputData.length() == 0)) {
+		_EXCEPTIONT("No output file (--out_data) or output data list (--out_data_list) specified");
 	}
 
 	// Parse preserve list
@@ -156,8 +157,8 @@ try {
 		vecOutputFiles.FromFile(strOutputDataList);
 	}
 
-	if (vecInputFiles.size() != vecOutputFiles.size()) {
-		_EXCEPTION2("Input file list must be same length as output file list (%lu vs %lu)",
+	if ((strOutputDataList.length() != 0) && (vecInputFiles.size() != vecOutputFiles.size())) {
+		_EXCEPTION2("Input data list must be same length as output data list (%lu vs %lu)",
 			vecInputFiles.size(), vecOutputFiles.size());
 	}
 
@@ -189,6 +190,10 @@ try {
 		vecVariableSpecifiedDims
 	);
 
+	if (vecVariableNames.size() == 0) {
+		_EXCEPTIONT("No variables (--var) specified");
+	}
+
 	// Parse output variable list (--varout)
 	std::vector<std::string> vecVariableOutNames;
 	if (strVariableOut == "") {
@@ -214,8 +219,10 @@ try {
 		eAccumulationFreq = AccumulationFrequency_Monthly;
 	} else if (strAccumFrequency == "annual") {
 		eAccumulationFreq = AccumulationFrequency_Annual;
+	} else if (strAccumFrequency == "wateryear") {
+		eAccumulationFreq = AccumulationFrequency_WaterYear;
 	} else {
-		_EXCEPTIONT("--accumfreq must be \"1h\", \"3h\", \"6h\", \"daily\", \"monthly\" or \"annual\"");
+		_EXCEPTIONT("--accumfreq must be \"1h\", \"3h\", \"6h\", \"daily\", \"monthly\", \"annual\", or \"wateryear\"");
 	}
 
 	// Data
@@ -230,7 +237,7 @@ try {
 	// Number of accumulated timesteps
 	int nAccumulatedTimesteps = 0;
 
-	// Loop through all files
+	// Start accumulation
 	AnnounceStartBlock("Start accumulation");
 
 	for (size_t v = 0; v < vecVariableStrings.size(); v++) {
@@ -264,24 +271,22 @@ try {
 			dataAccumCount.Zero();
 		}
 
+		NcTimeDimension vecTimesOut;
+		Time timeLastFileTime(Time::CalendarUnknown);
+		NcFile * pncfileout = NULL;
+		NcVar * varout = NULL;
+		int iCurrentAccumIndex = -1;
+
+		Time timeLastProcessed(Time::CalendarUnknown);
+
 		for (size_t f = 0; f < vecInputFiles.size(); f++) {
 	
 			AnnounceStartBlock("%s", vecInputFiles[f].c_str());
-	
-			// Open files
+
+			// Open input files
 			NcFile ncfilein(vecInputFiles[f].c_str(), NcFile::ReadOnly);
 			if (!ncfilein.is_valid()) {
 				_EXCEPTION1("Unable to open input file \"%s\"", vecInputFiles[f].c_str());
-			}
-	
-			NcFile::FileMode ncfileoutmode = NcFile::Replace;
-			if (v != 0) {
-				ncfileoutmode = NcFile::Write;
-			}
-
-			NcFile ncfileout(vecOutputFiles[f].c_str(), ncfileoutmode, NULL, 0, NcFile::Netcdf4);
-			if (!ncfileout.is_valid()) {
-				_EXCEPTION1("Unable to open output file \"%s\"", vecOutputFiles[f].c_str());
 			}
 
 			// Get variable
@@ -326,29 +331,43 @@ try {
 				}
 			}
 	
-			// Get time
-			NcTimeDimension vecTimes;
-			ReadCFTimeDataFromNcFile(&ncfilein, vecInputFiles[f], vecTimes, false);
+			// Get times in this input file
+			NcTimeDimension vecTimesIn;
+			ReadCFTimeDataFromNcFile(&ncfilein, vecInputFiles[f], vecTimesIn, false);
 	
-			if (vecTimes.size() < 1) {
+			if (vecTimesIn.size() < 1) {
 				_EXCEPTION1("Time variable in file \"%s\" has zero length",
 					vecInputFiles[f].c_str());
 			}
 
 			// Get output times
-			std::vector<int> iAccumIndex(vecTimes.size());
+			std::vector<int> iAccumIndex(vecTimesIn.size());
+			NcTimeDimension vecTimesOutNew;
+			vecTimesOutNew.m_nctype = vecTimesIn.m_nctype;
+			vecTimesOutNew.m_units = vecTimesIn.m_units;
+			vecTimesOutNew.m_dimtype = vecTimesIn.m_dimtype;
 
-			NcTimeDimension vecTimesOut;
-			vecTimesOut.m_nctype = vecTimes.m_nctype;
-			vecTimesOut.m_units = vecTimes.m_units;
-			vecTimesOut.m_dimtype = vecTimes.m_dimtype;
-			for (size_t t = 0; t < vecTimes.size(); t++) {
-				if ((t != 0) && (vecTimes[t] <= vecTimes[t-1])) {
+			if (vecOutputFiles.size() > 1) {
+				vecTimesOut.clear();
+				vecTimesOut.m_nctype = vecTimesIn.m_nctype;
+				vecTimesOut.m_units = vecTimesIn.m_units;
+				vecTimesOut.m_dimtype = vecTimesIn.m_dimtype;
+			}
+
+			for (size_t t = 0; t < vecTimesIn.size(); t++) {
+				if ((t == 0) && (timeLastProcessed.GetCalendarType() != Time::CalendarUnknown)) {
+					_ASSERT(f != 0);
+					if (vecTimesIn[0] <= timeLastProcessed) {
+						_EXCEPTION2("Time values across files \"%s\" and \"%s\" are not monotone increasing",
+							vecInputFiles[f-1].c_str(), vecInputFiles[f].c_str());
+					}
+				}
+				if ((t != 0) && (vecTimesIn[t] <= vecTimesIn[t-1])) {
 					_EXCEPTION1("Time values in file \"%s\" are not monotone increasing",
 						vecInputFiles[f].c_str());
 				}
 
-				Time timeRounded = vecTimes[t];
+				Time timeRounded = vecTimesIn[t];
 				if (eAccumulationFreq == AccumulationFrequency_1h) {
 					timeRounded.SetSecond((timeRounded.GetSecond() / 3600) * 3600);
 				} else if (eAccumulationFreq == AccumulationFrequency_3h) {
@@ -364,83 +383,131 @@ try {
 					timeRounded.SetSecond(0);
 					timeRounded.SetDay(1);
 					timeRounded.SetMonth(1);
+				} else if (eAccumulationFreq == AccumulationFrequency_WaterYear) {
+					if (timeRounded.GetMonth() >= 10) {
+						timeRounded.SetSecond(0);
+						timeRounded.SetDay(1);
+						timeRounded.SetMonth(10);
+					} else {
+						timeRounded.SetSecond(0);
+						timeRounded.SetDay(1);
+						timeRounded.SetMonth(10);
+						timeRounded.SetYear(timeRounded.GetYear()-1);
+					}
 				}
 				if (vecTimesOut.size() == 0) {
 					vecTimesOut.push_back(timeRounded);
+					vecTimesOutNew.push_back(timeRounded);
 				} else if (timeRounded != vecTimesOut[vecTimesOut.size()-1]) {
 					vecTimesOut.push_back(timeRounded);
+					vecTimesOutNew.push_back(timeRounded);
 				}
 				iAccumIndex[t] = vecTimesOut.size()-1;
 			}
 
-			iAccumIndex.push_back(-1);
+			// End of output file indicator
+			if ((f == vecInputFiles.size()-1) || (vecOutputFiles.size() > 1)) {
+				iAccumIndex.push_back(-1);
+			}
 
+			// Last processed time from previous file, when reducing multiple input files to one output file
+			if ((vecInputFiles.size() > 1) && (vecOutputFiles.size() == 1)) {
+				timeLastFileTime = vecTimesIn[vecTimesIn.size()-1];
+			}
+
+			// Open output file
+			if ((f == 0) || (vecOutputFiles.size() > 1)) {
+
+				_ASSERT(f < vecOutputFiles.size());
+				NcFile::FileMode ncfileoutmode = NcFile::Replace;
+				if (v != 0) {
+					ncfileoutmode = NcFile::Write;
+				}
+
+				pncfileout = new NcFile(vecOutputFiles[f].c_str(), ncfileoutmode, NULL, 0, NcFile::Netcdf4);
+				if (!pncfileout->is_valid()) {
+					_EXCEPTION1("Unable to open output file \"%s\"", vecOutputFiles[f].c_str());
+				}
+			}
+			_ASSERT(pncfileout != NULL);
+
+			// Write new output times to output file
 			if (v == 0) {
-				WriteCFTimeDataToNcFile(&ncfileout, vecOutputFiles[f], vecTimesOut);
-			}
-	
-			// Copy dimensions to output file
-			std::vector<NcDim *> vecVarDims;
-			vecVarDims.resize(var->num_dims());
-			vecVarDims[0] = NcGetTimeDimension(ncfileout);
-			if (vecVarDims[0] == NULL) {
-				_EXCEPTIONT("Error writing dimension \"time\" to output file");
-			}
-			for (long d = 1; d < var->num_dims(); d++) {
-				if (var->get_dim(d)->size() != vecSize[d]) {
-					_EXCEPTION4("Variable \"%s\" in file \"%s\" has mismatched dimension %li size: expected %li",
-						var->name(), vecInputFiles[f].c_str(), d, vecSize[d]);
-				}
-				NcDim * dimOut = ncfileout.get_dim(var->get_dim(d)->name());
-				if (dimOut == NULL) {
-					vecVarDims[d] = ncfileout.add_dim(var->get_dim(d)->name(), var->get_dim(d)->size());
-					if (vecVarDims[d] == NULL) {
-						_EXCEPTION1("Error writing dimension \"%s\" to output file", var->get_dim(d)->name());
-					}
-					CopyNcVarIfExists(ncfilein, ncfileout, var->get_dim(d)->name());
-
+				if (vecOutputFiles.size() == 1) {
+					WriteCFTimeDataToNcFile(pncfileout, vecOutputFiles[0], vecTimesOutNew, true, true);
 				} else {
-					vecVarDims[d] = dimOut;
+					WriteCFTimeDataToNcFile(pncfileout, vecOutputFiles[f], vecTimesOutNew);
 				}
 			}
-	
-			// Create output variable
-			NcVar * varout =
-				ncfileout.add_var(
-					vecVariableOutNames[v].c_str(),
-					ncFloat,
-					vecVarDims.size(),
-					const_cast<const NcDim**>(&(vecVarDims[0])));
 
-			if (varout == NULL) {
-				_EXCEPTION1("Error adding variable \"%s\" to output file", var->name());
-			}
-	
-			if (m_eAccumOp == AccumulateDataOp_Min) {
-				varout->add_att("_FillValue", std::numeric_limits<float>::max());
-			} else if (m_eAccumOp == AccumulateDataOp_Max) {
-				varout->add_att("_FillValue", -std::numeric_limits<float>::max());
-			}
-	
-			CopyNcVarAttributes(var, varout);
-	
-			// Copy preserve variables
-			if ((v == 0) && (strPreserveVar != "")) {
-				AnnounceStartBlock("Preserving variables");
-	
-				for (int v = 0; v < vecPreserveVariableStrings.size(); v++) {
-					Announce("Variable %s", vecPreserveVariableStrings[v].c_str());
-					CopyNcVar(
-						ncfilein,
-						ncfileout,
-						vecPreserveVariableStrings[v]);
+			// Create output variables
+			if ((f == 0) || (vecOutputFiles.size() > 1)) {
+
+				// Copy dimensions to output file
+				std::vector<NcDim *> vecVarDims;
+				vecVarDims.resize(var->num_dims());
+				vecVarDims[0] = NcGetTimeDimension(*pncfileout);
+				if (vecVarDims[0] == NULL) {
+					_EXCEPTIONT("Error writing dimension \"time\" to output file");
+				}
+				for (long d = 1; d < var->num_dims(); d++) {
+					if (var->get_dim(d)->size() != vecSize[d]) {
+						_EXCEPTION4("Variable \"%s\" in file \"%s\" has mismatched dimension %li size: expected %li",
+							var->name(), vecInputFiles[f].c_str(), d, vecSize[d]);
+					}
+					NcDim * dimOut = pncfileout->get_dim(var->get_dim(d)->name());
+					if (dimOut == NULL) {
+						vecVarDims[d] = pncfileout->add_dim(var->get_dim(d)->name(), var->get_dim(d)->size());
+						if (vecVarDims[d] == NULL) {
+							_EXCEPTION1("Error writing dimension \"%s\" to output file", var->get_dim(d)->name());
+						}
+						CopyNcVarIfExists(ncfilein, *pncfileout, var->get_dim(d)->name());
+
+					} else {
+						vecVarDims[d] = dimOut;
+					}
 				}
 	
-				AnnounceEndBlock("Done");
+				// Create output variable
+				varout =
+					pncfileout->add_var(
+						vecVariableOutNames[v].c_str(),
+						ncFloat,
+						vecVarDims.size(),
+						const_cast<const NcDim**>(&(vecVarDims[0])));
+
+				if (varout == NULL) {
+					_EXCEPTION1("Error adding variable \"%s\" to output file", var->name());
+				}
+	
+				if (m_eAccumOp == AccumulateDataOp_Min) {
+					varout->add_att("_FillValue", std::numeric_limits<float>::max());
+				} else if (m_eAccumOp == AccumulateDataOp_Max) {
+					varout->add_att("_FillValue", -std::numeric_limits<float>::max());
+				}
+
+				CopyNcVarAttributes(var, varout);
+
+				// Copy preserve variables
+				if ((v == 0) && (strPreserveVar != "")) {
+					AnnounceStartBlock("Preserving variables");
+	
+					for (int v = 0; v < vecPreserveVariableStrings.size(); v++) {
+						Announce("Variable %s", vecPreserveVariableStrings[v].c_str());
+						CopyNcVar(
+							ncfilein,
+							*pncfileout,
+							vecPreserveVariableStrings[v]);
+					}
+	
+					AnnounceEndBlock("Done");
+				}
+
+				// Reset accumulation index
+				iCurrentAccumIndex = iAccumIndex[0];
 			}
 	
 			// Loop through all input times
-			int iCurrentAccumIndex = iAccumIndex[0];
 			for (size_t t = 0; t < iAccumIndex.size(); t++) {
 	
 				// Write to file
@@ -495,7 +562,7 @@ try {
 				// Accumulate data
 				if (iCurrentAccumIndex != (-1)) {
 					Announce("%s => %s (accumulating)",
-						vecTimes[t].ToString().c_str(),
+						vecTimesIn[t].ToString().c_str(),
 						vecTimesOut[iCurrentAccumIndex].ToString().c_str());
 	
 					nAccumulatedTimesteps++;
@@ -569,7 +636,17 @@ try {
 				}
 			}
 	
+			// Close the file
+			if (vecOutputFiles.size() > 1) {
+				delete pncfileout;
+			}
+
 			AnnounceEndBlock("Done");
+		}
+
+		// Close the file
+		if ((vecInputFiles.size() > 1) && (vecOutputFiles.size() == 1)) {
+			delete pncfileout;
 		}
 
 		AnnounceEndBlock("Done");
