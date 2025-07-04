@@ -972,6 +972,12 @@ void Climatology(
 					varOut->add_att("threshold", vecClimoInfo[ct].threshstring.c_str());
 				}
 
+				// Add _FillValue attribute if override specified
+				if (strFillValueOverride != "") {
+					float dFillValue = std::stof(strFillValueOverride);
+					varOut->add_att("_FillValue", dFillValue);
+				}
+
 				// Store output variable
 				vecNcVarOut[v * vecClimoInfo.size() + ct] = varOut;
 			}
@@ -1320,7 +1326,7 @@ void Climatology(
 				_ASSERT(dDataIn.GetRows() == grid.GetSize());
 
 				// Get FillValue
-				if (strFillValueOverride != "") {
+				if (strFillValueOverride == "") {
 					if (dDataIn.HasFillValue()) {
 						if (std::isnan(dFillValue)) {
 							if (!std::isnan(dDataIn.GetFillValue())) {
