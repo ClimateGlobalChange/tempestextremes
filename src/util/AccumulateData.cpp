@@ -325,9 +325,7 @@ try {
 				dataAccum.Allocate(sTotalSize);
 	
 				if (fMissingData) {
-					if (m_eAccumOp == AccumulateDataOp_Avg) {
-						dataAccumCount.Allocate(sTotalSize);
-					}
+					dataAccumCount.Allocate(sTotalSize);
 				}
 			}
 	
@@ -528,6 +526,15 @@ try {
 								}
 							}
 						}
+
+					} else {
+						if (fMissingData) {
+							for (size_t i = 0; i < sTotalSize; i++) {
+								if (dataAccumCount[i] == 0) {
+									dataAccum[i] = dFillValue;
+								}
+							}
+						}
 					}
 	
 					vecPos[0] = iCurrentAccumIndex;
@@ -540,10 +547,6 @@ try {
 					) {
 						dataAccum.Zero();
 	
-						if (dataAccumCount.IsAttached()) {
-							dataAccumCount.Zero();
-						}
-	
 					} else if (m_eAccumOp == AccumulateDataOp_Min) {
 						for (size_t i = 0; i < sTotalSize; i++) {
 							dataAccum[i] = std::numeric_limits<float>::max();
@@ -553,6 +556,10 @@ try {
 						for (size_t i = 0; i < sTotalSize; i++) {
 							dataAccum[i] = -std::numeric_limits<float>::max();
 						}
+					}
+
+					if (fMissingData) {
+						dataAccumCount.Zero();
 					}
 
 					iCurrentAccumIndex = iAccumIndex[t];
@@ -601,6 +608,7 @@ try {
 									continue;
 								}
 								dataAccum[i] += dataIn[i];
+								dataAccumCount[i]++;
 							}
 	
 						} else if (m_eAccumOp == AccumulateDataOp_Avg) {
@@ -620,6 +628,7 @@ try {
 								if (dataIn[i] < dataAccum[i]) {
 									dataAccum[i] = dataIn[i];
 								}
+								dataAccumCount[i]++;
 							}
 	
 						} else if (m_eAccumOp == AccumulateDataOp_Max) {
@@ -630,6 +639,7 @@ try {
 								if (dataIn[i] > dataAccum[i]) {
 									dataAccum[i] = dataIn[i];
 								}
+								dataAccumCount[i]++;
 							}
 						}
 					}
