@@ -219,11 +219,13 @@ try {
 		}
 		if (fabs(dLon1 - dLon0) == 360.0) {
 			fRegional = false;
+			Announce("Longitude [%f,%f] Delta %f [global]", dLon0, dLon1, (dLon1 - dLon0) / static_cast<double>(nNLon));
 			for (int i = 0; i < nNLon; i++) {
 				vecLon[i] = dLon0 + (dLon1 - dLon0) * static_cast<double>(i) / static_cast<double>(nNLon);
 				vecLon[i] = DegToRad(vecLon[i]);
 			}
 		} else {
+			Announce("Longitude [%f,%f] Delta %f [regional]", dLon0, dLon1, (dLon1 - dLon0) / static_cast<double>(nNLon - 1));
 			for (int i = 0; i < nNLon; i++) {
 				vecLon[i] = dLon0 + (dLon1 - dLon0) * static_cast<double>(i) / static_cast<double>(nNLon - 1);
 				vecLon[i] = DegToRad(vecLon[i]);
@@ -232,6 +234,7 @@ try {
 
 		// Initialize latitude coordinates
 		DataArray1D<double> vecLat(nNLat);
+		Announce("Latitude [%f,%f] Delta %f", dLat0, dLat1, (dLat1 - dLat0) / static_cast<double>(nNLat - 1));
 		for (int j = 0; j < nNLat; j++) {
 			vecLat[j] = dLat0 + (dLat1 - dLat0) * static_cast<double>(j) / static_cast<double>(nNLat - 1);
 			vecLat[j] = DegToRad(vecLat[j]);
