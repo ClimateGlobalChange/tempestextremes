@@ -65,6 +65,9 @@ try {
 	// Shapefile
 	std::string strShapefile;
 
+	// Lonlat bounds
+	std::string strLonLatBounds;
+
 	// Output data
 	std::string strOutputData;
 
@@ -96,6 +99,7 @@ try {
 		CommandLineBool(fRegional, "regional");
 
 		CommandLineString(strShapefile, "shp", "");
+		CommandLineStringD(strLonLatBounds, "lonlatbounds", "", "\"lon0,lat0,lon1,lat1\" (in degrees)");
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineString(strOutputCSV, "out_csv", "");
 		CommandLineString(strVariables, "var", "");
@@ -140,20 +144,7 @@ try {
 	) {
 		_EXCEPTIONT("Invalid --op, expected \"mask\", \"mean\", \"q25\", \"median\" or \"q75\")");
 	}
-/*
-	// Parse variable list (--var)
-	std::vector<std::string> vecVariableStrings;
-	STLStringHelper::ParseVariableList(strVariable, vecVariableStrings);
 
-	std::vector<std::string> vecVariableNames;
-	std::vector< std::vector<std::string> > vecVariableSpecifiedDims;
-
-	STLStringHelper::SplitVariableStrings(
-		vecVariableStrings,
-		vecVariableNames,
-		vecVariableSpecifiedDims
-	);
-*/
 	// Open output text file
 	FILE * fpCSV = NULL;
 	if (strOutputCSV != "") {
@@ -172,6 +163,42 @@ try {
 	ReadShpFileAsMesh(strShapefile, mesh);
 	Announce("Shapefile contains %lu polygons", mesh.faces.size());
 	AnnounceEndBlock("Done");
+
+	// Parse --lonlatbounds
+	bool fHasLonLatBounds = false;
+	LatLonBox<double> lonlatbounds;
+	if (strLonLatBounds != "") {
+		AnnounceStartBlock("Parsing lonlat bounds");
+
+		std::vector<std::string> vecLonLatBoundsArg;
+		STLStringHelper::ParseVariableList(strLonLatBounds, vecLonLatBoundsArg,",;");
+		if (vecLonLatBoundsArg.size() != 4) {
+			_EXCEPTIONT("Malformed --lonlatbounds: expected form \"lon0,lat0,lon1,lat1\"");
+		}
+		if (!STLStringHelper::IsFloat(vecLonLatBoundsArg[0]) ||
+		    !STLStringHelper::IsFloat(vecLonLatBoundsArg[1]) ||
+		    !STLStringHelper::IsFloat(vecLonLatBoundsArg[2]) ||
+		    !STLStringHelper::IsFloat(vecLonLatBoundsArg[3])
+		) {
+			_EXCEPTIONT("Malformed --lonlatbounds: expected form \"lon0,lat0,lon1,lat1\"");
+		}
+
+		double dLonDeg0 = LonDegToStandardRange(std::stof(vecLonLatBoundsArg[0]));
+		double dLatDeg0 = std::stof(vecLonLatBoundsArg[1]);
+		double dLonDeg1 = LonDegToStandardRange(std::stof(vecLonLatBoundsArg[2]));
+		double dLatDeg1 = std::stof(vecLonLatBoundsArg[3]);
+
+		if ((fabs(dLatDeg0) > 90.0) || (fabs(dLatDeg1) > 90.0) || (dLatDeg1 < dLatDeg0)) {
+			_EXCEPTION2("Malformed --lonlatbounds: Latitude must be in range [-90,90] with lat0 < lat1 (given: %1.5f %1.5f)",
+				dLatDeg0, dLatDeg1);
+		}
+
+		lonlatbounds.set(dLonDeg0, dLonDeg1, dLatDeg0, dLatDeg1);
+		fHasLonLatBounds = true;
+
+		Announce("Limiting shapefiles to longitude [%g, %g] and latitude [%g, %g]", dLonDeg0, dLonDeg1, dLatDeg0, dLatDeg1);
+		AnnounceEndBlock(NULL);
+	}
 
 	// Number of regions
 	const size_t sShpRegionCount = mesh.faces.size();
@@ -352,6 +379,11 @@ try {
 	for (size_t k = 0; k < grid.m_dLat.GetRows(); k++) {
 		double dLatDeg = RadToDeg(grid.m_dLat[k]);
 		double dStandardLonDeg = LonDegToStandardRange(RadToDeg(grid.m_dLon[k]));
+		if (fHasLonLatBounds) {
+			if (!lonlatbounds.contains(dLatDeg, dStandardLonDeg)) {
+				continue;
+			}
+		}
 		for (size_t s = 0; s < sShpRegionCount; s++) {
 			if (vecLatLonBox[s].contains(dLatDeg, dStandardLonDeg)) {
 				if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg, dStandardLonDeg)) {
