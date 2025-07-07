@@ -843,7 +843,6 @@ void Climatology(
 						ClimoVariablePrefix(eClimoPeriod, vecClimoInfo[ct])
 						+ vecVariableNames[v];
 				} else {
-					_ASSERT(vecClimoInfo.size() == 1);
 					_ASSERT(v < vecVariableOutNames.size());
 					strOutVar =
 						ClimoVariablePrefix(eClimoPeriod, vecClimoInfo[ct])
