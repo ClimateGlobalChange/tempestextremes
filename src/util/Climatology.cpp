@@ -1573,9 +1573,6 @@ void Climatology(
 					DataArray3D<float> & dScratchDataFloat = vecScratchDataFloat[ct];
 					DataArray2D<double> & dAccumulatedData = vecAccumulatedData[ct];
 
-					// Get the threshold
-					float dClimoThreshold = vecClimoInfo[ct].threshvalue;
-
 					// Convert threshold units, if appropriate
 					if ((vecClimoInfo[ct].threshunits != "") &&
 					    (vecClimoInfo[ct].threshunits != dDataIn.GetUnits())
@@ -1599,6 +1596,9 @@ void Climatology(
 
 						vecClimoInfo[ct].threshunits = dDataIn.GetUnits();
 					}
+
+					// Get the threshold
+					float dClimoThreshold = vecClimoInfo[ct].threshvalue;
 
 					// Count number of time slices at each point and accumulate data
 					if (fMissingData) {
@@ -1689,6 +1689,9 @@ void Climatology(
 								for (size_t i = 0; i < dDataIn.GetRows(); i++) {
 									if ((dDataIn[i] != dFillValue) && (!std::isnan(dDataIn[i]))) {
 										if (dDataIn[i] > dClimoThreshold) {
+											if (i == 148983) {
+												std::cout << dDataIn[i] << " " << dClimoThreshold << std::endl;
+											}
 											dScratchData(0,0,i)++;
 										}
 									}
@@ -2384,6 +2387,7 @@ void Climatology(
 					fUpdatedNumberOfTimePeriods = true;
 					AnnounceEndBlock(NULL);
 				}
+				std::cout << dAccumulatedData(iCurrentTimeIndex,148983) << std::endl;
 			}
 
 			// AutoCor: Perform one final accumulation of scratch data into accumulated data
