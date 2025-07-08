@@ -1376,10 +1376,10 @@ void Climatology(
 							strLongName);
 
 						size_t vct = v * vecClimoInfo.size() + ct;
-						vecNcVarOut[vct]->add_att("units", var.GetUnits().c_str());
+						vecNcVarOut[vct]->add_att("units", strUnits.c_str());
 						vecNcVarOut[vct]->add_att("standard_name", strStandardName.c_str());
 						vecNcVarOut[vct]->add_att("long_name", strLongName.c_str());
-						vecNcVarOut[vct]->add_att("variable_name", vecVariableNames[v].c_str());
+						vecNcVarOut[vct]->add_att("operator", vecVariableNames[v].c_str());
 					}
 					vecNcVarOutWroteUnits[v] = true;
 				}
@@ -1577,30 +1577,27 @@ void Climatology(
 					float dClimoThreshold = vecClimoInfo[ct].threshvalue;
 
 					// Convert threshold units, if appropriate
-					if (t == 0) {
-						if (vecClimoInfo[ct].threshunits == "") {
-							continue;
+					if ((vecClimoInfo[ct].threshunits != "") &&
+					    (vecClimoInfo[ct].threshunits != dDataIn.GetUnits())
+					) {
+						float dThreshValueBak = vecClimoInfo[ct].threshvalue;
+
+						bool fSuccess =
+							ConvertUnits(
+								vecClimoInfo[ct].threshvalue,
+								vecClimoInfo[ct].threshunits,
+								dDataIn.GetUnits());
+
+						if (!fSuccess) {
+							_EXCEPTION2("Unable to convert threshold from units %s to %s: No known conversion",
+								vecClimoInfo[ct].threshunits.c_str(), dDataIn.GetUnits().c_str());
 						}
-						if (vecClimoInfo[ct].threshunits != dDataIn.GetUnits()) {
-							float dThreshValueBak = vecClimoInfo[ct].threshvalue;
 
-							bool fSuccess =
-								ConvertUnits(
-									vecClimoInfo[ct].threshvalue,
-									vecClimoInfo[ct].threshunits,
-									dDataIn.GetUnits());
+						Announce("Converted threshold %g %s to %g %s",
+							dThreshValueBak, vecClimoInfo[ct].threshunits.c_str(),
+							vecClimoInfo[ct].threshvalue, dDataIn.GetUnits().c_str());
 
-							if (!fSuccess) {
-								_EXCEPTION2("Unable to convert threshold from units %s to %s: No known conversion",
-									vecClimoInfo[ct].threshunits.c_str(), dDataIn.GetUnits().c_str());
-							}
-
-							Announce("Converted threshold %g %s to %g %s",
-								dThreshValueBak, vecClimoInfo[ct].threshunits.c_str(),
-								vecClimoInfo[ct].threshvalue, dDataIn.GetUnits().c_str());
-
-							vecClimoInfo[ct].threshunits = dDataIn.GetUnits();
-						}
+						vecClimoInfo[ct].threshunits = dDataIn.GetUnits();
 					}
 
 					// Count number of time slices at each point and accumulate data
