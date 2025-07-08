@@ -439,6 +439,7 @@ try {
 		varreg.ClearProcessingQueue();
 
 		std::vector<NcVar *> vecNcVarOut(vecVarIxIn.size());
+		std::vector<bool> vecNcVarOutWroteUnits(vecVarIxIn.size(), false);
 		for (int v = 0; v < vecVarIxIn.size(); v++) {
 			NcVar * varOut = NULL;
 
@@ -502,6 +503,7 @@ try {
 					}
 					CopyNcVarAttributes(ncvarIn, vecNcVarOut[v], vecDoNotCopyNames);
 				}
+				vecNcVarOutWroteUnits[v] = true;
 			}
 		}
 
@@ -531,6 +533,14 @@ try {
 
 				var.LoadGridData(varreg, vecFiles, grid);
 				const DataArray1D<float> & dataState = var.GetData();
+
+				// Write units attribute, if present
+				if (!vecNcVarOutWroteUnits[v]) {
+					vecNcVarOutWroteUnits[v] = true;
+					if (var.GetUnits() != "") {
+						vecNcVarOut[v]->add_att("units", var.GetUnits().c_str());
+					}
+				}
 
 				// Get the output position and size
 				VariableAuxIndex lPos = varreg.GetProcessingQueueAuxIx();

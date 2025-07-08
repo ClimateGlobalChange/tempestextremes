@@ -393,6 +393,46 @@ std::string ClimoVariablePrefix(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void ClimoUnitsNames(
+	const ClimatologyInfo & aClimoInfo,
+	std::string & strUnits,
+	std::string & strStandardName,
+	std::string & strLongName
+) {
+	if (aClimoInfo.type == ClimatologyType_MeanSq) {
+		strUnits = std::string("(") + strUnits + std::string(")2");
+		strStandardName = strStandardName + std::string(" squared");
+		strLongName = strLongName + std::string(" squared");
+
+	} else if (aClimoInfo.type == ClimatologyType_AutoCor) {
+		strUnits = "unitless";
+		strStandardName = std::string("autocorrelation of ") + strStandardName;
+		strLongName = std::string("autocorrelation of ") + strLongName;
+
+	} else if (aClimoInfo.type == ClimatologyType_AvgCount) {
+		strUnits = "times";
+		strStandardName = "average count of " + strStandardName + " satisfying threshold";
+		strLongName = "average count of " + strLongName + " satisfying threshold";
+
+	} else if (aClimoInfo.type == ClimatologyType_TimeUntil) {
+		strUnits = "times";
+		strStandardName = "average time until " + strStandardName + " satisfies threshold";
+		strLongName = "average time until " + strLongName + " satisfies threshold";
+
+	} else if (aClimoInfo.type == ClimatologyType_ThreshSum) {
+		strUnits = aClimoInfo.threshorigunits;
+		strStandardName = "threshold sum of " + strStandardName;
+		strLongName = "threshold sum of " + strLongName;
+
+	} else if (aClimoInfo.type == ClimatologyType_MaxConsec) {
+		strUnits = "times";
+		strStandardName = "average max consecutive times " + strStandardName + " satisfies threshold";
+		strLongName = "average max consecutive times " + strLongName + " satisfies threshold";
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 ///	<summary>
 ///		Produce a climatology over the given input files.
 ///	</summary>
@@ -572,8 +612,9 @@ void Climatology(
 	}
 #endif
 	// Vector of pointers to output NcVars for climatology
-	std::vector<NcVar*> vecNcVarOut;
-	vecNcVarOut.resize(vecClimoInfo.size() * vecVariableNames.size());
+	std::vector<NcVar*> vecNcVarOut(vecClimoInfo.size() * vecVariableNames.size(), NULL);
+
+	std::vector<bool> vecNcVarOutWroteUnits(vecVariableNames.size(), false);
 
 	// Vector of pointers to output NcVars for slice counts
 	std::vector<NcVar*> vecNcVarCount;
@@ -923,36 +964,11 @@ void Climatology(
 
 						varOut->add_att("original_units", strUnits.c_str());
 
-						if (vecClimoInfo[ct].type == ClimatologyType_MeanSq) {
-							strUnits = std::string("(") + strUnits + std::string(")2");
-							strStandardName = strStandardName + std::string(" squared");
-							strLongName = strLongName + std::string(" squared");
-
-						} else if (vecClimoInfo[ct].type == ClimatologyType_AutoCor) {
-							strUnits = "unitless";
-							strStandardName = std::string("autocorrelation of ") + strStandardName;
-							strLongName = std::string("autocorrelation of ") + strLongName;
-
-						} else if (vecClimoInfo[ct].type == ClimatologyType_AvgCount) {
-							strUnits = "times";
-							strStandardName = "average count of " + strStandardName + " satisfying threshold";
-							strLongName = "average count of " + strLongName + " satisfying threshold";
-
-						} else if (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) {
-							strUnits = "times";
-							strStandardName = "average time until " + strStandardName + " satisfies threshold";
-							strLongName = "average time until " + strLongName + " satisfies threshold";
-
-						} else if (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) {
-							strUnits = vecClimoInfo[ct].threshorigunits;
-							strStandardName = "threshold sum of " + strStandardName;
-							strLongName = "threshold sum of " + strLongName;
-
-						} else if (vecClimoInfo[ct].type == ClimatologyType_MaxConsec) {
-							strUnits = "times";
-							strStandardName = "average max consecutive times " + strStandardName + " satisfies threshold";
-							strLongName = "average max consecutive times " + strLongName + " satisfies threshold";
-						}
+						ClimoUnitsNames(
+							vecClimoInfo[ct],
+							strUnits,
+							strStandardName,
+							strLongName);
 
 						varOut->add_att("units", strUnits.c_str());
 						varOut->add_att("standard_name", strStandardName.c_str());
@@ -1344,6 +1360,28 @@ void Climatology(
 					} else if (dFillValue != std::numeric_limits<float>::max()) {
 						_EXCEPTION1("_FillValue found in earlier file (%g) missing in subsequent file", dFillValue);
 					}
+				}
+
+				// Write units, standard name and long name
+				if ((var.IsOp()) && (!vecNcVarOutWroteUnits[v])) {
+					for (int ct = 0; ct < vecClimoInfo.size(); ct++) {
+						std::string strUnits(var.GetUnits());
+						std::string strStandardName("operator");
+						std::string strLongName("operator");
+
+						ClimoUnitsNames(
+							vecClimoInfo[ct],
+							strUnits,
+							strStandardName,
+							strLongName);
+
+						size_t vct = v * vecClimoInfo.size() + ct;
+						vecNcVarOut[vct]->add_att("units", var.GetUnits().c_str());
+						vecNcVarOut[vct]->add_att("standard_name", strStandardName.c_str());
+						vecNcVarOut[vct]->add_att("long_name", strLongName.c_str());
+						vecNcVarOut[vct]->add_att("variable_name", vecVariableNames[v].c_str());
+					}
+					vecNcVarOutWroteUnits[v] = true;
 				}
 
 				// Check if we are in a new period and accumulate data

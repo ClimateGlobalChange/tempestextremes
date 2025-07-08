@@ -1119,12 +1119,14 @@ void Variable::LoadGridData(
 
 		// Build argument list
 		std::vector<DataArray1D<float> const *> vecArgData;
+		std::vector<std::string> vecUnits;
 		for (int i = 0; i < m_varArg.size(); i++) {
 			if (m_varArg[i] != InvalidVariableIndex) {
 				Variable & var = varreg.Get(m_varArg[i]);
 				var.LoadGridData(varreg, vecFiles, grid);
 
 				vecArgData.push_back(&var.GetData());
+				vecUnits.push_back(var.GetUnits());
 			} else {
 				vecArgData.push_back(NULL);
 			}
@@ -1132,6 +1134,12 @@ void Variable::LoadGridData(
 
 		// Apply the DataOp
 		pop->Apply(grid, m_strArg, vecArgData, m_data);
+
+		// Get the units
+		std::string strUnits = pop->GetUnits(vecUnits);
+		if (strUnits != "") {
+			m_data.SetUnits(strUnits);
+		}
 	}
 
 	// Store the time

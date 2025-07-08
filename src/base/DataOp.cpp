@@ -410,6 +410,30 @@ bool DataOp::Apply(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+std::string DataOp::GetUnits_Common(
+	const std::vector<std::string> & vecUnits
+) {
+	if (vecUnits.size() == 0) {
+		return std::string("");
+	}
+	for (size_t i = 1; i < vecUnits.size(); i++) {
+		if (vecUnits[i] != vecUnits[0]) {
+			return std::string("");
+		}
+	}
+	return vecUnits[0];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string DataOp::GetUnits(
+	const std::vector<std::string> & vecUnits
+) {
+	return "";
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // DataOp_VECMAG
 ///////////////////////////////////////////////////////////////////////////////
 
