@@ -1689,9 +1689,6 @@ void Climatology(
 								for (size_t i = 0; i < dDataIn.GetRows(); i++) {
 									if ((dDataIn[i] != dFillValue) && (!std::isnan(dDataIn[i]))) {
 										if (dDataIn[i] > dClimoThreshold) {
-											if (i == 148983) {
-												std::cout << dDataIn[i] << " " << dClimoThreshold << std::endl;
-											}
 											dScratchData(0,0,i)++;
 										}
 									}
@@ -2387,7 +2384,6 @@ void Climatology(
 					fUpdatedNumberOfTimePeriods = true;
 					AnnounceEndBlock(NULL);
 				}
-				std::cout << dAccumulatedData(iCurrentTimeIndex,148983) << std::endl;
 			}
 
 			// AutoCor: Perform one final accumulation of scratch data into accumulated data
