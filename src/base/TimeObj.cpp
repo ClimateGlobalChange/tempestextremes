@@ -131,25 +131,30 @@ bool Time::operator>(const Time & time) const {
 void Time::VerifyTime() {
 
 	// Verification only for known CalendarTypes
-	if ((m_eCalendarType == CalendarNoLeap) || 
+	if ((m_eCalendarType == CalendarNoLeap) ||
 		(m_eCalendarType == CalendarStandard) ||
 		(m_eCalendarType == CalendarGregorian) ||
+		(m_eCalendarType == CalendarJulian) ||
 		(m_eCalendarType == Calendar360Day) ||
 		(m_eCalendarType == Calendar365Day)
 	) {
 		int nDaysPerMonth[]
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-		if ((m_eCalendarType == CalendarStandard) ||
-			(m_eCalendarType == CalendarGregorian)
-		) {
-			if ((m_iYear % 4) == 0) {
-				nDaysPerMonth[1] = 29;
-				if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
-					nDaysPerMonth[1] = 28;
-				}
-			}
-		}
+    if ((m_eCalendarType == CalendarStandard) ||
+        (m_eCalendarType == CalendarGregorian)
+    ) {
+        if ((m_iYear % 4) == 0) {
+            nDaysPerMonth[1] = 29;
+            if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
+                nDaysPerMonth[1] = 28;
+            }
+        }
+    } else if (m_eCalendarType == CalendarJulian) {
+        if ((m_iYear % 4) == 0) {
+            nDaysPerMonth[1] = 29;
+        }
+    }
 		if (m_eCalendarType == Calendar360Day) {
 			for (int i = 0; i < 12; i++) {
 				nDaysPerMonth[i] = 30;
@@ -184,25 +189,30 @@ void Time::NormalizeTime() {
 	}
 
 	// Normalization only for known CalendarTypes
-	if ((m_eCalendarType == CalendarNoLeap) || 
+	if ((m_eCalendarType == CalendarNoLeap) ||
 		(m_eCalendarType == CalendarStandard) ||
 		(m_eCalendarType == CalendarGregorian) ||
+		(m_eCalendarType == CalendarJulian) ||
 		(m_eCalendarType == Calendar360Day) ||
 		(m_eCalendarType == Calendar365Day)
 	) {
 		int nDaysPerMonth[]
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-		if ((m_eCalendarType == CalendarStandard) ||
-			(m_eCalendarType == CalendarGregorian)
-		) {
-			if ((m_iYear % 4) == 0) {
-				nDaysPerMonth[1] = 29;
-				if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
-					nDaysPerMonth[1] = 28;
-				}
-			}
-		}
+    if ((m_eCalendarType == CalendarStandard) ||
+        (m_eCalendarType == CalendarGregorian)
+    ) {
+        if ((m_iYear % 4) == 0) {
+            nDaysPerMonth[1] = 29;
+            if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
+                nDaysPerMonth[1] = 28;
+            }
+        }
+    } else if (m_eCalendarType == CalendarJulian) {
+        if ((m_iYear % 4) == 0) {
+            nDaysPerMonth[1] = 29;
+        }
+    }
 		if (m_eCalendarType == Calendar360Day) {
 			for (int i = 0; i < 12; i++) {
 				nDaysPerMonth[i] = 30;
@@ -416,12 +426,18 @@ int Time::DayNumber() const {
 
 	} else if (
 		(m_eCalendarType == CalendarStandard) ||
-		(m_eCalendarType == CalendarGregorian)
+		(m_eCalendarType == CalendarGregorian) ||
+		(m_eCalendarType == CalendarJulian)
 	) {
 		int nM = (m_iMonth + 10) % 12;
 		int nY = m_iYear - nM/10;
-		int nDay = 365 * nY + nY / 4 - nY / 100 + nY / 400
-			+ (nM * 306 + 5) / 10 + m_iDay;
+    int nDay;
+    if (m_eCalendarType == CalendarJulian) {
+        nDay = 365 * nY + nY / 4 + (nM * 306 + 5) / 10 + m_iDay;
+    } else {
+        nDay = 365 * nY + nY / 4 - nY / 100 + nY / 400
+             + (nM * 306 + 5) / 10 + m_iDay;
+    }
 
 		return nDay;
 
@@ -464,10 +480,13 @@ bool Time::IsLeapYear() const {
 		return false;
 	}
 	if ((m_iYear % 4) == 0) {
-		if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
-			return false;
+		if ((m_eCalendarType == CalendarJulian)) {
+			return true;
 		}
-		return true;
+		if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
+		  return false;
+		}
+		  return true;
 	}
 
 	return false;
@@ -893,7 +912,7 @@ void Time::FromFormattedString(
 						strFormattedTime.c_str());
 				}
 
-			// Record second 
+			// Record second
 			} else if (strFormattedTime[i] == 's') {
 				if (szSecond == NULL) {
 					szSecond = &(strFormattedTime[j]);
@@ -903,7 +922,7 @@ void Time::FromFormattedString(
 						strFormattedTime.c_str());
 				}
 
-			// Record microsecond 
+			// Record microsecond
 			} else if (strFormattedTime[i] == 'u') {
 				if (szMicroSecond == NULL) {
 					szMicroSecond = &(strFormattedTime[j]);
@@ -973,7 +992,7 @@ void Time::FromFormattedString(
 			_EXCEPTION1("Malformed time string (%s): "
 				"Dangling values not allowed in Free formatting",
 				strFormattedTime.c_str());
-		} 
+		}
 	}
 
 	// Type
