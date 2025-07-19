@@ -311,6 +311,18 @@ try {
 					dFillValue = attFillValue->as_float(0);
 				}
 			}
+
+			// Get scale_factor and add_offset
+			float dScaleFactor = 1.0f;
+			float dAddOffset = 0.0f;
+			NcAtt * attScaleFactor = var->get_att("scale_factor");
+			if (attScaleFactor != NULL) {
+				dScaleFactor = attScaleFactor->as_float(0);
+			}
+			NcAtt * attAddOffset = var->get_att("add_offset");
+			if (attAddOffset != NULL) {
+				dAddOffset = attAddOffset->as_float(0);
+			}
 	
 			// Allocate space for accumulation
 			if (f == 0) {
@@ -577,6 +589,17 @@ try {
 					vecPos[0] = t;
 					var->set_cur(&(vecPos[0]));
 					var->get(&(dataIn[0]), &(vecSize[0]));
+
+					if (dScaleFactor != 1.0f) {
+						for (size_t i = 0; i < sTotalSize; i++) {
+							dataIn[i] *= dScaleFactor;
+						}
+					}
+					if (dAddOffset != 0.0f) {
+						for (size_t i = 0; i < sTotalSize; i++) {
+							dataIn[i] += dAddOffset;
+						}
+					}
 	
 					if (!fMissingData) {
 						if ((m_eAccumOp == AccumulateDataOp_Sum) ||
