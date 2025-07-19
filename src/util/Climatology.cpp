@@ -3393,7 +3393,7 @@ try {
 
 #if defined(TEMPEST_MPIOMP)
 	if (nMPISize != 1) {
-
+/*
 		// Barrier
 		MPI_Barrier(MPI_COMM_WORLD);
 		AnnounceSetOutputBuffer(stdout);
@@ -3432,6 +3432,7 @@ try {
 					strFillValueOverride);
 			}
 		}
+*/
 	}
 #endif
 
