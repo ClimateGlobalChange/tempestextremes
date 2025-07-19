@@ -141,20 +141,22 @@ void Time::VerifyTime() {
 		int nDaysPerMonth[]
 			= {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-    if ((m_eCalendarType == CalendarStandard) ||
-        (m_eCalendarType == CalendarGregorian)
-    ) {
-        if ((m_iYear % 4) == 0) {
-            nDaysPerMonth[1] = 29;
-            if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
-                nDaysPerMonth[1] = 28;
-            }
-        }
-    } else if (m_eCalendarType == CalendarJulian) {
-        if ((m_iYear % 4) == 0) {
-            nDaysPerMonth[1] = 29;
-        }
-    }
+		if ((m_eCalendarType == CalendarStandard) ||
+		    (m_eCalendarType == CalendarGregorian)
+		) {
+				if ((m_iYear % 4) == 0) {
+						nDaysPerMonth[1] = 29;
+						if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
+								nDaysPerMonth[1] = 28;
+						}
+				}
+
+		} else if (m_eCalendarType == CalendarJulian) {
+				if ((m_iYear % 4) == 0) {
+					nDaysPerMonth[1] = 29;
+				}
+		}
+
 		if (m_eCalendarType == Calendar360Day) {
 			for (int i = 0; i < 12; i++) {
 				nDaysPerMonth[i] = 30;
@@ -480,13 +482,13 @@ bool Time::IsLeapYear() const {
 		return false;
 	}
 	if ((m_iYear % 4) == 0) {
-		if ((m_eCalendarType == CalendarJulian)) {
+		if (m_eCalendarType == CalendarJulian) {
 			return true;
 		}
 		if (((m_iYear % 100) == 0) && ((m_iYear % 400) != 0)) {
-		  return false;
+			return false;
 		}
-		  return true;
+		return true;
 	}
 
 	return false;
