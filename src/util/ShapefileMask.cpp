@@ -373,7 +373,6 @@ try {
 	AnnounceStartBlock("Building map");
 
 	std::vector<int> nShpMap;
-	std::vector<size_t> sDataCount(sShpRegionCount, 0);
 
 	nShpMap.resize(grid.m_dLat.GetRows(), static_cast<int>(-1));
 	for (size_t k = 0; k < grid.m_dLat.GetRows(); k++) {
@@ -388,7 +387,6 @@ try {
 			if (vecLatLonBox[s].contains(dLatDeg, dStandardLonDeg)) {
 				if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg, dStandardLonDeg)) {
 					nShpMap[k] = static_cast<int>(s);
-					sDataCount[s]++;
 					break;
 				}
 			}
@@ -570,11 +568,13 @@ try {
 
 				// Calculate the mean within all shapes
 				if (strOperation == "mean") {
+					std::vector<size_t> sDataCount(sShpRegionCount, 0);
 					std::fill(dataOut.begin(), dataOut.end(), 0.0f);
 					for (size_t k = 0; k < nShpMap.size(); k++) {
 						if ((!std::isnan(dataState[k])) && (dataState[k] != dFillValue)) {
 							if (nShpMap[k] != static_cast<size_t>(-1)) {
 								dataOut[nShpMap[k]] += static_cast<double>(dataState[k]);
+								sDataCount[nShpMap[k]]++;
 							}
 						}
 					}
