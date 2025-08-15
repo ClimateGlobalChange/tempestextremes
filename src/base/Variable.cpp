@@ -226,7 +226,7 @@ int VariableRegistry::FindOrRegisterSubStr(
 
 			// Check for string argument
 			} else if (strIn[n] == '\"') {
-				int nStart = n+1;
+				int nStart = n;
 				for (n++; n <= strIn.length(); n++) {
 					if (n == strIn.length()) {
 						_EXCEPTION1("String must be terminated with \": %s",
