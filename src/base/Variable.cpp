@@ -45,6 +45,7 @@ VariableRegistry::VariableRegistry() :
 	m_domDataOp.Add("_POW");
 	m_domDataOp.Add("_LAT");
 	m_domDataOp.Add("_F");
+	m_domDataOp.Add("_DAILYCHILLHOURS");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -225,8 +226,8 @@ int VariableRegistry::FindOrRegisterSubStr(
 
 			// Check for string argument
 			} else if (strIn[n] == '\"') {
-				int nStart = n;
-				for (; n <= strIn.length(); n++) {
+				int nStart = n+1;
+				for (n++; n <= strIn.length(); n++) {
 					if (n == strIn.length()) {
 						_EXCEPTION1("String must be terminated with \": %s",
 							strIn.c_str());
