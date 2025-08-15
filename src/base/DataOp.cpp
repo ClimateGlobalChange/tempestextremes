@@ -23,6 +23,7 @@
 #include "kdtree.h"
 #include "Constants.h"
 #include "CoordTransforms.h"
+#include "Units.h"
 
 #include <cstdlib>
 #include <set>
@@ -376,6 +377,10 @@ DataOp * DataOpManager::Add(
 		}
 
 		return Add(new DataOp_MEAN(strName, dDist));
+
+	// Chill hours calculator using tasmin and tasmax
+	} else if (strName == "_DAILYCHILLHOURS") {
+		return Add(new DataOp_DAILYCHILLHOURS);
 
 	} else {
 		_EXCEPTION1("Invalid DataOp \"%s\"", strName.c_str());
@@ -2745,6 +2750,82 @@ bool DataOp_MEAN::Apply(
 	}
 
 	m_opMean.Apply(*(vecArgData[0]), dataout, true);
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_DAILYCHILLHOURS
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_DAILYCHILLHOURS::name = "_DAILYCHILLHOURS";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_DAILYCHILLHOURS::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 3) {
+		_EXCEPTION2("%s expects three arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+
+	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
+		_EXCEPTION1("%s expects argument 0 (tasmin) and 1 (tasmax) to be data variables",
+			m_strName.c_str());
+	}
+	const DataArray1D<float> & dataTasmin = *(vecArgData[0]);
+	const DataArray1D<float> & dataTasmax = *(vecArgData[1]);
+
+	// Freezing and chilling temperature are defined in degrees F
+	float dFreezingTemp = 32.0;
+	float dChillingTemp = 45.0;
+
+	// Convert to local unit
+	bool fSuccess;
+	fSuccess = ConvertUnits<float>(dFreezingTemp, "degF", strArg[2], false);
+	if (!fSuccess) {
+		_EXCEPTION2("%s cannot convert freezing temperature to provided units \"%s\"",
+			m_strName.c_str(), strArg[2].c_str());
+	}
+
+	fSuccess = ConvertUnits<float>(dChillingTemp, "degF", strArg[2], false);
+	if (!fSuccess) {
+		_EXCEPTION2("%s cannot convert chilling temperature to provided units \"%s\"",
+			m_strName.c_str(), strArg[2].c_str());
+	}
+
+	// Calculate daily chill hours using similar triangles
+	bool fWarning = false;
+	for (int i = 0; i < dataout.GetRows(); i++) {
+		if (dataTasmin[i] > dataTasmax[i]) {
+			dataout[i] = 0.0;
+			fWarning = true;
+		} else if (dataTasmax[i] < dFreezingTemp) {
+			dataout[i] = 0.0;
+		} else if (dataTasmax[i] < dChillingTemp) {
+			if (dataTasmin[i] < dFreezingTemp) {
+				dataout[i] = 24.0 * (dataTasmax[i] - dFreezingTemp) / (dataTasmax[i] - dataTasmin[i]);
+			} else {
+				dataout[i] = 24.0;
+			}
+		} else {
+			if (dataTasmin[i] < dFreezingTemp) {
+				dataout[i] = 24.0 * (dChillingTemp - dFreezingTemp) / (dataTasmax[i] - dataTasmin[i]);
+			} else if (dataTasmin[i] < dChillingTemp) {
+				dataout[i] = 24.0 * (dChillingTemp - dataTasmin[i]) / (dataTasmax[i] - dataTasmin[i]);
+			} else {
+				dataout[i] = 0.0;
+			}
+		}
+	}
+
+	if (fWarning) {
+		Announce("WARNING: Some grid points have tasmax < tasmin");
+	}
 
 	return true;
 }

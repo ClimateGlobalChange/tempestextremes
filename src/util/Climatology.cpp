@@ -58,6 +58,7 @@ enum ClimatologyPeriod {
 ///	</summary>
 enum ClimatologyType {
 	ClimatologyType_Mean,
+	ClimatologyType_Sum,
 	ClimatologyType_MeanSq,
 	ClimatologyType_StdDev,
 	ClimatologyType_AutoCor,
@@ -231,6 +232,8 @@ void ParseClimatologyTypes(
 		ClimatologyInfo climoinfo;
 		if (vecParsedClimatologyList[i] == "mean") {
 			climoinfo.type = ClimatologyType_Mean;
+		} else if (strClimoType == "sum") {
+			climoinfo.type = ClimatologyType_Sum;
 		} else if (strClimoType == "meansq") {
 			climoinfo.type = ClimatologyType_MeanSq;
 		} else if (strClimoType == "stddev") {
@@ -302,7 +305,7 @@ void ParseClimatologyTypes(
 				climoinfo.threshunits);
 
 		} else {
-			_EXCEPTIONT("--type invalid; expected \"mean\", \"meansq\", \"stddev\", \"autocor:<lag>\", \"min\", \"max\", \"avgmin\", \"avgmax\", \"avgcount<op><value>\", \"threshsum<op><value>\", \"timeuntil<op><value>\", \"maxconsec<op><value>\"");
+			_EXCEPTIONT("--type invalid; expected \"mean\", \"sum\", \"meansq\", \"stddev\", \"autocor:<lag>\", \"min\", \"max\", \"avgmin\", \"avgmax\", \"avgcount<op><value>\", \"threshsum<op><value>\", \"timeuntil<op><value>\", \"maxconsec<op><value>\"");
 		}
 
 		climoinfo.threshorigunits = climoinfo.threshunits;
@@ -330,6 +333,8 @@ std::string ClimoVariablePrefix(
 	}
 	if (eClimoType == ClimatologyType_Mean) {
 		strVariablePrefix += "mean_";
+	} else if (eClimoType == ClimatologyType_Sum) {
+		strVariablePrefix += "sum_";
 	} else if (eClimoType == ClimatologyType_MeanSq) {
 		strVariablePrefix += "meansq_";
 	} else if (eClimoType == ClimatologyType_StdDev) {
@@ -475,6 +480,7 @@ void Climatology(
 	for (int ct = 0; ct < vecClimoInfo.size(); ct++) {
 		// Climatology type
 		if ((vecClimoInfo[ct].type != ClimatologyType_Mean) &&
+		    (vecClimoInfo[ct].type != ClimatologyType_Sum) &&
 		    (vecClimoInfo[ct].type != ClimatologyType_MeanSq) &&
 		    (vecClimoInfo[ct].type != ClimatologyType_StdDev) &&
 			(vecClimoInfo[ct].type != ClimatologyType_Min) &&
@@ -523,7 +529,8 @@ void Climatology(
 		}
 
 		// Check if this climatology type requires data to be accumulated after each period
-		if ((vecClimoInfo[ct].type == ClimatologyType_AvgMin) ||
+		if ((vecClimoInfo[ct].type == ClimatologyType_Sum) ||
+		    (vecClimoInfo[ct].type == ClimatologyType_AvgMin) ||
 		    (vecClimoInfo[ct].type == ClimatologyType_AvgMax) ||
 		    (vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
 		    (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) ||
@@ -1418,8 +1425,18 @@ void Climatology(
 						}
 
 					} else if (eClimoPeriod == ClimatologyPeriod_Annual) {
-						if (vecTimesIn[t].GetYear() != timeCurrent.GetYear()) {
-							fNewPeriod = true;
+						if (strStartTime == "") {
+							if (vecTimesIn[t].GetYear() != timeCurrent.GetYear()) {
+								fNewPeriod = true;
+							}
+						} else {
+							if (timeCurrent != vecTimesIn[t]) {
+								Time timeRollover = timeStartTime;
+								timeRollover.SetYear(vecTimesIn[t].GetYear());
+								if ((timeCurrent <= timeRollover) && (vecTimesIn[t] >= timeRollover)) {
+									fNewPeriod = true;
+								}
+							}
 						}
 					}
 
@@ -1603,8 +1620,10 @@ void Climatology(
 					// Count number of time slices at each point and accumulate data
 					if (fMissingData) {
 
-						// Mean
-						if (vecClimoInfo[ct].type == ClimatologyType_Mean) {
+						// Mean and sum
+						if ((vecClimoInfo[ct].type == ClimatologyType_Mean) ||
+						    (vecClimoInfo[ct].type == ClimatologyType_Sum)
+						) {
 							for (size_t i = 0; i < dDataIn.GetRows(); i++) {
 								if ((dDataIn[i] != dFillValue) && (!std::isnan(dDataIn[i]))) {
 									dAccumulatedData(iTimeIndex,i) += static_cast<double>(dDataIn[i]);
@@ -1974,8 +1993,10 @@ void Climatology(
 					// Count number of time slices at each time and accumulate data
 					} else {
 
-						// Mean
-						if (vecClimoInfo[ct].type == ClimatologyType_Mean) {
+						// Mean and sum
+						if ((vecClimoInfo[ct].type == ClimatologyType_Mean) ||
+						    (vecClimoInfo[ct].type == ClimatologyType_Sum)
+						) {
 							for (size_t i = 0; i < dDataIn.GetRows(); i++) {
 								dAccumulatedData(iTimeIndex,i) += static_cast<double>(dDataIn[i]);
 							}
@@ -3214,7 +3235,7 @@ try {
 		CommandLineString(strVariables, "var", "");
 		CommandLineString(strOutputVariables, "varout", "");
 		CommandLineStringD(strClimoPeriod, "period", "daily", "[daily|monthly|seasonal|annual|all]");
-		CommandLineStringD(strClimoType, "type", "mean", "[mean|meansq|stddev|autocor|min|max|avgmin|avgmax|avgcount|threshsum|timeuntil|maxconsec]");
+		CommandLineStringD(strClimoType, "type", "mean", "[mean|sum|meansq|stddev|autocor|min|max|avgmin|avgmax|avgcount|threshsum|timeuntil|maxconsec]");
 		CommandLineBool(fIncludeLeapDays, "include_leap_days");
 		CommandLineString(strStartTime, "time_start", "");
 		CommandLineString(strEndTime, "time_end", "");
