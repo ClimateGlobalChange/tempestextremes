@@ -2475,7 +2475,8 @@ void Climatology(
 			}
 
 			// Calculate mean over time periods
-			if ((vecClimoInfo[ct].type == ClimatologyType_AutoCor) ||
+			if ((vecClimoInfo[ct].type == ClimatologyType_Sum) || 
+			    (vecClimoInfo[ct].type == ClimatologyType_AutoCor) ||
 			    (vecClimoInfo[ct].type == ClimatologyType_AvgMin) ||
 			    (vecClimoInfo[ct].type == ClimatologyType_AvgMax) ||
 			    (vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
