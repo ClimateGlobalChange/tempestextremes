@@ -465,9 +465,14 @@ bool DataOp_VECMAG::Apply(
 	const DataArray1D<float> & dataRight = *(vecArgData[1]);
 
 	for (int i = 0; i < dataout.GetRows(); i++) {
-		dataout[i] =
-			sqrt(dataLeft[i] * dataLeft[i]
-				+ dataRight[i] * dataRight[i]);
+		bool fIsFillValue = dataLeft.IsFillValueAtIx(i);
+		if (!fIsFillValue){
+			dataout[i] =
+				sqrt(dataLeft[i] * dataLeft[i]
+					+ dataRight[i] * dataRight[i]);
+		} else {
+				dataout[i]=std::numeric_limits<double>::quiet_NaN();
+				}
 	}
 
 	return true;
@@ -728,7 +733,12 @@ bool DataOp_DIFF::Apply(
 		const DataArray1D<float> & dataRight = *(vecArgData[1]);
 
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = dataLeft[i] - dataRight[i];
+			bool fIsFillValue = (dataLeft.IsFillValueAtIx(i) || dataRight.IsFillValueAtIx(i));
+			if (!fIsFillValue){
+				dataout[i] = dataLeft[i] - dataRight[i];
+			} else {
+				dataout[i]=std::numeric_limits<double>::quiet_NaN();
+			}
 		}
 	}
 
@@ -1731,7 +1741,6 @@ void BuildCurlOperator(
 ) {
 	opCurlE.Clear();
 	opCurlN.Clear();
-
 	int iRef = 0;
 
 	// Scaling factor used in Curl calculation
@@ -1984,7 +1993,6 @@ bool DataOp_CURL::Apply(
 
 		m_fInitialized = true;
 	}
-
 	m_opCurlE.Apply(*(vecArgData[0]), dataout, true);
 	m_opCurlN.Apply(*(vecArgData[1]), dataout, false); 
 
