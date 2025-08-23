@@ -46,6 +46,7 @@ VariableRegistry::VariableRegistry() :
 	m_domDataOp.Add("_LAT");
 	m_domDataOp.Add("_F");
 	m_domDataOp.Add("_DAILYCHILLHOURS");
+	m_domDataOp.Add("_RELHUMFROMTDTA");
 }
 
 ///////////////////////////////////////////////////////////////////////////////

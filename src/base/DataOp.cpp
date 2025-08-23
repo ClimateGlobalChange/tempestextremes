@@ -382,6 +382,10 @@ DataOp * DataOpManager::Add(
 	} else if (strName == "_DAILYCHILLHOURS") {
 		return Add(new DataOp_DAILYCHILLHOURS);
 
+	// Relative humidity using T2d and T2m
+	} else if (strName == "_RELHUMFROMTDTA") {
+		return Add(new DataOp_RELHUMFROMTDTA);
+
 	} else {
 		_EXCEPTION1("Invalid DataOp \"%s\"", strName.c_str());
 	}
@@ -2774,7 +2778,7 @@ bool DataOp_DAILYCHILLHOURS::Apply(
 	}
 
 	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
-		_EXCEPTION1("%s expects argument 0 (tasmin) and 1 (tasmax) to be data variables",
+		_EXCEPTION1("%s expects first argument (tasmin) and second argument (tasmax) to be data variables",
 			m_strName.c_str());
 	}
 	const DataArray1D<float> & dataTasmin = *(vecArgData[0]);
@@ -2825,6 +2829,64 @@ bool DataOp_DAILYCHILLHOURS::Apply(
 
 	if (fWarning) {
 		Announce("WARNING: Some grid points have tasmax < tasmin");
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_RELHUMFROMTDTA
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_RELHUMFROMTDTA::name = "_RELHUMFROMTDTA";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_RELHUMFROMTDTA::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 3) {
+		_EXCEPTION2("%s expects three arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+
+	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
+		_EXCEPTION1("%s expects first argument (td) and second argument (ta) to be data variables",
+			m_strName.c_str());
+	}
+	const DataArray1D<float> & dataTd = *(vecArgData[0]);
+	const DataArray1D<float> & dataTa = *(vecArgData[1]);
+
+	// Calculate relative humidity from Td and Ta
+
+	// Calculation with variables provided in degrees Celsius
+	if ((strArg[2] == "degC") || (strArg[2] == "C")) {
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = exp((17.1 * dataTd[i]) / (235.0 + dataTd[i]) - (17.1 * dataTa[i]) / (235.0 + dataTa[i]));
+		}
+
+	// Calculation with variables provided in Kelvin
+	} else if (strArg[2] == "K") {
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = exp((17.1 * (dataTd[i] - 273.15)) / (dataTd[i] - 38.15) - (17.1 * (dataTa[i] - 273.15)) / (dataTa[i] - 38.15));
+		}
+
+	// Calculation with variables provided in degrees Fahrenheit
+	} else if ((strArg[2] == "degF") || (strArg[2] == "F")) {
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			double dTdDegC = (5.0/9.0) * (dataTd[i] - 32.0);
+			double dTaDegC = (5.0/9.0) * (dataTa[i] - 32.0);
+
+			dataout[i] = exp((17.1 * dTdDegC) / (235.0 + dTdDegC) - (17.1 * dTaDegC) / (235.0 + dTaDegC));
+		}
+	
+	// Invalid unit
+	} else {
+		_EXCEPTION1("Invalid third argument units in _RELHUMFROMTDT2M (%s): Expected \"degC\", \"degF\", \"K\"",
+			strArg[2].c_str());
 	}
 
 	return true;
