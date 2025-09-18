@@ -117,9 +117,16 @@ bool ConvertUnits(
 
 	// Perform unit conversion from temperature (K)
 	} else if (strUnit == "K") {
-		if (strTargetUnit == "degC") {
+		if ((strTargetUnit == "degC") || (strTargetUnit == "C")) {
 			if (!fIsDelta) {
 				dValue -= 273.15;
+			}
+
+		} else if ((strTargetUnit == "degF") || (strTargetUnit == "F")) {
+			if (!fIsDelta) {
+				dValue = 32.0 + 9.0 / 5.0 * (dValue - 273.15);
+			} else {
+				dValue *= 9.0 / 5.0;
 			}
 
 		} else {
@@ -127,10 +134,37 @@ bool ConvertUnits(
 		}
 
 	// Perform unit conversion from temperature (degC)
-	} else if (strUnit == "degC") {
+	} else if ((strUnit == "degC") || (strUnit == "C")) {
 		if (strTargetUnit == "K") {
 			if (!fIsDelta) {
 				dValue += 273.15;
+			}
+
+		} else if ((strTargetUnit == "degF") || (strTargetUnit == "F")) {
+			if (!fIsDelta) {
+				dValue = 32.0 + 9.0 / 5.0 * dValue;
+			} else {
+				dValue *= 9.0 / 5.0;
+			}
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from temperature (degF)
+	} else if ((strUnit == "degF") || (strUnit == "F")) {
+		if (strTargetUnit == "K") {
+			if (!fIsDelta) {
+				dValue = 273.15 + (dValue - 32.0) * 5.0 / 9.0;
+			} else {
+				dValue *= 5.0 / 9.0;
+			}
+
+		} else if ((strTargetUnit == "degC") || (strTargetUnit == "C")) {
+			if (!fIsDelta) {
+				dValue = (dValue - 32.0) * 5.0 / 9.0;
+			} else {
+				dValue *= 5.0 / 9.0;
 			}
 
 		} else {
@@ -229,6 +263,66 @@ bool ConvertUnits(
 
 		} else if (strTargetUnit == "m2") {
 			dValue *= 1000.0 * 1000.0;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from kg m-2 s-1
+	} else if (strUnit == "kg m-2 s-1"){
+		if ((strTargetUnit == "mm/day") || (strTargetUnit == "mm/d") || (strTargetUnit == "mm d-1")) {
+			dValue *= 86400.0;
+
+		} else if ((strTargetUnit == "in/day") || (strTargetUnit == "in/d") || (strTargetUnit == "in d-1")) {
+			dValue *= 86400.0 / 25.4;
+
+		} else if ((strTargetUnit == "m s-1") || (strTargetUnit == "m/s")) {
+			dValue /= 1000.0;
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from mm/day
+	} else if ((strUnit == "mm/day") || (strUnit == "mm/d") || (strUnit == "mm d-1")) {
+		if (strTargetUnit == "kg m-2 s-1") {
+			dValue /= 86400.0;
+
+		} else if ((strTargetUnit == "in/day") || (strTargetUnit == "in/d") || (strTargetUnit == "in d-1")) {
+			dValue /= 25.4;
+
+		} else if ((strTargetUnit == "m s-1") || (strTargetUnit == "m/s")) {
+			dValue /= (1000.0 * 86400.0);
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from in/day
+	} else if ((strUnit == "in/day") || (strUnit == "in/d") || (strUnit == "in d-1")) {
+		if (strTargetUnit == "kg m-2 s-1") {
+			dValue *= 25.4 / 86400.0;
+
+		} else if ((strTargetUnit == "mm/day") || (strTargetUnit == "mm/d") || (strTargetUnit == "mm d-1")) {
+			dValue *= 25.4;
+
+		} else if ((strTargetUnit == "m s-1") || (strTargetUnit == "m/s")) {
+			dValue *= 25.4 / (1000.0 * 86400.0);
+
+		} else {
+			return false;
+		}
+
+	// Perform unit conversion from m/s
+	} else if ((strUnit == "m s-1") || (strUnit == "m/s")) {
+		if (strTargetUnit == "kg m-2 s-1") {
+			dValue *= 1000.0;
+
+		} else if ((strTargetUnit == "mm/day") || (strTargetUnit == "mm/d") || (strTargetUnit == "mm d-1")) {
+			dValue *= 1000.0 * 86400.0;
+
+		} else if ((strUnit == "in/day") || (strUnit == "in/d") || (strUnit == "in d-1")) {
+			dValue *= 1000.0 * 86400.0 / 25.4;
 
 		} else {
 			return false;

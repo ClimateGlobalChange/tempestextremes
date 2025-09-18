@@ -65,6 +65,9 @@ try {
 	// Shapefile
 	std::string strShapefile;
 
+	// Lonlat bounds
+	std::string strLonLatBounds;
+
 	// Output data
 	std::string strOutputData;
 
@@ -96,6 +99,7 @@ try {
 		CommandLineBool(fRegional, "regional");
 
 		CommandLineString(strShapefile, "shp", "");
+		CommandLineStringD(strLonLatBounds, "lonlatbounds", "", "\"lon0,lat0,lon1,lat1\" (in degrees)");
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineString(strOutputCSV, "out_csv", "");
 		CommandLineString(strVariables, "var", "");
@@ -120,11 +124,14 @@ try {
 	if (strShapefile.length() == 0) {
 		_EXCEPTIONT("No shapefile (--shp) specified");
 	}
-	if (strOutputData.length() == 0) {
-		_EXCEPTIONT("No output file (--out_data) specified");
+	if ((strOutputData.length() == 0) && (strOutputCSV.length() == 0)) {
+		_EXCEPTIONT("No output file (--out_data) or (--out_csv) specified");
 	}
 	if (strVariables.length() == 0) {
 		_EXCEPTIONT("No variables (--var) specified");
+	}
+	if ((strOutputData.length() == 0) && (fWriteShapeIds)) {
+		_EXCEPTIONT("Output file (--out_data) required when using (--writeshapeids)");
 	}
 
 	// Check operator
@@ -137,20 +144,7 @@ try {
 	) {
 		_EXCEPTIONT("Invalid --op, expected \"mask\", \"mean\", \"q25\", \"median\" or \"q75\")");
 	}
-/*
-	// Parse variable list (--var)
-	std::vector<std::string> vecVariableStrings;
-	STLStringHelper::ParseVariableList(strVariable, vecVariableStrings);
 
-	std::vector<std::string> vecVariableNames;
-	std::vector< std::vector<std::string> > vecVariableSpecifiedDims;
-
-	STLStringHelper::SplitVariableStrings(
-		vecVariableStrings,
-		vecVariableNames,
-		vecVariableSpecifiedDims
-	);
-*/
 	// Open output text file
 	FILE * fpCSV = NULL;
 	if (strOutputCSV != "") {
@@ -169,6 +163,42 @@ try {
 	ReadShpFileAsMesh(strShapefile, mesh);
 	Announce("Shapefile contains %lu polygons", mesh.faces.size());
 	AnnounceEndBlock("Done");
+
+	// Parse --lonlatbounds
+	bool fHasLonLatBounds = false;
+	LatLonBox<double> lonlatbounds;
+	if (strLonLatBounds != "") {
+		AnnounceStartBlock("Parsing lonlat bounds");
+
+		std::vector<std::string> vecLonLatBoundsArg;
+		STLStringHelper::ParseVariableList(strLonLatBounds, vecLonLatBoundsArg,",;");
+		if (vecLonLatBoundsArg.size() != 4) {
+			_EXCEPTIONT("Malformed --lonlatbounds: expected form \"lon0,lat0,lon1,lat1\"");
+		}
+		if (!STLStringHelper::IsFloat(vecLonLatBoundsArg[0]) ||
+		    !STLStringHelper::IsFloat(vecLonLatBoundsArg[1]) ||
+		    !STLStringHelper::IsFloat(vecLonLatBoundsArg[2]) ||
+		    !STLStringHelper::IsFloat(vecLonLatBoundsArg[3])
+		) {
+			_EXCEPTIONT("Malformed --lonlatbounds: expected form \"lon0,lat0,lon1,lat1\"");
+		}
+
+		double dLonDeg0 = LonDegToStandardRange(std::stof(vecLonLatBoundsArg[0]));
+		double dLatDeg0 = std::stof(vecLonLatBoundsArg[1]);
+		double dLonDeg1 = LonDegToStandardRange(std::stof(vecLonLatBoundsArg[2]));
+		double dLatDeg1 = std::stof(vecLonLatBoundsArg[3]);
+
+		if ((fabs(dLatDeg0) > 90.0) || (fabs(dLatDeg1) > 90.0) || (dLatDeg1 < dLatDeg0)) {
+			_EXCEPTION2("Malformed --lonlatbounds: Latitude must be in range [-90,90] with lat0 < lat1 (given: %1.5f %1.5f)",
+				dLatDeg0, dLatDeg1);
+		}
+
+		lonlatbounds.set(dLonDeg0, dLonDeg1, dLatDeg0, dLatDeg1);
+		fHasLonLatBounds = true;
+
+		Announce("Limiting shapefiles to longitude [%g, %g] and latitude [%g, %g]", dLonDeg0, dLonDeg1, dLatDeg0, dLatDeg1);
+		AnnounceEndBlock(NULL);
+	}
 
 	// Number of regions
 	const size_t sShpRegionCount = mesh.faces.size();
@@ -263,45 +293,52 @@ try {
 	}
 
 	// Open output file
-	NcFile ncOutput(strOutputData.c_str(), NcFile::Replace);
-	if (!ncOutput.is_valid()) {
-		_EXCEPTION1("Unable to open NetCDF file \"%s\" for writing",
-			strOutputData.c_str());
-	}
-
-	// Create shape index dimension in output file
-	NcDim * dimShp = ncOutput.add_dim("shpix", sShpRegionCount);
-	if (dimShp == NULL) {
-		_EXCEPTIONT("Error creating dimension \"shpix\" in output file");
-	}
-
-	// Create shape ids variable in output file
+	NcFile * pncOutput = NULL;
+	NcDim * dimShp = NULL;
 	NcDim * dim0 = NULL;
 	NcDim * dim1 = NULL;
-	if ((fWriteShapeIds) || (strOperation == "mask")) {
-		if (grid.m_nGridDim.size() == 1) {
-			dim0 = ncOutput.add_dim("ncol", grid.m_nGridDim[0]);
 
-		} else if (grid.m_nGridDim.size() == 2) {
-			dim0 = ncOutput.add_dim(strLatitudeName.c_str(), grid.m_nGridDim[0]);
-			dim1 = ncOutput.add_dim(strLongitudeName.c_str(), grid.m_nGridDim[1]);
+	if (strOutputData != "") {
+		Announce("Preparing output file");
 
-			CopyNcVarIfExists(
-				ncInput,
-				ncOutput,
-				strLatitudeName.c_str(),
-				true,
-				true);
+		pncOutput = new NcFile(strOutputData.c_str(), NcFile::Replace);
+		if (!pncOutput->is_valid()) {
+			_EXCEPTION1("Unable to open NetCDF file \"%s\" for writing",
+				strOutputData.c_str());
+		}
 
-			CopyNcVarIfExists(
-				ncInput,
-				ncOutput,
-				strLongitudeName.c_str(),
-				true,
-				true);
+		// Create shape index dimension in output file
+		dimShp = pncOutput->add_dim("shpix", sShpRegionCount);
+		if (dimShp == NULL) {
+			_EXCEPTIONT("Error creating dimension \"shpix\" in output file");
+		}
 
-		} else {
-			_EXCEPTIONT("Only 1D or 2D spatial data supported");
+		// Create shape ids variable in output file
+		if ((fWriteShapeIds) || (strOperation == "mask")) {
+			if (grid.m_nGridDim.size() == 1) {
+				dim0 = pncOutput->add_dim("ncol", grid.m_nGridDim[0]);
+
+			} else if (grid.m_nGridDim.size() == 2) {
+				dim0 = pncOutput->add_dim(strLatitudeName.c_str(), grid.m_nGridDim[0]);
+				dim1 = pncOutput->add_dim(strLongitudeName.c_str(), grid.m_nGridDim[1]);
+
+				CopyNcVarIfExists(
+					ncInput,
+					*pncOutput,
+					strLatitudeName.c_str(),
+					true,
+					true);
+
+				CopyNcVarIfExists(
+					ncInput,
+					*pncOutput,
+					strLongitudeName.c_str(),
+					true,
+					true);
+
+			} else {
+				_EXCEPTIONT("Only 1D or 2D spatial data supported");
+			}
 		}
 	}
 
@@ -318,109 +355,55 @@ try {
 			vecTimes,
 			false);
 
-		WriteCFTimeDataToNcFile(
-			&ncOutput,
-			strOutputData,
-			vecTimes);
+		if (pncOutput != NULL) {
+			WriteCFTimeDataToNcFile(
+				pncOutput,
+				strOutputData,
+				vecTimes);
 
-		dimTime = NcGetTimeDimension(ncOutput);
-		_ASSERT(dimTime != NULL);
+			dimTime = NcGetTimeDimension(*pncOutput);
+			_ASSERT(dimTime != NULL);
+		}
 
 	} else {
 		vecTimes.push_back(Time(Time::CalendarNone));
-	}
-
-	// Build up the processing queue and define output variables
-	varreg.ClearProcessingQueue();
-
-	std::vector<NcVar *> vecNcVarOut(vecVarIxIn.size());
-	std::vector<bool> vecNcVarOutFillValueCheck(vecVarIxIn.size(), false);
-	for (int v = 0; v < vecVarIxIn.size(); v++) {
-		NcVar * varOut = NULL;
-
-		DimInfoVector vecAuxDimInfo;
-		varreg.AppendVariableToProcessingQueue(
-			vecFiles,
-			grid,
-			vecVarIxIn[v],
-			&vecAuxDimInfo);
-
-		std::vector<NcDim *> vecDimOut;
-
-		if (fFileHasTime) {
-			vecDimOut.push_back(dimTime);
-		}
-
-		for (long d = 0; d < vecAuxDimInfo.size(); d++) {
-			NcDim * dim =
-				AddNcDimOrUseExisting(
-					ncOutput,
-					vecAuxDimInfo[d].name,
-					vecAuxDimInfo[d].size);
-
-			vecDimOut.push_back(dim);
-		}
-
-		vecDimOut.push_back(dimShp);
-		if (strOperation == "mask") {
-			vecDimOut.push_back(dim0);
-			if (grid.m_nGridDim.size() == 2) {
-				vecDimOut.push_back(dim1);
-			}
-		}
-
-		vecNcVarOut[v] = ncOutput.add_var(
-			vecVariableNamesOut[v].c_str(),
-			ncFloat,
-			vecDimOut.size(),
-			const_cast<const NcDim**>(&(vecDimOut[0])));
-
-		if (vecNcVarOut[v] == NULL) {
-			_EXCEPTION2("Error creating variable \"%s\" in file \"%s\"",
-				vecVariableNamesOut[v].c_str(),
-				strOutputData.c_str());
-		}
-	}
-
-	// Add FillValue attributes
-	std::vector<float> vecVarFillValues(vecVarIxIn.size(), 0.0f);
-	varreg.PopulateFillValues(vecFiles);
-	for (int v = 0; v < vecNcVarOut.size(); v++) {
-		const Variable & var = varreg.Get(vecVarIxIn[v]);
-		if (var.HasExplicitFillValue()) {
-			vecNcVarOut[v]->add_att("_FillValue", var.GetFillValueFloat());
-			vecVarFillValues[v] = var.GetFillValueFloat();
-		}
 	}
 
 	// Build the map from the input data to the shapefiles
 	AnnounceStartBlock("Building map");
 
 	std::vector<int> nShpMap;
-	std::vector<size_t> sDataCount(sShpRegionCount, 0);
 
 	nShpMap.resize(grid.m_dLat.GetRows(), static_cast<int>(-1));
 	for (size_t k = 0; k < grid.m_dLat.GetRows(); k++) {
 		double dLatDeg = RadToDeg(grid.m_dLat[k]);
 		double dStandardLonDeg = LonDegToStandardRange(RadToDeg(grid.m_dLon[k]));
+		if (fHasLonLatBounds) {
+			if (!lonlatbounds.contains(dLatDeg, dStandardLonDeg)) {
+				continue;
+			}
+		}
 		for (size_t s = 0; s < sShpRegionCount; s++) {
 			if (vecLatLonBox[s].contains(dLatDeg, dStandardLonDeg)) {
 				if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg, dStandardLonDeg)) {
 					nShpMap[k] = static_cast<int>(s);
-					sDataCount[s]++;
 					break;
 				}
 			}
 		}
 	}
 
+	AnnounceEndBlock("Done");
+
 	// Write the shape ids to a file
 	if (fWriteShapeIds) {
-		AnnounceStartBlock("Writing to file");
+		_ASSERT(pncOutput != NULL);
+
+		AnnounceStartBlock("Writing shape ids to file");
 
 		NcVar * varShapeIds = NULL;
 		if (grid.m_nGridDim.size() == 1) {
-			varShapeIds = ncOutput.add_var("shapeid", ncInt, dim0);
+			varShapeIds = pncOutput->add_var("shapeid", ncInt, dim0);
 			varShapeIds->add_att("_FillValue", (int)(-1));
 			if (varShapeIds == NULL) {
 				_EXCEPTION1("Unable to create variable \"shapeid\" in NetCDF file \"%s\"", strOutputData.c_str());
@@ -429,7 +412,7 @@ try {
 			varShapeIds->put(&(nShpMap[0]), dim0->size());
 
 		} else {
-			varShapeIds = ncOutput.add_var("shapeid", ncInt, dim0, dim1);
+			varShapeIds = pncOutput->add_var("shapeid", ncInt, dim0, dim1);
 			varShapeIds->add_att("_FillValue", (int)(-1));
 			if (varShapeIds == NULL) {
 				_EXCEPTION1("Unable to create variable \"shapeid\" in NetCDF file \"%s\"", strOutputData.c_str());
@@ -441,7 +424,64 @@ try {
 		AnnounceEndBlock("Done");
 	}
 
-	AnnounceEndBlock("Done");
+	// Build up the processing queue and define output variables
+	varreg.ClearProcessingQueue();
+
+	std::vector<NcVar *> vecNcVarOut(vecVarIxIn.size());
+	for (int v = 0; v < vecVarIxIn.size(); v++) {
+		NcVar * varOut = NULL;
+
+		DimInfoVector vecAuxDimInfo;
+		varreg.AppendVariableToProcessingQueue(
+			vecFiles,
+			grid,
+			vecVarIxIn[v],
+			&vecAuxDimInfo);
+
+		// Create output variable
+		if (pncOutput != NULL) {
+			std::vector<NcDim *> vecDimOut;
+
+			if (fFileHasTime) {
+				vecDimOut.push_back(dimTime);
+			}
+
+			for (long d = 0; d < vecAuxDimInfo.size(); d++) {
+				NcDim * dim =
+					AddNcDimOrUseExisting(
+						*pncOutput,
+						vecAuxDimInfo[d].name,
+						vecAuxDimInfo[d].size);
+
+				vecDimOut.push_back(dim);
+			}
+
+			vecDimOut.push_back(dimShp);
+			if (strOperation == "mask") {
+				vecDimOut.push_back(dim0);
+				if (grid.m_nGridDim.size() == 2) {
+					vecDimOut.push_back(dim1);
+				}
+			}
+
+			vecNcVarOut[v] = pncOutput->add_var(
+				vecVariableNamesOut[v].c_str(),
+				ncFloat,
+				vecDimOut.size(),
+				const_cast<const NcDim**>(&(vecDimOut[0])));
+
+			NcVar * ncvarIn = ncInput.get_var(vecVariableNamesIn[v].c_str());
+			if (ncvarIn != NULL) {
+				CopyNcVarAttributes(ncvarIn, vecNcVarOut[v]);
+			}
+
+			if (vecNcVarOut[v] == NULL) {
+				_EXCEPTION2("Error creating variable \"%s\" in file \"%s\"",
+					vecVariableNamesOut[v].c_str(),
+					strOutputData.c_str());
+			}
+		}
+	}
 
 	// Loop through all times in this file
 	for (int t = 0; t < vecTimes.size(); t++) {
@@ -470,6 +510,9 @@ try {
 			var.LoadGridData(varreg, vecFiles, grid);
 			const DataArray1D<float> & dataState = var.GetData();
 
+			// Check _FillValue
+			float dFillValue = var.GetFillValueFloat();
+
 			// Get the output position and size
 			VariableAuxIndex lPos = varreg.GetProcessingQueueAuxIx();
 			if (fFileHasTime) {
@@ -479,6 +522,8 @@ try {
 
 			// Mask the data
 			if (strOperation == "mask") {
+
+				_ASSERT(pncOutput != NULL);
 
 				size_t sShpIxPos = lPos.size();
 				lPos.push_back(0);
@@ -492,7 +537,7 @@ try {
 				}
 
 				for (int s = 0; s < static_cast<int>(sShpRegionCount); s++) {
-					std::vector<float> dataOut(dataState.GetRows(), vecVarFillValues[v]);
+					std::vector<float> dataOut(dataState.GetRows(), dFillValue);
 					for (size_t k = 0; k < nShpMap.size(); k++) {
 						if (nShpMap[k] == s) {
 							dataOut[k] = dataState[k];
@@ -511,7 +556,7 @@ try {
 				lSize.push_back(sShpRegionCount);
 		
 				// Allocate output data
-				std::vector<float> dataOut(sShpRegionCount, vecVarFillValues[v]);
+				std::vector<float> dataOut(sShpRegionCount, dFillValue);
 
 				if (fpCSV != NULL) {
 					if (fFileHasTime) {
@@ -523,10 +568,13 @@ try {
 
 				// Calculate the mean within all shapes
 				if (strOperation == "mean") {
+					std::vector<size_t> sDataCount(sShpRegionCount, 0);
+					std::fill(dataOut.begin(), dataOut.end(), 0.0f);
 					for (size_t k = 0; k < nShpMap.size(); k++) {
-						if ((!std::isnan(dataState[k])) && (dataState[k] != vecVarFillValues[v])) {
+						if ((!std::isnan(dataState[k])) && (dataState[k] != dFillValue)) {
 							if (nShpMap[k] != static_cast<size_t>(-1)) {
 								dataOut[nShpMap[k]] += static_cast<double>(dataState[k]);
+								sDataCount[nShpMap[k]]++;
 							}
 						}
 					}
@@ -535,7 +583,7 @@ try {
 							dataOut[s] /= static_cast<float>(sDataCount[s]);
 						}
 						if (fpCSV != NULL) {
-							fprintf(fpCSV, ", %1.5f", dataOut[s]);
+							fprintf(fpCSV, ", %g", dataOut[s]);
 						}
 					}
 	
@@ -545,7 +593,7 @@ try {
 					vecShpData.resize(sShpRegionCount);
 	
 					for (size_t k = 0; k < nShpMap.size(); k++) {
-						if ((!std::isnan(dataState[k])) && (dataState[k] != vecVarFillValues[v])) {
+						if ((!std::isnan(dataState[k])) && (dataState[k] != dFillValue)) {
 							if (nShpMap[k] != (-1)) {
 								vecShpData[nShpMap[k]].push_back(dataState[k]);
 							}
@@ -567,15 +615,7 @@ try {
 						}
 	
 						std::sort(vecShpData[s].begin(), vecShpData[s].end());
-/*
-						if (s == 2) {
-							FILE * fpx = fopen("test.txt", "w");
-							for (size_t i = 0; i < vecShpData[s].size(); i++) {
-								fprintf(fpx, "%1.5f\n", vecShpData[s][i]);
-							}
-							fclose(fpx);
-						}
-*/
+
 						size_t ix0 = 0;
 						size_t ix1 = 0;
 						if ((strOperation == "q25") || (fpCSV != NULL)) {
@@ -590,7 +630,7 @@ try {
 							dataOut[s] = 0.5 * (vecShpData[s][ix0] + vecShpData[s][ix1]);
 	
 							if (fpCSV != NULL) {
-								fprintf(fpCSV, ", %1.5f", dataOut[s]);
+								fprintf(fpCSV, ", %g", dataOut[s]);
 							}
 						}
 	
@@ -605,7 +645,7 @@ try {
 							dataOut[s] = 0.5 * (vecShpData[s][ix0] + vecShpData[s][ix1]);
 	
 							if (fpCSV != NULL) {
-								fprintf(fpCSV, ", %1.5f", dataOut[s]);
+								fprintf(fpCSV, ", %g", dataOut[s]);
 							}
 						}
 	
@@ -620,14 +660,16 @@ try {
 							dataOut[s] = 0.5 * (vecShpData[s][ix0] + vecShpData[s][ix1]);
 	
 							if (fpCSV != NULL) {
-								fprintf(fpCSV, ", %1.5f", dataOut[s]);
+								fprintf(fpCSV, ", %g", dataOut[s]);
 							}
 						}
 					}
 				}
 
-				vecNcVarOut[v]->set_cur(&(lPos[0]));
-				vecNcVarOut[v]->put(&(dataOut[0]), &(lSize[0]));
+				if (pncOutput != NULL) {
+					vecNcVarOut[v]->set_cur(&(lPos[0]));
+					vecNcVarOut[v]->put(&(dataOut[0]), &(lSize[0]));
+				}
 
 				if (fpCSV != NULL) {
 					fprintf(fpCSV, "\n");
@@ -644,309 +686,13 @@ try {
 			AnnounceEndBlock(NULL);
 		}
 	}
-/*
-// Loop through all variables
-	AnnounceStartBlock("Processing data");
 
-	for (size_t v = 0; v < vecVariableNamesIn.size(); v++) {
-		AnnounceStartBlock("Variable \"%s\"", vecVariableNamesIn[v].c_str());
-
-		bool fFirstRecordDim = true;
-
-		// Get data values
-		NcVar * varData = ncInput.get_var(vecVariableNamesIn[v].c_str());
-		if (varData == NULL) {
-			_EXCEPTION2("File \"%s\" does not contain variable \"%s\"",
-				strInputData.c_str(), vecVariableNamesIn[v].c_str());
-		}
-		if ((varData->num_dims() < 2) || (varData->num_dims() > 3)) {
-			_EXCEPTION2("File \"%s\" variable \"%s\" must contain two (time, ncol) or three dimensions (time, lat, lon)",
-				strInputData.c_str(), vecVariableNamesIn[v].c_str());
-		}
-		if (varData->num_dims() == 3) {
-			if (varData->get_dim(1)->size() != dLatDeg.size()) {
-				_EXCEPTION2("File \"%s\" variable \"%s\" must have latitude as its second dimension",
-					strInputData.c_str(), vecVariableNamesIn[v].c_str());
-			}
-			if (varData->get_dim(2)->size() != dLonDeg.size()) {
-				_EXCEPTION2("File \"%s\" variable \"%s\" must have longitude as its third dimension",
-					strInputData.c_str(), vecVariableNamesIn[v].c_str());
-			}
-		}
-		if (varData->num_dims() == 2) {
-			if ((varData->get_dim(0)->size() == dLatDeg.size()) &&
-			    (varData->get_dim(1)->size() == dLonDeg.size())
-			) {
-				fFirstRecordDim = false;
-
-			} else {
-				if (varData->get_dim(1)->size() != dLatDeg.size()) {
-					_EXCEPTION2("File \"%s\" variable \"%s\" must have a second dimension with the same length as \"lat\"",
-						strInputData.c_str(), vecVariableNamesIn[v].c_str());
-				}
-				if (dLonDeg.size() != dLatDeg.size()) {
-					_EXCEPTION1("File \"%s\" dimension \"lat\" must be the same length as dimension \"lon\"",
-						strInputData.c_str());
-				}
-			}
-		}
-
-		// Number of time slices on this variable
-		size_t sTimeCount = 1;
-
-		// Copy first dimension if it is record dimension
-		NcDim * dimVarFirst = varData->get_dim(0);
-		_ASSERT(dimVarFirst != NULL);
-
-		NcDim * dimVarFirstOut = NULL;
-
-		if (fFirstRecordDim) {
-			sTimeCount = dimVarFirst->size();
-
-			dimVarFirstOut = ncOutput.get_dim(dimVarFirst->name());
-			if (dimVarFirstOut == NULL) {
-				dimVarFirstOut = ncOutput.add_dim(dimVarFirst->name(), dimVarFirst->size());
-				if (dimVarFirstOut == NULL) {
-					_EXCEPTION2("Error creating dimension \"%s\" in file \"%s\"",
-						dimVarFirst->name(), strOutputData.c_str());
-				}
-				CopyNcVarIfExists(ncInput, ncOutput, dimVarFirst->name());
-			}
-		}
-
-		// Allocate data and count
-		std::vector<float> dData;
-
-		if (varData->num_dims() == 3) {
-			dData.resize(dLatDeg.size() * dLonDeg.size());
-		}
-		if (varData->num_dims() == 2) {
-			if (fFirstRecordDim) {
-				dData.resize(dLatDeg.size());
-			} else {
-				dData.resize(dLatDeg.size() * dLonDeg.size());
-			}
-		}
-
-		// For the first variable, create the map
-		if (v == 0) {
-			AnnounceStartBlock("Creating map");
-
-			// Rectilinear data
-			if ((varData->num_dims() == 3) || (!fFirstRecordDim)) {
-				nShpMap.resize(dLatDeg.size() * dLonDeg.size(), static_cast<size_t>(-1));
-				for (size_t j = 0; j < dLatDeg.size(); j++) {
-				for (size_t i = 0; i < dLonDeg.size(); i++) {
-					size_t k = j * dLonDeg.size() + i;
-		
-					for (size_t s = 0; s < sShpRegionCount; s++) {
-						double dStandardLonDeg = LonDegToStandardRange(dLonDeg[i]);
-						if (vecLatLonBox[s].contains(dLatDeg[j], dStandardLonDeg)) {
-							if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg[j], dStandardLonDeg)) {
-								nShpMap[k] = s;
-								break;
-							}
-						}
-					}
-				}
-				}
-
-			// Unstructured data
-			} else {
-				nShpMap.resize(dLatDeg.size(), static_cast<size_t>(-1));
-				for (size_t k = 0; k < dLatDeg.size(); k++) {
-					for (size_t s = 0; s < sShpRegionCount; s++) {
-						double dStandardLonDeg = LonDegToStandardRange(dLonDeg[k]);
-						if (vecLatLonBox[s].contains(dLatDeg[k], dStandardLonDeg)) {
-							if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg[k], dStandardLonDeg)) {
-								nShpMap[k] = s;
-								break;
-							}
-						}
-					}
-				}
-			}
-
-			AnnounceEndBlock("Done");
-		}
-
-		// Create output variable
-		NcVar * varDataOut = NULL;
-		if (fFirstRecordDim) {
-			varDataOut = ncOutput.add_var(vecVariableNames[v].c_str(), ncFloat, dimVarFirstOut, dimShp);
-		} else {
-			varDataOut = ncOutput.add_var(vecVariableNames[v].c_str(), ncFloat, dimShp);
-		}
-
-		if (varDataOut == NULL) {
-			_EXCEPTION1("Error creating variable \"%s\" in output file", vecVariableNames[v].c_str());
-		}
-		CopyNcVarAttributes(varData, varDataOut);
-
-		// Fillvalue
-		float dFillValue = FLT_MAX;
-		NcAtt * attFillValue = varData->get_att("_FillValue");
-		if (attFillValue != NULL) {
-			dFillValue = attFillValue->as_float(0);
-		}
-
-		// Loop through all times
-		for (size_t t = 0; t < sTimeCount; t++) {
-	
-			Announce("Time %lu/%lu", t, sTimeCount);
-
-			// Output to CSV
-			if (fpCSV != NULL) {
-				if (sTimeCount == 1) {
-					fprintf(fpCSV, "%s", vecVariableNames[v].c_str());
-				} else {
-					fprintf(fpCSV, "%s(%lu)", vecVariableNames[v].c_str(), t);
-				}
-			}
-
-			// Reset the counts
-			std::fill(sDataCount.begin(), sDataCount.end(), 0);
-	
-			// Allocate output data
-			std::vector<float> dataOut(sShpRegionCount, 0.0f);
-	
-			// Load data
-			if (varData->num_dims() == 3) {
-				varData->set_cur(t,0,0);
-				varData->get(&(dData[0]), 1, dLatDeg.size(), dLonDeg.size());
-			} else {
-				if (fFirstRecordDim) {
-					varData->set_cur(t,0);
-					varData->get(&(dData[0]), 1, dLatDeg.size());
-				} else {
-					varData->set_cur(0,0);
-					varData->get(&(dData[0]), dLatDeg.size(), dLonDeg.size());
-				}
-			}
-	
-			// Calculate the mean within all shapes
-			if (strOperation == "mean") {
-				for (size_t k = 0; k < nShpMap.size(); k++) {
-					if ((!std::isnan(dData[k])) && (dData[k] != dFillValue)) {
-						if (nShpMap[k] != static_cast<size_t>(-1)) {
-							dataOut[nShpMap[k]] += static_cast<double>(dData[k]);
-							sDataCount[nShpMap[k]]++;
-						}
-					}
-				}
-				for (size_t s = 0; s < sShpRegionCount; s++) {
-					if (sDataCount[s] != 0) {
-						dataOut[s] /= static_cast<float>(sDataCount[s]);
-					}
-				}
-
-			// Generate arrays of data in each shapefile
-			} else {
-				std::vector< std::vector<float> > vecShpData;
-				vecShpData.resize(sShpRegionCount);
-
-				for (size_t k = 0; k < nShpMap.size(); k++) {
-					if ((!std::isnan(dData[k])) && (dData[k] != dFillValue)) {
-						if (nShpMap[k] != static_cast<size_t>(-1)) {
-							vecShpData[nShpMap[k]].push_back(dData[k]);
-						}
-					}
-				}
-
-				for (size_t s = 0; s < vecShpData.size(); s++) {
-					if (vecShpData[s].size() == 0) {
-						dataOut[s] = 0.0;
-						continue;
-					}
-					if (vecShpData[s].size() == 1) {
-						dataOut[s] = vecShpData[s][0];
-						continue;
-					}
-					if (vecShpData[s].size() == 2) {
-						dataOut[s] = 0.5 * (vecShpData[s][0] + vecShpData[s][1]);
-						continue;
-					}
-
-					std::sort(vecShpData[s].begin(), vecShpData[s].end());
-
-					if (s == 0) {
-						FILE * fpx = fopen("test.txt", "w");
-						for (size_t i = 0; i < vecShpData[s].size(); i++) {
-							fprintf(fpx, "%1.5f\n", vecShpData[s][i]);
-						}
-						fclose(fpx);
-					}
-
-					size_t ix0 = 0;
-					size_t ix1 = 0;
-					if ((strOperation == "q25") || (fpCSV != NULL)) {
-						ix1 = (vecShpData[s].size()+1) / 4;
-
-						if ((vecShpData[s].size()+1) % 4 == 0) {
-							ix0 = ix1;
-						} else {
-							ix0 = ix1 - 1;
-						}
-
-						dataOut[s] = 0.5 * (vecShpData[s][ix0] + vecShpData[s][ix1]);
-
-						if (fpCSV != NULL) {
-							fprintf(fpCSV, ", %1.5f", dataOut[s]);
-						}
-					}
-
-					if ((strOperation == "median") || (fpCSV != NULL)) {
-						ix1 = (vecShpData[s].size()+1) / 2;
-						if ((vecShpData[s].size()+1) % 2 == 0) {
-							ix0 = ix1;
-						} else {
-							ix0 = ix1 - 1;
-						}
-
-						dataOut[s] = 0.5 * (vecShpData[s][ix0] + vecShpData[s][ix1]);
-
-						if (fpCSV != NULL) {
-							fprintf(fpCSV, ", %1.5f", dataOut[s]);
-						}
-					}
-
-					if ((strOperation == "q75") || (fpCSV != NULL)) {
-						ix1 = (vecShpData[s].size()+1) * 3 / 4;
-						if ((vecShpData[s].size()+1) % 4 == 0) {
-							ix0 = ix1;
-						} else {
-							ix0 = ix1 - 1;
-						}
-
-						dataOut[s] = 0.5 * (vecShpData[s][ix0] + vecShpData[s][ix1]);
-
-						if (fpCSV != NULL) {
-							fprintf(fpCSV, ", %1.5f", dataOut[s]);
-						}
-					}
-				}
-			}
-
-			// Write to disk
-			if (fFirstRecordDim) {
-				varDataOut->set_cur(t,0);
-				varDataOut->put(&(dataOut[0]), 1, sShpRegionCount);
-			} else {
-				varDataOut->set_cur((long)0);
-				varDataOut->put(&(dataOut[0]), sShpRegionCount);
-			}
-
-			if (fpCSV != NULL) {
-				fprintf(fpCSV, "\n");
-			}
-		}
-
-		AnnounceEndBlock("Done");
-	}
-
-	AnnounceEndBlock("Done");
-*/
 	AnnounceBanner();
+
+	// Cleanup
+	if (pncOutput != NULL) {
+		delete pncOutput;
+	}
 
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());
