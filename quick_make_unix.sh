@@ -11,7 +11,7 @@
 # Configuration Options
 BUILD_TYPE="Release"          # "Debug" or "Release"
 ENABLE_MPI="ON"               # "ON" or "OFF"
-OPTIMIZATION_LEVEL="-O0"      # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
+OPTIMIZATION_LEVEL="-O3"      # Options: "-O0", "-O1", "-O2", "-O3", "-Ofast"
 DEBUG_SYMBOLS="OFF"           # "ON" to include debug symbols (-g), "OFF" to exclude
 INSTALL_PREFIX=""             # Specify the installation directory.
                               # If left blank, it defaults to the project root (TEMPEST_EXTREMES_SOURCE_DIR)
@@ -104,7 +104,8 @@ cd "$BUILD_DIR" || { echo "Build directory not found: $BUILD_DIR"; exit 1; }
 # Configure the project:
 # - The source directory is set to SRC_DIR.
 # - The installation prefix is set to INSTALL_PREFIX so that install() will copy targets to ${INSTALL_PREFIX}/bin.
-cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+cmake -DCMAKE_CXX_COMPILER=CC \
+      -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
       -DCMAKE_CXX_FLAGS_DEBUG="${OPTIMIZATION_LEVEL} ${DEBUG_FLAGS}" \
       -DENABLE_MPI=${ENABLE_MPI} \
       -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \

@@ -41,6 +41,7 @@ public:
 		CalendarNoLeap,
 		CalendarStandard,
 		CalendarGregorian,
+		CalendarJulian,
 		Calendar360Day,
 		Calendar365Day,
 	};
@@ -151,6 +152,8 @@ public:
 			return CalendarGregorian;
 		} else if (strCalendarTemp == "proleptic_gregorian") {
 			return CalendarGregorian;
+		} else if (strCalendarTemp == "julian") {
+			return CalendarJulian;
 		} else if (strCalendarTemp == "360_day") {
 			return Calendar360Day;
 		} else if (strCalendarTemp == "365_day") {
@@ -178,6 +181,8 @@ public:
 			return std::string("standard");
 		} else if (eCalendarType == CalendarGregorian) {
 			return std::string("gregorian");
+		} else if (eCalendarType == CalendarJulian) {
+			return std::string("julian");
 		} else if (eCalendarType == Calendar360Day) {
 			return std::string("360_day");
 		} else if (eCalendarType == Calendar365Day) {

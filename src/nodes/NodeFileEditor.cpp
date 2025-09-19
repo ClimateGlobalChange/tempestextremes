@@ -27,7 +27,7 @@
 #include "Variable.h"
 #include "AutoCurator.h"
 #include "DataArray2D.h"
-#include "ArgumentTree.h"
+#include "CalculationList.h"
 #include "STLStringHelper.h"
 #include "NodeFileUtilities.h"
 #include "GridElements.h"
@@ -1891,9 +1891,9 @@ try {
 #endif
 
 	// Parse --calculate
-	ArgumentTree calc(true);
+	CalculationList calclist;
 	if (strCalculate != "") {
-		calc.Parse(strCalculate);
+		calclist.Parse(strCalculate);
 	}
 
 	// Parse --apply_time_delta
@@ -2138,57 +2138,31 @@ try {
 		ColumnDataHeader & cdhWorking = nodefile.m_cdh;
 
 		// Perform calculations
-		for (int i = 0; i < calc.size(); i++) {
+		for (int i = 0; i < calclist.size(); i++) {
+			const CalculationCommand & calccomm = calclist[i];
 			AnnounceStartBlock("Calculating \"%s\"",
-				calc.GetArgumentString(i).c_str());
-
-			const ArgumentTree * pargtree = calc.GetSubTree(i);
-			if (pargtree == NULL) {
-				AnnounceEndBlock("WARNING: No operation");
-				continue;
-			}
-
-			// Only assignment and function evaluations available
-			if ((pargtree->size() <= 2) || (pargtree->size() >= 5)) {
-				_EXCEPTIONT("Syntax error: Unable to interpret calculation");
-			}
-			if ((*pargtree)[1] != "=") {
-				_EXCEPTIONT("Syntax error: Unable to interpret calculation");
-			}
+				calccomm.ToString().c_str());
 
 			// Assignment operation
-			if (pargtree->size() == 3) {
-				int ix = cdhWorking.GetIndexFromString((*pargtree)[2]);
+			if (calccomm.arg.size() == 0) {
+				int ix = cdhWorking.GetIndexFromString(calccomm.rhs);
 				if (ix == (-1)) {
-					_EXCEPTION1("Unknown column header \"%s\"", (*pargtree)[2].c_str());
+					_EXCEPTION1("Unknown column header \"%s\"", calccomm.rhs.c_str());
 				}
-				nodefile.m_cdh.push_back((*pargtree)[0]);
+				nodefile.m_cdh.push_back(calccomm.lhs);
 				pathvec.Duplicate(ix);
 				AnnounceEndBlock("Done");
 				continue;
 			}
 
-			// Get the function arguments
-			int nArguments = (-1);
-			const ArgumentTree * pargfunc = pargtree->GetSubTree(3);
-			if (pargfunc != NULL) {
-				nArguments = pargfunc->size();
-			} else {
-				if ((*pargtree)[3] == "") {
-					nArguments = 0;
-				} else {
-					nArguments = 1;
-				}
-			}
-
 			// outputcmd
-			if ((*pargtree)[2] == "outputcmd") {
+			if (calccomm.rhs == "outputcmd") {
 
 				std::string strOutputCmd;
-				if (nArguments == 3) {
-					strOutputCmd = (*pargfunc)[0] + "," + (*pargfunc)[1] + "," + (*pargfunc)[2];
-				} else if (nArguments == 4) {
-					strOutputCmd = (*pargfunc)[0] + "(" + (*pargfunc)[1] + ")," + (*pargfunc)[2] + "," + (*pargfunc)[3];
+				if (calccomm.arg.size() == 3) {
+					strOutputCmd = calccomm.arg[0] + "," + calccomm.arg[1] + "," + calccomm.arg[2];
+				} else if (calccomm.arg.size() == 4) {
+					strOutputCmd = calccomm.arg[0] + "(" + calccomm.arg[1] + ")," + calccomm.arg[2] + "," + calccomm.arg[3];
 				} else {
 					_EXCEPTIONT("Syntax error: Function \"outputcmd\" "
 						"requires three arguments:\n"
@@ -2262,7 +2236,7 @@ try {
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhWorking.push_back((*pargtree)[0]);
+				cdhWorking.push_back(calccomm.lhs);
 
 				AnnounceEndBlock("Done");
 				continue;
@@ -2270,21 +2244,21 @@ try {
 			}
 
 			// eval_ace, eval_ike, eval_pdi
-			if (((*pargtree)[2] == "eval_ace") ||
-			    ((*pargtree)[2] == "eval_ike") ||
-			    ((*pargtree)[2] == "eval_pdi") ||
-				((*pargtree)[2] == "eval_acepsl")
+			if ((calccomm.rhs == "eval_ace") ||
+			    (calccomm.rhs == "eval_ike") ||
+			    (calccomm.rhs == "eval_pdi") ||
+				(calccomm.rhs == "eval_acepsl")
 			) {
 
 				// Cyclone metric
 				CycloneMetric eCycloneMetric;
-				if ((*pargtree)[2] == "eval_ace") {
+				if (calccomm.rhs == "eval_ace") {
 					eCycloneMetric = CycloneMetric_ACE;
-				} else if ((*pargtree)[2] == "eval_acepsl") {
+				} else if (calccomm.rhs == "eval_acepsl") {
 					eCycloneMetric = CycloneMetric_ACEPSL;
-				} else if ((*pargtree)[2] == "eval_ike") {
+				} else if (calccomm.rhs == "eval_ike") {
 					eCycloneMetric = CycloneMetric_IKE;
-				} else if ((*pargtree)[2] == "eval_pdi") {
+				} else if (calccomm.rhs == "eval_pdi") {
 					eCycloneMetric = CycloneMetric_PDI;
 				} else {
 					_EXCEPTION();
@@ -2293,35 +2267,35 @@ try {
 				std::string strRadiusArg;
 
 				if (eCycloneMetric == CycloneMetric_ACEPSL) {
-					if (nArguments != 2) {
+					if (calccomm.arg.size() != 2) {
 						_EXCEPTION2("Syntax error: Function \"%s\" "
 							"requires two arguments:\n"
 							"%s(<psl variable>, <radius>)",
-							(*pargtree)[2].c_str(),
-							(*pargtree)[2].c_str());
+							calccomm.rhs.c_str(),
+							calccomm.rhs.c_str());
 					}
 
-					strRadiusArg = (*pargfunc)[1];
+					strRadiusArg = calccomm.arg[1];
 
 				} else {
-					if (nArguments != 3) {
+					if (calccomm.arg.size() != 3) {
 						_EXCEPTION2("Syntax error: Function \"%s\" "
 							"requires three arguments:\n"
 							"%s(<u variable>, <v variable>, <radius>)",
-							(*pargtree)[2].c_str(),
-							(*pargtree)[2].c_str());
+							calccomm.rhs.c_str(),
+							calccomm.rhs.c_str());
 					}
 
-					strRadiusArg = (*pargfunc)[2];
+					strRadiusArg = calccomm.arg[2];
 				}
 
 				// Parse zonal wind variable
-				VariableIndex varixU = varreg.FindOrRegister((*pargfunc)[0]);
+				VariableIndex varixU = varreg.FindOrRegister(calccomm.arg[0]);
 
 				// Parse meridional wind variable (if present)
 				VariableIndex varixV = varixU;
 				if (eCycloneMetric != CycloneMetric_ACEPSL) {
-					varixV = varreg.FindOrRegister((*pargfunc)[1]);
+					varixV = varreg.FindOrRegister(calccomm.arg[1]);
 				}
 
 				// Loop through all Times
@@ -2363,25 +2337,25 @@ try {
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhWorking.push_back((*pargtree)[0]);
+				cdhWorking.push_back(calccomm.lhs);
 
 				AnnounceEndBlock("Done");
 				continue;
 			}
 
 			// radial_profile
-			if (((*pargtree)[2] == "radial_profile") || ((*pargtree)[2] == "radial_quadrant_profile")) {
-				if (nArguments != 3) {
+			if ((calccomm.rhs == "radial_profile") || (calccomm.rhs == "radial_quadrant_profile")) {
+				if (calccomm.arg.size() != 3) {
 					_EXCEPTION2("Syntax error: Function \"%s\" "
 						"requires three arguments:\n"
 						"%s(<variable>, <# bins>, <bin width>)",
-						(*pargtree)[2].c_str(), (*pargtree)[2].c_str());
+						calccomm.rhs.c_str(), calccomm.rhs.c_str());
 				}
 
-				bool fRadialProfile = ((*pargtree)[2] == "radial_profile");
+				bool fRadialProfile = (calccomm.rhs == "radial_profile");
 
 				// Parse zonal wind variable
-				VariableIndex varix = varreg.FindOrRegister((*pargfunc)[0]);
+				VariableIndex varix = varreg.FindOrRegister(calccomm.arg[0]);
 
 				// Loop through all Times
 				TimeToPathNodeMap::iterator iterPathNode =
@@ -2416,8 +2390,8 @@ try {
 								cdhWorking,
 								pathnode,
 								varix,
-								(*pargfunc)[1],
-								(*pargfunc)[2]);
+								calccomm.arg[1],
+								calccomm.arg[2]);
 	
 						} else {
 							CalculateQuadrantProfile(
@@ -2427,35 +2401,35 @@ try {
 								cdhWorking,
 								pathnode,
 								varix,
-								(*pargfunc)[1],
-								(*pargfunc)[2]);
+								calccomm.arg[1],
+								calccomm.arg[2]);
 						}
 					}
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhWorking.push_back((*pargtree)[0]);
+				cdhWorking.push_back(calccomm.lhs);
 
 				AnnounceEndBlock("Done");
 				continue;
 			}
 
 			// radial_wind_profile
-			if (((*pargtree)[2] == "radial_wind_profile") || ((*pargtree)[2] == "quadrant_wind_profile")) {
-				if (nArguments != 4) {
+			if ((calccomm.rhs == "radial_wind_profile") || (calccomm.rhs == "quadrant_wind_profile")) {
+				if (calccomm.arg.size() != 4) {
 					_EXCEPTION2("Syntax error: Function \"%s\" "
 						"requires four arguments:\n"
 						"%s(<u variable>, <v variable>, <# bins>, <bin width>)",
-						(*pargtree)[2].c_str(), (*pargtree)[2].c_str());
+						calccomm.rhs.c_str(), calccomm.rhs.c_str());
 				}
 
-				bool fRadialWindProfile = ((*pargtree)[2] == "radial_wind_profile");
+				bool fRadialWindProfile = (calccomm.rhs == "radial_wind_profile");
 
 				// Parse zonal wind variable
-				VariableIndex varixU = varreg.FindOrRegister((*pargfunc)[0]);
+				VariableIndex varixU = varreg.FindOrRegister(calccomm.arg[0]);
 
 				// Parse meridional wind variable
-				VariableIndex varixV = varreg.FindOrRegister((*pargfunc)[1]);
+				VariableIndex varixV = varreg.FindOrRegister(calccomm.arg[1]);
 
 				// Loop through all Times
 				TimeToPathNodeMap::iterator iterPathNode =
@@ -2491,8 +2465,8 @@ try {
 								pathnode,
 								varixU,
 								varixV,
-								(*pargfunc)[2],
-								(*pargfunc)[3]);
+								calccomm.arg[2],
+								calccomm.arg[3]);
 
 						} else {
 							CalculateQuadrantWindProfile(
@@ -2503,39 +2477,39 @@ try {
 								pathnode,
 								varixU,
 								varixV,
-								(*pargfunc)[2],
-								(*pargfunc)[3]);
+								calccomm.arg[2],
+								calccomm.arg[3]);
 						}
 					}
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhWorking.push_back((*pargtree)[0]);
+				cdhWorking.push_back(calccomm.lhs);
 
 				AnnounceEndBlock("Done");
 				continue;
 			}
 
 			// lastwhere
-			if (((*pargtree)[2] == "firstwhere") || ((*pargtree)[2] == "lastwhere")) {
-				if (nArguments != 3) {
+			if ((calccomm.rhs == "firstwhere") || (calccomm.rhs == "lastwhere")) {
+				if (calccomm.arg.size() != 3) {
 					_EXCEPTION2("Syntax error: Function \"%s\" "
 						"requires three arguments:\n"
 						"%s(<column name>, <op>, <value>)",
-						(*pargtree)[2].c_str(), (*pargtree)[2].c_str());
+						calccomm.rhs.c_str(), calccomm.rhs.c_str());
 				}
 
-				bool fFirstWhere = ((*pargtree)[2] == "firstwhere");
+				bool fFirstWhere = (calccomm.rhs == "firstwhere");
 
 				// Get arguments
-				int ixCol = cdhWorking.GetIndexFromString((*pargfunc)[0]);
+				int ixCol = cdhWorking.GetIndexFromString(calccomm.arg[0]);
 				if (ixCol == (-1)) {
-					_EXCEPTION1("Invalid column header \"%s\"", (*pargfunc)[0].c_str());
+					_EXCEPTION1("Invalid column header \"%s\"", calccomm.arg[0].c_str());
 				}
 
-				const std::string & strOp = (*pargfunc)[1];
+				const std::string & strOp = calccomm.arg[1];
 
-				const std::string & strThreshold = (*pargfunc)[2];
+				const std::string & strThreshold = calccomm.arg[2];
 
 				// Loop through all PathNodes
 				for (int p = 0; p < pathvec.size(); p++) {
@@ -2574,7 +2548,7 @@ try {
 						if (pdat2DA != NULL) {
 							if (pdat2DA->m_dValues.size() < 2) {
 								_EXCEPTION1("2DArray \"%s\" must have at least two entries",
-									(*pargfunc)[0].c_str());
+									calccomm.arg[0].c_str());
 							}
 							ColumnData1DArray * pdatOut = new ColumnData1DArray;
 
@@ -2596,32 +2570,32 @@ try {
 						}
 
 						_EXCEPTION1("Cannot cast \"%s\" to DoubleArray or 2DArray type",
-							(*pargfunc)[0].c_str());
+							calccomm.arg[0].c_str());
 					}
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhWorking.push_back((*pargtree)[0]);
+				cdhWorking.push_back(calccomm.lhs);
 
 				AnnounceEndBlock("Done");
 				continue;
 			}
 
 			// Extract the value of an array at a given radius
-			if ((*pargtree)[2] == "value") {
-				if (nArguments != 2) {
+			if (calccomm.rhs == "value") {
+				if (calccomm.arg.size() != 2) {
 					_EXCEPTIONT("Syntax error: Function \"value\" "
 						"requires two arguments:\n"
 						"value(<column name>, <index>)");
 				}
 
 				// Get arguments
-				int ix = cdhWorking.GetIndexFromString((*pargfunc)[0]);
+				int ix = cdhWorking.GetIndexFromString(calccomm.arg[0]);
 				if (ix == (-1)) {
-					_EXCEPTION1("Invalid column header \"%s\"", (*pargfunc)[0].c_str());
+					_EXCEPTION1("Invalid column header \"%s\"", calccomm.arg[0].c_str());
 				}
 
-				const std::string & strIndex = (*pargfunc)[1];
+				const std::string & strIndex = calccomm.arg[1];
 
 				// Loop through all PathNodes
 				for (int p = 0; p < pathvec.size(); p++) {
@@ -2636,7 +2610,7 @@ try {
 
 						if (pdat == NULL) {
 							_EXCEPTION1("Cannot cast \"%s\" to DoubleArray type",
-								(*pargfunc)[0].c_str());
+								calccomm.arg[0].c_str());
 						}
 
 						const std::vector<double> & dR = pdat->GetIndices();
@@ -2685,35 +2659,35 @@ try {
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhWorking.push_back((*pargtree)[0]);
+				cdhWorking.push_back(calccomm.lhs);
 
 				AnnounceEndBlock("Done");
 				continue;
 			}
 
 			// max_closed_contour_delta
-			if (((*pargtree)[2] == "max_closed_contour_delta") || ((*pargtree)[2] == "max_closed_contour_value")) {
-				if ((nArguments < 2) && (nArguments > 3)) {
+			if ((calccomm.rhs == "max_closed_contour_delta") || (calccomm.rhs == "max_closed_contour_value")) {
+				if ((calccomm.arg.size() < 2) && (calccomm.arg.size() > 3)) {
 					_EXCEPTION3("Syntax error: Function \"%s\" "
 						"requires two or three arguments:\n"
 						"%s(<variable>, <radius>)\n"
 						"%s(<variable>, <radius>, <index>)",
-						(*pargtree)[2].c_str(), (*pargtree)[2].c_str(), (*pargtree)[2].c_str());
+						calccomm.rhs.c_str(), calccomm.rhs.c_str(), calccomm.rhs.c_str());
 				}
 
 				// Add the root value back into the max_closed_contour_delta
-				bool fAddRootValue = ((*pargtree)[2] == "max_closed_contour_value");
+				bool fAddRootValue = (calccomm.rhs == "max_closed_contour_value");
 
 				// Parse variable
-				VariableIndex varix = varreg.FindOrRegister((*pargfunc)[0]);
+				VariableIndex varix = varreg.FindOrRegister(calccomm.arg[0]);
 
 				// Radius
-				std::string strRadius((*pargfunc)[1]);
+				std::string strRadius(calccomm.arg[1]);
 				
 				// Index
 				std::string strIndex("");
-				if (pargfunc->size() == 3) {
-					strIndex = (*pargfunc)[2];
+				if (calccomm.arg.size() == 3) {
+					strIndex = calccomm.arg[2];
 				}
 
 				// Loop through all Times
@@ -2755,21 +2729,21 @@ try {
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhWorking.push_back((*pargtree)[0]);
+				cdhWorking.push_back(calccomm.lhs);
 
 				AnnounceEndBlock("Done");
 				continue;
 			}
 
 			// region_name
-			if ((*pargtree)[2] == "region_name") {
-				if (nArguments != 1) {
+			if (calccomm.rhs == "region_name") {
+				if (calccomm.arg.size() != 1) {
 					_EXCEPTIONT("Syntax error: Function \"region_name\" "
 						"requires one argument:\n"
 						"region_name(<filename>)");
 				}
 
-				std::string strFilename = (*pargtree)[3];
+				std::string strFilename = calccomm.arg[0];
 				if (strFilename[0] == '\"') {
 					if ((strFilename.length() == 1) ||
 						(strFilename[strFilename.length()-1] != '\"')
@@ -2805,16 +2779,16 @@ try {
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhWorking.push_back((*pargtree)[0]);
+				cdhWorking.push_back(calccomm.lhs);
 
 				continue;
 			}
 /*
 			// min,max
-			if (((*pargtree)[2] == "min") ||
-			    ((*pargtree)[2] == "max")
+			if ((calccomm.rhs == "min") ||
+			    (calccomm.rhs == "max")
 			) {
-				if (nArguments < 2) {
+				if (calccomm.arg.size() < 2) {
 					_EXCEPTION1("Syntax error: Function \"%s\" requires at least two arguments",
 						(*pargtree)[2].c_str());
 				}
@@ -2831,15 +2805,15 @@ try {
 */
 /*
 			// sum_radius
-			if ((*pargtree)[2] == "sum_radius") {
-				if (pargfunc->size() != 2) {
+			if (calccomm.rhs == "sum_radius") {
+				if (calccomm.arg.size() != 2) {
 					_EXCEPTIONT("Syntax error: Function \"sum_radius\" "
 						"requires two arguments:\n"
 						"lastwhere(<field>, <radius>)");
 				}
 
 				// Parse variable
-				VariableIndex varix = varreg.FindOrRegister((*pargfunc)[0]);
+				VariableIndex varix = varreg.FindOrRegister(calccomm.arg[0]);
 
 				// Loop through all Times
 				TimeToPathNodeMap::iterator iterPathNode =
@@ -2873,12 +2847,12 @@ try {
 							cdhWorking,
 							pathnode,
 							varix,
-							(*pargfunc)[1]);
+							calccomm.arg[1]);
 					}
 				}
 
 				// Add new variable to ColumnDataHeader
-				cdhWorking.push_back((*pargtree)[0]);
+				cdhWorking.push_back(calccomm.lhs);
 
 				AnnounceEndBlock("Done");
 				continue;
@@ -2887,7 +2861,7 @@ try {
 			// Unknown operation
 			Announce(NULL);
 			AnnounceEndBlock("WARNING: Unknown function \"%s\" no operation performed",
-				(*pargtree)[2].c_str());
+				calccomm.rhs.c_str());
 
 		}
 

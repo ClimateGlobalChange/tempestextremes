@@ -88,6 +88,18 @@ public:
 		lon_periodic(a_lon_periodic),
 		lon_width(a_lon_width)
 	{
+		set(a_lon0, a_lon1, a_lat0, a_lat1);
+	}
+
+	///	<summary>
+	///		Set the latlonbox bounds to the specified values.
+	///	</summary>
+	void set(
+		Type a_lon0,
+		Type a_lon1,
+		Type a_lat0,
+		Type a_lat1
+	) {
 		lon[0] = a_lon0;
 		lon[1] = a_lon1;
 		lat[0] = a_lat0;

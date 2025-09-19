@@ -6,8 +6,6 @@
 list(APPEND FILES
   Announce.h
   Announce.cpp
-  ArgumentTree.h
-  ArgumentTree.cpp
   AutoCurator.h
   AutoCurator.cpp
   CommandLine.h

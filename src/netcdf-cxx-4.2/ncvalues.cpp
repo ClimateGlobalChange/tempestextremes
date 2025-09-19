@@ -42,6 +42,8 @@ implement(NcValues,nclong)
 implement(NcValues,long)
 implement(NcValues,float)
 implement(NcValues,double)
+implement(NcValues,ushort)
+implement(NcValues,uint)
 implement(NcValues,ncint64)
 implement(NcValues,ncuint64)
 implement(NcValues,ncstring)
@@ -54,6 +56,8 @@ Ncbytes_for_one_implement(nclong)
 Ncbytes_for_one_implement(long)
 Ncbytes_for_one_implement(float)
 Ncbytes_for_one_implement(double)
+Ncbytes_for_one_implement(ushort)
+Ncbytes_for_one_implement(uint)
 Ncbytes_for_one_implement(ncint64)
 Ncbytes_for_one_implement(ncuint64)
 Ncbytes_for_one_implement(ncstring)
@@ -64,6 +68,8 @@ as_ncbyte_implement(nclong)
 as_ncbyte_implement(long)
 as_ncbyte_implement(float)
 as_ncbyte_implement(double)
+as_ncbyte_implement(ushort)
+as_ncbyte_implement(uint)
 as_ncbyte_implement(ncint64)
 as_ncbyte_implement(ncuint64)
 
@@ -96,6 +102,14 @@ inline char NcValues_char::as_char( long n ) const {
 	return the_values[n];
 }
 
+inline char NcValues_ushort::as_char( long n ) const {
+	return the_values[n];
+}
+
+inline char NcValues_uint::as_char( long n ) const {
+	return the_values[n];
+}
+
 inline char NcValues_ncstring::as_char( long n ) const {
 	return the_values[n];
 }
@@ -117,6 +131,14 @@ inline short NcValues_char::as_short( long n ) const {
 }
 
 inline short NcValues_short::as_short( long n ) const {
+	return the_values[n];
+}
+
+inline short NcValues_ushort::as_short( long n ) const {
+	return the_values[n];
+}
+
+inline short NcValues_uint::as_short( long n ) const {
 	return the_values[n];
 }
 
@@ -154,6 +176,14 @@ inline int NcValues_long::as_int( long n ) const {
 	return the_values[n];
 }
 
+inline int NcValues_ushort::as_int( long n ) const {
+	return the_values[n];
+}
+
+inline int NcValues_uint::as_int( long n ) const {
+	return the_values[n];
+}
+
 inline int NcValues_ncstring::as_int( long n ) const {
 	return the_values[n];
 }
@@ -188,6 +218,14 @@ inline nclong NcValues_long::as_nclong( long n ) const {
 	return the_values[n];
 }
 
+inline nclong NcValues_ushort::as_nclong( long n ) const {
+	return the_values[n];
+}
+
+inline nclong NcValues_uint::as_nclong( long n ) const {
+	return the_values[n];
+}
+
 inline nclong NcValues_ncstring::as_nclong( long n ) const {
 	return the_values[n];
 }
@@ -219,6 +257,14 @@ inline long NcValues_long::as_long( long n ) const {
 	return the_values[n];
 }
 
+inline long NcValues_ushort::as_long( long n ) const {
+	return the_values[n];
+}
+
+inline long NcValues_uint::as_long( long n ) const {
+	return the_values[n];
+}
+
 inline long NcValues_ncint64::as_long( long n ) const {
 	return the_values[n];
 }
@@ -231,83 +277,33 @@ inline long NcValues_ncstring::as_long( long n ) const {
 	return the_values[n];
 }
 
+as_ncint64_implement(ncbyte)
+as_ncint64_implement(char)
+as_ncint64_implement(short)
+as_ncint64_implement(int)
+as_ncint64_implement(nclong)
+as_ncint64_implement(long)
 as_ncint64_implement(float)
 as_ncint64_implement(double)
+as_ncint64_implement(ushort)
+as_ncint64_implement(uint)
+as_ncint64_implement(ncint64)
+as_ncint64_implement(ncuint64)
+as_ncint64_implement(ncstring)
 
-inline ncint64 NcValues_ncbyte::as_ncint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncint64 NcValues_char::as_ncint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncint64 NcValues_short::as_ncint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncint64 NcValues_int::as_ncint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncint64 NcValues_nclong::as_ncint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncint64 NcValues_long::as_ncint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncint64 NcValues_ncint64::as_ncint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncint64 NcValues_ncuint64::as_ncint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncint64 NcValues_ncstring::as_ncint64( long n ) const {
-	return the_values[n];
-}
-
+as_ncuint64_implement(ncbyte)
+as_ncuint64_implement(char)
+as_ncuint64_implement(short)
+as_ncuint64_implement(int)
+as_ncuint64_implement(nclong)
+as_ncuint64_implement(long)
 as_ncuint64_implement(float)
 as_ncuint64_implement(double)
-
-inline ncuint64 NcValues_ncbyte::as_ncuint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncuint64 NcValues_char::as_ncuint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncuint64 NcValues_short::as_ncuint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncuint64 NcValues_int::as_ncuint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncuint64 NcValues_nclong::as_ncuint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncuint64 NcValues_long::as_ncuint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncuint64 NcValues_ncint64::as_ncuint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncuint64 NcValues_ncuint64::as_ncuint64( long n ) const {
-	return the_values[n];
-}
-
-inline ncuint64 NcValues_ncstring::as_ncuint64( long n ) const {
-	return the_values[n];
-}
+as_ncuint64_implement(ushort)
+as_ncuint64_implement(uint)
+as_ncuint64_implement(ncint64)
+as_ncuint64_implement(ncuint64)
+as_ncuint64_implement(ncstring)
 
 as_float_implement(ncbyte)
 as_float_implement(char)
@@ -317,6 +313,8 @@ as_float_implement(nclong)
 as_float_implement(long)
 as_float_implement(float)
 as_float_implement(double)
+as_float_implement(ushort)
+as_float_implement(uint)
 as_float_implement(ncint64)
 as_float_implement(ncuint64)
 as_float_implement(ncstring)
@@ -329,10 +327,39 @@ as_double_implement(nclong)
 as_double_implement(long)
 as_double_implement(float)
 as_double_implement(double)
+as_double_implement(ushort)
+as_double_implement(uint)
 as_double_implement(ncint64)
 as_double_implement(ncuint64)
 as_double_implement(ncstring)
 
+as_ushort_implement(ncbyte)
+as_ushort_implement(char)
+as_ushort_implement(short)
+as_ushort_implement(int)
+as_ushort_implement(nclong)
+as_ushort_implement(long)
+as_ushort_implement(float)
+as_ushort_implement(double)
+as_ushort_implement(ushort)
+as_ushort_implement(uint)
+as_ushort_implement(ncint64)
+as_ushort_implement(ncuint64)
+as_ushort_implement(ncstring)
+
+as_uint_implement(ncbyte)
+as_uint_implement(char)
+as_uint_implement(short)
+as_uint_implement(int)
+as_uint_implement(nclong)
+as_uint_implement(long)
+as_uint_implement(float)
+as_uint_implement(double)
+as_uint_implement(ushort)
+as_uint_implement(uint)
+as_uint_implement(ncint64)
+as_uint_implement(ncuint64)
+as_uint_implement(ncstring)
 
 as_string_implement(short)
 as_string_implement(int)
@@ -340,6 +367,8 @@ as_string_implement(nclong)
 as_string_implement(long)
 as_string_implement(float)
 as_string_implement(double)
+as_string_implement(ushort)
+as_string_implement(uint)
 as_string_implement(ncint64)
 as_string_implement(ncuint64)
 
@@ -435,6 +464,22 @@ std::ostream& NcValues_double::print(std::ostream& os) const {
 	if (the_number > 0)
 		os << the_values[the_number-1];
 	os.precision(save);
+	return os;
+}
+
+std::ostream& NcValues_ushort::print(std::ostream& os) const {
+	for(int i = 0; i < the_number - 1; i++)
+		os << the_values[i] << ", ";
+	if (the_number > 0)
+		os << the_values[the_number-1] ;
+	return os;
+}
+
+std::ostream& NcValues_uint::print(std::ostream& os) const {
+	for(int i = 0; i < the_number - 1; i++)
+		os << the_values[i] << ", ";
+	if (the_number > 0)
+		os << the_values[the_number-1] ;
 	return os;
 }
 

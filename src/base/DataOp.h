@@ -105,6 +105,22 @@ public:
 		DataArray1D<float> & dataout
 	);
 
+public:
+	///	<summary>
+	///		If all units in the vector are the same then return the common
+	///		units. If any are not equal return an empty string.
+	///	</summary>
+	std::string GetUnits_Common(
+		const std::vector<std::string> & vecUnits
+	);
+
+	///	<summary>
+	///		Get the modified units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	);
+
 protected:
 	///	<summary>
 	///		Name of this DataOp.
@@ -140,6 +156,16 @@ public:
 		const std::vector<DataArray1D<float> const *> & vecArgData,
 		DataArray1D<float> & dataout
 	);
+
+public:
+	///	<summary>
+	///		Get the modified units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	) {
+		return GetUnits_Common(vecUnits);
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -170,6 +196,15 @@ public:
 		const std::vector<DataArray1D<float> const *> & vecArgData,
 		DataArray1D<float> & dataout
 	);
+
+	///	<summary>
+	///		Get the modified units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	) {
+		return GetUnits_Common(vecUnits);
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -260,6 +295,15 @@ public:
 		const std::vector<DataArray1D<float> const *> & vecArgData,
 		DataArray1D<float> & dataout
 	);
+
+	///	<summary>
+	///		Get the modified units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	) {
+		return GetUnits_Common(vecUnits);
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -290,6 +334,15 @@ public:
 		const std::vector<DataArray1D<float> const *> & vecArgData,
 		DataArray1D<float> & dataout
 	);
+
+	///	<summary>
+	///		Get the modified units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	) {
+		return GetUnits_Common(vecUnits);
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -320,6 +373,15 @@ public:
 		const std::vector<DataArray1D<float> const *> & vecArgData,
 		DataArray1D<float> & dataout
 	);
+
+	///	<summary>
+	///		Get the modified units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	) {
+		return GetUnits_Common(vecUnits);
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -410,6 +472,15 @@ public:
 		const std::vector<DataArray1D<float> const *> & vecArgData,
 		DataArray1D<float> & dataout
 	);
+
+	///	<summary>
+	///		Get the modified units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	) {
+		return GetUnits_Common(vecUnits);
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -440,6 +511,15 @@ public:
 		const std::vector<DataArray1D<float> const *> & vecArgData,
 		DataArray1D<float> & dataout
 	);
+
+	///	<summary>
+	///		Get the modified units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	) {
+		return GetUnits_Common(vecUnits);
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -590,6 +670,15 @@ public:
 		const std::vector<DataArray1D<float> const *> & vecArgData,
 		DataArray1D<float> & dataout
 	);
+
+	///	<summary>
+	///		Get the units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	) {
+		return std::string("degrees_north");
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -620,6 +709,15 @@ public:
 		const std::vector<DataArray1D<float> const *> & vecArgData,
 		DataArray1D<float> & dataout
 	);
+
+	///	<summary>
+	///		Get the units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	) {
+		return std::string("degrees_east");
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -650,6 +748,15 @@ public:
 		const std::vector<DataArray1D<float> const *> & vecArgData,
 		DataArray1D<float> & dataout
 	);
+
+	///	<summary>
+	///		Get the units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	) {
+		return std::string("m2");
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -680,6 +787,15 @@ public:
 		const std::vector<DataArray1D<float> const *> & vecArgData,
 		DataArray1D<float> & dataout
 	);
+
+	///	<summary>
+	///		Get the modified units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	) {
+		return std::string("s-1");
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -990,6 +1106,15 @@ public:
 		DataArray1D<float> & dataout
 	);
 
+	///	<summary>
+	///		Get the modified units.
+	///	</summary>
+	virtual std::string GetUnits(
+		const std::vector<std::string> & vecUnits
+	) {
+		return GetUnits_Common(vecUnits);
+	}
+
 protected:
 	///	<summary>
 	///		Evaluation distance for the mean operator.
@@ -1005,6 +1130,66 @@ protected:
 	///		Sparse matrix operator.
 	///	</summary>
 	SparseMatrix<float> m_opMean;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class DataOp_DAILYCHILLHOURS : public DataOp {
+
+public:
+	///	<summary>
+	///		Operartor name.
+	///	</summary>
+	static const char * name;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_DAILYCHILLHOURS() :
+		DataOp(name)
+	{ }
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class DataOp_RELHUMFROMTDTA : public DataOp {
+
+public:
+	///	<summary>
+	///		Operartor name.
+	///	</summary>
+	static const char * name;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_RELHUMFROMTDTA() :
+		DataOp(name)
+	{ }
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
 };
 
 ///////////////////////////////////////////////////////////////////////////////

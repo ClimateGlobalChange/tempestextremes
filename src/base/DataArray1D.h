@@ -253,6 +253,21 @@ public:
 	}
 
 	///	<summary>
+	///		Set the content of this DataArray1D to the specified value.
+	///	</summary>
+	void Set(const T & x) {
+
+		// Check that this DataArray1D is attached to a data object
+		if (!IsAttached()) {
+			_EXCEPTIONT("Attempted operation on uninitialized DataArray1D");
+		}
+
+		for (size_t i = 0; i < m_sSize; i++) {
+			m_data[i] = x;
+		}
+	}
+
+	///	<summary>
 	///		Scale data by a given constant.
 	///	</summary>
 	void Scale(const T & x) {
@@ -350,6 +365,21 @@ public:
 
 public:
 	///	<summary>
+	///		Get the units.
+	///	</summary>
+	const std::string & GetUnits() const {
+		return m_strUnits;
+	}
+
+	///	<summary>
+	///		Set the units.
+	///	</summary>
+	void SetUnits(const std::string & strUnits) {
+		m_strUnits = strUnits;
+	}
+
+public:
+	///	<summary>
 	///		Implicit converstion to a pointer.
 	///	</summary>
 	inline operator T const*() const {
@@ -406,6 +436,11 @@ private:
 	///		FillValue.
 	///	</summary>
 	T m_dFillValue;
+
+	///	<summary>
+	///		Units of the data stored in the DataArray1D.
+	///	</summary>
+	std::string m_strUnits;
 
 	///	<summary>
 	///		A pointer to the data for this DataArray1D.

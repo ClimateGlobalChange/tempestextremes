@@ -16,7 +16,7 @@ list(APPEND NODE_FILE_COMPOSE_FILES
 )
 
 list(APPEND NODE_FILE_EDITOR_FILES
-  NodeFileEditor.cpp
+  NodeFileEditor.cpp CalculationList.cpp
 )
 
 list(APPEND NODE_FILE_FILTER_FILES

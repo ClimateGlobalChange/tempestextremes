@@ -331,6 +331,23 @@ public:
 	}
 
 	///	<summary>
+	///		Set the content of this DataArray4D to the specified value.
+	///	</summary>
+	void Set(const T & x) {
+
+		// Check that this DataArray4D is attached to a data object
+		if (!IsAttached()) {
+			_EXCEPTIONT("Attempted operation on uninitialized DataArray1D");
+		}
+
+		size_t sTotalSize = GetTotalSize();
+
+		for (size_t i = 0; i < sTotalSize; i++) {
+			m_data1D[i] = x;
+		}
+	}
+
+	///	<summary>
 	///		Scale data by a given constant.
 	///	</summary>
 	void Scale(const T & x) {

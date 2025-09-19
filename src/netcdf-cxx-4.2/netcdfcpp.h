@@ -77,6 +77,7 @@ public:
 		const NcDim* dim2=0,            // 3-dim
 		const NcDim* dim3=0,            // 4-dim
 		const NcDim* dim4=0 );          // 5-dim
+
 	virtual NcVar* add_var(
 		NcToken varname, NcType type,   // n-dim
 		int ndims,
@@ -89,6 +90,8 @@ public:
 	NcBool add_att( NcToken attname, int );
 	NcBool add_att( NcToken attname, float );
 	NcBool add_att( NcToken attname, double );
+	NcBool add_att( NcToken attname, ushort );
+	NcBool add_att( NcToken attname, uint );
 	NcBool add_att( NcToken attname, ncint64 );
 	NcBool add_att( NcToken attname, ncuint64 );
 	NcBool add_att( NcToken attname, const char*);
@@ -99,6 +102,8 @@ public:
 	NcBool add_att( NcToken attname, int, const int* );
 	NcBool add_att( NcToken attname, int, const float* );
 	NcBool add_att( NcToken attname, int, const double* );
+	NcBool add_att( NcToken attname, int, const ushort* );
+	NcBool add_att( NcToken attname, int, const uint* );
 	NcBool add_att( NcToken attname, int, const ncint64* );
 	NcBool add_att( NcToken attname, int, const ncuint64* );
 
@@ -121,7 +126,7 @@ public:
 	NcBool data_mode( void );              // leaves in data mode, if possible
 	int id( void ) const;                  // id used by C interface
 
-  protected:
+protected:
 	int the_id;
 	int in_define_mode;
 	FillMode the_fill_mode;
@@ -194,6 +199,8 @@ public:
 	virtual long as_long( long n ) const;         // nth value as long
 	virtual float as_float( long n ) const;       // nth value as floating-point
 	virtual double as_double( long n ) const;     // nth value as double
+	virtual ushort as_ushort( long n ) const;     // nth value as unsigned short
+	virtual uint as_uint( long n ) const;         // nth value as unsigned int
 	virtual ncint64 as_ncint64( long n ) const;   // nth value as ncint64
 	virtual ncuint64 as_ncuint64( long n ) const; // nth value as ncuint64
 	virtual char* as_string( long n ) const;      // nth value as string
@@ -242,6 +249,10 @@ public:
 		long c0=0, long c1=0, long c2=0, long c3=0, long c4=0 );
 	NcBool put( const double* vals,
 		long c0=0, long c1=0, long c2=0, long c3=0, long c4=0 );
+	NcBool put( const ushort* vals,
+		long c0=0, long c1=0, long c2=0, long c3=0, long c4=0 );
+	NcBool put( const uint* vals,
+		long c0=0, long c1=0, long c2=0, long c3=0, long c4=0 );
 	NcBool put( const ncint64* vals,
 		long c0=0, long c1=0, long c2=0, long c3=0, long c4=0 );
 	NcBool put( const ncuint64* vals,
@@ -256,6 +267,8 @@ public:
 	NcBool put( const long* vals, const long* counts );
 	NcBool put( const float* vals, const long* counts );
 	NcBool put( const double* vals, const long* counts );
+	NcBool put( const ushort* vals, const long* counts );
+	NcBool put( const uint* vals, const long* counts );
 	NcBool put( const ncint64* vals, const long* counts );
 	NcBool put( const ncuint64* vals, const long* counts );
 
@@ -277,6 +290,10 @@ public:
 		long c2=0, long c3=0, long c4=0 ) const;
 	NcBool get( double* vals, long c0=0, long c1=0,
 		long c2=0, long c3=0, long c4=0 ) const; 
+	NcBool get( ushort* vals, long c0=0, long c1=0,
+		long c2=0, long c3=0, long c4=0 ) const;
+	NcBool get( uint* vals, long c0=0, long c1=0,
+		long c2=0, long c3=0, long c4=0 ) const;
 	NcBool get( ncint64* vals, long c0=0, long c1=0,
 		long c2=0, long c3=0, long c4=0 ) const; 
 	NcBool get( ncuint64* vals, long c0=0, long c1=0,
@@ -291,6 +308,8 @@ public:
 	NcBool get( long* vals, const long* counts ) const;
 	NcBool get( float* vals, const long* counts ) const;
 	NcBool get( double* vals, const long* counts ) const;
+	NcBool get( ushort* vals, const long* counts ) const;
+	NcBool get( uint* vals, const long* counts ) const;
 	NcBool get( ncint64* vals, const long* counts ) const;
 	NcBool get( ncuint64* vals, const long* counts ) const;
 
@@ -310,6 +329,8 @@ public:
 	NcBool add_att( NcToken, long );
 	NcBool add_att( NcToken, float );
 	NcBool add_att( NcToken, double );
+	NcBool add_att( NcToken, ushort );
+	NcBool add_att( NcToken, uint );
 	NcBool add_att( NcToken, ncint64 );
 	NcBool add_att( NcToken, ncuint64 );
 	NcBool add_att( NcToken, const char* );            // string attribute
@@ -320,6 +341,8 @@ public:
 	NcBool add_att( NcToken, int, const long* );
 	NcBool add_att( NcToken, int, const float* );
 	NcBool add_att( NcToken, int, const double* );
+	NcBool add_att( NcToken, int, const ushort* );
+	NcBool add_att( NcToken, int, const uint* );
 	NcBool add_att( NcToken, int, const ncint64* );
 	NcBool add_att( NcToken, int, const ncuint64* );
 
@@ -345,6 +368,8 @@ public:
 	NcBool put_rec( const long* vals );
 	NcBool put_rec( const float* vals );
 	NcBool put_rec( const double* vals );
+	NcBool put_rec( const ushort* vals );
+	NcBool put_rec( const uint* vals );
 	NcBool put_rec( const ncint64* vals );
 	NcBool put_rec( const ncuint64* vals );
 
@@ -356,6 +381,8 @@ public:
 	NcBool put_rec( NcDim* d, const long* vals );
 	NcBool put_rec( NcDim* d, const float* vals );
 	NcBool put_rec( NcDim* d, const double* vals );
+	NcBool put_rec( NcDim* d, const ushort* vals );
+	NcBool put_rec( NcDim* d, const uint* vals );
 	NcBool put_rec( NcDim* d, const ncint64* vals );
 	NcBool put_rec( NcDim* d, const ncuint64* vals );
 
@@ -367,6 +394,8 @@ public:
 	NcBool put_rec( const long* vals, long rec );
 	NcBool put_rec( const float* vals, long rec );
 	NcBool put_rec( const double* vals, long rec );
+	NcBool put_rec( const ushort* vals, long rec );
+	NcBool put_rec( const uint* vals, long rec );
 	NcBool put_rec( const ncint64* vals, long rec );
 	NcBool put_rec( const ncuint64* vals, long rec );
 
@@ -378,6 +407,8 @@ public:
 	NcBool put_rec( NcDim* d, const long* vals, long slice );
 	NcBool put_rec( NcDim* d, const float* vals, long slice );
 	NcBool put_rec( NcDim* d, const double* vals, long slice );
+	NcBool put_rec( NcDim* d, const ushort* vals, long slice );
+	NcBool put_rec( NcDim* d, const uint* vals, long slice );
 	NcBool put_rec( NcDim* d, const ncint64* vals, long slice );
 	NcBool put_rec( NcDim* d, const ncuint64* vals, long slice );
 
@@ -389,6 +420,8 @@ public:
 	long get_index( const long* vals );
 	long get_index( const float* vals );
 	long get_index( const double* vals );
+	long get_index( const ushort* vals );
+	long get_index( const uint* vals );
 	long get_index( const ncint64* vals );
 	long get_index( const ncuint64* vals );
 
@@ -400,6 +433,8 @@ public:
 	long get_index( NcDim* d, const long* vals );
 	long get_index( NcDim* d, const float* vals );
 	long get_index( NcDim* d, const double* vals );
+	long get_index( NcDim* d, const ushort* vals );
+	long get_index( NcDim* d, const uint* vals );
 	long get_index( NcDim* d, const ncint64* vals );
 	long get_index( NcDim* d, const ncuint64* vals );
 

@@ -31,6 +31,7 @@
 #include <set>
 #include <map>
 #include <limits>
+#include <ctime>
 
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
@@ -117,6 +118,9 @@ try {
 
 	// Name of longitude dimension
 	std::string strLongitudeName;
+
+	// Command line
+	std::string strCommandLine = GetCommandLineAsString(argc, argv);
 
 	// Parse the command line
 	BeginCommandLine()
@@ -285,6 +289,14 @@ try {
 	NcFile ncfileout(strOutputData.c_str(), NcFile::Replace, NULL, 0, NcFile::Netcdf4);
 	std::vector<NcDim *> vecOutputGridDim;
 	NcVar * varOutputQuantile = NULL;
+
+	// Write provenance to output file
+	{
+		const std::time_t timetNow = std::time(nullptr);
+		std::string strProvenance = std::asctime(std::localtime(&timetNow));
+		strProvenance += ": " + strCommandLine;
+		ncfileout.add_att("history", strProvenance.c_str());
+	}
 
 	// Fill value
 	bool fFirstFileHasFillValue = false;
@@ -611,7 +623,12 @@ try {
 								_EXCEPTION2("_FillValue attribute is present in \"%s\" but not present in \"%s\"",
 									vecInputFiles[f].c_str(), vecInputFiles[0].c_str());
 							}
-							if (varQuantile.GetFillValueFloat() != dFillValue) {
+							int nFillValueNanCount =
+								((std::isnan(varQuantile.GetFillValueFloat()))?1:0)
+								+ ((std::isnan(dFillValue))?1:0);
+							if ((nFillValueNanCount == 1) ||
+							    ((nFillValueNanCount == 0) && (varQuantile.GetFillValueFloat() != dFillValue))
+							) {
 								_EXCEPTION4("_FillValue attribute present in \"%s\" (%f) is not equal to value present in \"%s\" (%f)",
 									vecInputFiles[f].c_str(), varQuantile.GetFillValueFloat(),
 									vecInputFiles[0].c_str(), dFillValue);

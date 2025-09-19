@@ -24,7 +24,6 @@
 #include "Variable.h"
 #include "AutoCurator.h"
 #include "DataArray2D.h"
-#include "ArgumentTree.h"
 #include "STLStringHelper.h"
 #include "NodeFileUtilities.h"
 #include "NetCDFUtilities.h"
