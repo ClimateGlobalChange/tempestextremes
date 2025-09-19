@@ -36,6 +36,11 @@ typedef std::vector<long> VariableDimIndex;
 typedef VariableDimIndex VariableAuxIndex;
 
 ///	<summary>
+///		An object holding sizes for a given Variable.
+///	</summary>
+typedef VariableDimIndex VariableAuxSize;
+
+///	<summary>
 ///		A structure containing both a dimension name and size.
 ///	</summary>
 class DimInfo {
@@ -265,6 +270,17 @@ void CopyNcVarAttributes(
 ////////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		Copy NetCDF attribute metadata from one variable to another.
+///	</summary>
+void CopyNcVarAttributes(
+	NcVar * varIn,
+	NcVar * varOut,
+	const std::vector<std::string> & vecDoNotCopyNames
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Insert a new dimension into the NcFile, or use existing.
 ///	</summary>
 NcDim * AddNcDimOrUseExisting(
@@ -291,12 +307,27 @@ void CopyNcVar(
 ///	<summary>
 ///		Copy a NetCDF variable from one file to another if it exists.
 ///	</summary>
-void CopyNcVarIfExists(
+bool CopyNcVarIfExists(
 	NcFile & ncIn,
 	NcFile & ncOut,
 	const std::string & strVarName,
 	bool fCopyAttributes = true,
 	bool fCopyData = true
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Copy latitude and longitude variables over and check for consistency.
+///	</summary>
+void CopyNcLatitudeLongitude(
+	NcFile & ncIn,
+	NcFile & ncOut,
+	const std::string & strLatitudeName,
+	const std::string & strLongitudeName,
+	const std::vector<size_t> & nGridDim,
+	NcDim ** pdimGrid0 = NULL,
+	NcDim ** pdimGrid1 = NULL
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -332,7 +363,8 @@ void WriteCFTimeDataToNcFile(
 	NcFile * ncfile,
 	const std::string & strFilename,
 	NcTimeDimension & vecTimes,
-	bool fRecordDim = true
+	bool fRecordDim = true,
+	bool fAppend = false
 );
 
 ////////////////////////////////////////////////////////////////////////////////

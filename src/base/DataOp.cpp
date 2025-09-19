@@ -23,6 +23,7 @@
 #include "kdtree.h"
 #include "Constants.h"
 #include "CoordTransforms.h"
+#include "Units.h"
 
 #include <cstdlib>
 #include <set>
@@ -377,6 +378,14 @@ DataOp * DataOpManager::Add(
 
 		return Add(new DataOp_MEAN(strName, dDist));
 
+	// Chill hours calculator using tasmin and tasmax
+	} else if (strName == "_DAILYCHILLHOURS") {
+		return Add(new DataOp_DAILYCHILLHOURS);
+
+	// Relative humidity using T2d and T2m
+	} else if (strName == "_RELHUMFROMTDTA") {
+		return Add(new DataOp_RELHUMFROMTDTA);
+
 	} else {
 		_EXCEPTION1("Invalid DataOp \"%s\"", strName.c_str());
 	}
@@ -407,6 +416,30 @@ bool DataOp::Apply(
 	DataArray1D<float> & out
 ) {
 	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string DataOp::GetUnits_Common(
+	const std::vector<std::string> & vecUnits
+) {
+	if (vecUnits.size() == 0) {
+		return std::string("");
+	}
+	for (size_t i = 1; i < vecUnits.size(); i++) {
+		if (vecUnits[i] != vecUnits[0]) {
+			return std::string("");
+		}
+	}
+	return vecUnits[0];
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::string DataOp::GetUnits(
+	const std::vector<std::string> & vecUnits
+) {
+	return "";
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2721,6 +2754,140 @@ bool DataOp_MEAN::Apply(
 	}
 
 	m_opMean.Apply(*(vecArgData[0]), dataout, true);
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_DAILYCHILLHOURS
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_DAILYCHILLHOURS::name = "_DAILYCHILLHOURS";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_DAILYCHILLHOURS::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 3) {
+		_EXCEPTION2("%s expects three arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+
+	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
+		_EXCEPTION1("%s expects first argument (tasmin) and second argument (tasmax) to be data variables",
+			m_strName.c_str());
+	}
+	const DataArray1D<float> & dataTasmin = *(vecArgData[0]);
+	const DataArray1D<float> & dataTasmax = *(vecArgData[1]);
+
+	// Freezing and chilling temperature are defined in degrees F
+	float dFreezingTemp = 32.0;
+	float dChillingTemp = 45.0;
+
+	// Convert to local unit
+	bool fSuccess;
+	fSuccess = ConvertUnits<float>(dFreezingTemp, "degF", strArg[2], false);
+	if (!fSuccess) {
+		_EXCEPTION2("%s cannot convert freezing temperature to provided units \"%s\"",
+			m_strName.c_str(), strArg[2].c_str());
+	}
+
+	fSuccess = ConvertUnits<float>(dChillingTemp, "degF", strArg[2], false);
+	if (!fSuccess) {
+		_EXCEPTION2("%s cannot convert chilling temperature to provided units \"%s\"",
+			m_strName.c_str(), strArg[2].c_str());
+	}
+
+	// Calculate daily chill hours using similar triangles
+	bool fWarning = false;
+	for (int i = 0; i < dataout.GetRows(); i++) {
+		if (dataTasmin[i] > dataTasmax[i]) {
+			dataout[i] = 0.0;
+			fWarning = true;
+		} else if (dataTasmax[i] < dFreezingTemp) {
+			dataout[i] = 0.0;
+		} else if (dataTasmax[i] < dChillingTemp) {
+			if (dataTasmin[i] < dFreezingTemp) {
+				dataout[i] = 24.0 * (dataTasmax[i] - dFreezingTemp) / (dataTasmax[i] - dataTasmin[i]);
+			} else {
+				dataout[i] = 24.0;
+			}
+		} else {
+			if (dataTasmin[i] < dFreezingTemp) {
+				dataout[i] = 24.0 * (dChillingTemp - dFreezingTemp) / (dataTasmax[i] - dataTasmin[i]);
+			} else if (dataTasmin[i] < dChillingTemp) {
+				dataout[i] = 24.0 * (dChillingTemp - dataTasmin[i]) / (dataTasmax[i] - dataTasmin[i]);
+			} else {
+				dataout[i] = 0.0;
+			}
+		}
+	}
+
+	if (fWarning) {
+		Announce("WARNING: Some grid points have tasmax < tasmin");
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_RELHUMFROMTDTA
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_RELHUMFROMTDTA::name = "_RELHUMFROMTDTA";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_RELHUMFROMTDTA::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 3) {
+		_EXCEPTION2("%s expects three arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+
+	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
+		_EXCEPTION1("%s expects first argument (td) and second argument (ta) to be data variables",
+			m_strName.c_str());
+	}
+	const DataArray1D<float> & dataTd = *(vecArgData[0]);
+	const DataArray1D<float> & dataTa = *(vecArgData[1]);
+
+	// Calculate relative humidity from Td and Ta
+
+	// Calculation with variables provided in degrees Celsius
+	if ((strArg[2] == "degC") || (strArg[2] == "C")) {
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = exp((17.1 * dataTd[i]) / (235.0 + dataTd[i]) - (17.1 * dataTa[i]) / (235.0 + dataTa[i]));
+		}
+
+	// Calculation with variables provided in Kelvin
+	} else if (strArg[2] == "K") {
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = exp((17.1 * (dataTd[i] - 273.15)) / (dataTd[i] - 38.15) - (17.1 * (dataTa[i] - 273.15)) / (dataTa[i] - 38.15));
+		}
+
+	// Calculation with variables provided in degrees Fahrenheit
+	} else if ((strArg[2] == "degF") || (strArg[2] == "F")) {
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			double dTdDegC = (5.0/9.0) * (dataTd[i] - 32.0);
+			double dTaDegC = (5.0/9.0) * (dataTa[i] - 32.0);
+
+			dataout[i] = exp((17.1 * dTdDegC) / (235.0 + dTdDegC) - (17.1 * dTaDegC) / (235.0 + dTaDegC));
+		}
+	
+	// Invalid unit
+	} else {
+		_EXCEPTION1("Invalid third argument units in _RELHUMFROMTDT2M (%s): Expected \"degC\", \"degF\", \"K\"",
+			strArg[2].c_str());
+	}
 
 	return true;
 }

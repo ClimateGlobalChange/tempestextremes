@@ -394,14 +394,14 @@ try {
 			CopyNcVarIfExists(
 				*(vecFiles[0]),
 				ncout,
-				strLatitudeName.c_str(),
+				strLatitudeName,
 				true,
 				true);
 
 			CopyNcVarIfExists(
 				*(vecFiles[0]),
 				ncout,
-				strLongitudeName.c_str(),
+				strLongitudeName,
 				true,
 				true);
 
@@ -439,6 +439,7 @@ try {
 		varreg.ClearProcessingQueue();
 
 		std::vector<NcVar *> vecNcVarOut(vecVarIxIn.size());
+		std::vector<bool> vecNcVarOutWroteUnits(vecVarIxIn.size(), false);
 		for (int v = 0; v < vecVarIxIn.size(); v++) {
 			NcVar * varOut = NULL;
 
@@ -488,6 +489,22 @@ try {
 			if (strFillValue != "") {
 				vecNcVarOut[v]->add_att("_FillValue", dFillValue);
 			}
+
+			// Copy attributes
+			Variable & var = varreg.Get(vecVarIxIn[v]);
+			if (!var.IsOp()) {
+				NcVar * ncvarIn = NULL;
+				size_t sFileIx = vecFiles.FindContainingVariable(var.GetName(), &ncvarIn);
+				if (ncvarIn != NULL) {
+					std::vector<std::string> vecDoNotCopyNames;
+					if (strFillValue != "") {
+						vecDoNotCopyNames.push_back("_FillValue");
+						vecDoNotCopyNames.push_back("missing_value");
+					}
+					CopyNcVarAttributes(ncvarIn, vecNcVarOut[v], vecDoNotCopyNames);
+				}
+				vecNcVarOutWroteUnits[v] = true;
+			}
 		}
 
 		// Loop through all times in this file
@@ -516,6 +533,14 @@ try {
 
 				var.LoadGridData(varreg, vecFiles, grid);
 				const DataArray1D<float> & dataState = var.GetData();
+
+				// Write units attribute, if present
+				if (!vecNcVarOutWroteUnits[v]) {
+					vecNcVarOutWroteUnits[v] = true;
+					if (var.GetUnits() != "") {
+						vecNcVarOut[v]->add_att("units", var.GetUnits().c_str());
+					}
+				}
 
 				// Get the output position and size
 				VariableAuxIndex lPos = varreg.GetProcessingQueueAuxIx();

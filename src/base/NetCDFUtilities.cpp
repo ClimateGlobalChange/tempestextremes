@@ -99,10 +99,16 @@ bool NcIsTimeDimension(
 	if (strcmp(dim->name(), "Time") == 0) {
 		return true;
 	}
+	if (strcmp(dim->name(), "xtime") == 0) {
+		return true;
+	}
 	if (strcmp(dim->name(), "initial_time0_hours") == 0) {
 		return true;
 	}
 	if (strcmp(dim->name(), "valid_time") == 0) {
+		return true;
+	}
+	if (strcmp(dim->name(), "day") == 0) {
 		return true;
 	}
 	return false;
@@ -123,12 +129,22 @@ NcDim * NcGetTimeDimension(
 		return dim;
 	}
 
+	dim = ncFile.get_dim("xtime");
+	if (dim != NULL) {
+		return dim;
+	}
+
 	dim = ncFile.get_dim("initial_time0_hours");
 	if (dim != NULL) {
 		return dim;
 	}
 
 	dim = ncFile.get_dim("valid_time");
+	if (dim != NULL) {
+		return dim;
+	}
+
+	dim = ncFile.get_dim("day");
 	if (dim != NULL) {
 		return dim;
 	}
@@ -162,6 +178,11 @@ NcVar * NcGetTimeVariable(
 	}
 
 	var = ncFile.get_var("valid_time");
+	if (var != NULL) {
+		return var;
+	}
+
+	var = ncFile.get_var("day");
 	if (var != NULL) {
 		return var;
 	}
@@ -209,9 +230,21 @@ void CopyNcFileAttributes(
 			fileOut->add_att(att->name(), num_vals,
 				(const double*)(pValues->base()));
 
+		} else if (att->type() == ncUShort) {
+			fileOut->add_att(att->name(), num_vals,
+				(const ushort*)(pValues->base()));
+
+		} else if (att->type() == ncUInt) {
+			fileOut->add_att(att->name(), num_vals,
+				(const uint*)(pValues->base()));
+
 		} else if (att->type() == ncInt64) {
 			fileOut->add_att(att->name(), num_vals,
-				(const int64_t*)(pValues->base()));
+				(const ncint64*)(pValues->base()));
+
+		} else if (att->type() == ncUInt64) {
+			fileOut->add_att(att->name(), num_vals,
+				(const ncuint64*)(pValues->base()));
 
 		} else if (att->type() == ncString) {
 			fileOut->add_att(att->name(), strlen((const char *)pValues->base()),
@@ -231,9 +264,40 @@ void CopyNcVarAttributes(
 	NcVar * varIn,
 	NcVar * varOut
 ) {
+	std::vector<std::string> vecDoNotCopyNames;
+	CopyNcVarAttributes(varIn, varOut, vecDoNotCopyNames);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void CopyNcVarAttributes(
+	NcVar * varIn,
+	NcVar * varOut,
+	const std::vector<std::string> & vecDoNotCopyNames
+) {
 	for (int a = 0; a < varIn->num_atts(); a++) {
 		NcAtt * att = varIn->get_att(a);
 		long num_vals = att->num_vals();
+		std::string strAttName = att->name();
+
+		// Check names against list of attributes not to copy
+		bool fSkipAttribute = false;
+		for (int b = 0; b < vecDoNotCopyNames.size(); b++) {
+			if (strAttName == vecDoNotCopyNames[b]) {
+				fSkipAttribute = true;
+			}
+		}
+		if (fSkipAttribute) {
+			continue;
+		}
+
+		// Do not copy over add_offset or scale_factor
+		if (strAttName == "add_offset") {
+			continue;
+		}
+		if (strAttName == "scale_factor") {
+			continue;
+		}
 
 		// Sometimes we can have strings of length zero.  It seems that this
 		// check isn't actually necessary to prevent segfaults, so it's
@@ -247,7 +311,7 @@ void CopyNcVarAttributes(
 		}
 
 		// Do not copy over _FillValue if input/output variable types are different
-		if (std::string(att->name()) == "_FillValue") {
+		if (strAttName == "_FillValue") {
 			if (varIn->type() != varOut->type()) {
 				continue;
 			}
@@ -278,9 +342,21 @@ void CopyNcVarAttributes(
 			varOut->add_att(att->name(), num_vals,
 				(const double*)(pValues->base()));
 
+		} else if (att->type() == ncUShort) {
+			varOut->add_att(att->name(), num_vals,
+				(const ushort*)(pValues->base()));
+
+		} else if (att->type() == ncUInt) {
+			varOut->add_att(att->name(), num_vals,
+				(const uint*)(pValues->base()));
+
 		} else if (att->type() == ncInt64) {
 			varOut->add_att(att->name(), num_vals,
-				(const int64_t*)(pValues->base()));
+				(const ncint64*)(pValues->base()));
+
+		} else if (att->type() == ncUInt64) {
+			varOut->add_att(att->name(), num_vals,
+				(const ncuint64*)(pValues->base()));
 
 		} else if (att->type() == ncString) {
 			varOut->add_att(att->name(), strlen((const char *)pValues->base()),
@@ -508,6 +584,50 @@ void CopyNcVar(
 		}
 	}
 
+	// ncUShort type
+	if (var->type() == ncUShort) {
+		varOut =
+			ncOut.add_var(
+				var->name(), var->type(),
+				dimOut.size(), (const NcDim**)&(dimOut[0]));
+
+		if (varOut == NULL) {
+			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
+		}
+
+		if (fCopyAttributes) {
+			CopyNcVarAttributes(var, varOut);
+		}
+
+		if (fCopyData) {
+			DataArray1D<ushort> data(nDataSize);
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
+	}
+
+	// ncInt type
+	if (var->type() == ncUInt) {
+		varOut =
+			ncOut.add_var(
+				var->name(), var->type(),
+				dimOut.size(), (const NcDim**)&(dimOut[0]));
+
+		if (varOut == NULL) {
+			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
+		}
+
+		if (fCopyAttributes) {
+			CopyNcVarAttributes(var, varOut);
+		}
+
+		if (fCopyData) {
+			DataArray1D<uint> data(nDataSize);
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
+	}
+
 	// ncInt64 type
 	if (var->type() == ncInt64) {
 		varOut =
@@ -530,6 +650,28 @@ void CopyNcVar(
 		}
 	}
 
+	// ncUInt64 type
+	if (var->type() == ncUInt64) {
+		varOut =
+			ncOut.add_var(
+				var->name(), var->type(),
+				dimOut.size(), (const NcDim**)&(dimOut[0]));
+
+		if (varOut == NULL) {
+			_EXCEPTION1("Cannot create variable \"%s\"", var->name());
+		}
+
+		if (fCopyAttributes) {
+			CopyNcVarAttributes(var, varOut);
+		}
+
+		if (fCopyData) {
+			DataArray1D<ncuint64> data(nDataSize);
+			var->get(&(data[0]), &(counts[0]));
+			varOut->put(&(data[0]), &(counts[0]));
+		}
+	}
+
 	// Check output variable exists
 	if (varOut == NULL) {
 		_EXCEPTION1("Unable to create output variable \"%s\"",
@@ -539,7 +681,7 @@ void CopyNcVar(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void CopyNcVarIfExists(
+bool CopyNcVarIfExists(
 	NcFile & ncIn,
 	NcFile & ncOut,
 	const std::string & strVarName,
@@ -550,8 +692,108 @@ void CopyNcVarIfExists(
 	NcError error(NcError::silent_nonfatal);
 
 	NcVar * var = ncIn.get_var(strVarName.c_str());
-	if (var != NULL) {
+	if (var == NULL) {
+		return false;
+	} else {
 		CopyNcVar(ncIn, ncOut, strVarName, fCopyAttributes, fCopyData);
+		return true;
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void CopyNcLatitudeLongitude(
+	NcFile & ncIn,
+	NcFile & ncOut,
+	const std::string & strLatitudeName,
+	const std::string & strLongitudeName,
+	const std::vector<size_t> & nGridDim,
+	NcDim ** pdimGrid0,
+	NcDim ** pdimGrid1
+) {
+	// Copy latitude and longitude variables, if they exist
+	bool fLatVarExists =
+		CopyNcVarIfExists(
+			ncIn,
+			ncOut,
+			strLatitudeName,
+			true,
+			true);
+
+	bool fLonVarExists =
+		CopyNcVarIfExists(
+			ncIn,
+			ncOut,
+			strLongitudeName,
+			true,
+			true);
+
+	// No latitude or longitude variable in file
+	if (!fLatVarExists && !fLonVarExists) {
+		if ((pdimGrid0 != NULL) && (nGridDim.size() >= 1)) {
+			*pdimGrid0 = ncOut.add_dim(strLatitudeName.c_str(), nGridDim[0]);
+		}
+		if ((pdimGrid1 != NULL) && (nGridDim.size() >= 2)) {
+			*pdimGrid1 = ncOut.add_dim(strLongitudeName.c_str(), nGridDim[1]);
+		}
+		return;
+	}
+
+	// Only one of latitude or longitude in file
+	if (!fLatVarExists) {
+		_EXCEPTION2("Longitude variable \"%s\" present but latitude variable \"%s\" is missing in file",
+			strLongitudeName.c_str(), strLatitudeName.c_str());
+	}
+	if (!fLonVarExists) {
+		_EXCEPTION2("Latitude variable \"%s\" present but longitude variable \"%s\" is missing in file",
+			strLatitudeName.c_str(), strLongitudeName.c_str());
+	}
+
+	// Verify consistency of latitude and longitude variables
+	NcVar * varLatOut = ncOut.get_var(strLatitudeName.c_str());
+	NcVar * varLonOut = ncOut.get_var(strLongitudeName.c_str());
+	_ASSERT(varLatOut != NULL);
+	_ASSERT(varLonOut != NULL);
+
+	if ((varLatOut->num_dims() != 1) && (varLatOut->num_dims() != 2)) {
+		_EXCEPTION1("Latitude variable \"%s\" must have dimension 1 or 2", strLatitudeName.c_str());
+	}
+	if ((varLonOut->num_dims() != 1) && (varLonOut->num_dims() != 2)) {
+		_EXCEPTION1("Longitude variable \"%s\" must have dimension 1 or 2", strLongitudeName.c_str());
+	}
+
+	if (varLatOut->num_dims() != varLonOut->num_dims()) {
+		_EXCEPTION4("Inconsistent number of dimensions between latitude "
+			"variable \"%s\" (%li) and longitude variable \"%s\" (%li)",
+			strLatitudeName.c_str(), varLatOut->num_dims(),
+			strLongitudeName.c_str(), varLonOut->num_dims());
+	}
+
+	// Grid dim 0
+	if (pdimGrid0 != NULL) {
+		*pdimGrid0 = varLatOut->get_dim(0);
+	}
+
+	// Grid dim 1
+	if (varLatOut->num_dims() == 1) {
+		*pdimGrid1 = varLonOut->get_dim(0);
+
+	} else {
+		if (std::string(varLatOut->get_dim(0)->name()) != std::string(varLonOut->get_dim(0)->name())) {
+			_EXCEPTION4("Inconsistent first dimension between latitude "
+				"variable \"%s\" (%s) and longitude variable \"%s\" (%s)",
+				strLatitudeName.c_str(), varLatOut->get_dim(0)->name(),
+				strLongitudeName.c_str(), varLonOut->get_dim(0)->name());
+		}
+		if (std::string(varLatOut->get_dim(1)->name()) != std::string(varLonOut->get_dim(1)->name())) {
+			_EXCEPTION4("Inconsistent second dimension between latitude "
+				"variable \"%s\" (%s) and longitude variable \"%s\" (%s)",
+				strLatitudeName.c_str(), varLatOut->get_dim(1)->name(),
+				strLongitudeName.c_str(), varLonOut->get_dim(1)->name());
+		}
+		if (pdimGrid1 != NULL) {
+			*pdimGrid1 = varLatOut->get_dim(1);
+		}
 	}
 }
 
@@ -811,7 +1053,8 @@ void WriteCFTimeDataToNcFile(
 	NcFile * ncfile,
 	const std::string & strFilename,
 	NcTimeDimension & vecTimes,
-	bool fRecordDim
+	bool fRecordDim,
+	bool fAppend
 ) {
 	_ASSERT(ncfile != NULL);
 
@@ -831,19 +1074,61 @@ void WriteCFTimeDataToNcFile(
 				strFilename.c_str());
 		}
 	} else {
-		if (dimTime->size() != vecTimes.size()) {
+		if ((!fAppend) && (dimTime->size() != vecTimes.size())) {
 			_EXCEPTION3("File \"%s\" already contains dimension \"time\" with unexpected size (%li != %li)",
 				strFilename.c_str(), dimTime->size(), vecTimes.size());
 		}
 	}
 
-	NcVar * varTime = ncfile->add_var("time", vecTimes.nctype(), dimTime);
+	// Create or obtain time variable
+	NcVar * varTime = NcGetTimeVariable(*ncfile);
 	if (varTime == NULL) {
-		NcError ncerr;
-		_EXCEPTION3("Unable to create variable \"time\" in file \"%s\" (%i: %s)",
-			strFilename.c_str(), ncerr.get_err(), ncerr.get_errmsg());
+		varTime = ncfile->add_var("time", vecTimes.nctype(), dimTime);
+		if (varTime == NULL) {
+			NcError ncerr;
+			_EXCEPTION3("Unable to create variable \"time\" in file \"%s\" (%i: %s)",
+				strFilename.c_str(), ncerr.get_err(), ncerr.get_errmsg());
+		}
+		varTime->add_att("long_name", "time");
+		varTime->add_att("calendar", vecTimes[0].GetCalendarName().c_str());
+		varTime->add_att("units", vecTimes.units().c_str());
+
+		if (vecTimes.dimtype() != NcTimeDimension::TimeDimType_Standard) {
+			if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_DailyMean) {
+				varTime->add_att("type", "daily climatology");
+			} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_MonthlyMean) {
+				varTime->add_att("type", "monthly climatology");
+			} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_SeasonalMean) {
+				varTime->add_att("type", "seasonal climatology");
+			} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_AnnualMean) {
+				varTime->add_att("type", "annual climatology");
+			}
+		}
+
+	} else {
+		if (!fAppend) {
+			_EXCEPTION1("File \"%s\" already contains variable \"time\"",
+				strFilename.c_str());
+		}
+		if (varTime->type() != vecTimes.nctype()) {
+			_EXCEPTION1("File \"%s\" time dimension incompatible type on append; "
+				"likely change in time NetCDF type across files",
+				strFilename.c_str());
+		}
+		NcAtt * attCalendar = varTime->get_att("calendar");
+		if ((attCalendar == NULL) || (vecTimes[0].GetCalendarName() != attCalendar->as_string(0))) {
+			_EXCEPTION1("File \"%s\" variable \"time\" attempting to append with different calendar attribute",
+				strFilename.c_str());
+		}
+		NcAtt * attUnits = varTime->get_att("units");
+		if ((attUnits == NULL) || (vecTimes.units() != attUnits->as_string(0))) {
+			_EXCEPTION1("File \"%s\" variable \"time\" attempting to append with different units attribute",
+				strFilename.c_str());
+		}
+		varTime->set_cur(dimTime->size());
 	}
 
+	// Write times
 	if (vecTimes.nctype() == ncInt) {
 		DataArray1D<int> nTimes(vecTimes.size());
 		for (int t = 0; t < nTimes.GetRows(); t++) {
@@ -881,22 +1166,6 @@ void WriteCFTimeDataToNcFile(
 
 	} else {
 		_EXCEPTION1("Invalid \"time\" type (%i)", varTime->type());
-	}
-
-	varTime->add_att("long_name", "time");
-	varTime->add_att("calendar", vecTimes[0].GetCalendarName().c_str());
-	varTime->add_att("units", vecTimes.units().c_str());
-
-	if (vecTimes.dimtype() != NcTimeDimension::TimeDimType_Standard) {
-		if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_DailyMean) {
-			varTime->add_att("type", "daily climatology");
-		} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_MonthlyMean) {
-			varTime->add_att("type", "monthly climatology");
-		} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_SeasonalMean) {
-			varTime->add_att("type", "seasonal climatology");
-		} else if (vecTimes.dimtype() == NcTimeDimension::TimeDimType_AnnualMean) {
-			varTime->add_att("type", "annual climatology");
-		}
 	}
 }
 
