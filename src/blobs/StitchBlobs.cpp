@@ -249,386 +249,390 @@ struct Tag {
 ///		2-D vectors after the communication. 
 ///		This class can also generate and return the setAllTags based on the local vecAllBlobTags.
 ///	</summary>
+/// <summary>
+///   A class used for MPI collective communication for vecAllBlobTags
+///   (gather and scatter) between processors.
+///   This class serializes a 2-D vecAllBlobTags into a 1-D array + index,
+///   and can deserialize back to the original 2-D layout.
+///   It can also generate and return setAllTags based on the local vecAllBlobTags.
+/// </summary>
 class TagCollectiveOP {
-	private:
-		///	<summary>
-		///		Tag for MPI communication for sending/receiving Tag
-		///	</summary>
-		int gather_tag = 107;
+private:
+    /// <summary> Tag for MPI communication for sending/receiving Tag </summary>
+    int gather_tag = 107;
 
-		///	<summary>
-		///		Tag for MPI communication for sending/receiving Tag index
-		///	</summary>
-		int gather_tag_index = 108;
+    /// <summary> Tag for MPI communication for sending/receiving Tag index </summary>
+    int gather_tag_index = 108;
 
-		///	<summary>
-		///		The MPI Communicator
-		///	</summary>
-		MPI_Comm m_comm; 
+    /// <summary> The MPI Communicator </summary>
+    MPI_Comm m_comm;
 
-		///	<summary>
-		///		The MPI Datatype for Tag
-		///	</summary>
-		MPI_Datatype MPI_Tag_type;
+    /// <summary> The MPI Datatype for Tag </summary>
+    MPI_Datatype MPI_Tag_type;
 
-		///	<summary>
-		///		The Flag that marks whether the vecAllTags are in serialized state. 
-		///		(default with 0; 1 after calling Serialize(); False after calling Deserailize()).	
-		///	</summary>
-		int serializedFlag;
+    /// <summary>
+    ///   Flag marking whether the flat buffers are currently in serialized state.
+    ///   (false initially; true after Serialize(); false after Deserialize()).
+    /// </summary>
+    bool serializedFlag;
 
-		///	<summary>
-		///		Serialize the std::vector< std::vector<Tag>> vecAllBlobTags into a 1-D array 
-		///		and generate the index array serialVecAllBlobTags_index
-		///	</summary>
-		void Serialize() {
-			serialVecAllBlobTags.clear();
-			serialVecAllBlobTags_index.clear();
-			int curIndx = 0;//Point to the next empty slot for inserting a new vector<Tag>
-			serialVecAllBlobTags_index.push_back(curIndx);
-			for (int i = 0; i < _vecAllBlobTags.size(); i++) {
-				for (int j = 0; j < _vecAllBlobTags[i].size(); j++) {
-					serialVecAllBlobTags.push_back(_vecAllBlobTags[i][j]);
-					curIndx++;
-				}
-				serialVecAllBlobTags_index.push_back(curIndx);
-			}
-			serializedFlag = 1;
-		}
+    /// <summary>
+    ///   Optional non-owning view of the input 2-D tags. If set, Serialize() reads from *in_;
+    ///   otherwise it reads from the owning _vecAllBlobTags.
+    /// </summary>
+    const std::vector<std::vector<Tag>>* in_ = nullptr;
 
-		///	<summary>
-		///		Deserialize the the local std::vector<Tag> serialVecAllBlobTags array 
-		///		to generate the deserialSetAllTags and desirialVecAllBlobTags
-		///		the this.serialVecAllBlobTags and this.serialVecAllBlobTags_index will be cleared
-		///		after the deserialization
-		///	</summary>
-		void Deserialize() {
-			for (int i = 0; i < serialVecAllBlobTags_index.size() - 1; i++) {
-				int startIndx = serialVecAllBlobTags_index[i];
-				int endIndx = std::min(serialVecAllBlobTags_index[i+1],int(serialVecAllBlobTags.size()));
-				std::vector<Tag> curVecBlobTags;
-				for (int i = startIndx; i < endIndx; i++) {
-					curVecBlobTags.push_back(serialVecAllBlobTags[i]);
-					deserialSetAllTags.insert(serialVecAllBlobTags[i]);
-				}
-				desirialVecAllBlobTags.push_back(curVecBlobTags);
-			}
-			serialVecAllBlobTags.clear();
-			serialVecAllBlobTags_index.clear();
-			serializedFlag = 0;
-		}
-		
+    /// <summary>
+    ///   Serialize the std::vector<std::vector<Tag>> into a 1-D array (tags)
+    ///   and an index array (prefix offsets, length = ncols+1).
+    /// </summary>
+    void Serialize() {
+        const auto& src = (in_ ? *in_ : _vecAllBlobTags);
 
+        // Pre-size to minimize reallocations
+        size_t total = 0;
+        serialVecAllBlobTags.clear();
+        serialVecAllBlobTags_index.clear();
+        serialVecAllBlobTags_index.reserve(src.size() + 1);
+        for (const auto& v : src) total += v.size();
+        serialVecAllBlobTags.reserve(total);
 
-	protected:
-		///	<summary>
-		///		The unexchanged original local 2-D vecAllBlobTags that needs to be serialize before communication.		
-		///	</summary>
-		std::vector< std::vector<Tag>> _vecAllBlobTags;
+        int curIndx = 0;
+        serialVecAllBlobTags_index.push_back(curIndx);
+        for (size_t i = 0; i < src.size(); ++i) {
+            // append this column
+            for (size_t j = 0; j < src[i].size(); ++j) {
+                serialVecAllBlobTags.push_back(src[i][j]);
+                ++curIndx;
+            }
+            serialVecAllBlobTags_index.push_back(curIndx);
+        }
+        serializedFlag = true;
+    }
 
-		///	<summary>
-		///		The serialized 1D vecAllBlobTags that needs to be sent.	
-		///	</summary>
-		std::vector<Tag> serialVecAllBlobTags;
+    /// <summary>
+    ///   Deserialize the local 1-D arrays into the 2-D vector + set.
+    ///   After deserialization, the flat buffers are cleared and released.
+    /// </summary>
+    void Deserialize() {
+        desirialVecAllBlobTags.clear();
+        if (serialVecAllBlobTags_index.size() > 0) {
+            desirialVecAllBlobTags.reserve(serialVecAllBlobTags_index.size() - 1);
+        }
 
-		///	<summary>
-		///		The serialized 1D vecAllBlobTags index array that needs to be sent.	
-		///	</summary>
-		std::vector<int> serialVecAllBlobTags_index;
+        for (size_t i = 0; i + 1 < serialVecAllBlobTags_index.size(); ++i) {
+            const int startIndx = serialVecAllBlobTags_index[i];
+            const int endIndx   = std::min(serialVecAllBlobTags_index[i+1],
+                                           static_cast<int>(serialVecAllBlobTags.size()));
+            std::vector<Tag> curVecBlobTags;
+            curVecBlobTags.reserve(endIndx - startIndx);
+            for (int k = startIndx; k < endIndx; ++k) {
+                curVecBlobTags.push_back(serialVecAllBlobTags[k]);
+                deserialSetAllTags.insert(serialVecAllBlobTags[k]);
+            }
+            desirialVecAllBlobTags.push_back(std::move(curVecBlobTags));
+        }
 
-		///	<summary>
-		///		Output setAllTags based on the local desirialVecAllBlobTags. (Only used for processor 0)	
-		///	</summary>	
-		std::set<Tag> deserialSetAllTags;
+        // release flat buffers
+        serialVecAllBlobTags.clear();            serialVecAllBlobTags.shrink_to_fit();
+        serialVecAllBlobTags_index.clear();      serialVecAllBlobTags_index.shrink_to_fit();
+        serializedFlag = false;
+    }
 
-		///	<summary>
-		///		The deserial vecAllBlobTags after communication (Only used for processor 0)	
-		///	</summary>
-		std::vector< std::vector<Tag>> desirialVecAllBlobTags;
+protected:
+    /// <summary> Owning fallback storage for the input 2-D vecAllBlobTags (used if in_ == nullptr) </summary>
+    std::vector<std::vector<Tag>> _vecAllBlobTags;
 
-		///	<summary>
-		///		Vector that records the size information of vecAllBlobTags on each processors	
-		///	</summary>
-		std::vector<int> vecScatterCounts;
+    /// <summary> Serialized 1-D tags buffer </summary>
+    std::vector<Tag> serialVecAllBlobTags;
 
-		///	<summary>
-		///		Vector that records the index information of the serial vecAllBlobTags on each processors	
-		///	</summary>
-		std::vector<int> vecScatterCounts_index;
+    /// <summary> Serialized 1-D index buffer (length = ncols+1) </summary>
+    std::vector<int> serialVecAllBlobTags_index;
 
-	public:
+    /// <summary> Output setAllTags after deserialization (only used on processor 0) </summary>
+    std::set<Tag> deserialSetAllTags;
 
-		///	<summary>
-		///		Constructor that will read in std::vector< std::vector<Tag>> vecAllBlobTags and MPI communicator
-		///		It will also create the derived MPI_Datatype for Tag and commit it.
-		///	</summary>	
-		TagCollectiveOP(
-			MPI_Comm communicator, 
-			const std::vector< std::vector<Tag>> & vecAllBlobTags
-		) {
-			this->_vecAllBlobTags = vecAllBlobTags;
-			this->m_comm = communicator;
-			this->serializedFlag = 0;
-			int rank, size;
-			MPI_Comm_size(m_comm, &size);
-			MPI_Comm_rank(m_comm, &rank);
+    /// <summary> Deserialized 2-D vecAllBlobTags after communication (only used on processor 0) </summary>
+    std::vector<std::vector<Tag>> desirialVecAllBlobTags;
 
-			// Create an MPI datatype for the Tag:
-			struct Tag sampleTag;
-			int tagFieldsCount = 3;	
-			MPI_Datatype Tag_typesig[3] = {MPI_INT,MPI_INT,MPI_INT};
-			int Tag_block_lengths[3] = {1,1,1};
-			MPI_Aint Tag_displacements[3];
-	
-			MPI_Aint base_address;
-			MPI_Get_address(&sampleTag, &base_address);
-			MPI_Get_address(&sampleTag.id, &Tag_displacements[0]);
-			MPI_Get_address(&sampleTag.time, &Tag_displacements[1]);
-			MPI_Get_address(&sampleTag.global_id, &Tag_displacements[2]);
+    /// <summary> Per-rank total Tag counts (sum of sizes of all local columns) </summary>
+    std::vector<int> vecScatterCounts;
 
-			Tag_displacements[0] = MPI_Aint_diff(Tag_displacements[0], base_address);
-			Tag_displacements[1] = MPI_Aint_diff(Tag_displacements[1], base_address);
-			Tag_displacements[2] = MPI_Aint_diff(Tag_displacements[2], base_address);
+    /// <summary>
+    ///  Per-rank column counts (number of columns), NOT (ncols+1).
+    ///  The +1 sentinel is handled locally after Scatter.
+    /// </summary>
+    std::vector<int> vecScatterCounts_index;
 
-			MPI_Type_create_struct(tagFieldsCount, Tag_block_lengths, Tag_displacements, Tag_typesig, &MPI_Tag_type);
+public:
+    /// <summary>
+    ///   Constructor: stores a non-owning view of vecAllBlobTags and creates/commits MPI_Tag_type.
+    ///   No deep copies are made here.
+    /// </summary>
+    TagCollectiveOP(MPI_Comm communicator, const std::vector<std::vector<Tag>>& vecAllBlobTags)
+    : m_comm(communicator), serializedFlag(false), in_(&vecAllBlobTags) {
+        // Create an MPI datatype for Tag:
+        Tag sampleTag;
+        const int tagFieldsCount = 3;
+        MPI_Datatype Tag_typesig[3] = { MPI_INT, MPI_INT, MPI_INT };
+        int          Tag_block_lengths[3] = { 1, 1, 1 };
+        MPI_Aint     Tag_displacements[3];
 
-			int result = MPI_Type_commit(&MPI_Tag_type);
-			if (result != MPI_SUCCESS) {
-				_EXCEPTION1("The MPI routine MPI_Type_commit(&MPI_Tag_type) failed (code %i)", result);
-			}
-		}
+        MPI_Aint base_address;
+        MPI_Get_address(&sampleTag, &base_address);
+        MPI_Get_address(&sampleTag.id,         &Tag_displacements[0]);
+        MPI_Get_address(&sampleTag.time,       &Tag_displacements[1]);
+        MPI_Get_address(&sampleTag.global_id,  &Tag_displacements[2]);
 
-		///	<summary>
-		///		Destructor.
-		///	</summary>
-		~TagCollectiveOP(){
-			MPI_Type_free(&MPI_Tag_type);			
-		}
+        Tag_displacements[0] = MPI_Aint_diff(Tag_displacements[0], base_address);
+        Tag_displacements[1] = MPI_Aint_diff(Tag_displacements[1], base_address);
+        Tag_displacements[2] = MPI_Aint_diff(Tag_displacements[2], base_address);
 
-		///	<summary>
-		///		The MPI gather process that will gather each local vecAllBlobTags to the processor 0.
-		///	</summary>
-		void Gather() {
-			int rank, size;
-			MPI_Comm_size(m_comm, &size);
-			MPI_Comm_rank(m_comm, &rank);
+        MPI_Type_create_struct(tagFieldsCount, Tag_block_lengths, Tag_displacements,
+                               Tag_typesig, &MPI_Tag_type);
 
-			this->Serialize();
-			int d = std::ceil(std::log2(size)); // here we use floor.
-			
-			for (int j = 0; j < d; j++) {
+        const int result = MPI_Type_commit(&MPI_Tag_type);
+        if (result != MPI_SUCCESS) {
+            _EXCEPTION1("The MPI routine MPI_Type_commit(&MPI_Tag_type) failed (code %i)", result);
+        }
+    }
 
-				// First send the serialVecAllBlobTags
-				if ((rank & (int)std::round(std::pow(2,j))) != 0) {
-					
-					// Send to (world_rank ^ pow(2,j)
-					int destRank = rank ^ (int)round(std::pow(2,j));
-					if (destRank > size - 1) {
-						continue;
-					}
+    /// <summary> Destructor. </summary>
+    ~TagCollectiveOP() {
+        MPI_Type_free(&MPI_Tag_type);
+    }
 
-					MPI_Send (serialVecAllBlobTags.data(), serialVecAllBlobTags.size(), MPI_Tag_type, destRank, gather_tag, m_comm);
-					MPI_Send (serialVecAllBlobTags_index.data(), serialVecAllBlobTags_index.size(), MPI_INT, destRank, gather_tag_index, m_comm);
-					// Simply need to break the algorithm here (juest return, not Finalize())
-					return;
+    /// <summary>
+    ///   Hypercube gather that collects all local vecAllBlobTags on rank 0.
+    ///   Rank!=0 ranks exit early once they’ve sent their payloads.
+    /// </summary>
+    void Gather() {
+        int rank = -1, size = 1;
+        MPI_Comm_rank(m_comm, &rank);
+        MPI_Comm_size(m_comm, &size);
 
+        Serialize(); // serialize current local input (non-owning view)
 
-				} else {
-					// Receive from (world_rank ^ pow(2,j))
-					MPI_Status status;
-					int recvCount;
-					int sourceRank = rank ^ (int)std::round(std::pow(2,j));
+        // ceil(log2(size)) stages
+        const int d = (size <= 1) ? 0 : static_cast<int>(std::ceil(std::log2(static_cast<double>(size))));
 
-					if (sourceRank > size - 1) {
-						continue;
-					}
+        for (int j = 0; j < d; ++j) {
+            const int bit = (1 << j);
 
-					MPI_Probe(sourceRank, gather_tag,  m_comm, &status);
+            if ((rank & bit) != 0) {
+                // sender: send both payloads and return
+                const int destRank = rank ^ bit;
+                if (destRank >= size) continue;
 
-					MPI_Get_count( &status, MPI_Tag_type, &recvCount);					 
-					std::vector<Tag> recvTags;
-					recvTags.resize(recvCount);
-					MPI_Recv(recvTags.data(), recvCount, MPI_Tag_type, sourceRank, gather_tag, m_comm, &status);
+                MPI_Send(serialVecAllBlobTags.data(),
+                         static_cast<int>(serialVecAllBlobTags.size()),
+                         MPI_Tag_type, destRank, gather_tag, m_comm);
 
-					// Pack the receive Tag into the local serialVecAllBlobTags.
-					for (auto recvTag : recvTags) {
-						serialVecAllBlobTags.push_back(recvTag);
-					}
+                MPI_Send(serialVecAllBlobTags_index.data(),
+                         static_cast<int>(serialVecAllBlobTags_index.size()),
+                         MPI_INT, destRank, gather_tag_index, m_comm);
 
-					MPI_Status status_index;
-					int recvCount_index;
-					MPI_Probe(sourceRank, gather_tag_index,  m_comm, &status_index);
+                return; // done on this rank after sending
+            } else {
+                // receiver: append sender's payloads
+                const int sourceRank = rank ^ bit;
+                if (sourceRank >= size) continue;
 
-					MPI_Get_count( &status_index, MPI_INT, &recvCount_index);					 
-					std::vector<int> recvTagsIndx;
-					recvTagsIndx.resize(recvCount_index);
-					MPI_Recv(recvTagsIndx.data(), recvCount_index, MPI_INT, sourceRank, gather_tag_index, m_comm, &status_index);
+                // --- Tags: probe -> resize once -> receive directly into the back
+                MPI_Status status;
+                int recvCount = 0;
+                MPI_Probe(sourceRank, gather_tag, m_comm, &status);
+                MPI_Get_count(&status, MPI_Tag_type, &recvCount);
 
-					
-					// Update the received index and then Pack the receive Tag index into the
-					// local serialVecAllBlobTags_index.
-					// Example:
-					// Initial:
-					// P0 serialVecAllBlobTags: 0, 3, 5, 7;   P1 serialVecAllBlobTags: 0, 3, 5, 7
-					// After Gather:
-					// P0 serialVecAllBlobTags: 0, 3, 5, 7, 9, 11, 13
-					int serialVecAllBlobTags_index_size = serialVecAllBlobTags_index.size();
-					int curLocalTagSize = serialVecAllBlobTags_index[serialVecAllBlobTags_index_size - 1];
-					for (int i = 1; i < recvTagsIndx.size(); i++) {
-						// Update the index
-						int index = recvTagsIndx[i];
-						index += curLocalTagSize;
-						serialVecAllBlobTags_index.push_back(index);
-					}
-				}
-			}
-		}
+                const int offT = static_cast<int>(serialVecAllBlobTags.size());
+                serialVecAllBlobTags.resize(offT + recvCount);
+                MPI_Recv(serialVecAllBlobTags.data() + offT, recvCount, MPI_Tag_type,
+                         sourceRank, gather_tag, m_comm, MPI_STATUS_IGNORE);
 
-		///	<summary>
-		///		Return the gathered setAllTags (only called by the processor 0)
-		///	</summary>
-		std::set<Tag> GetGatheredSetAllTags() {
-			int rank, size;
-			MPI_Comm_size(m_comm, &size);
-			MPI_Comm_rank(m_comm, &rank);
-			if (rank == 0) {
-				if (serializedFlag == 1) {
-					this->Deserialize();
-				}
+                // --- Index: probe -> receive into tmp -> append [1..end) with offset
+                MPI_Status status_index;
+                int recvCount_index = 0;
+                MPI_Probe(sourceRank, gather_tag_index, m_comm, &status_index);
+                MPI_Get_count(&status_index, MPI_INT, &recvCount_index);
 
-				return deserialSetAllTags;
-			} else {
-				_EXCEPTIONT("Only processor 0 should call GetGatheredSetAllTags().");
-			}
-		}
+                std::vector<int> tmp(recvCount_index);
+                MPI_Recv(tmp.data(), recvCount_index, MPI_INT,
+                         sourceRank, gather_tag_index, m_comm, MPI_STATUS_IGNORE);
 
-		///	<summary>
-		///		Return the gathered/scattered vecAllTags (only called by the processor 0)
-		///		GatheredFlag = 1 indicates that returning the vecAllBlobTags after gathering to the processor 0
-		///		(in this case, vecAllBlobTags is the global vecAllBlobTags and only processor 0 can call the function)
-		///		GatheredFalg = 0 indicates that returning the vecAllBlobTags after scattering to each processot.
-		///		(in this case, vecAllBlobTags is the local vecAllBlobTags and all valid processor can call the function)
-		///	</summary>
-		std::vector< std::vector<Tag> > GetUnserialVecAllTags(int GatheredFlag) {
-			int rank, size;
-			MPI_Comm_size(m_comm, &size);
-			MPI_Comm_rank(m_comm, &rank);
-			if ((GatheredFlag == 1 && rank == 0) || GatheredFlag== 0) {
-				if (serializedFlag == 1) {
-					this->Deserialize();
-				}
-				return desirialVecAllBlobTags;
-			} else {
-				_EXCEPTIONT("Only processor 0 should call GetUnserialVecAllTags().");
-			}
-		}
+                const int curLocalTagSize =
+                    serialVecAllBlobTags_index.empty()
+                      ? 0
+                      : serialVecAllBlobTags_index.back();
 
-		///	<summary>
-		///		Gather the size info of the original unexchanged vecAllBlobTags to processor 0
-		///		On processor 0, the _vecAllBlobTags will be the gathered global vecAllBlobTags;
-		///		On other processors, the _vecAllBlobTags will be updated to the input vecAllBlobTags
-		///	</summary>
-		void GatherTagCounts(const std::vector< std::vector<Tag> > & vecAllBlobTags) {
-			int rank, size;
-			MPI_Comm_size(m_comm, &size);
-			MPI_Comm_rank(m_comm, &rank);
-			int curSize = 0;		
-			for ( auto vecBlobTags : vecAllBlobTags) {
-				curSize += vecBlobTags.size();			
-			}
-			int localSize = vecAllBlobTags.size();
-			vecScatterCounts.resize(size);
-			vecScatterCounts_index.resize(size);
+                // append indices [1..end) with base offset
+                const size_t oldSz = serialVecAllBlobTags_index.size();
+                serialVecAllBlobTags_index.resize(oldSz + std::max(0, recvCount_index - 1));
+                for (int k = 1; k < recvCount_index; ++k) {
+                    serialVecAllBlobTags_index[oldSz + (k - 1)] = tmp[k] + curLocalTagSize;
+                }
+            }
+        }
+    }
 
-			if (rank == 0) {				
-				MPI_Gather(&curSize, 1, MPI_INT, vecScatterCounts.data(), 1, MPI_INT, 0, m_comm);
-				MPI_Gather(&localSize, 1, MPI_INT, vecScatterCounts_index.data(), 1, MPI_INT, 0, m_comm);
+    /// <summary> Return the gathered setAllTags (only rank 0 should call). </summary>
+    std::set<Tag> GetGatheredSetAllTags() {
+        int rank = -1;
+        MPI_Comm_rank(m_comm, &rank);
+        if (rank == 0) {
+            if (serializedFlag) {
+                Deserialize();
+            }
+            return std::move(deserialSetAllTags);
+        } else {
+            _EXCEPTIONT("Only processor 0 should call GetGatheredSetAllTags().");
+        }
+    }
 
-			} else {
-				this->_vecAllBlobTags = vecAllBlobTags;
-				MPI_Gather(&curSize, 1, MPI_INT, NULL, 0, MPI_INT, 0,m_comm);
-				MPI_Gather(&localSize, 1, MPI_INT, NULL, 0, MPI_INT, 0,m_comm);
+    /// <summary>
+    ///   Return the gathered/scattered vecAllBlobTags.
+    ///   GatheredFlag = 1 → returning global (only rank 0 valid).
+    ///   GatheredFlag = 0 → returning local (all ranks valid).
+    /// </summary>
+    std::vector<std::vector<Tag>> GetUnserialVecAllTags(int GatheredFlag) {
+        int rank = -1;
+        MPI_Comm_rank(m_comm, &rank);
+        if ((GatheredFlag == 1 && rank == 0) || GatheredFlag == 0) {
+            if (serializedFlag) {
+                Deserialize();
+            }
+            return std::move(desirialVecAllBlobTags);
+        } else {
+            _EXCEPTIONT("Only processor 0 should call GetUnserialVecAllTags().");
+        }
+    }
 
-			}
-		}
+    /// <summary>
+    ///   Gather per-rank sizes from the ORIGINAL (unexchanged) layout.
+    ///   On rank 0, fills vecScatterCounts (tags) and vecScatterCounts_index (ncols).
+    ///   On other ranks, just updates the non-owning view to the provided input (no copy).
+    /// </summary>
+    void GatherTagCounts(const std::vector<std::vector<Tag>>& vecAllBlobTags) {
+        int rank = -1, size = 1;
+        MPI_Comm_rank(m_comm, &rank);
+        MPI_Comm_size(m_comm, &size);
 
+        int curSize = 0;
+        for (const auto& vecBlobTags : vecAllBlobTags) { // no copies
+            curSize += static_cast<int>(vecBlobTags.size());
+        }
+        const int localCols = static_cast<int>(vecAllBlobTags.size());
 
-		///	<summary>
-		///		Scatter the vecAllBlobs to each processor
-		///		The displacement is calculated based on the vecGlobalTimes
-		///		On processor 0, the _vecAllBlobTags will be the reduced global vecAllBlobTags;
-		///		On other processors, the _vecAllBlobTags will be the original unreduced _vecAllBlobTags
-		///	</summary>
-		void Scatter(){
-			int rank, size;
-			MPI_Comm_size(m_comm, &size);
-			MPI_Comm_rank(m_comm, &rank);
+        vecScatterCounts.resize(size);
+        vecScatterCounts_index.resize(size);
 
-			this->Serialize();
+        if (rank == 0) {
+            MPI_Gather(&curSize,   1, MPI_INT, vecScatterCounts.data(),       1, MPI_INT, 0, m_comm);
+            MPI_Gather(&localCols, 1, MPI_INT, vecScatterCounts_index.data(), 1, MPI_INT, 0, m_comm);
+        } else {
+            // point our non-owning view at the caller's ORIGINAL layout (no deep copy)
+            in_ = &vecAllBlobTags;
+            MPI_Gather(&curSize,   1, MPI_INT, nullptr, 0, MPI_INT, 0, m_comm);
+            MPI_Gather(&localCols, 1, MPI_INT, nullptr, 0, MPI_INT, 0, m_comm);
+        }
+    }
 
-			if (rank == 0) {
-				// For Tags
-				std::vector<int> arrayScatterCounts(size);
-				std::vector<int> arrayScatterDisplacements(size);
-				_ASSERT(vecScatterCounts.size() > 1);
-				arrayScatterCounts[0] = vecScatterCounts[0];
-				arrayScatterDisplacements[0] = 0;		
-				for (int i = 1; i < vecScatterCounts.size(); i++) {
-					arrayScatterCounts[i] = vecScatterCounts[i];				
-					arrayScatterDisplacements[i] = vecScatterCounts[i - 1] + arrayScatterDisplacements[i - 1];
-				}
+    /// <summary>
+    ///   Scatter the (updated) global vecAllBlobTags on rank 0 back to all ranks.
+    ///   Counts for tags and columns come from GatherTagCounts().
+    ///   Column indices (ncols entries per rank) are scattered, and each rank fixes the +1 sentinel locally.
+    /// </summary>
+    void Scatter() {
+        int rank = -1, size = 1;
+        MPI_Comm_rank(m_comm, &rank);
+        MPI_Comm_size(m_comm, &size);
 
-				// For Tags Index
-				std::vector<int> arrayScatterCounts_index(size);
-				std::vector<int> arrayScatterDisplacements_index(size);
-				_ASSERT(vecScatterCounts_index.size() > 1);
-				arrayScatterCounts_index[0] = vecScatterCounts_index[0];
-				arrayScatterDisplacements_index[0] = 0;		
-				for (int i = 1; i < vecScatterCounts.size(); i++) {
-					arrayScatterCounts_index[i] = vecScatterCounts_index[i];				
-					arrayScatterDisplacements_index[i] = vecScatterCounts_index[i - 1] + arrayScatterDisplacements_index[i - 1];
-				}
-				
-				//-------------------Scatter---------------------------
-				// For Tags
-				auto scatterBuffer = this->serialVecAllBlobTags;
-				this->serialVecAllBlobTags.clear();
-				this->serialVecAllBlobTags.resize(arrayScatterCounts[rank]);
-				MPI_Scatterv(scatterBuffer.data(), arrayScatterCounts.data(), arrayScatterDisplacements.data(), MPI_Tag_type, 
-							serialVecAllBlobTags.data(), arrayScatterCounts[rank], MPI_Tag_type, 0, m_comm);
+        // Serialize current view on every rank:
+        //  - rank 0 serializes the UPDATED GLOBAL
+        //  - others serialize their ORIGINAL local (pointed to by in_)
+        Serialize();
 
-				// For index
-				auto scatterBuffer_index = this->serialVecAllBlobTags_index;
-				this->serialVecAllBlobTags_index.clear();
-				this->serialVecAllBlobTags_index.resize(arrayScatterCounts_index[rank]);
-				MPI_Scatterv(scatterBuffer_index.data(), arrayScatterCounts_index.data(), arrayScatterDisplacements_index.data(), 
-							MPI_INT, serialVecAllBlobTags_index.data(), arrayScatterCounts_index[rank], MPI_INT, 0, m_comm);
-	
-			} else {
-				int localTagSize = serialVecAllBlobTags.size();
-				this->serialVecAllBlobTags.clear();
-				this->serialVecAllBlobTags.resize(localTagSize);
-				MPI_Scatterv(NULL, NULL, NULL, MPI_Tag_type, serialVecAllBlobTags.data(), localTagSize, MPI_Tag_type, 0, m_comm);
+        if (rank == 0) {
+            // Build counts / displacements for tags (elements) and index (ncols)
+            std::vector<int> arrayScatterCounts(size);
+            std::vector<int> arrayScatterDisplacements(size);
+            _ASSERT(vecScatterCounts.size() > 0);
+            arrayScatterCounts[0]        = vecScatterCounts[0];
+            arrayScatterDisplacements[0] = 0;
+            for (int i = 1; i < static_cast<int>(vecScatterCounts.size()); ++i) {
+                arrayScatterCounts[i]        = vecScatterCounts[i];
+                arrayScatterDisplacements[i] = arrayScatterDisplacements[i - 1] + vecScatterCounts[i - 1];
+            }
 
-				int localTagSize_index = serialVecAllBlobTags_index.size();
-				this->serialVecAllBlobTags_index.clear();
-				this->serialVecAllBlobTags_index.resize(localTagSize_index);
-				MPI_Scatterv(NULL, NULL, NULL, MPI_INT, serialVecAllBlobTags_index.data(), localTagSize_index, MPI_INT, 0, m_comm);
-			}
+            std::vector<int> arrayScatterCounts_index(size);
+            std::vector<int> arrayScatterDisplacements_index(size);
+            _ASSERT(vecScatterCounts_index.size() > 0);
+            arrayScatterCounts_index[0]        = vecScatterCounts_index[0]; // ncols (NOT ncols+1)
+            arrayScatterDisplacements_index[0] = 0;
+            for (int i = 1; i < static_cast<int>(vecScatterCounts_index.size()); ++i) {
+                arrayScatterCounts_index[i]        = vecScatterCounts_index[i];
+                arrayScatterDisplacements_index[i] = arrayScatterDisplacements_index[i - 1] + vecScatterCounts_index[i - 1];
+            }
 
-			// Now modify the received serialVecAllBlobTags_index for deserailization call
-			int prevCount = serialVecAllBlobTags_index[0];
-			serialVecAllBlobTags_index[0] = 0;				
-			for (int i = 1; i < serialVecAllBlobTags_index.size() - 1; i++ ) {
-				serialVecAllBlobTags_index[i] = serialVecAllBlobTags_index[i] - prevCount;
-			}
-			if (rank == 0) {
-				serialVecAllBlobTags_index.push_back(serialVecAllBlobTags.size());
+            // Scatter without cloning global buffers (MPI_IN_PLACE on root)
+            // Tags
+            MPI_Scatterv(
+                serialVecAllBlobTags.data(),
+                arrayScatterCounts.data(),
+                arrayScatterDisplacements.data(),
+                MPI_Tag_type,
+                MPI_IN_PLACE, 0, MPI_Tag_type, 0, m_comm);
 
-			} else {
-				serialVecAllBlobTags_index[serialVecAllBlobTags_index.size() - 1] = serialVecAllBlobTags.size();
-			}
-		}
+            // Index (ncols per rank; each rank will append/set the +1 sentinel)
+            MPI_Scatterv(
+                serialVecAllBlobTags_index.data(),
+                arrayScatterCounts_index.data(),
+                arrayScatterDisplacements_index.data(),
+                MPI_INT,
+                MPI_IN_PLACE, 0, MPI_INT, 0, m_comm);
+
+            // Keep only rank 0 slice locally
+            serialVecAllBlobTags.resize(arrayScatterCounts[0]);
+            serialVecAllBlobTags_index.resize(arrayScatterCounts_index[0]);
+        } else {
+            // Non-root: receive only; sizes come from our local serialized view
+            const int localTagSize        = static_cast<int>(serialVecAllBlobTags.size());
+            const int localTagSize_index  = static_cast<int>(serialVecAllBlobTags_index.size()); // this is (ncols+1)
+
+            serialVecAllBlobTags.clear();
+            serialVecAllBlobTags.resize(localTagSize);
+            MPI_Scatterv(nullptr, nullptr, nullptr, MPI_Tag_type,
+                         serialVecAllBlobTags.data(), localTagSize, MPI_Tag_type,
+                         0, m_comm);
+
+            serialVecAllBlobTags_index.clear();
+            serialVecAllBlobTags_index.resize(localTagSize_index);
+            MPI_Scatterv(nullptr, nullptr, nullptr, MPI_INT,
+                         serialVecAllBlobTags_index.data(), localTagSize_index, MPI_INT,
+                         0, m_comm);
+            // NOTE: root sends only ncols indices; we have an extra slot for the sentinel we set below.
+        }
+
+        // Localize index to [0 .. localTagCount] and fix sentinel (UNCHANGED semantics)
+        if (!serialVecAllBlobTags_index.empty()) {
+            const int base = serialVecAllBlobTags_index[0];
+            serialVecAllBlobTags_index[0] = 0;
+            for (size_t i = 1; i + 1 < serialVecAllBlobTags_index.size(); ++i) {
+                serialVecAllBlobTags_index[i] -= base;
+            }
+            if (rank == 0) {
+                serialVecAllBlobTags_index.push_back(static_cast<int>(serialVecAllBlobTags.size()));
+            } else {
+                serialVecAllBlobTags_index.back() = static_cast<int>(serialVecAllBlobTags.size());
+            }
+        }
+
+        // hygiene
+        serialVecAllBlobTags.shrink_to_fit();
+        serialVecAllBlobTags_index.shrink_to_fit();
+
+        // still serialized (ready for caller to Deserialize() via Get*() accessors)
+        serializedFlag = true;
+    }
 };
 
 
@@ -2219,186 +2223,164 @@ typedef MapGraph::iterator MapGraphIterator;
 #if defined(TEMPEST_MPIOMP) 
 
 
-///	<summary>
-///		A Class for MPI communication for sending/receiving Tag pairs (MapGraph)
-///	</summary>
+/// <summary>
+///   A Class for MPI communication for sending/receiving Tag pairs (MapGraph)
+/// </summary>
 class MapGraphGatherOp {
-	private:
-		///	<summary>
-		///		Tag for MPI communication for sending/receiving Tag pairs
-		///	</summary>
-		int reduce_tag = 106;
+private:
+    /// <summary> Tag for MPI communication for sending/receiving Tag pairs </summary>
+    int reduce_tag = 106;
 
-		///	<summary>
-		///		The MPI Communicator
-		///	</summary>
-		MPI_Comm m_comm; 
+    /// <summary> The MPI Communicator </summary>
+    MPI_Comm m_comm;
 
-		///	<summary>
-		///		An array of MPI_Request.	
-		///	</summary>
-		std::vector<MPI_Request> MPIrequests;
+    /// <summary> An array of MPI_Request. </summary>
+    std::vector<MPI_Request> MPIrequests;
 
-		///	<summary>
-		///		An array of MPI_Status.	
-		///	</summary>
-		std::vector<MPI_Status> MPIstatuses;
+    /// <summary> An array of MPI_Status. </summary>
+    std::vector<MPI_Status>  MPIstatuses;
 
+    /// <summary>
+    ///   Non-owning view of the input multimap (avoids ctor deep copy).
+    ///   Falls back to _multimapTagGraph only if in_ == nullptr.
+    /// </summary>
+    const MapGraph* in_ = nullptr;
 
-		///	<summary>
-		///		Serialize the MapGraph and generate the local std::pair<Tag, Tag> array
-		///	</summary>
-		void Serialize(){
-			localPairs.clear();
-			for (auto it = _multimapTagGraph.begin(); it != _multimapTagGraph.end(); ++it) {
-				localPairs.push_back(std::pair<Tag, Tag>(it->first, it->second));
-			}
+    /// <summary>
+    ///   Serialize the MapGraph and generate the local std::pair<Tag,Tag> array.
+    ///   Uses a single reserve() to avoid growth copies.
+    /// </summary>
+    void Serialize() {
+        const MapGraph& src = (in_ ? *in_ : _multimapTagGraph);
 
-		}
+        localPairs.clear();
+        localPairs.reserve(src.size());
+        for (const auto& kv : src) {
+            // kv is pair<const Tag, Tag>; copy into pair<Tag, Tag>
+            localPairs.emplace_back(kv.first, kv.second);
+        }
+    }
 
-		///	<summary>
-		///		Deserialize the local std::pair<Tag, Tag> array and generate back
-		///		the MapGraph (Only Processor 0 will call it)
-		///	</summary>
-		void Deserialize() {
-			for (std::pair<Tag, Tag> tagPair : localPairs) {
-				outputTagGraph.insert(tagPair);
-			}
+    /// <summary>
+    ///   Deserialize local std::pair<Tag,Tag> array back into MapGraph
+    ///   (only processor 0 will call it). Frees localPairs afterwards.
+    /// </summary>
+    void Deserialize() {
+        outputTagGraph.clear();
+        outputTagGraph.insert(localPairs.begin(), localPairs.end());
 
-		}
+        // hygiene: drop the big buffer after building the graph
+        std::vector<std::pair<Tag,Tag>>().swap(localPairs);
+    }
 
-	protected:
-		///	<summary>
-		///		Original multimapTagGraph.	
-		///	</summary>
-		MapGraph _multimapTagGraph;
+protected:
+    /// <summary>
+    ///   Fallback owning storage (unused in normal path; kept for drop-in compatibility).
+    /// </summary>
+    MapGraph _multimapTagGraph;
 
+    /// <summary> Serialized local multimapTagGraph. </summary>
+    std::vector<std::pair<Tag, Tag>> localPairs;
 
-		///	<summary>
-		///		Serialized local multimapTagGraph.	
-		///	</summary>
-		std::vector<std::pair<Tag, Tag>> localPairs;
+    /// <summary> Output multimapTagGraph. (Only used for processor 0) </summary>
+    MapGraph outputTagGraph;
 
-		///	<summary>
-		///		Output multimapTagGraph. (Only used for processor 0)	
-		///	</summary>	
-		MapGraph outputTagGraph;
-	
-	public:
-		///	<summary>
-		///		Construct the Operator with multimapTagGraph
-		///		It will contruct the this->m_comm and this->_multimapTagGraph based on
-		///		the input communicator and multimapTagGraph
-		///		And also construct the derived MPI_Datatype for Tag and commit it.
-		///	</summary>
-		MapGraphGatherOp(MPI_Comm communicator, 
-						 const MapGraph & multimapTagGraph) {
-			
-			// Set communicator first so we can log with it
-			this->m_comm = communicator;
-			
-			//[DEBUG START]
-			int r=-1, s=-1;
-			MPI_Comm_rank(m_comm, &r);
-			MPI_Comm_size(m_comm, &s);
+public:
+    /// <summary>
+    ///   Construct the Operator with a non-owning view of multimapTagGraph.
+    ///   Avoids deep copy; only stores the communicator and a pointer.
+    /// </summary>
+    MapGraphGatherOp(MPI_Comm communicator, const MapGraph& multimapTagGraph) {
+        // Set communicator first so we can log with it
+        this->m_comm = communicator;
 
-			const size_t inEdges = multimapTagGraph.size();
-			MpiDbgAtF(m_comm, "MapGraphGather/ctor",
-					"enter: rank=%d size=%d localEdges=%zu RSS=%.1f GB",
-					r, s, inEdges, GB(GetRSSBytes()));
+        // [DEBUG START]
+        int r=-1, s=-1;
+        MPI_Comm_rank(m_comm, &r);
+        MPI_Comm_size(m_comm, &s);
+        const size_t inEdges = multimapTagGraph.size();
+        MpiDbgAtF(m_comm, "MapGraphGather/ctor",
+                  "enter: rank=%d size=%d localEdges=%zu RSS=%.1f GB",
+                  r, s, inEdges, GB(GetRSSBytes()));
+        // [DEBUG END]
 
-			//[DEBUG END]
+        // Non-owning view (no deep copy)
+        this->in_ = &multimapTagGraph;
 
-			this->_multimapTagGraph = multimapTagGraph;
-			
-			//[DEBUG START]
-			const size_t copied = this->_multimapTagGraph.size();
-			MpiDbgAtF(m_comm, "MapGraphGather/ctor",
-					"after copy: copiedEdges=%zu RSS=%.1f GB",
-					copied, GB(GetRSSBytes()));
-			//[DEBUG END]
+        // [DEBUG START] (message retains format but clarifies no copy)
+        MpiDbgAtF(m_comm, "MapGraphGather/ctor",
+                  "after view: edges=%zu RSS=%.1f GB",
+                  inEdges, GB(GetRSSBytes()));
+        // [DEBUG END]
+    }
 
-		}
+    /// <summary> Destructor </summary>
+    ~MapGraphGatherOp() {
+        MPIrequests.clear();
+        MPIstatuses.clear();
+    }
 
-		///	<summary>
-		///		Destructor
-		///	</summary>
-		~MapGraphGatherOp(){
-			MPIrequests.clear();
-			MPIstatuses.clear();
-		}
+    /// <summary>
+    ///   The MPI gather that will gather each local MapGraph to processor 0.
+    ///   Hypercube pattern. Senders return immediately after sending.
+    /// </summary>
+    void Gather() {
+        int rank=-1, size=1;
+        MPI_Comm_rank(m_comm, &rank);
+        MPI_Comm_size(m_comm, &size);
 
+        Serialize();
 
+        const int d = (size <= 1)
+                      ? 0
+                      : static_cast<int>(std::ceil(std::log2(static_cast<double>(size))));
 
-		///	<summary>
-		///		The MPI gather that will gather each local MapGraph to the processor 0.
-		///	</summary>
-		void Gather() {
-			int rank, size;
-			MPI_Comm_size(m_comm, &size);
-			MPI_Comm_rank(m_comm, &rank);
+        for (int j = 0; j < d; ++j) {
+            const int bit = (1 << j);
 
-			this->Serialize();
-			int d = std::ceil(std::log2(size));//here we use ceil.
-			for (int j = 0; j < d; j++) {
-				if ((rank & (int)std::round(std::pow(2,j))) != 0) {
-					
-					//send to (world_rank ^ pow(2,j)
-					int destRank = rank ^ (int)round(std::pow(2,j));
-					if (destRank > size - 1) {
-						continue;
-					}
+            if ((rank & bit) != 0) {
+                // send to partner then return
+                const int destRank = rank ^ bit;
+                if (destRank >= size) continue;
 
-					MPI_Send (localPairs.data(), localPairs.size() * sizeof(std::pair<Tag, Tag>), MPI_BYTE, destRank, reduce_tag, m_comm);
-					//  We just simply need to break the algorithm here (juest return, not Finalize())
-					return;
-				} else {
-					//receive from (world_rank ^ pow(2,j))
-					MPI_Status status;
-					int byteCount;
-					int sourceRank = rank ^ (int)std::round(std::pow(2,j));
+                const int nbytes = static_cast<int>(localPairs.size() * sizeof(std::pair<Tag,Tag>));
+                MPI_Send(localPairs.data(), nbytes, MPI_BYTE, destRank, reduce_tag, m_comm);
+                return;
+            } else {
+                const int sourceRank = rank ^ bit;
+                if (sourceRank >= size) continue;
 
-					if (sourceRank > size - 1) {
-						continue;
-					}
+                // probe to get byte count
+                MPI_Status status;
+                int byteCount = 0;
+                MPI_Probe(sourceRank, reduce_tag, m_comm, &status);
+                MPI_Get_count(&status, MPI_BYTE, &byteCount);
 
-					MPI_Probe(sourceRank, reduce_tag,  m_comm, &status);
+                // resize once and receive directly into the tail (no temp buffer)
+                const int recvPairs = byteCount / static_cast<int>(sizeof(std::pair<Tag,Tag>));
+                const size_t off    = localPairs.size();
+                localPairs.resize(off + recvPairs);
 
-					MPI_Get_count( &status, MPI_BYTE, &byteCount);					 
-					std::vector<std::pair<Tag, Tag>> recvTagPairs;
-					recvTagPairs.resize(byteCount / sizeof(std::pair<Tag, Tag>));
-					MPI_Recv(recvTagPairs.data(), byteCount, MPI_BYTE, sourceRank, reduce_tag, m_comm, &status);
+                MPI_Recv(localPairs.data() + off, byteCount, MPI_BYTE,
+                         sourceRank, reduce_tag, m_comm, MPI_STATUS_IGNORE);
+            }
+        }
+    }
 
-					//Pack the receive Pairs into the localPairs.
-					for (auto recvPair : recvTagPairs) {
-						localPairs.push_back(recvPair);
-					}
-
-
-
-				}
-
-			}
-
-		}
-
-		///	<summary>
-		///	Return the gathered multiGraph (only called by the processor 0)
-		///	</summary>
-		MapGraph GetGatheredTagGraph() {
-			int rank, size;
-			MPI_Comm_size(m_comm, &size);
-			MPI_Comm_rank(m_comm, &rank);
-			if (rank == 0) {
-				this->Deserialize();
-				return outputTagGraph;
-			} else {
-				_EXCEPTIONT("Only processor 0 should call GetGatheredTagGraph().");
-			}
-			
-
-		}
-
+    /// <summary>
+    ///   Return the gathered multi-graph (only processor 0 should call).
+    ///   Builds from localPairs and returns by move to avoid extra copy.
+    /// </summary>
+    MapGraph GetGatheredTagGraph() {
+        int rank=-1;
+        MPI_Comm_rank(m_comm, &rank);
+        if (rank == 0) {
+            Deserialize();
+            return std::move(outputTagGraph);
+        } else {
+            _EXCEPTIONT("Only processor 0 should call GetGatheredTagGraph().");
+        }
+    }
 };
 
 #endif 
@@ -4865,6 +4847,7 @@ try {
 				// Revert the exchanged vecGlobalTimes and nGlobalTimes for output:
 				if (didExchangeTimes) {
 					vecGlobalTimes = std::move(origVecGlobalTimes);
+					std::vector<std::vector<Time>>().swap(origVecGlobalTimes);
 					nGlobalTimes = original_nGlobalTimes;
 				}
 				
@@ -4892,6 +4875,7 @@ try {
 			// Restore original blobs by move (no copy) only if we exchanged
 			if (didExchangeBlobs) {
 				vecAllBlobs = std::move(origVecAllBlobs);
+				std::vector<std::vector<IndicatorSet>>().swap(origVecAllBlobs);
 			}
 
 			}
