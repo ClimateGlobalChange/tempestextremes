@@ -3007,12 +3007,26 @@ static inline void SummarizeBlobs(
 int main(int argc, char** argv) {
 
 #if defined(TEMPEST_MPIOMP)
-		// Initialize MPI
-		int result = MPI_Init(&argc, &argv);
+	// Initialize MPI
+	int result = MPI_Init(&argc, &argv);
 
-		if (result != MPI_SUCCESS) {
-			_EXCEPTION1("The MPI routine MPI_Init failed (code %i)", result);
-		}
+	if (result != MPI_SUCCESS) {
+		_EXCEPTION1("The MPI routine MPI_Init failed (code %i)", result);
+	}
+	int processorResponsibalForFile_UB;
+	int processorResponsibalForFile_LB;
+	MPI_Comm MPI_REAL_COMM;
+	int tempMPIRank;
+	int tempMPISize;
+	int nMPIRank;
+	int nMPISize;
+	int valid_flag;//Used to indicate the current rank is valid or not.
+
+	valid_flag = 1;
+
+	MPI_REAL_COMM = MPI_COMM_NULL;
+	nMPIRank = 0;
+	nMPISize = 1;
 
 #endif
 
@@ -3364,17 +3378,13 @@ try {
 		// Note: if vecInputFiles.size() < total processor numbers, only <vecInputFiles.size()>
 		//   number of processor will be used.
 		// Calculate how many files each processor should process
-		int processorResponsibalForFile_UB;
-		int processorResponsibalForFile_LB;
-		MPI_Comm MPI_REAL_COMM;
-		int tempMPIRank;
-		int tempMPISize;
-		int nMPIRank;
-		int nMPISize;
-		int valid_flag;//Used to indicate the current rank is valid or not.
+		processorResponsibalForFile_LB = 0;
+		processorResponsibalForFile_UB = static_cast<int>(vecInputFiles.size());
+
 
 		MPI_Comm_rank(MPI_COMM_WORLD, &tempMPIRank);	
 		MPI_Comm_size(MPI_COMM_WORLD, &tempMPISize);
+
 
 		if (tempMPISize > 1) {
 			// Assign each processor with corresponding file index. The remainder will be
@@ -3400,20 +3410,24 @@ try {
 
 			}
 
-			if (vecInputFiles.size() < tempMPISize) {
-				if (tempMPIRank >= vecInputFiles.size() ) {
-					valid_flag = 0;
-				} else {
-					// Create a new communicator with only at most vecInputFiles.size() size
-					valid_flag = 1;					
-				}
-
+			// Mark ranks with no files as invalid
+			if (vecInputFiles.size() < static_cast<size_t>(tempMPISize) &&
+				tempMPIRank >= static_cast<int>(vecInputFiles.size())) {
+				valid_flag = 0;
 			} else {
-				valid_flag = 1;		
+				valid_flag = 1;
 			}
-			MPI_Comm_split(MPI_COMM_WORLD, valid_flag, tempMPIRank, &MPI_REAL_COMM);
-			MPI_Comm_rank(MPI_REAL_COMM, &nMPIRank);	
-			MPI_Comm_size(MPI_REAL_COMM, &nMPISize);
+
+
+			// Exclude inactive ranks using MPI_UNDEFINED
+			const int color = valid_flag ? 0 : MPI_UNDEFINED;
+			MPI_Comm_split(MPI_COMM_WORLD, color, tempMPIRank, &MPI_REAL_COMM);
+
+			if (MPI_REAL_COMM != MPI_COMM_NULL) {
+				MPI_Comm_rank(MPI_REAL_COMM, &nMPIRank);
+				MPI_Comm_size(MPI_REAL_COMM, &nMPISize);
+			}
+
 
 			//[DEBUG START]
 			// --- Sanity: who participates in MPI_REAL_COMM ---
@@ -3444,10 +3458,10 @@ try {
 			//[DEBUG END]
 
 		} else {
-			processorResponsibalForFile_LB = 0;
-			processorResponsibalForFile_UB = vecInputFiles.size();
-			MPI_Comm_rank(MPI_COMM_WORLD, &nMPIRank);	
-			MPI_Comm_size(MPI_COMM_WORLD, &nMPISize);
+			// single-rank convenience
+			MPI_REAL_COMM = MPI_COMM_WORLD;
+			nMPIRank = 0;
+			nMPISize = 1;
 
 		}
 
@@ -4063,7 +4077,7 @@ try {
 		size_t timeCount = 0;
 		for (const auto& v : vecGlobalTimes) timeCount += v.size();
 
-		if (nMPISize > 1 && valid_flag) {
+		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 			MpiDbgAtF(MPI_COMM_WORLD, "PreExchangeSnapshot, before all operators constructed",
 				"RANK %d of %d | RSS=%.1f GB | nGlobalTimes=%d (files=%zu,total entries=%zu) | "
 				"Blobs: nonEmptyTimes=%zu blobs=%zu points=%zu maxBlob=%zu ~%.1f GiB(sets) | "
@@ -4137,7 +4151,7 @@ try {
 #if defined(TEMPEST_MPIOMP)
     //[DEBUG START]
 	{
-		if (nMPISize > 1 && valid_flag) {
+		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 			int wrank=-1, wsize=-1;
 			MPI_Comm_rank(MPI_COMM_WORLD,&wrank);
 			MPI_Comm_size(MPI_COMM_WORLD,&wsize);
@@ -4166,7 +4180,7 @@ try {
 	bool didExchangeBlobs = false;                        // track whether we need to restore later
 	bool didExchangeBoxes = false;                        // track whether we need to restore later
 
-	if (nMPISize > 1 && valid_flag) {
+	if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 
 		//[DEBUG START]
 		MpiDbgAtF(MPI_REAL_COMM, "Phase", "before TimesExchange Start");
@@ -4373,7 +4387,7 @@ try {
 
 	//[DEBUG START]
 	# if defined(TEMPEST_MPIOMP)
-	if (nMPISize > 1 && valid_flag) {
+	if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 		MpiDbgAtF(MPI_COMM_WORLD, "Connectivity", "before build (nGlobalTimes=%d)", nGlobalTimes);
 	}
 	# else
@@ -4391,7 +4405,7 @@ try {
 		//recalculate the nGlobalTimes here based on the updated vecGlobalTimes file (will be inverted after the connectivity graph is built)	
 		int original_nGlobalTimes = nGlobalTimes;
 			
-		if (nMPISize > 1 && valid_flag) {
+		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 			nGlobalTimes = 0;
 			iFileLocal = processorResponsibalForFile_LB;
 			for (int f = processorResponsibalForFile_LB; f < processorResponsibalForFile_UB; f++) {
@@ -4597,7 +4611,7 @@ try {
 
 	//[DEBUG START]
 	# if defined(TEMPEST_MPIOMP)
-	if (nMPISize > 1 && valid_flag) {
+	if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 		MpiDbgAtF(MPI_COMM_WORLD, "Connectivity", "after build : localEdges=%zu",
 			multimapTagGraph.size());
 	}
@@ -4615,7 +4629,7 @@ try {
 	//[DEBUG START]
 	{
 		int world_r=-1; MPI_Comm_rank(MPI_COMM_WORLD,&world_r);
-		if (nMPISize > 1 && valid_flag) {
+		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 			int real_r=-1, real_n=0;
 			MPI_Comm_rank(MPI_REAL_COMM,&real_r);
 			MPI_Comm_size(MPI_REAL_COMM,&real_n);
@@ -4630,7 +4644,7 @@ try {
 	//[DEBUG END]
 
 
-		if (nMPISize > 1 && valid_flag) {
+		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 			//[DEBUG START]
 			{
 				size_t localEdges = multimapTagGraph.size();
@@ -4738,7 +4752,7 @@ try {
 
 	// [DEBUG BEGIN] Quick snapshot before component identification (mostly rank 0 work)
 	{
-		if (nMPISize > 1 && valid_flag) {
+		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 
 			int wrank=-1, wsize=-1;
 			MPI_Comm_rank(MPI_COMM_WORLD,&wrank);
@@ -5077,13 +5091,13 @@ try {
 	{	
 		#if defined(TEMPEST_MPIOMP)
 			// Processor 0 scatter the updated vecAllBlobsTag to other processors
-			if (nMPISize > 1 && valid_flag) {
+			if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 
 
 				// [Debug START]
 				{
 					size_t localEdges = multimapTagGraph.size();
-					MpiDbgAtF(MPI_REAL_COMM, "pre-TagScatter, right after (nMPISize > 1 && valid_flag)", "localEdges=%zu", localEdges);
+					MpiDbgAtF(MPI_REAL_COMM, "pre-TagScatter, right after (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL)", "localEdges=%zu", localEdges);
 				}
 				// [Debug END]
 
@@ -5168,7 +5182,7 @@ try {
 			MPI_Comm_size(MPI_REAL_COMM, &__size);
 
 			const int __N = static_cast<int>(vecOutputFiles.size());
-			const bool __par = (nMPISize > 1 && valid_flag);
+			const bool __par = (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL);
 
 			// Compute this rank's [LB, UB) responsibility range
 			const int __lb = __par ? processorResponsibalForFile_LB : 0;
@@ -5200,7 +5214,7 @@ try {
 
 		for (int f = 0; f < vecOutputFiles.size(); f++) {
 			#if defined(TEMPEST_MPIOMP) //[Commented out for auto-complete, need to uncomment later]
-				if (nMPISize > 1 && valid_flag) {
+				if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 					
 					// Assign each processor with their responsible chunks of files
 					if ((f >= processorResponsibalForFile_UB) || f < processorResponsibalForFile_LB) {
@@ -5333,7 +5347,7 @@ try {
 		AnnounceEndBlock("Done");
 
 		#if defined(TEMPEST_MPIOMP)
-		if (nMPISize > 1 && valid_flag) {
+		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 			MPI_Barrier(MPI_REAL_COMM);
 		}
 		#endif
@@ -5411,17 +5425,25 @@ try {
 } catch(Exception & e) {
 	Announce(e.ToString().c_str());
 
-#if defined(TEMPEST_MPIOMP)
+	#if defined(TEMPEST_MPIOMP)
 	MPI_Abort(MPI_COMM_WORLD, 1);
-#endif
+	#endif
+
 	return 1;
 }
 
-
-
 #if defined(TEMPEST_MPIOMP)
-	// Deinitialize MPI
-	MPI_Finalize();
+    // Free sub-communicator if we created one
+    if (MPI_REAL_COMM != MPI_COMM_NULL && MPI_REAL_COMM != MPI_COMM_WORLD) {
+        MPI_Comm_free(&MPI_REAL_COMM);
+        MPI_REAL_COMM = MPI_COMM_NULL;
+    }
+
+    //  synchronize for tidy exit (safe even if single-rank)
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // Finalize MPI as the LAST thing before returning
+    MPI_Finalize();
 #endif
 
 	return 0;
