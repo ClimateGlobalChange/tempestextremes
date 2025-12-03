@@ -54,178 +54,178 @@
 
 
 
-//////////////////////////////////[DEBUG START]/////////////////////////////////////////////
+// //////////////////////////////////[DEBUG START]/////////////////////////////////////////////
 
-#include <unistd.h>
-#include <fstream>
-#include <sys/resource.h>
-#include <cstdio>
-#include <cstdlib>
-#include <cstdarg>
-#include <limits>
-#include <string>
-#include <vector>
-#include <sstream>
-#include <iostream>
+// #include <unistd.h>
+// #include <fstream>
+// #include <sys/resource.h>
+// #include <cstdio>
+// #include <cstdlib>
+// #include <cstdarg>
+// #include <limits>
+// #include <string>
+// #include <vector>
+// #include <sstream>
+// #include <iostream>
 
 
 
-// current RSS in bytes (Linux)
-static inline size_t GetRSSBytes() {
-    std::ifstream s("/proc/self/status");
-    std::string key;
-    size_t kb = 0;
-    while (s >> key) {
-        if (key == "VmRSS:") {
-            if (s >> kb) {
-                std::string unit; s >> unit; // expect "kB"
-                return kb * 1024ULL;
-            }
-            return 0ULL;
-        }
-        s.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    }
-    return 0ULL;
-}
+// // current RSS in bytes (Linux)
+// static inline size_t GetRSSBytes() {
+//     std::ifstream s("/proc/self/status");
+//     std::string key;
+//     size_t kb = 0;
+//     while (s >> key) {
+//         if (key == "VmRSS:") {
+//             if (s >> kb) {
+//                 std::string unit; s >> unit; // expect "kB"
+//                 return kb * 1024ULL;
+//             }
+//             return 0ULL;
+//         }
+//         s.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+//     }
+//     return 0ULL;
+// }
 
-static inline double GB(size_t bytes) {
-    return double(bytes) / (1024.0*1024.0*1024.0);
-}
+// static inline double GB(size_t bytes) {
+//     return double(bytes) / (1024.0*1024.0*1024.0);
+// }
 
-template <class T>
-inline double VecCapGiB(const std::vector<T>& v) {
-    return double(v.capacity()) * sizeof(T) / (1024.0*1024.0*1024.0);
-}
+// template <class T>
+// inline double VecCapGiB(const std::vector<T>& v) {
+//     return double(v.capacity()) * sizeof(T) / (1024.0*1024.0*1024.0);
+// }
 
-// format into a std::string (printf-style)
-inline std::string vformat(const char* fmt, va_list ap) {
-    char buf[4096];
-    vsnprintf(buf, sizeof(buf), fmt ? fmt : "", ap);
-    return std::string(buf);
-}
+// // format into a std::string (printf-style)
+// inline std::string vformat(const char* fmt, va_list ap) {
+//     char buf[4096];
+//     vsnprintf(buf, sizeof(buf), fmt ? fmt : "", ap);
+//     return std::string(buf);
+// }
 
-// Safe bytes calculators for debug accounting
-template <class T>
-inline double BytesToGiB(size_t n) { return double(n)*sizeof(T) / (1024.0*1024.0*1024.0); }
+// // Safe bytes calculators for debug accounting
+// template <class T>
+// inline double BytesToGiB(size_t n) { return double(n)*sizeof(T) / (1024.0*1024.0*1024.0); }
 
-template <class T>
-inline double VecBytesGiB(const std::vector<T>& v) { return BytesToGiB<T>(v.size()); }
+// template <class T>
+// inline double VecBytesGiB(const std::vector<T>& v) { return BytesToGiB<T>(v.size()); }
 
-// Bounds-check helper for (offset,len) walkers
-inline void AssertSliceBounds(const char* where, size_t off, size_t len, size_t total) {
-    if (off > total || len > total || off+len > total) {
-        std::fprintf(stderr,
-            "FATAL %s: slice OOB (off=%zu len=%zu total=%zu)\n", where, off, len, total);
-        std::fflush(stderr);
-        std::abort(); // debug-only abort; leave in while triaging
-    }
-}
+// // Bounds-check helper for (offset,len) walkers
+// inline void AssertSliceBounds(const char* where, size_t off, size_t len, size_t total) {
+//     if (off > total || len > total || off+len > total) {
+//         std::fprintf(stderr,
+//             "FATAL %s: slice OOB (off=%zu len=%zu total=%zu)\n", where, off, len, total);
+//         std::fflush(stderr);
+//         std::abort(); // debug-only abort; leave in while triaging
+//     }
+// }
 
-static inline double EstimateSetOverheadGiB(size_t nPoints) {
-    // conservative average per std::set node
-    const double per = 40.0; // bytes (red-black node: pointers + payload + color/pad)
-    return (nPoints * per) / (1024.0*1024.0*1024.0);
-}
+// static inline double EstimateSetOverheadGiB(size_t nPoints) {
+//     // conservative average per std::set node
+//     const double per = 40.0; // bytes (red-black node: pointers + payload + color/pad)
+//     return (nPoints * per) / (1024.0*1024.0*1024.0);
+// }
 
-#if defined(TEMPEST_MPIOMP)
-// ========================= MPI versions =========================
-inline void MpiDbgAtF(MPI_Comm comm, const char* where, const char* fmt, ...) {
-    int r=-1; MPI_Comm_rank(comm, &r);
-    double rssGB = GB(GetRSSBytes());
+// #if defined(TEMPEST_MPIOMP)
+// // ========================= MPI versions =========================
+// inline void MpiDbgAtF(MPI_Comm comm, const char* where, const char* fmt, ...) {
+//     int r=-1; MPI_Comm_rank(comm, &r);
+//     double rssGB = GB(GetRSSBytes());
 
-    std::ostringstream oss;
-    oss.setf(std::ios::fixed); oss.precision(1);
-    oss << "[rank " << r << "] " << (where ? where : "")
-        << " | RSS=" << rssGB << " GB";
-    if (fmt) {
-        va_list ap; va_start(ap, fmt);
-        oss << " : " << vformat(fmt, ap);
-        va_end(ap);
-    }
-    oss << "\n";
-    std::cout << oss.str() << std::flush;
-}
+//     std::ostringstream oss;
+//     oss.setf(std::ios::fixed); oss.precision(1);
+//     oss << "[rank " << r << "] " << (where ? where : "")
+//         << " | RSS=" << rssGB << " GB";
+//     if (fmt) {
+//         va_list ap; va_start(ap, fmt);
+//         oss << " : " << vformat(fmt, ap);
+//         va_end(ap);
+//     }
+//     oss << "\n";
+//     std::cout << oss.str() << std::flush;
+// }
 
-inline void MpiDbgF(const char* fmt, ...) {
-    int r=-1; MPI_Comm_rank(MPI_COMM_WORLD, &r);
-    double rssGB = GB(GetRSSBytes());
-    std::ostringstream oss; oss.setf(std::ios::fixed); oss.precision(1);
-    oss << "[rank " << r << "] RSS=" << rssGB << " GB : ";
-    va_list ap; va_start(ap, fmt);
-    oss << vformat(fmt, ap);
-    va_end(ap);
-    oss << "\n";
-    std::cout << oss.str() << std::flush;
-}
+// inline void MpiDbgF(const char* fmt, ...) {
+//     int r=-1; MPI_Comm_rank(MPI_COMM_WORLD, &r);
+//     double rssGB = GB(GetRSSBytes());
+//     std::ostringstream oss; oss.setf(std::ios::fixed); oss.precision(1);
+//     oss << "[rank " << r << "] RSS=" << rssGB << " GB : ";
+//     va_list ap; va_start(ap, fmt);
+//     oss << vformat(fmt, ap);
+//     va_end(ap);
+//     oss << "\n";
+//     std::cout << oss.str() << std::flush;
+// }
 
-inline void MpiDbgAtFOrdered(MPI_Comm comm, const char* where, const char* fmt, ...) {
-    int me=-1, n=-1; MPI_Comm_rank(comm, &me); MPI_Comm_size(comm, &n);
+// inline void MpiDbgAtFOrdered(MPI_Comm comm, const char* where, const char* fmt, ...) {
+//     int me=-1, n=-1; MPI_Comm_rank(comm, &me); MPI_Comm_size(comm, &n);
 
-    va_list ap; va_start(ap, fmt);
-    std::string msg = vformat(fmt, ap);
-    va_end(ap);
+//     va_list ap; va_start(ap, fmt);
+//     std::string msg = vformat(fmt, ap);
+//     va_end(ap);
 
-    for (int r=0; r<n; ++r) {
-        MPI_Barrier(comm);
-        if (r == me) {
-            double rssGB = GB(GetRSSBytes());
-            std::ostringstream oss; oss.setf(std::ios::fixed); oss.precision(1);
-            oss << "[rank " << me << "] " << (where ? where : "")
-                << " | RSS=" << rssGB << " GB : " << msg << "\n";
-            std::cout << oss.str() << std::flush;
-        }
-    }
-    MPI_Barrier(comm);
-}
+//     for (int r=0; r<n; ++r) {
+//         MPI_Barrier(comm);
+//         if (r == me) {
+//             double rssGB = GB(GetRSSBytes());
+//             std::ostringstream oss; oss.setf(std::ios::fixed); oss.precision(1);
+//             oss << "[rank " << me << "] " << (where ? where : "")
+//                 << " | RSS=" << rssGB << " GB : " << msg << "\n";
+//             std::cout << oss.str() << std::flush;
+//         }
+//     }
+//     MPI_Barrier(comm);
+// }
 
-#else
-// ========================= Serial shims =========================
-// Minimal stand-ins so call sites compile unchanged in non-MPI builds.
-using MPI_Comm = int;
-#ifndef MPI_COMM_WORLD
-#define MPI_COMM_WORLD 0
-#endif
+// #else
+// // ========================= Serial shims =========================
+// // Minimal stand-ins so call sites compile unchanged in non-MPI builds.
+// using MPI_Comm = int;
+// #ifndef MPI_COMM_WORLD
+// #define MPI_COMM_WORLD 0
+// #endif
 
-inline void MpiDbgAtF(MPI_Comm /*comm*/, const char* where, const char* fmt, ...) {
-    const double rssGB = GB(GetRSSBytes());
-    std::ostringstream oss; oss.setf(std::ios::fixed); oss.precision(1);
-    oss << "[serial] " << (where ? where : "") << " | RSS=" << rssGB << " GB";
-    if (fmt) {
-        va_list ap; va_start(ap, fmt);
-        oss << " : " << vformat(fmt, ap);
-        va_end(ap);
-    }
-    oss << "\n";
-    std::cout << oss.str() << std::flush;
-}
+// inline void MpiDbgAtF(MPI_Comm /*comm*/, const char* where, const char* fmt, ...) {
+//     const double rssGB = GB(GetRSSBytes());
+//     std::ostringstream oss; oss.setf(std::ios::fixed); oss.precision(1);
+//     oss << "[serial] " << (where ? where : "") << " | RSS=" << rssGB << " GB";
+//     if (fmt) {
+//         va_list ap; va_start(ap, fmt);
+//         oss << " : " << vformat(fmt, ap);
+//         va_end(ap);
+//     }
+//     oss << "\n";
+//     std::cout << oss.str() << std::flush;
+// }
 
-inline void MpiDbgF(const char* fmt, ...) {
-    const double rssGB = GB(GetRSSBytes());
-    std::ostringstream oss; oss.setf(std::ios::fixed); oss.precision(1);
-    oss << "[serial] RSS=" << rssGB << " GB : ";
-    va_list ap; va_start(ap, fmt);
-    oss << vformat(fmt, ap);
-    va_end(ap);
-    oss << "\n";
-    std::cout << oss.str() << std::flush;
-}
+// inline void MpiDbgF(const char* fmt, ...) {
+//     const double rssGB = GB(GetRSSBytes());
+//     std::ostringstream oss; oss.setf(std::ios::fixed); oss.precision(1);
+//     oss << "[serial] RSS=" << rssGB << " GB : ";
+//     va_list ap; va_start(ap, fmt);
+//     oss << vformat(fmt, ap);
+//     va_end(ap);
+//     oss << "\n";
+//     std::cout << oss.str() << std::flush;
+// }
 
-// No-op ordered variant for serial builds (keeps signature)
-inline void MpiDbgAtFOrdered(MPI_Comm /*comm*/, const char* where, const char* fmt, ...) {
-    const double rssGB = GB(GetRSSBytes());
-    std::ostringstream oss; oss.setf(std::ios::fixed); oss.precision(1);
-    oss << "[serial] " << (where ? where : "") << " | RSS=" << rssGB << " GB";
-    if (fmt) {
-        va_list ap; va_start(ap, fmt);
-        oss << " : " << vformat(fmt, ap);
-        va_end(ap);
-    }
-    oss << "\n";
-    std::cout << oss.str() << std::flush;
-}
-#endif // TEMPEST_MPIOMP
+// // No-op ordered variant for serial builds (keeps signature)
+// inline void MpiDbgAtFOrdered(MPI_Comm /*comm*/, const char* where, const char* fmt, ...) {
+//     const double rssGB = GB(GetRSSBytes());
+//     std::ostringstream oss; oss.setf(std::ios::fixed); oss.precision(1);
+//     oss << "[serial] " << (where ? where : "") << " | RSS=" << rssGB << " GB";
+//     if (fmt) {
+//         va_list ap; va_start(ap, fmt);
+//         oss << " : " << vformat(fmt, ap);
+//         va_end(ap);
+//     }
+//     oss << "\n";
+//     std::cout << oss.str() << std::flush;
+// }
+// #endif // TEMPEST_MPIOMP
 
-//////////////////////////////////[DEBUG END]/////////////////////////////////////////////
+// //////////////////////////////////[DEBUG END]/////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1029,20 +1029,6 @@ class TagExchangeOP {
 				}
 			}
 
-			//[DEBUG START]
-			{
-				int r=-1, sz=-1; MPI_Comm_rank(m_comm,&r); MPI_Comm_size(m_comm,&sz);
-				// [CHANGED] derive send sizes from input edges (no staging copies)
-				size_t sendL = 0, sendR = 0;                                    // [CHANGED]
-				if (r % 2 != 0) {                                               // [CHANGED]
-					if (r != 0)        sendL = in_->front().size();             // [CHANGED]
-					if (r != sz - 1)   sendR = in_->back().size();              // [CHANGED]
-				}                                                                // [CHANGED]
-				MpiDbgAtF(m_comm, "TagExchange Start",
-						"RANK %d : send L=%zu, R=%zu (Tag)", r, sendL, sendR);
-			}
-
-			//[DEBUG END]
 		}
 
 		///	<summary>
@@ -1059,14 +1045,6 @@ class TagExchangeOP {
 			MPI_Comm_size(m_comm, &size);
 			MPI_Comm_rank(m_comm, &rank);
 
-			//[DEBUG START]
-			{
-				int rank=-1; MPI_Comm_rank(m_comm,&rank);
-				size_t recvL = recvTags[0].size(), recvR = recvTags[1].size();
-				MpiDbgAtF(m_comm, "TagExchange End",
-						"RANK %d : recv L=%zu, R=%zu (Tag)", rank, recvL, recvR);
-			}
-			//[DEBUG END]			
 
 			int result = MPI_Waitall( MPIrequests.size(), MPIrequests.data(), MPIstatuses.data());
 			if (result != MPI_SUCCESS) {
@@ -1377,23 +1355,7 @@ class BlobBoxesDegExchangeOP {
 				}
 			}
 
-			//[DEBUG START]
-			{
-				int wrank=-1, wsize=-1; MPI_Comm_rank(m_comm, &wrank); MPI_Comm_size(m_comm, &wsize);
-				size_t lEdge = (wrank != 0)        ? in_->front().size() : 0;
-				size_t rEdge = (wrank != wsize - 1)? in_->back().size()  : 0;
-				MpiDbgAtF(m_comm, "BoxesExchange EdgeCols",
-						"RANK %d : Lcol=%zu Rcol=%zu", wrank, lEdge, rEdge);
 
-				size_t sL = 0, sR = 0;
-				if (wrank % 2 != 0) {
-					if (wrank != 0)        sL = in_->front().size();
-					if (wrank != wsize - 1) sR = in_->back().size();
-				}
-				MpiDbgAtF(m_comm, "BoxesExchange Start after Send and Recv Post",
-						"RANK %d : send L=%zu boxes, R=%zu boxes", wrank, sL, sR);
-			}
-			//[DEBUG END]
 		}
 
 		///	<summary>
@@ -1410,18 +1372,7 @@ class BlobBoxesDegExchangeOP {
 			if (result != MPI_SUCCESS) {
 				_EXCEPTION1("The MPI routine MPI_Waitall failed (code %i)", result);
 			}
-			//[DEBUG START]
-			{
-				int wrank=-1; MPI_Comm_rank(m_comm, &wrank);
-				size_t rL = recvBlobBoxesDeg.size() >= 1 ? recvBlobBoxesDeg[0].size() : 0;
-				size_t rR = recvBlobBoxesDeg.size() >= 2 ? recvBlobBoxesDeg[1].size() : 0;
-				MpiDbgAtF(m_comm, "BoxesExchange End after Waitall",
-						"RANK %d : recv L=%zu boxes, R=%zu boxes", wrank, rL, rR);
-				MpiDbgAtF(m_comm, "BoxesExchange Meta",
-						"RANK %d : sizeof(LatLonBox<double>)=%zu bytes", wrank, sizeof(LatLonBox<double>));
-			}
 
-            //[DEBUG END]
 
 			MPIrequests.clear();
 			MPIstatuses.clear();
@@ -1466,21 +1417,6 @@ class BlobBoxesDegExchangeOP {
 			for (auto& v : recvBlobBoxesDeg) v.shrink_to_fit();
 			recvBlobBoxesDeg.clear();
 			recvBlobBoxesDeg.shrink_to_fit();
-
-			// [DEBUG START] final, after-pack snapshot
-			{
-				int wrank=-1; MPI_Comm_rank(m_comm, &wrank);
-				size_t cols = exchangedvecAllBlobBoxesDeg.size();
-				size_t totalBoxes = 0;
-				for (const auto& col : exchangedvecAllBlobBoxesDeg) totalBoxes += col.size();
-				const double approxGiB = double(totalBoxes) * sizeof(LatLonBox<double>)
-									/ (1024.0*1024.0*1024.0);
-				MpiDbgAtF(m_comm, "BoxesExchange End (after pack, right before return)",
-						"RANK %d : columns=%zu totalBoxes=%zu (~%.3f GiB by elem size)",
-						wrank, cols, totalBoxes, approxGiB);
-			}
-			// [DEBUG END]
-
 
 
 		}
@@ -1579,64 +1515,6 @@ class BlobsExchangeOp {
 			}
 		}
 
-		// ///	<summary>
-		// ///		Deserialize the received vector<int>recvBlobs into vector<IndicatorSet> and clear the recvBlobsIndx array
-		// ///	</summary>
-		// void Deserialize(){
-		// 	recvBlobsUnserial.clear();
-		// 	recvBlobsUnserial.resize(2);
-		// 	int rank, size;
-		// 	MPI_Comm_size(m_comm, &size);
-		// 	MPI_Comm_rank(m_comm, &rank);
-
-
-		// 	for (auto dir : {DIR_LEFT, DIR_RIGHT}) {
-		// 		//Rank 0 will not receive from its left, hence no deserialization.
-		// 		if (rank == 0 && dir == DIR_LEFT) {
-		// 			continue;
-		// 		}
-
-		// 		//[DEBUG START]
-		// 		if (recvBlobsIndx[dir].empty()) {
-		// 			Announce("RANK %d WARN: recvBlobsIndx[%d] empty; sets=0", rank, (int)dir);
-		// 			continue;
-		// 		}
-		// 		//[DEBUG END]
-
-		// 		// If nothing arrived (empty index), skip
-		// 		if (recvBlobsIndx[dir].empty()) {
-		// 			continue;
-		// 		}
-
-		// 		//the last processor will now receive from its right, hence no deserialization
-		// 		if ((rank == size - 1) && dir == DIR_RIGHT) {
-		// 			continue;
-		// 		}
-		// 		for (int i = 0; i < static_cast<int>(recvBlobsIndx[dir].size())-1; i++){
-		// 			IndicatorSet curSet;
-		// 			int startIndx = recvBlobsIndx[dir][i];
-		// 			int endIndx = std::min(recvBlobsIndx[dir][i+1],int(recvBlobs[dir].size()));
-
-
-		// 			//[DEBUG START]
-		// 			AssertSliceBounds("BlobsDeserialize",
-		// 							(size_t)startIndx,
-		// 							(size_t)(endIndx - startIndx),
-		// 							recvBlobs[dir].size());
-		// 			//[DEBUG END]
-
-		// 			//Deserialize each set
-		// 			for (int j = startIndx; j < endIndx; ++j){
-		// 				curSet.insert(recvBlobs[dir][j]);
-		// 			}
-
-		// 			//push each set into the vector
-		// 			recvBlobsUnserial[dir].push_back(std::move(curSet));
-		// 		}
-		// 	}
-		// 	recvBlobsIndx.clear();
-		// 	sendBlobsIndx.clear();
-		// }
 	protected:
 
 		///	<summary>
@@ -1860,25 +1738,6 @@ class BlobsExchangeOp {
 			}
 
 
-			 //[DEBUG START]
-			 {
-				int rank=-1,size=-1; MPI_Comm_rank(m_comm,&rank); MPI_Comm_size(m_comm,&size);
-				// [CHANGED] Debug derives sizes from *in_ instead of _vecAllBlobs
-				size_t lSets = (rank != 0)        ? in_->front().size() : 0;
-				size_t rSets = (rank != size - 1) ? in_->back().size()  : 0;
-				MpiDbgAtF(m_comm, "BlobsExchange EdgeCols",
-						"RANK %d : LcolSets=%zu RcolSets=%zu", rank, lSets, rSets);
-
-				size_t sL = sendBlobs.size()>=1 ? sendBlobs[0].size() : 0;
-				size_t sR = sendBlobs.size()>=2 ? sendBlobs[1].size() : 0;
-				size_t iL = sendBlobsIndx.size()>=1 ? sendBlobsIndx[0].size() : 0;
-				size_t iR = sendBlobsIndx.size()>=2 ? sendBlobsIndx[1].size() : 0;
-				MpiDbgAtF(m_comm, "BlobsExchange Start after Send and Recv Post",
-						"RANK %d : send L=%zu ints (%zu idx), R=%zu ints (%zu idx)",
-						rank, sL, iL, sR, iR);
-			}
-			//[DEBUG END]
-
 
 
 		}
@@ -1899,28 +1758,6 @@ class BlobsExchangeOp {
 				_EXCEPTION1("The MPI routine MPI_Waitall failed (code %i)", result);
 			}
 
-			//[DEBUG START]
-			{
-				int rank=-1; MPI_Comm_rank(m_comm,&rank);
-				size_t rL  = recvBlobs.size()>=1 ? recvBlobs[0].size() : 0;
-				size_t rR  = recvBlobs.size()>=2 ? recvBlobs[1].size() : 0;
-				size_t riL = recvBlobsIndx.size()>=1 ? recvBlobsIndx[0].size() : 0;
-				size_t riR = recvBlobsIndx.size()>=2 ? recvBlobsIndx[1].size() : 0;
-				MpiDbgAtF(m_comm, "BlobsExchange , Right after MPI_Waitall",
-						"RANK %d : recv L=%zu ints (%zu idx), R=%zu ints (%zu idx)",
-						rank, rL, riL, rR, riR);
-
-				size_t colsAfter = exchangedVecAllBlobs.size();
-				size_t totalSets = 0, totalPoints = 0;
-				for (const auto& col : exchangedVecAllBlobs) {
-					totalSets += col.size();
-					for (const auto& s : col) totalPoints += s.size();
-				}
-				MpiDbgAtF(m_comm, "post-BlobsExchange, Right after MPI_Waitall",
-						"RANK %d : columns=%zu totalBlobs(sets)=%zu totalPoints=%zu",
-						rank, colsAfter, totalSets, totalPoints);
-			}
-			//[DEBUG END]
 
 			MPIrequests.clear();
 			MPIstatuses.clear();
@@ -1937,17 +1774,6 @@ class BlobsExchangeOp {
 
 
 
-			//[DEBUG START]
-            size_t colsAfter = exchangedVecAllBlobs.size();
-            size_t totalSets = 0;
-            size_t totalPoints = 0;
-            for (const auto& col : exchangedVecAllBlobs) {
-                totalSets += col.size();
-                for (const auto& s : col) totalPoints += s.size();
-            }
-            Announce("RANK %d post-BlobsExchange, before Deserialize: columns=%zu totalBlobs(sets)=%zu totalPoints=%zu",
-                     rank, colsAfter, totalSets, totalPoints);
-            //[DEBUG END]
 
 
 			// Only the even number processors need deserialize
@@ -1967,13 +1793,6 @@ class BlobsExchangeOp {
 					for (int i = 0; i < nsets; ++i) {
 						const int startIndx = recvBlobsIndx[dir][i];
 						const int endIndx   = std::min(recvBlobsIndx[dir][i+1], int(recvBlobs[dir].size()));
-
-						//[DEBUG START]
-						AssertSliceBounds("BlobsDeserialize",
-								(size_t)startIndx,
-								(size_t)(endIndx - startIndx),
-								recvBlobs[dir].size());
-						//[DEBUG END]
 
 						IndicatorSet curSet;
 						for (int j = startIndx; j < endIndx; ++j){
@@ -2015,20 +1834,7 @@ class BlobsExchangeOp {
 				// For odd number processors, nothing is modified.
 				exchangedVecAllBlobs.swap(*in_); 
 			}
-			// [DEBUG START] final, after-pack snapshot
-			{
-				int rank=-1; MPI_Comm_rank(m_comm,&rank);
-				size_t cols=exchangedVecAllBlobs.size();
-				size_t sets=0, points=0;
-				for (const auto& col : exchangedVecAllBlobs) {
-					sets += col.size();
-					for (const auto& s : col) points += s.size();
-				}
-				MpiDbgAtF(m_comm, "BlobsExchange End (after pack, right before return)",
-						"RANK %d : columns=%zu totalBlobs(sets)=%zu totalPoints=%zu",
-						rank, cols, sets, points);
-			}
-			// [DEBUG END]
+
 
 			recvBlobs.clear();            recvBlobs.shrink_to_fit();
 			recvBlobsIndx.clear();        recvBlobsIndx.shrink_to_fit();
@@ -2256,14 +2062,6 @@ class GlobalTimesExchangeOp {
 				}
 			}
 
-			//[DEBUG START]
-			{
-				int rank=-1; MPI_Comm_rank(m_comm,&rank);
-				MpiDbgAtF(m_comm, "TimesExchange Start, after Send and Recv Post",
-						"RANK %d : sending 2 boundary Time stamps", rank);
-			}
-			//[DEBUG END]
-
 
 
 
@@ -2284,13 +2082,6 @@ class GlobalTimesExchangeOp {
 				_EXCEPTION1("The MPI routine MPI_Waitall failed (code %i)", result);
 			}
 
-			//[DEBUG START]
-			{
-				int rank=-1; MPI_Comm_rank(m_comm,&rank);
-				MpiDbgAtF(m_comm, "TimesExchange End, right after MPI_Waitall",
-						"RANK %d : recv flags set", rank);
-			}
-			//[DEBUG END]
 
 			MPIrequests.clear();
 			MPIstatuses.clear();
@@ -2333,17 +2124,6 @@ class GlobalTimesExchangeOp {
 				// Odd ranks: no edits needed; exchangedVecGlobalTimes already holds original via move
 			}
 
-
-
-			// [DEBUG START] final, after-pack snapshot
-			{
-				int dr=-1; MPI_Comm_rank(m_comm,&dr);
-				size_t cols = exchangedVecGlobalTimes.size(), total=0;
-				for (const auto& v : exchangedVecGlobalTimes) total += v.size();
-				MpiDbgAtF(m_comm, "TimesExchange End",
-						"RANK %d : columns=%zu totalTimes=%zu", dr, cols, total);
-			}
-			// [DEBUG END]
 
 
 		}
@@ -2438,24 +2218,9 @@ public:
         // Set communicator first so we can log with it
         this->m_comm = communicator;
 
-        // [DEBUG START]
-        int r=-1, s=-1;
-        MPI_Comm_rank(m_comm, &r);
-        MPI_Comm_size(m_comm, &s);
-        const size_t inEdges = multimapTagGraph.size();
-        MpiDbgAtF(m_comm, "MapGraphGather/ctor",
-                  "enter: rank=%d size=%d localEdges=%zu RSS=%.1f GB",
-                  r, s, inEdges, GB(GetRSSBytes()));
-        // [DEBUG END]
-
         // Non-owning view (no deep copy)
         this->in_ = &multimapTagGraph;
 
-        // [DEBUG START] (message retains format but clarifies no copy)
-        MpiDbgAtF(m_comm, "MapGraphGather/ctor",
-                  "after view: edges=%zu RSS=%.1f GB",
-                  inEdges, GB(GetRSSBytes()));
-        // [DEBUG END]
     }
 
     /// <summary> Destructor </summary>
@@ -3429,34 +3194,6 @@ try {
 			}
 
 
-			//[DEBUG START]
-			// --- Sanity: who participates in MPI_REAL_COMM ---
-			{
-				int world_r=-1, real_r=-1, real_n=0, world_n=0;
-				MPI_Comm_rank(MPI_COMM_WORLD, &world_r);
-				MPI_Comm_size(MPI_COMM_WORLD, &world_n);
-
-				if (tempMPISize > 1) {
-					if (valid_flag) {
-						// this rank is in MPI_REAL_COMM
-						MPI_Comm_rank(MPI_REAL_COMM, &real_r);
-						MPI_Comm_size(MPI_REAL_COMM, &real_n);
-						MpiDbgAtF(MPI_COMM_WORLD, "MPI_REAL_COMM",
-								"world_rank=%d of %d -> participates as real_rank=%d of %d",
-								world_r, world_n, real_r, real_n);
-					} else {
-						// this rank is NOT in MPI_REAL_COMM
-						MpiDbgAtF(MPI_COMM_WORLD, "MPI_REAL_COMM",
-								"world_rank=%d of %d -> does NOT participate", world_r, world_n);
-					}
-				} else {
-					MpiDbgAtF(MPI_COMM_WORLD, "MPI_REAL_COMM",
-							"single-rank run: world_rank=%d participates (no split)", world_r);
-				}
-			}
-
-			//[DEBUG END]
-
 		} else {
 			// single-rank convenience
 			MPI_REAL_COMM = MPI_COMM_WORLD;
@@ -3536,17 +3273,6 @@ try {
 	_ASSERT(nGlobalTimes == vecGlobalTimeIxToFileTimeIx.size());
 
 
-	//[DEBUG START]
-	#if defined(TEMPEST_MPIOMP)
-	
-	{
-    int wrank=-1, wsize=-1; MPI_Comm_rank(MPI_COMM_WORLD,&wrank); MPI_Comm_size(MPI_COMM_WORLD,&wsize);
-    Announce("RANK %d initial nGlobalTimes=%d (vecGlobalTimes.size()=%zu)", wrank, nGlobalTimes, vecGlobalTimes.size());
-	}
-
-	#endif
-	//[DEBUG END]
-
 
 	AnnounceEndBlock("Done");
 
@@ -3579,15 +3305,6 @@ try {
 	#endif 
 
 
-	//[DEBUG START]
-	#if defined(TEMPEST_MPIOMP)
-	{
-		int wrank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&wrank);
-		Announce("RANK %d BEFORE blob build: nFiles(start..end)=[%d..%d)  using nGlobalTimes=%d",
-				wrank, startIndx, nFiles, nGlobalTimes);
-	}
-	#endif
-	//[DEBUG END]
 
 	for (int f = startIndx; f < nFiles; f++) {
 		// Clear existing data in the register
@@ -4042,134 +3759,11 @@ try {
 	AnnounceEndBlock("Done");
 
 
-	//[DEBUG START]
-
-	#if defined(TEMPEST_MPIOMP) 
-	
-
-	// === Pre-exchange memory/counter snapshot (works in serial and MPI) ===
-	{
-		int wrank=0, wsize=1;
-		#if defined(TEMPEST_MPIOMP)
-			MPI_Comm_rank(MPI_COMM_WORLD,&wrank);
-			MPI_Comm_size(MPI_COMM_WORLD,&wsize);
-		#endif
-
-		// Blobs
-		size_t neTimes=0, nBlobs=0, nPts=0, maxBlob=0;
-		SummarizeBlobs(vecAllBlobs, neTimes, nBlobs, nPts, maxBlob);
-		const double blobsGiB = EstimateSetOverheadGiB(nPts);
-
-		// Tags (raw size estimate)
-		size_t tagTimes = vecAllBlobTags.size();
-		size_t tagCount = 0;
-		for (const auto& v : vecAllBlobTags) tagCount += v.size();
-		const size_t tagBytes = tagCount * sizeof(Tag);
-
-		// Boxes (raw size)
-		size_t boxTimes = vecAllBlobBoxesDeg.size();
-		size_t boxCount = 0;
-		for (const auto& v : vecAllBlobBoxesDeg) boxCount += v.size();
-		const size_t boxBytes = boxCount * sizeof(LatLonBox<double>);
-
-		// Global times (count only; Time layout is implementation-specific)
-		size_t timeFiles = vecGlobalTimes.size();
-		size_t timeCount = 0;
-		for (const auto& v : vecGlobalTimes) timeCount += v.size();
-
-		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
-			MpiDbgAtF(MPI_COMM_WORLD, "PreExchangeSnapshot, before all operators constructed",
-				"RANK %d of %d | RSS=%.1f GB | nGlobalTimes=%d (files=%zu,total entries=%zu) | "
-				"Blobs: nonEmptyTimes=%zu blobs=%zu points=%zu maxBlob=%zu ~%.1f GiB(sets) | "
-				"Tags: times=%zu total=%zu raw=%.3f GiB | "
-				"Boxes: times=%zu total=%zu raw=%.3f GiB",
-				wrank, wsize, GB(GetRSSBytes()),
-				nGlobalTimes, timeFiles, timeCount,
-				neTimes, nBlobs, nPts, maxBlob, blobsGiB,
-				tagTimes, tagCount, GB(tagBytes),
-				boxTimes, boxCount, GB(boxBytes)
-			);
-		} else{
-			Announce("PreExchangeSnapshot | RSS=%.1f GB | nGlobalTimes=%d (files=%zu,total entries=%zu) | "
-				"Blobs: nonEmptyTimes=%zu blobs=%zu points=%zu maxBlob=%zu ~%.1f GiB(sets) | "
-				"Tags: times=%zu total=%zu raw=%.3f GiB | "
-				"Boxes: times=%zu total=%zu raw=%.3f GiB",
-				GB(GetRSSBytes()),
-				nGlobalTimes, timeFiles, timeCount,
-				neTimes, nBlobs, nPts, maxBlob, blobsGiB,
-				tagTimes, tagCount, GB(tagBytes),
-				boxTimes, boxCount, GB(boxBytes)
-			);
-		}
-	}
-	#else
-		//[DEBUG START]
-		// Blobs
-		size_t neTimes=0, nBlobs=0, nPts=0, maxBlob=0;
-		SummarizeBlobs(vecAllBlobs, neTimes, nBlobs, nPts, maxBlob);
-		const double blobsGiB = EstimateSetOverheadGiB(nPts);
-
-		// Tags (raw size estimate)
-		size_t tagTimes = vecAllBlobTags.size();
-		size_t tagCount = 0;
-		for (const auto& v : vecAllBlobTags) tagCount += v.size();
-		const size_t tagBytes = tagCount * sizeof(Tag);
-
-		// Boxes (raw size)
-		size_t boxTimes = vecAllBlobBoxesDeg.size();
-		size_t boxCount = 0;
-		for (const auto& v : vecAllBlobBoxesDeg) boxCount += v.size();
-		const size_t boxBytes = boxCount * sizeof(LatLonBox<double>);
-
-		// Global times (count only; Time layout is implementation-specific)
-		size_t timeFiles = vecGlobalTimes.size();
-		size_t timeCount = 0;
-		for (const auto& v : vecGlobalTimes) timeCount += v.size();
-
-
-		MpiDbgAtF(MPI_COMM_WORLD, "PreExchangeSnapshot, before all operators constructed",
-		"RANK %d of %d | RSS=%.1f GB | nGlobalTimes=%d (files=%zu,total entries=%zu) | "
-		"Blobs: nonEmptyTimes=%zu blobs=%zu points=%zu maxBlob=%zu ~%.1f GiB(sets) | "
-		"Tags: times=%zu total=%zu raw=%.3f GiB | "
-		"Boxes: times=%zu total=%zu raw=%.3f GiB",
-		0, 1, GB(GetRSSBytes()),
-		nGlobalTimes, timeFiles, timeCount,
-		neTimes, nBlobs, nPts, maxBlob, blobsGiB,
-		tagTimes, tagCount, GB(tagBytes),
-		boxTimes, boxCount, GB(boxBytes)
-		);
-		//[DEBUG END]
-
-	#endif 
-
-	//[DEBUG END]
-
 	//================================Actual Parallization Starts===================================
 	//1. Exchang the vecAllBlobs; vecAllBlobTags; vecPrevBlobBoxesDeg; vecGlobalTimes
 	//==============================================================================================
 
 #if defined(TEMPEST_MPIOMP)
-    //[DEBUG START]
-	{
-		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
-			int wrank=-1, wsize=-1;
-			MPI_Comm_rank(MPI_COMM_WORLD,&wrank);
-			MPI_Comm_size(MPI_COMM_WORLD,&wsize);
-
-			size_t nTimesNE=0, nBlobs=0, nPts=0, maxBlob=0;
-			SummarizeBlobs(vecAllBlobs, nTimesNE, nBlobs, nPts, maxBlob);
-			double estGiB = EstimateSetOverheadGiB(nPts);
-
-			MpiDbgAtF(MPI_COMM_WORLD, "pre-exchange",
-				"RANK %d : nGlobalTimes=%d nonEmptyTimes=%zu blobs=%zu points=%zu maxBlob=%zu "
-				"est-blobs-mem≈%.1f GiB (std::set nodes)",
-				wrank, nGlobalTimes, nTimesNE, nBlobs, nPts, maxBlob, estGiB);
-		}
-	}
-    //[DEBUG END]
-
-
-
 
 	//We still need the original unexchanged data for these two variables later
 	std::vector<std::vector<Time>> origVecGlobalTimes;
@@ -4182,16 +3776,10 @@ try {
 
 	if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 
-		//[DEBUG START]
-		MpiDbgAtF(MPI_REAL_COMM, "Phase", "before TimesExchange Start");
-		//[DEBUG END]
 
 		//Exchange vecGlobalTimes (will be reverted after the connectivity graph is built)		
 		origVecGlobalTimes = std::move(vecGlobalTimes); // keep original without copying
 
-		//[DEBUG START]
-		MpiDbgAtF(MPI_REAL_COMM, "HX/TimesExchange", "start");
-		//[DEBUG END]
 		GlobalTimesExchangeOp MPI_exchangedGlobalTimes(
 			MPI_REAL_COMM,
 			origVecGlobalTimes,
@@ -4204,34 +3792,12 @@ try {
 		didExchangeTimes = true;
 
 
-
-		//[DEBUG START]
-		{
-			size_t totTimes=0; for (const auto& v : vecGlobalTimes) totTimes += v.size();
-			// We intentionally keep origVecGlobalTimes alive for later — no deep copy occurred,
-			// but two distinct buffers coexist until we restore.
-			const bool coexist = !origVecGlobalTimes.empty(); 
-			size_t totTimesOrig=0; if (coexist) for (const auto& v : origVecGlobalTimes) totTimesOrig += v.size();
-
-			MpiDbgAtF(MPI_REAL_COMM, "HX/TimesExchange", 
-				"end | columns=%zu totalTimes=%zu | original_kept=%s original_totalTimes=%zu",
-				vecGlobalTimes.size(), totTimes, coexist ? "YES" : "no", totTimesOrig);
-		}
-		//[DEBUG END]
-
 		//Exchange vecAllBlobTags			
 		// Move ORIGINAL local tags into a backup BEFORE constructing TagExchangeOP. Prevents overwriting the input that
 		// TagCollective needs later.
 		origVecAllBlobTags = std::move(vecAllBlobTags);
 
 
-		//[DEBUG START]
-		{
-			size_t totTags=0; for (const auto& v : vecAllBlobTags) totTags += v.size();
-			MpiDbgAtF(MPI_REAL_COMM, "HX/TagExchange", "start | columns=%zu totalTags=%zu",
-					vecAllBlobTags.size(), totTags);
-		}
-		//[DEBUG END]
 		TagExchangeOP MPI_exchangedTags(MPI_REAL_COMM, origVecAllBlobTags);
 		MPI_exchangedTags.StartExchange();
 		MPI_exchangedTags.EndExchange();
@@ -4239,31 +3805,8 @@ try {
 		didExchangeTags = true;
 
 
-		//[DEBUG START]
-		{
-			size_t totTagsNew=0; for (const auto& v : vecAllBlobTags) totTagsNew += v.size();
-			const bool coexist = !origVecAllBlobTags.empty(); // original intentionally kept
-			size_t totTagsOrig=0; if (coexist) for (const auto& v : origVecAllBlobTags) totTagsOrig += v.size();
-
-			MpiDbgAtF(MPI_REAL_COMM, "HX/TagExchange",
-				"end | columns=%zu totalTags=%zu | original_kept=%s original_totalTags=%zu",
-				vecAllBlobTags.size(), totTagsNew, coexist ? "YES" : "no", totTagsOrig);
-		}
-		//[DEBUG END]
-
 		//Exchange vecAllBlobs
 
-
-		//[DEBUG START]
-        {
-            size_t ne=0, nb=0, np=0, mx=0;
-            SummarizeBlobs(vecAllBlobs, ne, nb, np, mx);
-            const double estGiB = EstimateSetOverheadGiB(np);
-            MpiDbgAtF(MPI_REAL_COMM, "HX/BlobsExchange",
-                "start | columns=%zu nonEmptyTimes=%zu blobs=%zu points=%zu maxBlob=%zu est-sets≈%.2f GiB",
-                vecAllBlobs.size(), ne, nb, np, mx, estGiB);
-        }
-		//[DEBUG END]
 		// Construct op with the original backup (non-owning view)
 		BlobsExchangeOp MPI_exchangedBlobs(MPI_REAL_COMM, vecAllBlobs);
 		MPI_exchangedBlobs.StartExchange();
@@ -4272,109 +3815,26 @@ try {
 		vecAllBlobs = std::move(MPI_exchangedBlobs).TakeExchangedVecAllBlobs();
 		didExchangeBlobs = true;
 
-
-		//[DEBUG START]
-        {
-            size_t ne=0, nb=0, np=0, mx=0;
-            SummarizeBlobs(vecAllBlobs, ne, nb, np, mx);
-            const double estGiB = EstimateSetOverheadGiB(np);
-            MpiDbgAtF(MPI_REAL_COMM, "HX/BlobsExchange",
-                "end | columns=%zu nonEmptyTimes=%zu blobs=%zu points=%zu maxBlob=%zu est-sets≈%.2f GiB",
-                vecAllBlobs.size(), ne, nb, np, mx, estGiB);
-        }
-		//[DEBUG END]
-
 		//Exchange vecPrevBlobBoxesDeg
-		//[DEBUG START]
-		MpiDbgAtF(MPI_REAL_COMM, "HX/BoxesExchange", "start");
-		//[DEBUG END]
+
 		BlobBoxesDegExchangeOP MPI_exchangedBlobBoxesDeg(MPI_REAL_COMM, vecAllBlobBoxesDeg);
 		MPI_exchangedBlobBoxesDeg.StartExchange();
 		MPI_exchangedBlobBoxesDeg.EndExchange();
 		vecAllBlobBoxesDeg = std::move(MPI_exchangedBlobBoxesDeg).TakeExchangedVecAllBlobBoxesDeg();
 		didExchangeBoxes = true;
 
-		//[DEBUG START]
-        {
-            size_t totalBoxes = 0;
-            for (const auto& col : vecAllBlobBoxesDeg) totalBoxes += col.size();
-            const double approxGiB =
-                double(totalBoxes) * sizeof(LatLonBox<double>) / (1024.0*1024.0*1024.0);
-
-            MpiDbgAtF(MPI_REAL_COMM, "HX/BoxesExchange",
-                "end | columns=%zu totalBoxes=%zu (~%.3f GiB by elem size)",
-                vecAllBlobBoxesDeg.size(), totalBoxes, approxGiB);
-        }
-		//[DEBUG END]
 
 		//Make sure all processors finish the exchange
 		MPI_Barrier(MPI_REAL_COMM);
 
-		//[DEBUG START]
-        {
-            size_t totTimes=0, totTags=0, totBoxes=0;
-            for (const auto& v : vecGlobalTimes)     totTimes += v.size();
-            for (const auto& v : vecAllBlobTags)     totTags  += v.size();
-            for (const auto& v : vecAllBlobBoxesDeg) totBoxes += v.size();
-
-            size_t nonEmptyTimes=0, nBlobs=0, nPts=0, maxBlob=0;
-            SummarizeBlobs(vecAllBlobs, nonEmptyTimes, nBlobs, nPts, maxBlob);
-            const double estGiB = EstimateSetOverheadGiB(nPts);
-
-            MpiDbgAtF(MPI_REAL_COMM, "HX/after-all-exchanges, after Barrier",
-                "cols: times=%zu(%zu) tags=%zu(%zu) blobs=%zu boxes=%zu(%zu) | "
-                "nonEmptyTimes=%zu blobs=%zu points=%zu maxBlob=%zu est-sets≈%.2f GiB",
-                vecGlobalTimes.size(),     totTimes,
-                vecAllBlobTags.size(),     totTags,
-                vecAllBlobs.size(),
-                vecAllBlobBoxesDeg.size(), totBoxes,
-                nonEmptyTimes, nBlobs, nPts, maxBlob, estGiB);
-        }
-		//[DEBUG END]
 
 	}
 
 	
-    // //[DEBUG START]
-	// {
-	// 	int wrank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&wrank);
-	// 	size_t colsBoxes = vecAllBlobBoxesDeg.size();
-	// 	size_t colsBlobs = vecAllBlobs.size();
-	// 	if (colsBoxes != colsBlobs) {
-	// 		MpiDbgAtF(MPI_COMM_WORLD, "Sanity",
-	// 				"RANK %d : MISMATCH columns boxes=%zu blobs=%zu", wrank, colsBoxes, colsBlobs);
-	// 	} else {
-	// 		size_t firstBad = (size_t)-1, badCount = 0;
-	// 		size_t totalBoxes=0, totalBlobs=0;
-	// 		for (size_t c=0; c<colsBoxes; ++c) {
-	// 			totalBoxes += vecAllBlobBoxesDeg[c].size();
-	// 			totalBlobs += vecAllBlobs[c].size();
-	// 			if (vecAllBlobBoxesDeg[c].size() != vecAllBlobs[c].size()) {
-	// 				if (firstBad==(size_t)-1) firstBad = c;
-	// 				++badCount;
-	// 				if (badCount <= 5) {
-	// 					MpiDbgAtF(MPI_COMM_WORLD, "Sanity",
-	// 						"RANK %d : MISMATCH @col=%zu boxes=%zu blobs=%zu",
-	// 						wrank, c, vecAllBlobBoxesDeg[c].size(), vecAllBlobs[c].size());
-	// 				}
-	// 			}
-	// 		}
-	// 		if (badCount==0) {
-	// 			MpiDbgAtF(MPI_COMM_WORLD, "Sanity",
-	// 				"RANK %d : Boxes==Blobs OK columns=%zu totals boxes=%zu blobs=%zu",
-	// 				wrank, colsBoxes, totalBoxes, totalBlobs);
-	// 		} else {
-	// 			MpiDbgAtF(MPI_COMM_WORLD, "Sanity",
-	// 				"RANK %d : Boxes!=Blobs BAD mismatched_cols=%zu (first=%zu) totals boxes=%zu blobs=%zu",
-	// 				wrank, badCount, firstBad, totalBoxes, totalBlobs);
-	// 		}
-	// 	}
-	// }
-	// //[DEBUG END]
 
 #else
 	//[DEBUG START]
-	MpiDbgAtF(MPI_COMM_WORLD, "Phase", "no exchange (serial)");
+	// MpiDbgAtF(MPI_COMM_WORLD, "Phase", "no exchange (serial)");
 
 #endif
 
@@ -4385,16 +3845,7 @@ try {
 	// Set of Tags that are within the restrict region
 	std::set<Tag> setRestrictRegion;
 
-	//[DEBUG START]
-	# if defined(TEMPEST_MPIOMP)
-	if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
-		MpiDbgAtF(MPI_COMM_WORLD, "Connectivity", "before build (nGlobalTimes=%d)", nGlobalTimes);
-	}
-	# else
-		MpiDbgAtF(MPI_COMM_WORLD, "Connectivity", "before build (nGlobalTimes=%d)", nGlobalTimes);
-	# endif
 
-	//[DEBUG END]
 
 	AnnounceStartBlock("Building connectivity graph");
 
@@ -4412,20 +3863,7 @@ try {
 				nGlobalTimes += vecGlobalTimes[f].size();
 			}
 
-		//[DEBUG START]
-		const int nCols = static_cast<int>(vecAllBlobs.size()); // columns after exchange
-		if (nGlobalTimes > nCols) {
-			MpiDbgAtF(MPI_COMM_WORLD, "Connectivity",
-					"WARN: nGlobalTimes(%d) > columns(%d) — clamping", nGlobalTimes, nCols);
-			nGlobalTimes = nCols;
 
-			MpiDbgAtF(MPI_COMM_WORLD, "Connectivity",
-			"RANK %d : nGlobalTimes changed from %d to %d (files %d..%d)",
-			nMPIRank, original_nGlobalTimes, nGlobalTimes,
-			processorResponsibalForFile_LB, processorResponsibalForFile_UB);
-		}
-
-		//[DEBUG END]
 		}
 
 
@@ -4482,12 +3920,6 @@ try {
 			// Find overlap with bounding boxes at previous time
 			for (int q = 0; q < vecPrevBlobTags.size(); q++) {
 
-				//[DEBUG START]
-				_ASSERT(p >= 0 && p < (int)vecBlobBoxesDeg.size());
-				_ASSERT(q >= 0 && q < (int)vecPrevBlobBoxesDeg.size());
-				_ASSERT(vecBlobs.size() == vecBlobBoxesDeg.size());
-				_ASSERT(vecPrevBlobs.size() == vecPrevBlobBoxesDeg.size());
-				//[DEBUG END]
 
 
 				const LatLonBox<double> & boxQ = vecPrevBlobBoxesDeg[q];
@@ -4609,167 +4041,65 @@ try {
 		}
 	}
 
-	//[DEBUG START]
-	# if defined(TEMPEST_MPIOMP)
-	if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
-		MpiDbgAtF(MPI_COMM_WORLD, "Connectivity", "after build : localEdges=%zu",
-			multimapTagGraph.size());
-	}
-	# else
-		MpiDbgAtF(MPI_COMM_WORLD, "Connectivity", "after build : localEdges=%zu",
-			multimapTagGraph.size());
-	# endif
-	//[DEBUG END]
+
 	AnnounceEndBlock("Done");
 	
 
 
 	
 	#if defined(TEMPEST_MPIOMP)
-	//[DEBUG START]
-	{
-		int world_r=-1; MPI_Comm_rank(MPI_COMM_WORLD,&world_r);
-		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
-			int real_r=-1, real_n=0;
-			MPI_Comm_rank(MPI_REAL_COMM,&real_r);
-			MPI_Comm_size(MPI_REAL_COMM,&real_n);
-			MpiDbgAtF(MPI_COMM_WORLD, "MPI_REAL_COMM(check)",
-					"world_rank=%d confirmed in MPI_REAL_COMM as real_rank=%d of %d",
-					world_r, real_r, real_n);
-		} else {
-			MpiDbgAtF(MPI_COMM_WORLD, "MPI_REAL_COMM(check)",
-					"world_rank=%d not in MPI_REAL_COMM for connectivity gathers", world_r);
-		}
-	}
-	//[DEBUG END]
 
 
 		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
-			//[DEBUG START]
-			{
-				size_t localEdges = multimapTagGraph.size();
-				MpiDbgAtF(MPI_REAL_COMM, "pre-MapGraphGather", "localEdges=%zu", localEdges);
-			}
-			MpiDbgAtFOrdered(MPI_REAL_COMM, "pre-MapGraphGather/ordered",
-				"localEdges=%zu", multimapTagGraph.size());
-			//[DEBUG END]
 
 
 			//Gather the connectivity graph (multimapTagGraph) to P0
 			MapGraphGatherOp MPI_MapGraph(MPI_REAL_COMM,multimapTagGraph);
 
-			//[DEBUG START]
-			MpiDbgAtF(MPI_REAL_COMM, "MapGraphGather/Gather", "begin");
-			//[DEBUG END]
+
 
 			MPI_MapGraph.Gather();
 
-			//[DEBUG START]
-			MpiDbgAtF(MPI_REAL_COMM, "MapGraphGather/Gather", "end");
-			//[DEBUG END]
-			
+
 
 			if (nMPIRank == 0){
-				//[DEBUG START]
-				MpiDbgAtF(MPI_REAL_COMM, "GetGatheredTagGraph", "begin");
-				//[DEBUG END]
+
 
 				multimapTagGraph = MPI_MapGraph.GetGatheredTagGraph();
 
-				//[DEBUG START]
-				MpiDbgAtF(MPI_REAL_COMM, "GetGatheredTagGraph", "end totalEdges=%zu", multimapTagGraph.size());
-				//[DEBUG END]
+
 			}
 
-			//[DEBUG START]
-			{
-				size_t localVecTimes = vecAllBlobTags.size();
-				size_t localVecTags  = 0;
-				for (const auto& v : vecAllBlobTags) localVecTags += v.size();
-				MpiDbgAtF(MPI_REAL_COMM, "pre-TagsGather", "times=%zu totalTags=%zu",
-						localVecTimes, localVecTags);
-			}
-			//[DEBUG END]
-
-			
-
-			//[DEBUG START]
-			MpiDbgAtF(MPI_REAL_COMM, "TagsGather/Gather", "begin");
-			//[DEBUG END]
 
 			//Gather the setAllTags to P0
 			TagCollectiveOP MPI_TagsGather(MPI_REAL_COMM, origVecAllBlobTags);
 			MPI_TagsGather.Gather();
 
-			//[DEBUG START]
-			MpiDbgAtF(MPI_REAL_COMM, "TagsGather/Gather", "end");
-			//[DEBUG END]
+
 
 
 			//And then reduced the original global time to P0 for next step:
 			int reducedNGlobalTimes = 0;
 
-			//[DEBUG START]
-			MpiDbgAtF(MPI_REAL_COMM, "Reduce(nGlobalTimes)", "begin");
-			//[DEBUG END]
+
 
 			MPI_Reduce(&original_nGlobalTimes, &reducedNGlobalTimes, 1, MPI_INT, MPI_SUM, 0, MPI_REAL_COMM);
 			if (nMPIRank == 0) {
 				nGlobalTimes = reducedNGlobalTimes;
 
-				//[DEBUG START]
-				MpiDbgAtF(MPI_REAL_COMM, "Reduce(nGlobalTimes)", "end nGlobalTimes=%d", nGlobalTimes);
-				//[DEBUG END]
 			}
 
 			MPI_Barrier(MPI_REAL_COMM);
 			if (nMPIRank == 0){
 
-				//[DEBUG START]
-				MpiDbgAtF(MPI_REAL_COMM, "GetGatheredSetAllTags", "begin");
-				//[DEBUG END]
 
 				setAllTags = MPI_TagsGather.GetGatheredSetAllTags();
-
-				//[DEBUG START]
-				MpiDbgAtF(MPI_REAL_COMM, "GetGatheredSetAllTags", "end setAllTags=%zu", setAllTags.size());
-				//[DEBUG END]
-
-				//[DEBUG START]
-				MpiDbgAtF(MPI_REAL_COMM, "GetUnserialVecAllTags(1)", "begin");
-				//[DEBUG END]
-
 				vecAllBlobTags = MPI_TagsGather.GetUnserialVecAllTags(1);
-
-				//[DEBUG START]
-				size_t gatheredTimes = vecAllBlobTags.size();
-				size_t gatheredTags  = 0; for (auto& v: vecAllBlobTags) gatheredTags += v.size();
-				MpiDbgAtF(MPI_REAL_COMM, "GetUnserialVecAllTags(1)", "end times=%zu totalTags=%zu", gatheredTimes, gatheredTags);
-				//[DEBUG END]
 			}
 			
 		} 
 
-	// [DEBUG BEGIN] Quick snapshot before component identification (mostly rank 0 work)
-	{
-		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 
-			int wrank=-1, wsize=-1;
-			MPI_Comm_rank(MPI_COMM_WORLD,&wrank);
-			MPI_Comm_size(MPI_COMM_WORLD,&wsize);
-
-			size_t nAllTags = setAllTags.size();
-			size_t nGraphEdges = multimapTagGraph.size();
-			size_t nTimes = vecAllBlobTags.size();
-
-			MpiDbgAtF(MPI_COMM_WORLD, "pre-ID",
-				"rank=%d size=%d setAllTags=%zu graphEdges=%zu vecAllBlobTags=%zu nGlobalTimes=%d",
-				wrank, wsize, nAllTags, nGraphEdges, nTimes, nGlobalTimes);
-
-			_ASSERT(nGlobalTimes == int(vecAllBlobTags.size()));
-		}
-	}
-	// [DEBUG END]
 	#else
 		// Serial quick snapshot
 		{
@@ -4800,9 +4130,7 @@ try {
 
 	std::set<Tag>::const_iterator iterTag = setAllTags.begin();
 
-	// [DEBUG BEGIN] 
-	int dbg_iter = 0;
-	// [DEBUG END]
+
 
 	for (; iterTag != setAllTags.end(); iterTag++) {
 		#if defined(TEMPEST_MPIOMP)
@@ -4925,15 +4253,6 @@ try {
 				std::pair<Tag,Tag>(*iterTagsVisited, tagMinimum));
 		}
 
-
-		// [DEBUG START] component summary
-		#if defined(TEMPEST_MPIOMP)
-		if ((nTotalBlobCount % 100) == 0) {
-			Announce("DBG ID comp summary: blobsSoFar=%d  lastCompSize=%zu  mapEqSize=%zu  RSS=%.2f GB",
-					nTotalBlobCount, setTagsVisited.size(), mapEquivalentTags.size(), GB(GetRSSBytes()));
-		}
-		#endif
-		// [DEBUG END]
 	}
 
 	AnnounceEndBlock("Done");
@@ -4951,16 +4270,6 @@ try {
 		_ASSERT(nGlobalTimes == vecAllBlobTags.size());
 		std::vector<Tag> & vecBlobTags = vecAllBlobTags[t];
 
-		
-		// [DEBUG BEGIN]]
-		#if defined(TEMPEST_MPIOMP)
-		if ((t % 500) == 0) {
-        	Announce("DBG Reassign progress: t=%d  tagsAtT=%zu  RSS=%.2f GB",
-                 t, vecBlobTags.size(), GB(GetRSSBytes()));
-    	}
-		#endif
-		// [DEBUG END]
-		
 
 
 		for (int p = 0; p < vecBlobTags.size(); p++) {
@@ -5094,12 +4403,6 @@ try {
 			if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
 
 
-				// [Debug START]
-				{
-					size_t localEdges = multimapTagGraph.size();
-					MpiDbgAtF(MPI_REAL_COMM, "pre-TagScatter, right after (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL)", "localEdges=%zu", localEdges);
-				}
-				// [Debug END]
 
 
 				// Revert the exchanged vecGlobalTimes and nGlobalTimes for output:
@@ -5145,20 +4448,12 @@ try {
 					StripHalosInPlace(vecAllBlobBoxesDeg, r, s);
 				}
 
-
-				//[DEBUG START]
-				{
-					size_t localEdges = multimapTagGraph.size();
-					MpiDbgAtF(MPI_REAL_COMM, "post-TagScatter, after reverting everything", "localEdges=%zu", localEdges);
-
-				}
-				//[DEBUG END]
 			}
 		#else
-			// [Debug START]
-			size_t localEdges = multimapTagGraph.size();
-			MpiDbgAtF(MPI_COMM_WORLD, "post-TagScatter (Which doesn't exist for serial), after reverting everything (also doesn't exsit)", "localEdges=%zu", localEdges);
-			// [Debug END]
+			// // [Debug START]
+			// size_t localEdges = multimapTagGraph.size();
+			// MpiDbgAtF(MPI_COMM_WORLD, "post-TagScatter (Which doesn't exist for serial), after reverting everything (also doesn't exsit)", "localEdges=%zu", localEdges);
+			// // [Debug END]
 
 		#endif
 
@@ -5172,45 +4467,6 @@ try {
 
 		int iGlobalTimeIx = 0;
 
-		//[DEBUG START]
-
-		#if defined(TEMPEST_MPIOMP)
-		// ---- Rank ownership banner (once per rank, ordered) ----
-		{
-			int __rank = 0, __size = 1;
-			MPI_Comm_rank(MPI_REAL_COMM, &__rank);
-			MPI_Comm_size(MPI_REAL_COMM, &__size);
-
-			const int __N = static_cast<int>(vecOutputFiles.size());
-			const bool __par = (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL);
-
-			// Compute this rank's [LB, UB) responsibility range
-			const int __lb = __par ? processorResponsibalForFile_LB : 0;
-			const int __ub = __par ? processorResponsibalForFile_UB : __N;
-			const int __planned = std::max(0, __ub - __lb);
-
-			// Print in rank order to avoid interleaving
-			for (int r = 0; r < __size; ++r) {
-				MPI_Barrier(MPI_REAL_COMM);
-				if (r == __rank) {
-					std::cout << "rank " << __rank << " is responsible for "
-							<< __planned << " files";
-					if (__planned > 0) {
-						std::cout << " (indices " << __lb << " .. " << (__ub - 1) << ")";
-					}
-					std::cout << std::endl;
-
-					// List the actual file paths this rank will write
-					for (int __i = __lb; __i < __ub; ++__i) {
-						std::cout << "  [" << __i << "] " << vecOutputFiles[__i] << std::endl;
-					}
-					std::cout.flush();
-				}
-			}
-			MPI_Barrier(MPI_REAL_COMM);
-		}
-		#endif
-		//[Debug END]
 
 		for (int f = 0; f < vecOutputFiles.size(); f++) {
 			#if defined(TEMPEST_MPIOMP) //[Commented out for auto-complete, need to uncomment later]
