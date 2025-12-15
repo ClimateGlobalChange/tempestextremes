@@ -66,6 +66,9 @@ try {
 	// Target lonlat coords
 	std::string strTargetLonLat;
 
+	// Target lonlat points
+	std::string strTargetLLPoints;
+
 	// Regional
 	bool fRegional = true;
 
@@ -96,6 +99,7 @@ try {
 		CommandLineString(strTargetConnect, "tgt_connect", "");
 		CommandLineString(strTargetVar, "tgt_var", "");
 		CommandLineStringD(strTargetLonLat, "tgt_lonlat", "", "\"lon0,lat0,lon1,lat1,nlon,nlat\" (in degrees)");
+		CommandLineStringD(strTargetLLPoints, "tgt_lonlatpts", "", "\"lon0,lat0;lat1,lat1;...\" (in degrees)");
 		CommandLineString(strOutputMap, "out_map", "");
 		CommandLineString(strSourceLongitudeName, "src_lonname", "lon");
 		CommandLineString(strSourceLatitudeName, "src_latname", "lat");
@@ -118,17 +122,18 @@ try {
 	if ((strSourceData.length() == 0) && (strSourceVar.length() != 0)) {
 		_EXCEPTIONT("Argument (--src_var) must be combined with (--src_data)");
 	}
-	if ((strTargetData.length() == 0) && (strTargetConnect.length() == 0) && (strTargetLonLat.length() == 0)) {
-		_EXCEPTIONT("No target data file (--tgt_data), connectivity file (--tgt_connect) or lonlat count (--tgt_lonlat) specified");
+	if ((strTargetData.length() == 0) && (strTargetConnect.length() == 0) && (strTargetLonLat.length() == 0) && (strTargetLLPoints.length() == 0)) {
+		_EXCEPTIONT("No target data file (--tgt_data), connectivity file (--tgt_connect), lonlat box (--tgt_lonlat) or lonlat points (--tgt_lonlatpts) specified");
 	}
 
 	int nTgtArgCount = 
 		  ((strTargetData.length() != 0)?(1):(0))
 		+ ((strTargetConnect.length() != 0)?(1):(0))
-		+ ((strTargetLonLat.length() != 0)?(1):(0));
+		+ ((strTargetLonLat.length() != 0)?(1):(0))
+		+ ((strTargetLLPoints.length() != 0)?(1):(0));
 
 	if (nTgtArgCount > 1) {
-		_EXCEPTIONT("Only one target data file (--tgt_data), target connectivity file (--tgt_connect) or lonlat count (--tgt_lonlat) may be specified");
+		_EXCEPTIONT("Only one target data file (--tgt_data), target connectivity file (--tgt_connect), lonlat box (--tgt_lonlat) or lonlat points (--tgt_lonlatpts) may be specified");
 	}
 	if ((strTargetData.length() == 0) && (strTargetVar.length() != 0)) {
 		_EXCEPTIONT("Argument (--tgt_var) must be combined with (--tgt_data)");
@@ -244,6 +249,39 @@ try {
 
 		AnnounceEndBlock("Done");
 
+	// No connectivity file; target grid is a set of longitude latitude points
+	} else if (strTargetLLPoints != "") {
+		AnnounceStartBlock("Generating target grid information from --tgt_lonlatpts");
+
+		std::vector<std::string> vecTgtLonLatPts;
+		STLStringHelper::ParseVariableList(strTargetLLPoints, vecTgtLonLatPts, ";");
+		if (vecTgtLonLatPts.size() < 1) {
+			_EXCEPTION1("At least one pair of points must be specified by --tgt_lonlatpts; given \"%s\"",
+				strTargetLLPoints.c_str());
+		}
+
+		gridTarget.m_nGridDim.resize(1);
+		gridTarget.m_nGridDim[0] = vecTgtLonLatPts.size();
+		gridTarget.m_dLon.Allocate(vecTgtLonLatPts.size());
+		gridTarget.m_dLat.Allocate(vecTgtLonLatPts.size());
+
+		for (size_t spt = 0; spt < vecTgtLonLatPts.size(); spt++) {
+			std::vector<std::string> vecTgtLonLatCoord;
+			STLStringHelper::ParseVariableList(vecTgtLonLatPts[spt], vecTgtLonLatCoord, ",");
+			if (vecTgtLonLatCoord.size() != 2) {
+				_EXCEPTION1("Points specified by --tgt_lonlatpts must have two values lon,lat; given \"%s\"",
+					vecTgtLonLatPts[spt].c_str());
+			}
+			if ((!STLStringHelper::IsFloat(vecTgtLonLatCoord[0])) || (!STLStringHelper::IsFloat(vecTgtLonLatCoord[1]))) {
+				_EXCEPTION1("Points specified by --tgt_lonlatpts must be type float; given \"%s\"",
+					vecTgtLonLatPts[spt].c_str());
+			}
+			gridTarget.m_dLon[spt] = DegToRad(stof(vecTgtLonLatCoord[0]));
+			gridTarget.m_dLat[spt] = DegToRad(stof(vecTgtLonLatCoord[1]));
+		}
+
+		AnnounceEndBlock("Done");
+
 	// No connectivity file; check for latitude/longitude dimension
 	} else {
 		Announce("Generating latitude-longitude grid from target data file");
@@ -344,6 +382,7 @@ try {
 		vecSrcLonDeg[i] = RadToDeg(gridSource.m_dLon[i]);
 		vecSrcLatDeg[i] = RadToDeg(gridSource.m_dLat[i]);
 	}
+	size_t sOutOfRangePts = 0;
 	for (int j = 0; j < nB; j++) {
 		if ((j % (nB / 10) == 0) && (j != 0)) {
 			int nPctComplete = j / (nB / 10);
@@ -376,6 +415,7 @@ try {
 				vecRow[j] = 1;
 				vecCol[j] = 1;
 				vecS[j] = 0.0;
+				sOutOfRangePts++;
 				continue;
 			}
 		}
@@ -385,6 +425,9 @@ try {
 		vecRow[j] = j + 1;
 		vecCol[j] = static_cast<int>(sNearestNode) + 1;
 		vecS[j] = 1.0;
+	}
+	if (sOutOfRangePts > 0) {
+		Announce("WARNING: %lu points sampled are out of range of --maxdist", sOutOfRangePts);
 	}
 	AnnounceEndBlock(NULL);
 
