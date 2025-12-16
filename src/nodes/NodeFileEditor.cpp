@@ -1397,8 +1397,8 @@ void CalculateCycloneMetrics(
 	// Value
 	double dValue = 0.0;
 	if ((eCycloneMetric == CycloneMetric_MIN) || (eCycloneMetric == CycloneMetric_MAX)) {
-        dValue = dataStateU[ix0];
-        }
+		dValue = dataStateU[ix0];
+	}
 
 	// Loop through all latlon elements
 	while (queueNodes.size() != 0) {
@@ -1444,19 +1444,23 @@ void CalculateCycloneMetrics(
 			if (dTempValue > dValue) {
 				dValue = dTempValue;
 			}
-		
+	
+		// TODO: Should this move into the next else block and use dUmag?
+		// Minimum wind speed 
 		} else if (eCycloneMetric == CycloneMetric_MIN) {
-				double dTempValue = dataStateU[ix];
-				if (dTempValue < dValue) {
-					dValue = dTempValue;
-				}	
-		
+			double dTempValue = dataStateU[ix];
+			if (dTempValue < dValue) {
+				dValue = dTempValue;
+			}	
+	
+		// Maximum wind speed
 		} else if (eCycloneMetric == CycloneMetric_MAX) {
-				double dTempValue = dataStateU[ix];
-				if (dTempValue > dValue) {
-					dValue = dTempValue;
-				}
+			double dTempValue = dataStateU[ix];
+			if (dTempValue > dValue) {
+				dValue = dTempValue;
+			}
 
+		// ACE, IKE or PDI
 		} else {
 			// Velocities at this location
 			double dUlon = dataStateU[ix];
@@ -1523,6 +1527,9 @@ double FirstWhere(
 	if (dIndices.size() != dArray.size()) {
 		_EXCEPTIONT("PathNode R array size different from Ua size");
 	}
+	if (dIndices.size() == 1) {
+		_EXCEPTIONT("More than one histogram bin required in FirstWhere");
+	}
 
 	// Get the radius
 	double dRadius = pathnode.GetColumnDataAsDouble(cdh, strRadius);
@@ -1534,11 +1541,14 @@ double FirstWhere(
     // Get the bin width
 	double dBinWidth = dIndices[dIndices.size() - 1] / (dIndices.size() - 1);
 
+	// Index of radius
+	const int iRadiusIx = static_cast<int>(dRadius / dBinWidth);
+
 	// Get the threshold
 	double dThreshold;
 	if (strThreshold == "max") {
 		dThreshold = dArray[0];
-		for (int k = 0; k < dRadius / dBinWidth; k++) {
+		for (int k = 0; k < iRadiusIx; k++) {
 			if (dArray[k] > dThreshold) {
 				dThreshold = dArray[k];
 			}
@@ -1546,7 +1556,7 @@ double FirstWhere(
 
 	} else if (strThreshold == "min") {
 		dThreshold = dArray[0];
-		for (int k = 0; k < dRadius / dBinWidth; k++) {
+		for (int k = 0; k < iRadiusIx; k++) {
 			if (dArray[k] < dThreshold) {
 				dThreshold = dArray[k];
 			}
@@ -1565,7 +1575,7 @@ double FirstWhere(
 	int j = 0;
 
 	if (strOp == "fallsbelow") {
-		for (; j <= dRadius / dBinWidth; j++) {
+		for (; j <= iRadiusIx; j++) {
 			double dTempValue = dArray[j];
 			if (dTempValue > dValue) {
 				dValue = dTempValue;
@@ -1585,7 +1595,7 @@ double FirstWhere(
 		}
 		
 	} else if (strOp == "risesabove") {
-		for (; j <= dRadius / dBinWidth ; j++) {
+		for (; j <= iRadiusIx ; j++) {
 			double dTempValue = dArray[j];
 			if (dTempValue < dValue) {
 				dValue = dTempValue;
@@ -1603,14 +1613,14 @@ double FirstWhere(
 				}
 			}
 		}
-        
-    } else if (strOp == "=") {
-		for (; j <= dRadius / dBinWidth ; j++) {
-            if (dArray[j] == dThreshold) {
+
+	} else if (strOp == "=") {
+		for (; j <= iRadiusIx ; j++) {
+			if (dArray[j] == dThreshold) {
 				break;
 			}
 		}
-        
+
 	} else {
 		_EXCEPTION1("Invalid operator \"%s\" in function firstwhere()",
 			strOp.c_str());
@@ -1638,6 +1648,9 @@ double LastWhere(
 	}
 	if (dIndices.size() != dArray.size()) {
 		_EXCEPTIONT("PathNode R array size different from Ua size");
+	}
+	if (dIndices.size() == 1) {
+		_EXCEPTIONT("More than one histogram bin required in LastWhere");
 	}
 
 	// Get the threshold
@@ -2278,9 +2291,9 @@ try {
 			if ((calccomm.rhs == "eval_ace") ||
 			    (calccomm.rhs == "eval_ike") ||
 			    (calccomm.rhs == "eval_pdi") ||
-				(calccomm.rhs == "eval_acepsl") ||
-				(calccomm.rhs == "eval_min") ||
-				(calccomm.rhs == "eval_max")
+			    (calccomm.rhs == "eval_acepsl") ||
+			    (calccomm.rhs == "eval_min") ||
+			    (calccomm.rhs == "eval_max")
 			) {
 
 				// Cyclone metric
@@ -2303,7 +2316,10 @@ try {
 
 				std::string strRadiusArg;
 
-				if (eCycloneMetric == CycloneMetric_ACEPSL || eCycloneMetric == CycloneMetric_MIN || eCycloneMetric == CycloneMetric_MAX) {
+				if ((eCycloneMetric == CycloneMetric_ACEPSL) ||
+				    (eCycloneMetric == CycloneMetric_MIN) ||
+				    (eCycloneMetric == CycloneMetric_MAX)
+				) {
 					if (calccomm.arg.size() != 2) {
 						_EXCEPTION2("Syntax error: Function \"%s\" "
 							"requires two arguments:\n"
@@ -2597,7 +2613,7 @@ try {
 						if (pdat2DA != NULL) {
 							if (pdat2DA->m_dValues.size() < 2) {
 								_EXCEPTION1("2DArray \"%s\" must have at least two entries",
-									(*pargfunc)[0].c_str());
+									calccomm.arg[0].c_str());
 							}
 							ColumnData1DArray * pdatOut = new ColumnData1DArray;
 
