@@ -1226,6 +1226,12 @@ try {
 		vecInputFiles.FromFile(strInputFileList, false);
 	}
 
+#ifdef TEMPEST_NOREGEX
+	if (strTimeFilter != "") {
+		_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
+	}
+#endif
+#ifndef TEMPEST_NOREGEX
 	// Parse --timefilter
 	if (strTimeFilter == "3hr") {
 		strTimeFilter = "(0|3|6|9|12|15|18|21)";
@@ -1240,12 +1246,7 @@ try {
 		strTimeFilter = "\\d+";
 	}
 
-#ifdef TEMPEST_NOREGEX
-	if (strTimeFilter != "") {
-		_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
-	}
-#endif
-#ifndef TEMPEST_NOREGEX
+	// Define regular expression
 	std::regex reTimeSubset;
 	if (strTimeFilter != "") {
 		// Test regex support
