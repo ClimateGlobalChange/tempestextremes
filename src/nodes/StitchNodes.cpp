@@ -92,8 +92,10 @@ void ParseDetectNodesFile(
 	bool fAllowRepeatedTimes,
 	const Time & timeBegin,
 	const Time & timeEnd,
-	size_t sGridDims,
-	const std::regex & reTimeSubset
+	size_t sGridDims
+#ifndef TEMPEST_NOREGEX
+	, const std::regex & reTimeSubset
+#endif
 ) {
 	// Open file for reading
 	FILE * fp = fopen(strInputFile.c_str(), "r");
@@ -1329,8 +1331,11 @@ try {
 				fAllowRepeatedTimes,
 				timeBegin,
 				timeEnd,
-				sGridDims,
-				reTimeSubset);
+				sGridDims
+#ifndef TEMPEST_NOREGEX
+				, reTimeSubset
+#endif
+				);
 		}
 
 		if (mapCandidateInfo.size() == 0) {
