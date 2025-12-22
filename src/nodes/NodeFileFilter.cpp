@@ -68,7 +68,7 @@ public:
 		m_varix(InvalidVariableIndex),
 		m_dDistanceDeg(0.0),
 		m_eOp(GreaterThan),
-		m_dValue(0.0),
+		m_strValue(""),
 		m_dMaxDistDeg(180.0)
 	{ }
 
@@ -132,7 +132,7 @@ public:
 
 				// Read in value
 				} else if (eReadMode == ReadMode_Value) {
-					m_dValue = atof(strSubStr.c_str());
+					m_strValue = strSubStr;
 
 					iLast = i + 1;
 					eReadMode = ReadMode_MaxDist;
@@ -190,12 +190,7 @@ public:
 			strDescription += " is not equal to ";
 		}
 
-		if (fabs(m_dValue) < 1.0e-4) {
-			snprintf(szBuffer, 128, "%e", m_dValue);
-		} else {
-			snprintf(szBuffer, 128, "%f", m_dValue);
-		}
-		strDescription += szBuffer;
+		strDescription += m_strValue;
 
 		snprintf(szBuffer, 128, "%f", m_dMaxDistDeg);
 		strDescription += std::string(" (max dist ") + szBuffer + " degrees)";
@@ -208,35 +203,36 @@ public:
 	///		Determine if a particular value satisfies this threshold.
 	///	</summary>
 	bool SatisfiedBy(
-		double dValue
+		double dValue,
+        double dOpValue
 	) const {
 		if (m_eOp == GreaterThan) {
-			if (dValue > m_dValue) {
+			if (dValue > dOpValue) {
 				return true;
 			}
 
 		} else if (m_eOp == LessThan) {
-			if (dValue < m_dValue) {
+			if (dValue < dOpValue) {
 				return true;
 			}
 
 		} else if (m_eOp == GreaterThanEqualTo) {
-			if (dValue >= m_dValue) {
+			if (dValue >= dOpValue) {
 				return true;
 			}
 
 		} else if (m_eOp == LessThanEqualTo) {
-			if (dValue <= m_dValue) {
+			if (dValue <= dOpValue) {
 				return true;
 			}
 
 		} else if (m_eOp == EqualTo) {
-			if (dValue == m_dValue) {
+			if (dValue == dOpValue) {
 				return true;	
 			}
 
 		} else if (m_eOp == NotEqualTo) {
-			if (dValue != m_dValue) {
+			if (dValue != dOpValue) {
 				return true;
 			}
 
@@ -266,7 +262,7 @@ public:
 	///	<summary>
 	///		Threshold value.
 	///	</summary>
-	double m_dValue;
+	std::string m_strValue;
 
 	///	<summary>
 	///		Maximum distance in degrees.
@@ -440,6 +436,7 @@ void BuildMask_ByContour(
 template <typename real>
 void BuildMask_NearbyBlobs(
 	const SimpleGrid & grid,
+    const NodeFile & nodefile,
 	const DataArray1D<real> & dataState,
 	std::vector<double> & vecLonRad,
 	std::vector<double> & vecLatRad,
@@ -449,6 +446,16 @@ void BuildMask_NearbyBlobs(
 	// Get the variable
 	const double dDistDeg = nearbyblobsop.m_dDistanceDeg;
 	const double dMaxDistDeg = nearbyblobsop.m_dMaxDistDeg;
+    std::string strValue = nearbyblobsop.m_strValue;
+    double dOpValue = 0.0;
+    
+    std::vector<double> VecValue;
+    if (STLStringHelper::IsFloat(strValue)) {
+        dOpValue = std::stod(strValue);
+    } else {
+        nodefile.InterpolatedColumnDouble(
+			strValue, VecValue);
+    }
 
 	_ASSERT(vecLonRad.size() == vecLatRad.size());
 	_ASSERT(dataState.GetRows() == grid.GetSize());
@@ -471,7 +478,7 @@ void BuildMask_NearbyBlobs(
 		std::queue<int> queueNodes;
 		queueNodes.push(ix0);
 
-		// Set of nodes that have already beenvisited
+		// Set of nodes that have already been visited
 		std::set<int> setNodesVisited;
 
 		// Loop through all elements
@@ -503,8 +510,12 @@ void BuildMask_NearbyBlobs(
 				queueNodes.push(grid.m_vecConnectivity[ix][n]);
 			}
 
+            if (!VecValue.empty()){
+                dOpValue=VecValue[j];
+            }
+            
 			// Check if this point satisfies the nearbyblobs criteria
-			if (!nearbyblobsop.SatisfiedBy(static_cast<double>(dataState[ix]))) {
+			if (!nearbyblobsop.SatisfiedBy(static_cast<double>(dataState[ix]),dOpValue)) {
 				continue;
 			}
 
@@ -542,7 +553,7 @@ void BuildMask_NearbyBlobs(
 				}
 
 				// Verify this point satisfies the condition
-				if (!nearbyblobsop.SatisfiedBy(static_cast<double>(dataState[ixblob]))) {
+				if (!nearbyblobsop.SatisfiedBy(static_cast<double>(dataState[ixblob]),dOpValue)) {
 
 					// Isn't part of the blob, but add it to the list of
 					// nodes to visit.
@@ -561,9 +572,9 @@ void BuildMask_NearbyBlobs(
 					queueThresholdedNodes.push(grid.m_vecConnectivity[ixblob][n]);
 				}
 
-				dataMask[ixblob] = 1.0;
+				dataMask[ixblob] += 1.0;
 			}
-		}
+		}			
 	}
 }
 
@@ -975,23 +986,36 @@ void NodeFileFilter(
 
 			AnnounceEndBlock("Done");
 		}
+		int tc = 0;
+
 		if (vecNearbyBlobsOp.size() != 0) {
 			AnnounceStartBlock("Building mask (nearbyblobs)");
-			Variable & varOp = varreg.Get(vecNearbyBlobsOp[0].m_varix);
-			vecInFiles.SetConstantTimeIx(t);
-			varOp.LoadGridData(varreg, vecInFiles, grid);
-			const DataArray1D<float> & dataState = varOp.GetData();
-			_ASSERT(dataState.GetRows() == grid.GetSize());
-
-			BuildMask_NearbyBlobs<float>(
-				grid,
-				dataState,
-				vecLonRad,
-				vecLatRad,
-				vecNearbyBlobsOp[0],
-				dataMask);
-
-			AnnounceEndBlock("Done");
+			for (tc = 0; tc < vecNearbyBlobsOp.size(); tc++) {
+				Variable & varOp = varreg.Get(vecNearbyBlobsOp[tc].m_varix);
+				vecInFiles.SetConstantTimeIx(t);
+				varOp.LoadGridData(varreg, vecInFiles, grid);
+				const DataArray1D<float> & dataState = varOp.GetData();
+				_ASSERT(dataState.GetRows() == grid.GetSize());
+				int vecsize = vecNearbyBlobsOp.size();
+				BuildMask_NearbyBlobs<float>(
+					grid,
+					nodefile,
+					dataState,
+					vecLonRad,
+					vecLatRad,
+					vecNearbyBlobsOp[tc],
+					dataMask);
+	
+				AnnounceEndBlock("Done");
+			}
+        }
+		
+		if (tc > 1){
+			for (int i = 0; i < dataMask.GetRows(); i++) {
+				if(dataMask[i] > 0){
+					dataMask[i] = dataMask[i] - (tc-1);
+				}
+			}
 		}
 
 		if (fInvert) {
@@ -1380,9 +1404,23 @@ try {
 
 	if (strNearbyBlobs != "") {
 		AnnounceStartBlock("Parsing --nearbyblobs");
-		NearbyBlobsOp op;
-		op.Parse(varreg, strNearbyBlobs);
-		vecNearbyBlobsOp.push_back(op);
+        int iLast = 0;
+		for (int i = 0; i <= strNearbyBlobs.length(); i++) {
+
+			if ((i == strNearbyBlobs.length()) ||
+				(strNearbyBlobs[i] == ';') ||
+				(strNearbyBlobs[i] == ':')
+			) {
+				std::string strSubStr =
+					strNearbyBlobs.substr(iLast, i - iLast);
+			
+				int iNextOp = (int)(vecNearbyBlobsOp.size());
+				vecNearbyBlobsOp.resize(iNextOp + 1);
+				vecNearbyBlobsOp[iNextOp].Parse(varreg, strSubStr);
+
+				iLast = i + 1;
+			}
+		}
 		AnnounceEndBlock(NULL);
 	}
 
