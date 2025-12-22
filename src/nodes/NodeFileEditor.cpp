@@ -1330,19 +1330,36 @@ void MaxClosedContourDelta(
 ///	</summary>
 enum CycloneMetric {
 	CycloneMetric_ACEPSL,
+	CycloneMetric_MIN,
+	CycloneMetric_MAX,
 	CycloneMetric_ACE,
 	CycloneMetric_IKE,
 	CycloneMetric_PDI,
-	CycloneMetric_MIN,
-	CycloneMetric_MAX
 };
 
 ///	<summary>
 ///		Calculate popular cyclone metrics, including:
-///		Accumulated Cyclone Energy (ACE),
-///		Integrated Kinetic Energy (IKE),
+///		Accumulated Cyclone Energy from PSL (ACEPSL)
+///		Minimum value within a given radius (MIN)
+///		Maximum value within a given radius (MAX)
+///		Accumulated Cyclone Energy (ACE)
+///		Integrated Kinetic Energy (IKE)
 ///		Potential Dissipation Index (PDI)
 ///	</summary>
+///	<param name="varixU">
+///		The first variable index to be used in the calculation, depending
+///		on the value of eCycloneMetric:
+///		CycloneMetric_ACEPSL: PSL variable
+///		CycloneMetric_MIN: Variable used in minimum calculation
+///		CycloneMetric_MAX: Variable used in maximum calculation
+///		CycloneMetric_ACE/IKE/PDI: Zonal velocity variable
+///	</param>
+///	<param name="varixV">
+///		The first variable index to be used in the calculation, depending
+///		on the value of eCycloneMetric:
+///		CycloneMetric_ACEPSL/MIN/MAX: Unused
+///		CycloneMetric_ACE/IKE/PDI: Meridional velocity variable
+///	</param>
 void CalculateCycloneMetrics(
 	CycloneMetric eCycloneMetric,
 	VariableRegistry & varreg,
@@ -1445,15 +1462,14 @@ void CalculateCycloneMetrics(
 				dValue = dTempValue;
 			}
 	
-		// TODO: Should this move into the next else block and use dUmag?
-		// Minimum wind speed 
+		// Minimum of dataStateU
 		} else if (eCycloneMetric == CycloneMetric_MIN) {
 			double dTempValue = dataStateU[ix];
 			if (dTempValue < dValue) {
 				dValue = dTempValue;
 			}	
 	
-		// Maximum wind speed
+		// Maximum of dataStateU
 		} else if (eCycloneMetric == CycloneMetric_MAX) {
 			double dTempValue = dataStateU[ix];
 			if (dTempValue > dValue) {
@@ -2347,7 +2363,10 @@ try {
 
 				// Parse meridional wind variable (if present)
 				VariableIndex varixV = varixU;
-				if (eCycloneMetric == CycloneMetric_ACE || eCycloneMetric == CycloneMetric_PDI || eCycloneMetric == CycloneMetric_IKE) {
+				if ((eCycloneMetric == CycloneMetric_ACE) ||
+				    (eCycloneMetric == CycloneMetric_PDI) ||
+				    (eCycloneMetric == CycloneMetric_IKE)
+				) {
 					varixV = varreg.FindOrRegister(calccomm.arg[1]);
 				}
 
