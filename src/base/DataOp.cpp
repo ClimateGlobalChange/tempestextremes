@@ -386,6 +386,10 @@ DataOp * DataOpManager::Add(
 	} else if (strName == "_RELHUMFROMTDTA") {
 		return Add(new DataOp_RELHUMFROMTDTA);
 
+	// VPD from Ta and RH
+	} else if (strName == "_VPDFROMTAHUR") {
+		return Add(new DataOp_VPDFROMTAHUR);
+
 	} else {
 		_EXCEPTION1("Invalid DataOp \"%s\"", strName.c_str());
 	}
@@ -2886,6 +2890,64 @@ bool DataOp_RELHUMFROMTDTA::Apply(
 	// Invalid unit
 	} else {
 		_EXCEPTION1("Invalid third argument units in _RELHUMFROMTDT2M (%s): Expected \"degC\", \"degF\", \"K\"",
+			strArg[2].c_str());
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_VPDFROMTAHUR
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_VPDFROMTAHUR::name = "_VPDFROMTAHUR";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_VPDFROMTAHUR::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 3) {
+		_EXCEPTION2("%s expects three arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+
+	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
+		_EXCEPTION1("%s expects first argument (ta) and second argument (hur) to be data variables",
+			m_strName.c_str());
+	}
+	const DataArray1D<float> & dataTa = *(vecArgData[0]);
+	const DataArray1D<float> & dataHur = *(vecArgData[1]);
+
+	// Calculate relative humidity from Td and Ta
+	dataout.SetUnits("hPa");
+
+	// Calculation with variables provided in degrees Celsius
+	if ((strArg[2] == "degC") || (strArg[2] == "C")) {
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = 6.1094 * exp(17.625 * dataTa[i] / (dataTa[i] + 243.04)) * (1.0 - dataHur[i] / 100.0);
+		}
+
+	// Calculation with variables provided in Kelvin
+	} else if (strArg[2] == "K") {
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			dataout[i] = 6.1094 * exp(17.625 * (dataTa[i] - 273.15) / (dataTa[i] - 30.11)) * (1.0 - dataHur[i] / 100.0);
+		}
+
+	// Calculation with variables provided in degrees Fahrenheit
+	} else if ((strArg[2] == "degF") || (strArg[2] == "F")) {
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			double dTaDegC = (5.0/9.0) * (dataTa[i] - 32.0);
+
+			dataout[i] = 6.1094 * exp(17.625 * dTaDegC / (dTaDegC + 243.04)) * (1.0 - dataHur[i] / 100.0);
+		}
+
+	// Invalid unit
+	} else {
+		_EXCEPTION1("Invalid third argument units in _VPDFROMTARH (%s): Expected \"degC\", \"degF\", \"K\"",
 			strArg[2].c_str());
 	}
 
