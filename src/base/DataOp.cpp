@@ -3322,27 +3322,48 @@ bool DataOp_RELHUMFROMTDTA::Apply(
 	const DataArray1D<float> & dataTd = *(vecArgData[0]);
 	const DataArray1D<float> & dataTa = *(vecArgData[1]);
 
+	dataout.SetFillValue(DefaultFillValue);
+	dataout.SetUnits("percent");
+
 	// Calculate relative humidity from Td and Ta
 
 	// Calculation with variables provided in degrees Celsius
 	if ((strArg[2] == "degC") || (strArg[2] == "C")) {
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = exp((17.1 * dataTd[i]) / (235.0 + dataTd[i]) - (17.1 * dataTa[i]) / (235.0 + dataTa[i]));
+			if ((dataTd.HasFillValue() && (dataTd[i] == dataTd.GetFillValue())) ||
+			    (dataTa.HasFillValue() && (dataTa[i] == dataTa.GetFillValue()))
+			) {
+				dataout[i] = dataout.GetFillValue();
+			} else {
+				dataout[i] = 100.0 * exp((17.1 * dataTd[i]) / (235.0 + dataTd[i]) - (17.1 * dataTa[i]) / (235.0 + dataTa[i]));
+			}
 		}
 
 	// Calculation with variables provided in Kelvin
 	} else if (strArg[2] == "K") {
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = exp((17.1 * (dataTd[i] - 273.15)) / (dataTd[i] - 38.15) - (17.1 * (dataTa[i] - 273.15)) / (dataTa[i] - 38.15));
+			if ((dataTd.HasFillValue() && (dataTd[i] == dataTd.GetFillValue())) ||
+			    (dataTa.HasFillValue() && (dataTa[i] == dataTa.GetFillValue()))
+			) {
+				dataout[i] = dataout.GetFillValue();
+			} else {
+				dataout[i] = 100.0 * exp((17.1 * (dataTd[i] - 273.15)) / (dataTd[i] - 38.15) - (17.1 * (dataTa[i] - 273.15)) / (dataTa[i] - 38.15));
+			}
 		}
 
 	// Calculation with variables provided in degrees Fahrenheit
 	} else if ((strArg[2] == "degF") || (strArg[2] == "F")) {
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			double dTdDegC = (5.0/9.0) * (dataTd[i] - 32.0);
-			double dTaDegC = (5.0/9.0) * (dataTa[i] - 32.0);
+			if ((dataTd.HasFillValue() && (dataTd[i] == dataTd.GetFillValue())) ||
+			    (dataTa.HasFillValue() && (dataTa[i] == dataTa.GetFillValue()))
+			) {
+				dataout[i] = dataout.GetFillValue();
+			} else {
+				double dTdDegC = (5.0/9.0) * (dataTd[i] - 32.0);
+				double dTaDegC = (5.0/9.0) * (dataTa[i] - 32.0);
 
-			dataout[i] = exp((17.1 * dTdDegC) / (235.0 + dTdDegC) - (17.1 * dTaDegC) / (235.0 + dTaDegC));
+				dataout[i] = 100.0 * exp((17.1 * dTdDegC) / (235.0 + dTdDegC) - (17.1 * dTaDegC) / (235.0 + dTaDegC));
+			}
 		}
 	
 	// Invalid unit
@@ -3380,27 +3401,47 @@ bool DataOp_VPDFROMTAHUR::Apply(
 	const DataArray1D<float> & dataTa = *(vecArgData[0]);
 	const DataArray1D<float> & dataHur = *(vecArgData[1]);
 
-	// Calculate relative humidity from Td and Ta
+	dataout.SetFillValue(DefaultFillValue);
 	dataout.SetUnits("hPa");
+
+	// Calculate relative humidity from Td and Ta
 
 	// Calculation with variables provided in degrees Celsius
 	if ((strArg[2] == "degC") || (strArg[2] == "C")) {
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = 6.1094 * exp(17.625 * dataTa[i] / (dataTa[i] + 243.04)) * (1.0 - dataHur[i] / 100.0);
+			if ((dataHur.HasFillValue() && (dataHur[i] == dataHur.GetFillValue())) ||
+			    (dataTa.HasFillValue() && (dataTa[i] == dataTa.GetFillValue()))
+			) {
+				dataout[i] = dataout.GetFillValue();
+			} else {
+				dataout[i] = 6.1094 * exp(17.625 * dataTa[i] / (dataTa[i] + 243.04)) * (1.0 - dataHur[i] / 100.0);
+			}
 		}
 
 	// Calculation with variables provided in Kelvin
 	} else if (strArg[2] == "K") {
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = 6.1094 * exp(17.625 * (dataTa[i] - 273.15) / (dataTa[i] - 30.11)) * (1.0 - dataHur[i] / 100.0);
+			if ((dataHur.HasFillValue() && (dataHur[i] == dataHur.GetFillValue())) ||
+			    (dataTa.HasFillValue() && (dataTa[i] == dataTa.GetFillValue()))
+			) {
+				dataout[i] = dataout.GetFillValue();
+			} else {
+				dataout[i] = 6.1094 * exp(17.625 * (dataTa[i] - 273.15) / (dataTa[i] - 30.11)) * (1.0 - dataHur[i] / 100.0);
+			}
 		}
 
 	// Calculation with variables provided in degrees Fahrenheit
 	} else if ((strArg[2] == "degF") || (strArg[2] == "F")) {
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			double dTaDegC = (5.0/9.0) * (dataTa[i] - 32.0);
+			if ((dataHur.HasFillValue() && (dataHur[i] == dataHur.GetFillValue())) ||
+			    (dataTa.HasFillValue() && (dataTa[i] == dataTa.GetFillValue()))
+			) {
+				dataout[i] = dataout.GetFillValue();
+			} else {
+				double dTaDegC = (5.0/9.0) * (dataTa[i] - 32.0);
 
-			dataout[i] = 6.1094 * exp(17.625 * dTaDegC / (dTaDegC + 243.04)) * (1.0 - dataHur[i] / 100.0);
+				dataout[i] = 6.1094 * exp(17.625 * dTaDegC / (dTaDegC + 243.04)) * (1.0 - dataHur[i] / 100.0);
+			}
 		}
 
 	// Invalid unit

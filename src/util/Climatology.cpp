@@ -989,14 +989,18 @@ void Climatology(
 				if ((vecClimoInfo[ct].type == ClimatologyType_AvgCount) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_ThreshSum) ||
 				    (vecClimoInfo[ct].type == ClimatologyType_TimeUntil) ||
-					(vecClimoInfo[ct].type == ClimatologyType_MaxConsec)
+				    (vecClimoInfo[ct].type == ClimatologyType_MaxConsec)
 				) {
 					varOut->add_att("threshold", vecClimoInfo[ct].threshstring.c_str());
 				}
 
 				// Add _FillValue attribute if override specified
+				Variable & var = varreg.Get(vecVarIxIn[v]);
 				if (strFillValueOverride != "") {
 					float dFillValue = std::stof(strFillValueOverride);
+					varOut->add_att("_FillValue", dFillValue);
+				} else if (var.IsOp()) {
+					float dFillValue = DataOp::DefaultFillValue;
 					varOut->add_att("_FillValue", dFillValue);
 				}
 
