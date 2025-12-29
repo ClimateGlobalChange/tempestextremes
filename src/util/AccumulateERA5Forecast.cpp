@@ -29,6 +29,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <ctime>
 
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
