@@ -31,6 +31,7 @@
 #include <set>
 #include <map>
 #include <limits>
+#include <ctime>
 
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
@@ -97,6 +98,9 @@ try {
 
 	// Variables to preserve
 	std::string strPreserveVar;
+
+	// Command line
+	std::string strCommandLine = GetCommandLineAsString(argc, argv);
 
 	// Parse the command line
 	BeginCommandLine()
@@ -438,6 +442,14 @@ try {
 				if (!pncfileout->is_valid()) {
 					_EXCEPTION1("Unable to open output file \"%s\"", vecOutputFiles[f].c_str());
 				}
+
+				// Add provenance information
+				const std::time_t timetNow = std::time(nullptr);
+				std::string strProvenance = std::asctime(std::localtime(&timetNow));
+				strProvenance += ": " + strCommandLine;
+
+				pncfileout->add_att("history", strProvenance.c_str());
+
 			}
 			_ASSERT(pncfileout != NULL);
 
