@@ -95,6 +95,9 @@ try {
 	// Name of longitude dimension
 	std::string strLongitudeName;
 
+	// Command line
+	std::string strCommandLine = GetCommandLineAsString(argc, argv);
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputDir, "in_dir", "");
@@ -400,6 +403,13 @@ try {
 		varOut->add_att("number_of_significant_digits", 7);
 		varOut->add_att("time_frequency", strAccumFrequency.c_str());
 		varOut->add_att("computed_using", strVariableName.c_str());
+
+		// Add provenance information
+		const std::time_t timetNow = std::time(nullptr);
+		std::string strProvenance = std::asctime(std::localtime(&timetNow));
+		strProvenance += ": " + strCommandLine;
+
+		ncfileout.add_att("history", strProvenance.c_str());
 	}
 	AnnounceEndBlock("Done");
 
@@ -472,7 +482,7 @@ try {
 					varIn->get(&(dData[0]), 1, 1, lLatitudeCount, lLongitudeCount);
 
 					for (int i = 0; i < dData.GetRows(); i++) {
-						dAccum[i] += dData[i] / 1000.0 * 3600.0;
+						dAccum[i] += dData[i];
 					}
 				}
 				AnnounceEndBlock(NULL);
