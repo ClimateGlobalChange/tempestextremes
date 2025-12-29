@@ -110,7 +110,7 @@ try {
 		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|3h|6h|daily]");
 		CommandLineString(strFileString, "file", "*235_055*");
 		CommandLineString(strVariableName, "var", "MTPR");
-		CommandLineString(strVariableOutName, "varout", "tp");
+		CommandLineString(strVariableOutName, "varout", "pr");
 
 		CommandLineString(strLongitudeName, "lonname", "longitude");
 		CommandLineString(strLatitudeName, "latname", "latitude");
@@ -383,17 +383,26 @@ try {
 			_EXCEPTION1("Unable to add variable \"%s\" to output file", strVariableOutName.c_str());
 		}
 
-		NcAtt * attLongName = varIn->get_att("long_name");
-		if (attLongName != NULL) {
-			varOut->add_att("long_name", attLongName->as_string(0));
-		}
-		NcAtt * attShortName = varIn->get_att("short_name");
-		if (attShortName != NULL) {
-			varOut->add_att("short_name", attShortName->as_string(0));
-		}
-		NcAtt * attUnits = varIn->get_att("units");
-		if (attUnits != NULL) {
-			varOut->add_att("units", attUnits->as_string(0));
+		// Variable attributes for CF-compliant precipitation output
+		if (strVariableOutName == "pr") {
+			varOut->add_att("standard_name", "precipitation_flux");
+			varOut->add_att("long_name", "Precipitation");
+			varOut->add_att("units", "kg m-2 s-1");
+
+		// Variable attributes (default)
+		} else {
+			NcAtt * attLongName = varIn->get_att("long_name");
+			if (attLongName != NULL) {
+				varOut->add_att("long_name", attLongName->as_string(0));
+			}
+			NcAtt * attShortName = varIn->get_att("short_name");
+			if (attShortName != NULL) {
+				varOut->add_att("short_name", attShortName->as_string(0));
+			}
+			NcAtt * attUnits = varIn->get_att("units");
+			if (attUnits != NULL) {
+				varOut->add_att("units", attUnits->as_string(0));
+			}
 		}
 		
 		varOut->add_att("grid_specification", "0.25 degree x 0.25 degree from 90N to 90S and 0E to 359.75E (721 x 1440 Latitude/Longitude)");
@@ -487,6 +496,11 @@ try {
 					}
 				}
 				AnnounceEndBlock(NULL);
+
+				// Average data over the accumulation frequency
+				for (int i = 0; i < dData.GetRows(); i++) {
+					dAccum[i] /= static_cast<float>(lAccumFrequency);
+				}
 
 				// Write data
 				if (lTimeIx >= varOut->get_dim(0)->size()) {
