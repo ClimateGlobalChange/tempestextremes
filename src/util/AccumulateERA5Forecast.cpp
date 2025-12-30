@@ -90,6 +90,9 @@ try {
 	// Output variable
 	std::string strVariableOutName;
 
+	// Use the timestamp from the beginning of the period
+	bool fAccumulateForward;
+
 	// Name of latitude dimension
 	std::string strLatitudeName;
 
@@ -111,6 +114,7 @@ try {
 		CommandLineString(strFileString, "file", "*235_055*");
 		CommandLineString(strVariableName, "var", "MTPR");
 		CommandLineString(strVariableOutName, "varout", "pr");
+		CommandLineBool(fAccumulateForward, "accumforward");
 
 		CommandLineString(strLongitudeName, "lonname", "longitude");
 		CommandLineString(strLatitudeName, "latname", "latitude");
@@ -167,6 +171,18 @@ try {
 		vecInputFiles.FromFile(strInputDataList);
 	}
 	if (strInputDir != "") {
+		char szYearMonth[32];
+		std::string strYearMonthDir;
+
+		// Initialize a new temporary file to hold filenames
+		snprintf(szYearMonth, 32, "%04i%02i", nInputYear, nInputMonth);
+		std::string strTempFile = std::string("/tmp/accum") + std::string(szYearMonth);
+
+		std::string strSystemString = std::string("rm -rf ") + strTempFile;
+		Announce(strSystemString.c_str());
+		system(strSystemString.c_str());
+
+		// List files from the previous month into strTempFile
 		int nInputMonthPrev = nInputMonth - 1;
 		int nInputYearPrev = nInputYear;
 		if (nInputMonthPrev == 0) {
@@ -174,23 +190,16 @@ try {
 			nInputMonthPrev = 12;
 		}
 
-		char szYearMonth[32];
 		snprintf(szYearMonth, 32, "%04i%02i", nInputYearPrev, nInputMonthPrev);
 
-		std::string strTempFile = std::string("/tmp/accum") + std::string(szYearMonth);
-
-		std::string strSystemString = std::string("rm -rf ") + strTempFile;
-
-		Announce(strSystemString.c_str());
-		system(strSystemString.c_str());
-
-		std::string strYearMonthDir = strInputDir + "/" + std::string(szYearMonth);
+		strYearMonthDir = strInputDir + "/" + std::string(szYearMonth);
 
 		strSystemString = std::string("ls ") + strYearMonthDir + std::string("/") + strFileString + std::string(" >> ") + strTempFile;
 
 		Announce(strSystemString.c_str());
 		system(strSystemString.c_str());
 
+		// List files from the current month into strTempFile
 		snprintf(szYearMonth, 32, "%04i%02i", nInputYear, nInputMonth);
 		strYearMonthDir = strInputDir + "/" + std::string(szYearMonth);
 
@@ -275,11 +284,19 @@ try {
 
 				for (long lFH = 0; lFH < dimTimeHour->size(); lFH += lAccumFrequency) {
 					Time timeForecast = timeInitial;
-					timeForecast.AddHours(lFH + lAccumFrequency);
+					if (fAccumulateForward) {
+						timeForecast.AddHours(lFH);
+					} else {
+						timeForecast.AddHours(lFH + lAccumFrequency);
+					}
 
 					if ((nInputYear == (-1)) || (timeForecast.GetYear() == nInputYear)) {
 						if ((nInputMonth == (-1)) || (timeForecast.GetMonth() == nInputMonth)) {
-							vecTimeInt.push_back(nTimeInitial + lFH + lAccumFrequency);
+							if (fAccumulateForward) {
+								vecTimeInt.push_back(nTimeInitial + lFH);
+							} else {
+								vecTimeInt.push_back(nTimeInitial + lFH + lAccumFrequency);
+							}
 						}
 					}
 				}
@@ -335,10 +352,18 @@ try {
 	
 		{
 			DataArray2D<int> nTimeBnds(vecTimeInt.size(), 2);
-			for (int t = 0; t < vecTimeInt.size(); t++) {
-				nTimeBnds(t,0) = vecTimeInt[t] - static_cast<int>(lAccumFrequency);
-				nTimeBnds(t,1) = vecTimeInt[t];
+			if (fAccumulateForward) {
+				for (int t = 0; t < vecTimeInt.size(); t++) {
+					nTimeBnds(t,0) = vecTimeInt[t];
+					nTimeBnds(t,1) = vecTimeInt[t] + static_cast<int>(lAccumFrequency);
+				}
+			} else {
+				for (int t = 0; t < vecTimeInt.size(); t++) {
+					nTimeBnds(t,0) = vecTimeInt[t] - static_cast<int>(lAccumFrequency);
+					nTimeBnds(t,1) = vecTimeInt[t];
+				}
 			}
+
 			varTimeBnds->set_cur(0,0);
 			varTimeBnds->put(&(nTimeBnds(0,0)), vecTimeInt.size(), 2);
 
@@ -473,7 +498,12 @@ try {
 
 				// Determine if the end of this forecast is in the right year/month
 				Time timeForecast = timeInitial;
-				timeForecast.AddHours(lFH + lAccumFrequency);
+
+				if (fAccumulateForward) {
+					timeForecast.AddHours(lFH);
+				} else {
+					timeForecast.AddHours(lFH + lAccumFrequency);
+				}
 
 				if ((nInputYear != (-1)) && (timeForecast.GetYear() != nInputYear)) {
 					continue;
