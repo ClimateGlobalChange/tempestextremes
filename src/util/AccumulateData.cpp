@@ -87,6 +87,9 @@ try {
 	// Accumulate from previous times
 	bool fAccumBackward;
 
+	// Offset hour
+	int nOffsetHour;
+
 	// Check for missing data
 	bool fMissingData;
 
@@ -111,6 +114,7 @@ try {
 		CommandLineStringD(strOp, "op", "sum", "[sum|avg|min|max]");
 		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|3h|6h|daily|monthly|annual|wateryear]");
 		CommandLineBool(fAccumBackward, "accumbackward");
+		CommandLineInt(nOffsetHour, "offsethour", 0);
 		CommandLineBool(fMissingData, "missingdata");
 		CommandLineString(strVariable, "var", "");
 		CommandLineString(strVariableOut, "varout", "");
@@ -227,6 +231,16 @@ try {
 		eAccumulationFreq = AccumulationFrequency_WaterYear;
 	} else {
 		_EXCEPTIONT("--accumfreq must be \"1h\", \"3h\", \"6h\", \"daily\", \"monthly\", \"annual\", or \"wateryear\"");
+	}
+
+	// Check --offsethour
+	if (nOffsetHour != 0) {
+		if (eAccumulationFreq != AccumulationFrequency_24h) {
+			_EXCEPTIONT("--offsethour is only compatible with \"daily\"");
+		}
+		if ((nOffsetHour < -12) || (nOffsetHour > 12)) {
+			_EXCEPTIONT("For --accumfreq \"daily\" --offsethour must be between -12 and +12");
+		}
 	}
 
 	// Data
@@ -389,7 +403,23 @@ try {
 				} else if (eAccumulationFreq == AccumulationFrequency_6h) {
 					timeRounded.SetSecond((timeRounded.GetSecond() / 21600) * 21600);
 				} else if (eAccumulationFreq == AccumulationFrequency_24h) {
-					timeRounded.SetSecond(0);
+					if (nOffsetHour == 0) {
+						timeRounded.SetSecond(0);
+					} else if (nOffsetHour < 0) {
+						if (timeRounded.GetSecond() >= 86400 + 3600 * nOffsetHour) {
+							timeRounded.SetSecond(86400 + 3600 * nOffsetHour);
+						} else {
+							timeRounded.SetSecond(3600 * nOffsetHour);
+							timeRounded.NormalizeTime();
+						}
+					} else {
+						if (timeRounded.GetSecond() >= 3600 * nOffsetHour) {
+							timeRounded.SetSecond(3600 * nOffsetHour);
+						} else {
+							timeRounded.SetSecond(-86400 + 3600 * nOffsetHour);
+							timeRounded.NormalizeTime();
+						}
+					}
 				} else if (eAccumulationFreq == AccumulationFrequency_Monthly) {
 					timeRounded.SetSecond(0);
 					timeRounded.SetDay(1);
