@@ -310,8 +310,9 @@ void CopyNcVarAttributes(
 				varIn->name(), att->name());
 		}
 
-		// Do not copy over _FillValue if input/output variable types are different
-		if (strAttName == "_FillValue") {
+		// Do not copy over _FillValue or missing_value if input/output
+		// variable types are different
+		if ((strAttName == "_FillValue") || (strAttName == "missing_value")) {
 			if (varIn->type() != varOut->type()) {
 				continue;
 			}
