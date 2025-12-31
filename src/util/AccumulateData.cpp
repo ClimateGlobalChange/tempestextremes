@@ -319,6 +319,7 @@ try {
 			}
 	
 			// Get FillValue
+			bool fHasFillValue = false;
 			float dFillValue = std::numeric_limits<float>::max();
 			if (fMissingData) {
 				NcAtt * attFillValue = var->get_att("_FillValue");
@@ -327,6 +328,7 @@ try {
 				}
 				if (attFillValue != NULL) {
 					dFillValue = attFillValue->as_float(0);
+					fHasFillValue = true;
 				}
 			}
 
@@ -340,6 +342,11 @@ try {
 			NcAtt * attAddOffset = var->get_att("add_offset");
 			if (attAddOffset != NULL) {
 				dAddOffset = attAddOffset->as_float(0);
+			}
+
+			// Apply scale_factor and add_offset to _FillValue
+			if (fHasFillValue) {
+				dFillValue = dFillValue * dScaleFactor + dAddOffset;
 			}
 	
 			// Allocate space for accumulation
@@ -536,6 +543,10 @@ try {
 					varout->add_att("_FillValue", std::numeric_limits<float>::max());
 				} else if (m_eAccumOp == AccumulateDataOp_Max) {
 					varout->add_att("_FillValue", -std::numeric_limits<float>::max());
+				} else {
+					if (fHasFillValue) {
+						varout->add_att("_FillValue", dFillValue);
+					}
 				}
 
 				CopyNcVarAttributes(var, varout);

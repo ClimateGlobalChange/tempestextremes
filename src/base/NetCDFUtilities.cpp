@@ -316,6 +316,12 @@ void CopyNcVarAttributes(
 			if (varIn->type() != varOut->type()) {
 				continue;
 			}
+			if (varOut->get_att("_FillValue") != NULL) {
+				continue;
+			}
+			if (varOut->get_att("missing_value") != NULL) {
+				continue;
+			}
 		}
 
 		// Otherwise copy over attributes
