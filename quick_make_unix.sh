@@ -59,8 +59,6 @@ elif [ "$SYSTEM_TYPE" = "NCAR Derecho" ]; then
     module load ncarenv
     module load ncarcompilers
     module load intel
-    module load cray-mpich
-    module load netcdf
 elif [ "$SYSTEM_TYPE" = "Windows" ]; then
     echo "Windows detected. Please follow the README instructions for Windows build or manually run the commands in your bash enviroment."
     exit 1
