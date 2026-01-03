@@ -69,9 +69,6 @@ fi
 
 ./remove_depend.sh
 
-# Load required modules for NetCDF and HDF5
-module load cray-hdf5
-module load cray-netcdf
 
 # Define the project root directory (where this script is)
 SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
