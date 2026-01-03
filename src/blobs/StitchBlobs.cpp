@@ -2768,6 +2768,41 @@ static inline void SummarizeBlobs(
     }
 }
 
+//////////////////////////////////[DEBUG END]/////////////////////////////////////////////
+
+///	<summary>
+///		Broadcast the std::string from rank 0 to all other processors.
+///		Designed to broadcast strOutTimeUnits to make sure all output files
+///		have a consistent time origin.
+///	</summary>
+#if defined(TEMPEST_MPIOMP)
+static void BcastString(MPI_Comm comm, std::string &s) {
+
+    // inactive ranks prevention
+    if (comm == MPI_COMM_NULL) {
+        return;
+    }
+
+    int rank = 0;
+    MPI_Comm_rank(comm, &rank);
+
+    int n = 0;
+    if (rank == 0) {
+        // int should be enough here since time unit string is tiny
+        n = static_cast<int>(s.size());
+    }
+
+    MPI_Bcast(&n, 1, MPI_INT, 0, comm);
+
+    if (rank != 0) {
+        s.resize(n);
+    }
+
+    if (n > 0) {
+        MPI_Bcast(&s[0], n, MPI_CHAR, 0, comm);
+    }
+}
+#endif
 
 int main(int argc, char** argv) {
 
@@ -3204,6 +3239,40 @@ try {
 
 	#endif
 
+	#if defined(TEMPEST_MPIOMP)
+		// Ensure all active ranks use a consistent time units origin by always reading it
+		// from global input file 0, unless user provided --outtimeunits.
+		if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
+			if (strOutTimeUnits.empty()) {
+				NcFileVector vecNcFiles0;
+				vecNcFiles0.ParseFromString(vecInputFiles[0]);
+				_ASSERT(vecNcFiles0.size() > 0);
+
+				NcVar * varTime0 = NcGetTimeVariable(*(vecNcFiles0[0]));
+				if (varTime0 == NULL) {
+					_EXCEPTION1("File \"%s\" does not contain \"time\" variable",
+						vecNcFiles0.GetFilename(0).c_str());
+				}
+
+				NcAtt * attTime0 = varTime0->get_att("units");
+				if (attTime0 == NULL) {
+					_EXCEPTION1("File \"%s\" missing \"time:units\" attribute",
+						vecNcFiles0.GetFilename(0).c_str());
+				}
+
+				strOutTimeUnits = attTime0->as_string(0);
+			}
+		}
+	#endif
+
+
+
+
+
+
+
+
+
 	for (int f = 0; f < vecInputFiles.size(); f++){
 	
 		#if defined(TEMPEST_MPIOMP)
@@ -3223,6 +3292,36 @@ try {
 			_EXCEPTION1("File \"%s\" does not contain \"time\" variable",
 				vecNcFiles.GetFilename(0).c_str());
 		}
+
+		//[DEBUG START]
+		#if defined(TEMPEST_MPIOMP)
+			// Defensive sanity check (NO behavior change):
+			// Warn if this rank's local file has a different time:units
+			if (nMPISize > 1 && valid_flag && MPI_REAL_COMM != MPI_COMM_NULL) {
+
+				NcAtt * attLocal = varTime->get_att("units");
+				if (attLocal != NULL) {
+					const std::string localUnits = attLocal->as_string(0);
+
+					if (!strOutTimeUnits.empty() && localUnits != strOutTimeUnits) {
+						int __wrank = -1;
+						MPI_Comm_rank(MPI_COMM_WORLD, &__wrank);
+
+						Announce(
+							"WARNING [rank %d]: time units mismatch in file \"%s\": "
+							"local=\"%s\" vs canonical=\"%s\" (output will still use canonical)",
+							__wrank,
+							vecNcFiles.GetFilename(0).c_str(),
+							localUnits.c_str(),
+							strOutTimeUnits.c_str()
+						);
+					}
+				}
+			}
+		#endif
+
+
+		//[DEBUG END]
 
 		nctypeTime = varTime->type();
 
@@ -4476,6 +4575,8 @@ try {
 					if ((f >= processorResponsibalForFile_UB) || f < processorResponsibalForFile_LB) {
 						continue;
 					}
+				} else{
+					continue;
 				}
 
 
