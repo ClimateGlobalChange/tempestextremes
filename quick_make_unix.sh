@@ -59,8 +59,6 @@ elif [ "$SYSTEM_TYPE" = "NCAR Derecho" ]; then
     module load ncarenv
     module load ncarcompilers
     module load intel
-    module load cray-mpich
-    module load netcdf
 elif [ "$SYSTEM_TYPE" = "Windows" ]; then
     echo "Windows detected. Please follow the README instructions for Windows build or manually run the commands in your bash enviroment."
     exit 1
@@ -71,9 +69,6 @@ fi
 
 ./remove_depend.sh
 
-# Load required modules for NetCDF and HDF5
-module load cray-hdf5
-module load cray-netcdf
 
 # Define the project root directory (where this script is)
 SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
