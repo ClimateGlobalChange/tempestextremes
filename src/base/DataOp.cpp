@@ -30,6 +30,30 @@
 #include <queue>
 
 ///////////////////////////////////////////////////////////////////////////////
+
+double SatVapPres_FromCC_degC(
+	double dTempDegC
+) {
+	return 6.1094 * exp(17.625 * dTempDegC / (dTempDegC + 243.04));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+double SatVapPres_FromCC_K(
+	double dTempK
+) {
+	return 6.1094 * exp(17.625 * (dTempK - 273.15) / (dTempK - 30.11));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+double SatVapPres_FromCC_degF(
+	double dTempDegF
+) {
+	return SatVapPres_FromCC_degC((5.0/9.0)*(dTempDegF - 32.0));
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // DataOpManager
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -389,6 +413,10 @@ DataOp * DataOpManager::Add(
 	// VPD from Ta and RH
 	} else if (strName == "_VPDFROMTAHUR") {
 		return Add(new DataOp_VPDFROMTAHUR);
+
+	// VPD from Ta and SH
+	} else if (strName == "_VPDFROMTAHUS") {
+		return Add(new DataOp_VPDFROMTAHUSPRES);
 
 	} else {
 		_EXCEPTION1("Invalid DataOp \"%s\"", strName.c_str());
@@ -3404,8 +3432,6 @@ bool DataOp_VPDFROMTAHUR::Apply(
 	dataout.SetFillValue(DefaultFillValue);
 	dataout.SetUnits("hPa");
 
-	// Calculate relative humidity from Td and Ta
-
 	// Calculation with variables provided in degrees Celsius
 	if ((strArg[2] == "degC") || (strArg[2] == "C")) {
 		for (int i = 0; i < dataout.GetRows(); i++) {
@@ -3414,7 +3440,7 @@ bool DataOp_VPDFROMTAHUR::Apply(
 			) {
 				dataout[i] = dataout.GetFillValue();
 			} else {
-				dataout[i] = 6.1094 * exp(17.625 * dataTa[i] / (dataTa[i] + 243.04)) * (1.0 - dataHur[i] / 100.0);
+				dataout[i] = SatVapPres_FromCC_degC(dataTa[i]) * (1.0 - dataHur[i] / 100.0);
 			}
 		}
 
@@ -3426,7 +3452,7 @@ bool DataOp_VPDFROMTAHUR::Apply(
 			) {
 				dataout[i] = dataout.GetFillValue();
 			} else {
-				dataout[i] = 6.1094 * exp(17.625 * (dataTa[i] - 273.15) / (dataTa[i] - 30.11)) * (1.0 - dataHur[i] / 100.0);
+				dataout[i] = SatVapPres_FromCC_K(dataTa[i]) * (1.0 - dataHur[i] / 100.0);
 			}
 		}
 
@@ -3438,15 +3464,95 @@ bool DataOp_VPDFROMTAHUR::Apply(
 			) {
 				dataout[i] = dataout.GetFillValue();
 			} else {
-				double dTaDegC = (5.0/9.0) * (dataTa[i] - 32.0);
-
-				dataout[i] = 6.1094 * exp(17.625 * dTaDegC / (dTaDegC + 243.04)) * (1.0 - dataHur[i] / 100.0);
+				dataout[i] = SatVapPres_FromCC_degF(dataTa[i]) * (1.0 - dataHur[i] / 100.0);
 			}
 		}
 
 	// Invalid unit
 	} else {
 		_EXCEPTION1("Invalid third argument units in _VPDFROMTARH (%s): Expected \"degC\", \"degF\", \"K\"",
+			strArg[2].c_str());
+	}
+
+	return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DataOp_VPDFROMTAHUSPRES
+///////////////////////////////////////////////////////////////////////////////
+
+const char * DataOp_VPDFROMTAHUSPRES::name = "_VPDFROMTAHUSPRES";
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool DataOp_VPDFROMTAHUSPRES::Apply(
+	const SimpleGrid & grid,
+	const std::vector<std::string> & strArg,
+	const std::vector<DataArray1D<float> const *> & vecArgData,
+	DataArray1D<float> & dataout
+) {
+	if (strArg.size() != 4) {
+		_EXCEPTION2("%s expects four arguments: %i given",
+			m_strName.c_str(), strArg.size());
+	}
+
+	if ((vecArgData[0] == NULL) || (vecArgData[1] == NULL)) {
+		_EXCEPTION1("%s expects first argument (ta), second argument (hus) and third argument (pr) to be data variables",
+			m_strName.c_str());
+	}
+	const DataArray1D<float> & dataTa = *(vecArgData[0]);
+	const DataArray1D<float> & dataHus = *(vecArgData[1]);
+	const DataArray1D<float> & dataPr = *(vecArgData[2]);
+
+	dataout.SetFillValue(DefaultFillValue);
+	dataout.SetUnits("hPa");
+
+	// Calculation with variables provided in degrees Celsius
+	if ((strArg[2] == "degC") || (strArg[2] == "C")) {
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			if ((dataHus.HasFillValue() && (dataHus[i] == dataHus.GetFillValue())) ||
+			    (dataTa.HasFillValue() && (dataTa[i] == dataTa.GetFillValue())) ||
+			    (dataPr.HasFillValue() && (dataPr[i] == dataPr.GetFillValue()))
+			) {
+				dataout[i] = dataout.GetFillValue();
+			} else {
+				// Actual vapor pressure = q * p / ((Mw/Md) + (1-Mw/Md) * q)
+				double dAVP = dataHus[i] * dataPr[i] / (0.6221 + 0.3779 * dataHus[i]);
+				dataout[i] = SatVapPres_FromCC_degC(dataTa[i]) - dAVP;
+			}
+		}
+
+	// Calculation with variables provided in Kelvin
+	} else if (strArg[2] == "K") {
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			if ((dataHus.HasFillValue() && (dataHus[i] == dataHus.GetFillValue())) ||
+			    (dataTa.HasFillValue() && (dataTa[i] == dataTa.GetFillValue())) ||
+			    (dataPr.HasFillValue() && (dataPr[i] == dataPr.GetFillValue()))
+			) {
+				dataout[i] = dataout.GetFillValue();
+			} else {
+				double dAVP = dataHus[i] * dataPr[i] / (0.6221 + 0.3779 * dataHus[i]);
+				dataout[i] = SatVapPres_FromCC_K(dataTa[i]) - dAVP;
+			}
+		}
+
+	// Calculation with variables provided in degrees Fahrenheit
+	} else if ((strArg[2] == "degF") || (strArg[2] == "F")) {
+		for (int i = 0; i < dataout.GetRows(); i++) {
+			if ((dataHus.HasFillValue() && (dataHus[i] == dataHus.GetFillValue())) ||
+			    (dataTa.HasFillValue() && (dataTa[i] == dataTa.GetFillValue())) ||
+			    (dataPr.HasFillValue() && (dataPr[i] == dataPr.GetFillValue()))
+			) {
+				dataout[i] = dataout.GetFillValue();
+			} else {
+				double dAVP = dataHus[i] * dataPr[i] / (0.6221 + 0.3779 * dataHus[i]);
+				dataout[i] = SatVapPres_FromCC_degF(dataTa[i]) - dAVP;
+			}
+		}
+
+	// Invalid unit
+	} else {
+		_EXCEPTION1("Invalid third argument units in _VPDFROMTAHUSPRES (%s): Expected \"degC\", \"degF\", \"K\"",
 			strArg[2].c_str());
 	}
 
