@@ -415,7 +415,7 @@ DataOp * DataOpManager::Add(
 		return Add(new DataOp_VPDFROMTAHUR);
 
 	// VPD from Ta and SH
-	} else if (strName == "_VPDFROMTAHUS") {
+	} else if (strName == "_VPDFROMTAHUSPRES") {
 		return Add(new DataOp_VPDFROMTAHUSPRES);
 
 	} else {
@@ -3508,7 +3508,7 @@ bool DataOp_VPDFROMTAHUSPRES::Apply(
 	dataout.SetUnits("hPa");
 
 	// Calculation with variables provided in degrees Celsius
-	if ((strArg[2] == "degC") || (strArg[2] == "C")) {
+	if ((strArg[3] == "degC") || (strArg[3] == "C")) {
 		for (int i = 0; i < dataout.GetRows(); i++) {
 			if ((dataHus.HasFillValue() && (dataHus[i] == dataHus.GetFillValue())) ||
 			    (dataTa.HasFillValue() && (dataTa[i] == dataTa.GetFillValue())) ||
@@ -3517,13 +3517,14 @@ bool DataOp_VPDFROMTAHUSPRES::Apply(
 				dataout[i] = dataout.GetFillValue();
 			} else {
 				// Actual vapor pressure = q * p / ((Mw/Md) + (1-Mw/Md) * q)
-				double dAVP = dataHus[i] * dataPr[i] / (0.6221 + 0.3779 * dataHus[i]);
+				// Assumes pressure is given in Pa
+				double dAVP = dataHus[i] * (dataPr[i] / 100.0) / (0.6221 + 0.3779 * dataHus[i]);
 				dataout[i] = SatVapPres_FromCC_degC(dataTa[i]) - dAVP;
 			}
 		}
 
 	// Calculation with variables provided in Kelvin
-	} else if (strArg[2] == "K") {
+	} else if (strArg[3] == "K") {
 		for (int i = 0; i < dataout.GetRows(); i++) {
 			if ((dataHus.HasFillValue() && (dataHus[i] == dataHus.GetFillValue())) ||
 			    (dataTa.HasFillValue() && (dataTa[i] == dataTa.GetFillValue())) ||
@@ -3531,13 +3532,13 @@ bool DataOp_VPDFROMTAHUSPRES::Apply(
 			) {
 				dataout[i] = dataout.GetFillValue();
 			} else {
-				double dAVP = dataHus[i] * dataPr[i] / (0.6221 + 0.3779 * dataHus[i]);
+				double dAVP = dataHus[i] * (dataPr[i] / 100.0) / (0.6221 + 0.3779 * dataHus[i]);
 				dataout[i] = SatVapPres_FromCC_K(dataTa[i]) - dAVP;
 			}
 		}
 
 	// Calculation with variables provided in degrees Fahrenheit
-	} else if ((strArg[2] == "degF") || (strArg[2] == "F")) {
+	} else if ((strArg[3] == "degF") || (strArg[3] == "F")) {
 		for (int i = 0; i < dataout.GetRows(); i++) {
 			if ((dataHus.HasFillValue() && (dataHus[i] == dataHus.GetFillValue())) ||
 			    (dataTa.HasFillValue() && (dataTa[i] == dataTa.GetFillValue())) ||
@@ -3545,7 +3546,7 @@ bool DataOp_VPDFROMTAHUSPRES::Apply(
 			) {
 				dataout[i] = dataout.GetFillValue();
 			} else {
-				double dAVP = dataHus[i] * dataPr[i] / (0.6221 + 0.3779 * dataHus[i]);
+				double dAVP = dataHus[i] * (dataPr[i] / 100.0) / (0.6221 + 0.3779 * dataHus[i]) / (1000.0);
 				dataout[i] = SatVapPres_FromCC_degF(dataTa[i]) - dAVP;
 			}
 		}
