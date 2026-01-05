@@ -345,6 +345,17 @@ void CopyNcVarTimeSubset(
 ////////////////////////////////////////////////////////////////////////////////
 
 ///	<summary>
+///		Read Time data from a WRF output NetCDF file.
+///	</summary>
+void ReadWRFTimeDataFromNcFile(
+	NcFile * ncfile,
+	const std::string & strFilename,
+	NcTimeDimension & vecTimes
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
 ///		Read the time data from a NetCDF file.
 ///	</summary>
 void ReadCFTimeDataFromNcFile(

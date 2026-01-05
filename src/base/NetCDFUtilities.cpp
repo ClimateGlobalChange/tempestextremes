@@ -909,6 +909,48 @@ void CopyNcVarTimeSubset(
 
 ////////////////////////////////////////////////////////////////////////////////
 
+void ReadWRFTimeDataFromNcFile(
+	NcFile * ncfile,
+	const std::string & strFilename,
+	NcTimeDimension & vecTimes
+) {
+	_ASSERT(ncfile != NULL);
+
+	// Empty existing Time vector
+	vecTimes.clear();
+
+	// Get the Times variable
+	NcVar * varTimes = ncfile->get_var("Times");
+	if (varTimes == NULL) {
+		_EXCEPTION1("Variable \"Times\" not found in WRF file \"%s\"",
+			strFilename.c_str());
+	}
+
+	if (varTimes->num_dims() != 2) {
+		_EXCEPTION1("Variable \"Times\" in WRF file \"%s\" must have 2 dimensions (Time x DateStrLen)",
+			strFilename.c_str());
+	}
+
+	// Load in Times data
+	std::string strTime;
+	strTime.resize(varTimes->get_dim(1)->size());
+
+	for (long t = 0; t < varTimes->get_dim(0)->size(); t++) {
+		varTimes->set_cur(t, 0);
+		varTimes->get(&(strTime[0]), 1, varTimes->get_dim(1)->size());
+
+		Time time(Time::CalendarGregorian);
+		time.FromFormattedString(strTime);
+		vecTimes.push_back(time);
+
+		if (t == 0) {
+			vecTimes.m_units = std::string("hours since ") + time.ToString();
+		}
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void ReadCFTimeDataFromNcFile(
 	NcFile * ncfile,
 	const std::string & strFilename,

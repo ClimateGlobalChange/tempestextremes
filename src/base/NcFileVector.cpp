@@ -81,7 +81,16 @@ void NcFileVector::InsertFile(
 		} else {
 			NcVar * varTime = NcGetTimeVariable(*pNewFile);
 			if (varTime == NULL) {
-				m_vecFileType.push_back(FileType_NoTimeVar);
+				NcVar * varTimes = pNewFile->get_var("Times");
+				if (varTimes != NULL) {
+					ReadWRFTimeDataFromNcFile(
+						pNewFile,
+						strFile,
+						m_vecFileTime[m_vecFileTime.size()-1]);
+					m_vecFileType.push_back(FileType_Standard);
+				} else {
+					m_vecFileType.push_back(FileType_NoTimeVar);
+				}
 			} else {
 				// If the time variable exists read it in
 				ReadCFTimeDataFromNcFile(
@@ -207,6 +216,10 @@ long NcFileVector::GetTimeIx(size_t pos) const {
 		_ASSERT(m_vecNcFile.size() == m_vecFileType.size());
 
 		const NcTimeDimension & vecTimes = m_vecFileTime[pos];
+		if (m_vecFileType[pos] == FileType_NoTimeVar) {
+			_EXCEPTION1("Input file \"%s\" has no time variable. Cannot determine time index from time string.",
+				m_vecFilenames[pos].c_str());
+		}
 		_ASSERT(vecTimes.size() > 0);
 
 		if (m_vecFileType[pos] == NcFileVector::FileType_Standard) {
