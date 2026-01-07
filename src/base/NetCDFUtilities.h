@@ -191,6 +191,11 @@ public:
 	///		Associated type of time.
 	///	</summary>
 	TimeDimType m_dimtype;
+
+	///	<summary>
+	///		Time bounds.
+	///	</summary>
+	std::vector< std::pair<Time,Time> > m_vecTimeBounds;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
