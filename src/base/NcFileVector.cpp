@@ -36,6 +36,7 @@ void NcFileVector::clear() {
 	m_vecNcFile.resize(0);
 	m_vecFilenames.resize(0);
 	m_vecFileType.resize(0);
+	m_vecFileTime.resize(0);
 	m_time = Time(Time::CalendarUnknown);
 	m_vecTimeIxs.resize(0);
 }
@@ -223,9 +224,23 @@ long NcFileVector::GetTimeIx(size_t pos) const {
 		_ASSERT(vecTimes.size() > 0);
 
 		if (m_vecFileType[pos] == NcFileVector::FileType_Standard) {
+
+			// Try to identify exact timestamp
 			for (long t = 0; t < vecTimes.size(); t++) {
 				if (vecTimes[t] == m_time) {
 					return t;
+				}
+			}
+
+			// Use time bounds
+			if (vecTimes.m_vecTimeBounds.size() != 0) {
+				_ASSERT(vecTimes.m_vecTimeBounds.size() == vecTimes.size());
+				for (long t = 0; t < vecTimes.size(); t++) {
+					if ((vecTimes.m_vecTimeBounds[t].first <= m_time) &&
+					    (vecTimes.m_vecTimeBounds[t].second > m_time)
+					) {
+						return t;
+					}
 				}
 			}
 
