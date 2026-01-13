@@ -850,6 +850,7 @@ void GeneratePathSegmentsWithPriority(
 	const std::vector< std::vector<Node> > & vecNodes,
 	const std::vector<kdtree *> & vecKDTrees,
 	const int ixPriorityCol,
+	bool fSortPriorityHighToLow,
 	int nMaxGapSteps,
 	double dMaxGapSeconds,
 	double dRangeDeg,
@@ -881,6 +882,9 @@ void GeneratePathSegmentsWithPriority(
 			}
 
 			double dPriority = std::stod(tscinfo[i][ixPriorityCol]);
+			if (fSortPriorityHighToLow) {
+				dPriority *= -1.0;
+			}
 			mapPriority.insert(std::pair<double, TimeCandidatePair>(dPriority, TimeCandidatePair(t,i)));
 		}
 	}
@@ -1471,6 +1475,11 @@ try {
 			vecPathSegmentsSet);
 
 	} else {
+		bool fSortPriorityHighToLow = false;
+		if (strPrioritize[0] == '-') {
+			strPrioritize = strPrioritize.substr(1);
+			fSortPriorityHighToLow = true;
+		}	
 		int ixPriorityCol = (-1);
 		for (int i = 0; i < vecFormatStrings.size(); i++) {
 			if (vecFormatStrings[i] == strPrioritize) {
@@ -1488,6 +1497,7 @@ try {
 			vecNodes,
 			vecKDTrees,
 			ixPriorityCol,
+			fSortPriorityHighToLow,
 			nMaxGapSteps,
 			dMaxGapSeconds,
 			dRangeDeg,
