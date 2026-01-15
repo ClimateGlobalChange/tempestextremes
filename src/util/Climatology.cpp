@@ -444,6 +444,7 @@ void ClimoUnitsNames(
 void Climatology(
 	const std::vector<std::string> & vecInputFileList,
 	const std::string & strConnectivityFile,
+	const std::string & strGridFile,
 	const std::string & strOutputFile,
 	const std::string & strVariables,
 	const std::string & strOutputVariables,
@@ -673,12 +674,25 @@ void Climatology(
 				_EXCEPTIONT("No data files specified; unable to generate grid");
 			}
 
-			grid.GenerateLatitudeLongitude(
-				vecncDataFiles[0],
-				strLatitudeName,
-				strLongitudeName,
-				fRegional,
-				fDiagonalConnectivity);
+			if (strGridFile == "") {
+				grid.GenerateLatitudeLongitude(
+					vecncDataFiles[0],
+					strLatitudeName,
+					strLongitudeName,
+					fRegional,
+					fDiagonalConnectivity);
+			} else {
+				NcFile ncgridfile(strGridFile.c_str(), NcFile::ReadOnly);
+				if (!ncgridfile.is_valid()) {
+					_EXCEPTION1("Unable to open grid file \"%s\"", strGridFile.c_str());
+				}
+				grid.GenerateLatitudeLongitude(
+					&ncgridfile,
+					strLatitudeName,
+					strLongitudeName,
+					fRegional,
+					fDiagonalConnectivity);
+			}
 
 			if (grid.m_nGridDim.size() != 2) {
 				_EXCEPTIONT("Logic error when generating connectivity");
@@ -3168,6 +3182,9 @@ try {
 	// Connectivity file
 	std::string strConnectivity;
 
+	// Grid file
+	std::string strGridFile;
+
 	// Output data file
 	std::string strOutputFile;
 
@@ -3236,6 +3253,7 @@ try {
 		CommandLineString(strInputFile, "in_data", "");
 		CommandLineString(strInputFileList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineString(strGridFile, "in_grid", "");
 		CommandLineString(strOutputFile, "out_data", "");
 		CommandLineString(strVariables, "var", "");
 		CommandLineString(strOutputVariables, "varout", "");
@@ -3398,6 +3416,7 @@ try {
 	Climatology(
 		vecMyInputFileList,
 		strConnectivity,
+		strGridFile,
 		strMyOutputFile,
 		strVariables,
 		strOutputVariables,
