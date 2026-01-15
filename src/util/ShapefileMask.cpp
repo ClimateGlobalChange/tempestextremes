@@ -59,6 +59,9 @@ try {
 	// Connectivity file
 	std::string strConnectivity;
 
+	// Grid file
+	std::string strGridFile;
+
 	// Data is regional
 	bool fRegional;
 
@@ -96,6 +99,7 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineString(strGridFile, "in_grid", "");
 		CommandLineBool(fRegional, "regional");
 
 		CommandLineString(strShapefile, "shp", "");
@@ -105,7 +109,7 @@ try {
 		CommandLineString(strVariables, "var", "");
 		CommandLineString(strOutputVariables, "varout", "");
 		CommandLineBool(fWriteShapeIds, "writeshapeids");
-		CommandLineStringD(strOperation, "op", "mask", "(mask|mean|q25|median|q75)");
+		CommandLineStringD(strOperation, "op", "mask", "(mask|mean|sum|q25|median|q75)");
 		CommandLineString(strLongitudeName, "lonname", "lon");
 		CommandLineString(strLatitudeName, "latname", "lat");
 
@@ -138,6 +142,7 @@ try {
 	STLStringHelper::ToLower(strOperation);
 	if ((strOperation != "mask") &&
 		(strOperation != "mean") &&
+		(strOperation != "sum") &&
 	    (strOperation != "q25") &&
 	    (strOperation != "median") &&
 	    (strOperation != "q75")
@@ -248,12 +253,27 @@ try {
 		AnnounceStartBlock("No connectivity file specified");
 		Announce("Attempting to generate latitude-longitude grid from data file");
 
-		grid.GenerateLatitudeLongitude(
-			vecFiles[0],
-			strLatitudeName,
-			strLongitudeName,
-			fRegional,
-			false);
+		if (strGridFile == "") {
+			grid.GenerateLatitudeLongitude(
+				vecFiles[0],
+				strLatitudeName,
+				strLongitudeName,
+				fRegional,
+				false);
+		} else {
+			NcFile ncgridfile(strGridFile.c_str(), NcFile::ReadOnly);
+			if (!ncgridfile.is_valid()) {
+				_EXCEPTION1("Unable to open --in_grid file \"%s\"",
+					strGridFile.c_str());
+			}
+
+			grid.GenerateLatitudeLongitude(
+				&ncgridfile,
+				strLatitudeName,
+				strLongitudeName,
+				fRegional,
+				false);
+		}
 
 		if (grid.m_nGridDim.size() != 2) {
 			_EXCEPTIONT("Logic error when generating connectivity");
@@ -567,20 +587,24 @@ try {
 				}
 
 				// Calculate the mean within all shapes
-				if (strOperation == "mean") {
-					std::vector<size_t> sDataCount(sShpRegionCount, 0);
+				if ((strOperation == "mean") || (strOperation == "sum")) {
+					_ASSERT(grid.m_dArea.GetRows() == nShpMap.size());
+					//std::vector<size_t> sDataCount(sShpRegionCount, 0);
+					std::vector<double> dAccumulatedArea(sShpRegionCount, 0.0);
 					std::fill(dataOut.begin(), dataOut.end(), 0.0f);
 					for (size_t k = 0; k < nShpMap.size(); k++) {
 						if ((!std::isnan(dataState[k])) && (dataState[k] != dFillValue)) {
 							if (nShpMap[k] != static_cast<size_t>(-1)) {
-								dataOut[nShpMap[k]] += static_cast<double>(dataState[k]);
-								sDataCount[nShpMap[k]]++;
+								dataOut[nShpMap[k]] += static_cast<double>(dataState[k]) * grid.m_dArea[k];
+								dAccumulatedArea[nShpMap[k]] += grid.m_dArea[k];
+								//sDataCount[nShpMap[k]]++;
 							}
 						}
 					}
+					bool fNormalizeByArea = (strOperation == "mean");
 					for (size_t s = 0; s < sShpRegionCount; s++) {
-						if (sDataCount[s] != 0) {
-							dataOut[s] /= static_cast<float>(sDataCount[s]);
+						if (fNormalizeByArea && (dAccumulatedArea[s] != 0)) {
+							dataOut[s] /= static_cast<float>(dAccumulatedArea[s]);
 						}
 						if (fpCSV != NULL) {
 							fprintf(fpCSV, ", %g", dataOut[s]);
