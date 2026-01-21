@@ -266,7 +266,7 @@ try {
 
 		vecPos.clear();
 		vecSize.clear();
-
+/*
 		if (dataAccum.IsAttached()) {
 			if ((m_eAccumOp == AccumulateDataOp_Sum) ||
 			    (m_eAccumOp == AccumulateDataOp_Avg)
@@ -284,7 +284,7 @@ try {
 				}
 			}
 		}
-
+*/
 		if (dataAccumCount.IsAttached()) {
 			dataAccumCount.Zero();
 		}
@@ -360,16 +360,27 @@ try {
 				vecPos.resize(var->num_dims(), 0);
 				dataIn.Allocate(sTotalSize);
 				dataAccum.Allocate(sTotalSize);
+
+				if (m_eAccumOp == AccumulateDataOp_Min) {
+					for (size_t i = 0; i < sTotalSize; i++) {
+						dataAccum[i] = std::numeric_limits<float>::max();
+					}
 	
+				} else if (m_eAccumOp == AccumulateDataOp_Max) {
+					for (size_t i = 0; i < sTotalSize; i++) {
+						dataAccum[i] = -std::numeric_limits<float>::max();
+					}
+				}
+
 				if (fMissingData) {
 					dataAccumCount.Allocate(sTotalSize);
 				}
 			}
-	
+
 			// Get times in this input file
 			NcTimeDimension vecTimesIn;
 			ReadCFTimeDataFromNcFile(&ncfilein, vecInputFiles[f], vecTimesIn, false);
-	
+
 			if (vecTimesIn.size() < 1) {
 				_EXCEPTION1("Time variable in file \"%s\" has zero length",
 					vecInputFiles[f].c_str());
