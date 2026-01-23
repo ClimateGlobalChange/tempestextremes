@@ -34,6 +34,8 @@ elif [ "$OS_TYPE" == "Linux" ]; then
     # Check if hostname contains "derecho" (case-insensitive)
     elif echo "$HOSTNAME" | grep -qi "derecho"; then
         SYSTEM_TYPE="NCAR Derecho"
+    elif echo "$HOSTNAME" | grep -qi "crlogin"; then
+        SYSTEM_TYPE="NCAR Casper"
     else
         SYSTEM_TYPE="MacOS/Linux"
     fi
@@ -61,6 +63,14 @@ elif [ "$SYSTEM_TYPE" = "NCAR Derecho" ]; then
     module load intel
     module load cray-mpich
     module load netcdf
+elif [ "$SYSTEM_TYPE" = "NCAR Casper" ]; then
+    echo "Loading modules for NCAR Casper..."
+    #module purge
+    module load ncarenv
+    module load ncarcompilers
+    module load intel
+    module load openmpi
+    module load netcdf
 elif [ "$SYSTEM_TYPE" = "Windows" ]; then
     echo "Windows detected. Please follow the README instructions for Windows build or manually run the commands in your bash enviroment."
     exit 1
@@ -72,8 +82,13 @@ fi
 ./remove_depend.sh
 
 # Load required modules for NetCDF and HDF5
-module load cray-hdf5
-module load cray-netcdf
+if [ "$SYSTEM_TYPE" = "NCAR Casper" ]; then
+  module load hdf5
+  module load netcdf
+else
+  module load cray-hdf5
+  module load cray-netcdf
+fi
 
 # Define the project root directory (where this script is)
 SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
