@@ -52,6 +52,9 @@ try {
 	// Connectivity file
 	std::string strConnectivity;
 
+	// Grid file
+	std::string strGridFile;
+
 	// Data is regional
 	bool fRegional;
 
@@ -93,6 +96,7 @@ try {
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strInputDataList, "in_data_list", "");
 		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineString(strGridFile, "in_grid", "");
 		CommandLineBool(fDiagonalConnectivity, "diag_connect");
 		CommandLineBool(fRegional, "regional");
 
@@ -230,7 +234,11 @@ try {
 
 		// Get the list of data files
 		NcFileVector vecFiles;
-		vecFiles.ParseFromString(vecInputFileList[0]);
+		if (strGridFile == "") {
+			vecFiles.ParseFromString(vecInputFileList[0]);
+		} else {
+			vecFiles.ParseFromString(strGridFile);
+		}
 
 		grid.GenerateLatitudeLongitude(
 			vecFiles[0],
@@ -329,6 +337,14 @@ try {
 		_ASSERT(vecFiles.size() > 0);
 
 		// Get time information
+		bool fFileHasTime =
+			(vecFiles.GetFileType(0) != NcFileVector::FileType_NoTimeDim) &&
+			(vecFiles.GetFileType(0) != NcFileVector::FileType_NoTimeVar);
+
+		const NcTimeDimension & vecTimes =
+			vecFiles.GetNcTimeDimension(0);
+/*
+		// No need to read in CFTimeData again, since it's already done in NcFileVector now
 		bool fFileHasTime = (NcGetTimeVariable(*(vecFiles[0])) != NULL);
 		NcTimeDimension vecTimes;
 		if (fFileHasTime) {
@@ -338,7 +354,7 @@ try {
 				vecTimes,
 				false);
 		}
-
+*/
 		NcTimeDimension vecOutputTimes;
 
 #ifndef TEMPEST_NOREGEX

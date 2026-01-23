@@ -188,10 +188,23 @@ public:
 			dataVectorOut.Zero();
 		}
 
-		SparseMapConstIterator iter = m_mapEntries.begin();
-		for (; iter != m_mapEntries.end(); iter++) {
-			dataVectorOut[iter->first.first] +=
-				iter->second * dataVectorIn[iter->first.second];
+		if (dataVectorIn.HasFillValue()) {
+			SparseMapConstIterator iter = m_mapEntries.begin();
+			for (; iter != m_mapEntries.end(); iter++) {
+				if ((!std::isnan(dataVectorIn[iter->first.second])) &&
+				    (dataVectorIn[iter->first.second] != dataVectorIn.GetFillValue())
+				) {
+					dataVectorOut[iter->first.first] +=
+						iter->second * dataVectorIn[iter->first.second];
+				}
+			}
+
+		} else {
+			SparseMapConstIterator iter = m_mapEntries.begin();
+			for (; iter != m_mapEntries.end(); iter++) {
+				dataVectorOut[iter->first.first] +=
+					iter->second * dataVectorIn[iter->first.second];
+			}
 		}
 	}
 

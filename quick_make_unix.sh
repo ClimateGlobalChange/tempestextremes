@@ -34,6 +34,8 @@ elif [ "$OS_TYPE" == "Linux" ]; then
     # Check if hostname contains "derecho" (case-insensitive)
     elif echo "$HOSTNAME" | grep -qi "derecho"; then
         SYSTEM_TYPE="NCAR Derecho"
+    elif echo "$HOSTNAME" | grep -qi "crlogin"; then
+        SYSTEM_TYPE="NCAR Casper"
     else
         SYSTEM_TYPE="MacOS/Linux"
     fi
@@ -59,6 +61,16 @@ elif [ "$SYSTEM_TYPE" = "NCAR Derecho" ]; then
     module load ncarenv
     module load ncarcompilers
     module load intel
+    module load cray-mpich
+    module load netcdf
+elif [ "$SYSTEM_TYPE" = "NCAR Casper" ]; then
+    echo "Loading modules for NCAR Casper..."
+    #module purge
+    module load ncarenv
+    module load ncarcompilers
+    module load intel
+    module load openmpi
+    module load netcdf
 elif [ "$SYSTEM_TYPE" = "Windows" ]; then
     echo "Windows detected. Please follow the README instructions for Windows build or manually run the commands in your bash enviroment."
     exit 1
@@ -69,6 +81,14 @@ fi
 
 ./remove_depend.sh
 
+# Load required modules for NetCDF and HDF5
+if [ "$SYSTEM_TYPE" = "NCAR Casper" ]; then
+  module load hdf5
+  module load netcdf
+else
+  module load cray-hdf5
+  module load cray-netcdf
+fi
 
 # Define the project root directory (where this script is)
 SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -99,12 +119,18 @@ cd "$BUILD_DIR" || { echo "Build directory not found: $BUILD_DIR"; exit 1; }
 # Configure the project:
 # - The source directory is set to SRC_DIR.
 # - The installation prefix is set to INSTALL_PREFIX so that install() will copy targets to ${INSTALL_PREFIX}/bin.
-cmake -DCMAKE_CXX_COMPILER=CC \
-      -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
-      -DCMAKE_CXX_FLAGS_DEBUG="${OPTIMIZATION_LEVEL} ${DEBUG_FLAGS}" \
-      -DENABLE_MPI=${ENABLE_MPI} \
-      -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
-      "$SRC_DIR"
+cmake_args=(
+  -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+  -DCMAKE_CXX_FLAGS_DEBUG="${OPTIMIZATION_LEVEL} ${DEBUG_FLAGS}"
+  -DENABLE_MPI="${ENABLE_MPI}"
+  -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}"
+)
+
+if [[ "$SYSTEM_TYPE" == "NERSC Perlmutter" ]]; then
+  cmake_args+=(-DCMAKE_CXX_COMPILER=CC)
+fi
+
+cmake "${cmake_args[@]}" "$SRC_DIR"
 
 if [ $? -ne 0 ]; then
   echo "CMake configuration failed. Exiting."

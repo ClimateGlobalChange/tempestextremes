@@ -282,7 +282,7 @@ public:
 		return !((*this) < time);
 	}
 
-protected:
+public:
 	///	<summary>
 	///		Verify that the Time is in accordance with the calendar.
 	///	</summary>

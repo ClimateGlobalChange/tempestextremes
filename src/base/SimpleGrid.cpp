@@ -625,7 +625,7 @@ void SimpleGrid::GenerateRectilinearStereographic(
 
 	_ASSERT(nX >= 1);
 	_ASSERT(dDeltaXRad > 0.0);
-	_ASSERT(fabs(dLatRad0 <= 0.5 * M_PI));
+	_ASSERT(fabs(dLatRad0) <= 0.5 * M_PI);
 
 	if (fabs(dLatRad0 - 0.5 * M_PI) < ReferenceTolerance) {
 		dLatRad0 = 0.5 * M_PI;
@@ -725,7 +725,7 @@ void SimpleGrid::GenerateRadialStereographic(
 
 	_ASSERT(nR >= 1);
 	_ASSERT(dDeltaRRad > 0.0);
-	_ASSERT(fabs(dLatRad0 <= 0.5 * M_PI));
+	_ASSERT(fabs(dLatRad0) <= 0.5 * M_PI);
 
 	const double dRgcdmax = (static_cast<double>(nR-1) + 0.5) * dDeltaRRad;
 

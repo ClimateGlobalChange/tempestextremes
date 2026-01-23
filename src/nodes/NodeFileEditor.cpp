@@ -1330,17 +1330,36 @@ void MaxClosedContourDelta(
 ///	</summary>
 enum CycloneMetric {
 	CycloneMetric_ACEPSL,
+	CycloneMetric_MIN,
+	CycloneMetric_MAX,
 	CycloneMetric_ACE,
 	CycloneMetric_IKE,
-	CycloneMetric_PDI
+	CycloneMetric_PDI,
 };
 
 ///	<summary>
 ///		Calculate popular cyclone metrics, including:
-///		Accumulated Cyclone Energy (ACE),
-///		Integrated Kinetic Energy (IKE),
+///		Accumulated Cyclone Energy from PSL (ACEPSL)
+///		Minimum value within a given radius (MIN)
+///		Maximum value within a given radius (MAX)
+///		Accumulated Cyclone Energy (ACE)
+///		Integrated Kinetic Energy (IKE)
 ///		Potential Dissipation Index (PDI)
 ///	</summary>
+///	<param name="varixU">
+///		The first variable index to be used in the calculation, depending
+///		on the value of eCycloneMetric:
+///		CycloneMetric_ACEPSL: PSL variable
+///		CycloneMetric_MIN: Variable used in minimum calculation
+///		CycloneMetric_MAX: Variable used in maximum calculation
+///		CycloneMetric_ACE/IKE/PDI: Zonal velocity variable
+///	</param>
+///	<param name="varixV">
+///		The first variable index to be used in the calculation, depending
+///		on the value of eCycloneMetric:
+///		CycloneMetric_ACEPSL/MIN/MAX: Unused
+///		CycloneMetric_ACE/IKE/PDI: Meridional velocity variable
+///	</param>
 void CalculateCycloneMetrics(
 	CycloneMetric eCycloneMetric,
 	VariableRegistry & varreg,
@@ -1394,6 +1413,9 @@ void CalculateCycloneMetrics(
 
 	// Value
 	double dValue = 0.0;
+	if ((eCycloneMetric == CycloneMetric_MIN) || (eCycloneMetric == CycloneMetric_MAX)) {
+		dValue = dataStateU[ix0];
+	}
 
 	// Loop through all latlon elements
 	while (queueNodes.size() != 0) {
@@ -1439,7 +1461,22 @@ void CalculateCycloneMetrics(
 			if (dTempValue > dValue) {
 				dValue = dTempValue;
 			}
+	
+		// Minimum of dataStateU
+		} else if (eCycloneMetric == CycloneMetric_MIN) {
+			double dTempValue = dataStateU[ix];
+			if (dTempValue < dValue) {
+				dValue = dTempValue;
+			}	
+	
+		// Maximum of dataStateU
+		} else if (eCycloneMetric == CycloneMetric_MAX) {
+			double dTempValue = dataStateU[ix];
+			if (dTempValue > dValue) {
+				dValue = dTempValue;
+			}
 
+		// ACE, IKE or PDI
 		} else {
 			// Velocities at this location
 			double dUlon = dataStateU[ix];
@@ -1496,6 +1533,7 @@ double FirstWhere(
 	PathNode & pathnode,
 	const std::string & strOp,
 	const std::string & strThreshold,
+	std::string strRadius,
 	const std::vector<double> & dIndices,
 	const std::vector<double> & dArray
 ) {
@@ -1505,12 +1543,28 @@ double FirstWhere(
 	if (dIndices.size() != dArray.size()) {
 		_EXCEPTIONT("PathNode R array size different from Ua size");
 	}
+	if (dIndices.size() == 1) {
+		_EXCEPTIONT("More than one histogram bin required in FirstWhere");
+	}
+
+	// Get the radius
+	double dRadius = pathnode.GetColumnDataAsDouble(cdh, strRadius);
+
+	if (dRadius > dIndices[dIndices.size() - 1]) {
+		_EXCEPTIONT("Radius should be smaller than the largest radius of the radial profile");
+	}
+
+    // Get the bin width
+	double dBinWidth = dIndices[dIndices.size() - 1] / (dIndices.size() - 1);
+
+	// Index of radius
+	const int iRadiusIx = static_cast<int>(dRadius / dBinWidth);
 
 	// Get the threshold
 	double dThreshold;
 	if (strThreshold == "max") {
 		dThreshold = dArray[0];
-		for (int k = 0; k < dArray.size(); k++) {
+		for (int k = 0; k < iRadiusIx; k++) {
 			if (dArray[k] > dThreshold) {
 				dThreshold = dArray[k];
 			}
@@ -1518,7 +1572,7 @@ double FirstWhere(
 
 	} else if (strThreshold == "min") {
 		dThreshold = dArray[0];
-		for (int k = 0; k < dArray.size(); k++) {
+		for (int k = 0; k < iRadiusIx; k++) {
 			if (dArray[k] < dThreshold) {
 				dThreshold = dArray[k];
 			}
@@ -1529,53 +1583,56 @@ double FirstWhere(
 			pathnode.GetColumnDataAsDouble(cdh, strThreshold);
 	}
 
+	// Initial Value
+	double dValue = dArray[0];
+	int dIndex = 0;
+
 	// Find array index
 	int j = 0;
-	if (strOp == ">=") {
-		for (; j < dArray.size(); j++) {
-			if (dArray[j] >= dThreshold) {
-				break;
+
+	if (strOp == "fallsbelow") {
+		for (; j <= iRadiusIx; j++) {
+			double dTempValue = dArray[j];
+			if (dTempValue > dValue) {
+				dValue = dTempValue;
+				dIndex = j;
 			}
 		}
-
-	} else if (strOp == ">") {
-		for (; j < dArray.size(); j++) {
-			if (dArray[j] > dThreshold) {
-				break;
+		if (dValue < dThreshold) {
+			j = 0;
+		} else {
+			// Get the index of the maximum value
+			j = dIndex + 1;
+			for (; j < dArray.size(); j++) {
+				if (dArray[j] < dThreshold) {
+					break;
+				}
 			}
 		}
-
-	} else if (strOp == "<=") {
-		for (; j < dArray.size(); j++) {
-			if (dArray[j] <= dThreshold) {
-				break;
+		
+	} else if (strOp == "risesabove") {
+		for (; j <= iRadiusIx ; j++) {
+			double dTempValue = dArray[j];
+			if (dTempValue < dValue) {
+				dValue = dTempValue;
+				dIndex = j;
 			}
 		}
-
-	} else if (strOp == "<") {
-		for (; j < dArray.size(); j++) {
-			if (dArray[j] < dThreshold) {
-				break;
+		if (dValue > dThreshold) {
+			j = 0;
+		} else {
+			// Get the index of the minimum value
+			j = dIndex + 1;
+			for (; j < dArray.size(); j++) {
+				if (dArray[j] > dThreshold) {
+					break;
+				}
 			}
 		}
 
 	} else if (strOp == "=") {
-		for (; j < dArray.size(); j++) {
+		for (; j <= iRadiusIx ; j++) {
 			if (dArray[j] == dThreshold) {
-				break;
-			}
-		}
-
-	} else if (strOp == "fallsbelow") {
-		for (; j < dArray.size()-1; j++) {
-			if ((dArray[j] >= dThreshold) && (dArray[j+1] < dThreshold)) {
-				break;
-			}
-		}
-
-	} else if (strOp == "risesabove") {
-		for (; j < dArray.size()-1; j++) {
-			if ((dArray[j] <= dThreshold) && (dArray[j+1] > dThreshold)) {
 				break;
 			}
 		}
@@ -1607,6 +1664,9 @@ double LastWhere(
 	}
 	if (dIndices.size() != dArray.size()) {
 		_EXCEPTIONT("PathNode R array size different from Ua size");
+	}
+	if (dIndices.size() == 1) {
+		_EXCEPTIONT("More than one histogram bin required in LastWhere");
 	}
 
 	// Get the threshold
@@ -2247,7 +2307,9 @@ try {
 			if ((calccomm.rhs == "eval_ace") ||
 			    (calccomm.rhs == "eval_ike") ||
 			    (calccomm.rhs == "eval_pdi") ||
-				(calccomm.rhs == "eval_acepsl")
+			    (calccomm.rhs == "eval_acepsl") ||
+			    (calccomm.rhs == "eval_min") ||
+			    (calccomm.rhs == "eval_max")
 			) {
 
 				// Cyclone metric
@@ -2260,13 +2322,20 @@ try {
 					eCycloneMetric = CycloneMetric_IKE;
 				} else if (calccomm.rhs == "eval_pdi") {
 					eCycloneMetric = CycloneMetric_PDI;
+				} else if (calccomm.rhs == "eval_min") {
+					eCycloneMetric = CycloneMetric_MIN;
+				} else if (calccomm.rhs == "eval_max") {
+					eCycloneMetric = CycloneMetric_MAX;
 				} else {
 					_EXCEPTION();
 				}
 
 				std::string strRadiusArg;
 
-				if (eCycloneMetric == CycloneMetric_ACEPSL) {
+				if ((eCycloneMetric == CycloneMetric_ACEPSL) ||
+				    (eCycloneMetric == CycloneMetric_MIN) ||
+				    (eCycloneMetric == CycloneMetric_MAX)
+				) {
 					if (calccomm.arg.size() != 2) {
 						_EXCEPTION2("Syntax error: Function \"%s\" "
 							"requires two arguments:\n"
@@ -2294,7 +2363,10 @@ try {
 
 				// Parse meridional wind variable (if present)
 				VariableIndex varixV = varixU;
-				if (eCycloneMetric != CycloneMetric_ACEPSL) {
+				if ((eCycloneMetric == CycloneMetric_ACE) ||
+				    (eCycloneMetric == CycloneMetric_PDI) ||
+				    (eCycloneMetric == CycloneMetric_IKE)
+				) {
 					varixV = varreg.FindOrRegister(calccomm.arg[1]);
 				}
 
@@ -2491,15 +2563,22 @@ try {
 			}
 
 			// lastwhere
-			if ((calccomm.rhs == "firstwhere") || (calccomm.rhs == "lastwhere")) {
-				if (calccomm.arg.size() != 3) {
+			if ((calccomm.rhs == "lastwhere") || (calccomm.rhs == "firstwhere")) {
+
+				bool fFirstWhere = (calccomm.rhs == "firstwhere");
+
+				if ((fFirstWhere) && (calccomm.arg.size() != 4)) {
+					_EXCEPTIONT("Syntax error: Function \"firstwhere\" "
+						"requires four arguments:\n"
+						"firstwhere(<column name>, <op>, <value>, <radius>)");
+				}
+
+				if ((!fFirstWhere) && (calccomm.arg.size() != 3)) {
 					_EXCEPTION2("Syntax error: Function \"%s\" "
 						"requires three arguments:\n"
 						"%s(<column name>, <op>, <value>)",
 						calccomm.rhs.c_str(), calccomm.rhs.c_str());
 				}
-
-				bool fFirstWhere = (calccomm.rhs == "firstwhere");
 
 				// Get arguments
 				int ixCol = cdhWorking.GetIndexFromString(calccomm.arg[0]);
@@ -2510,6 +2589,11 @@ try {
 				const std::string & strOp = calccomm.arg[1];
 
 				const std::string & strThreshold = calccomm.arg[2];
+
+				std::string strRadiusArg = "";
+				if (fFirstWhere) {
+					strRadiusArg = calccomm.arg[3];
+				} 
 
 				// Loop through all PathNodes
 				for (int p = 0; p < pathvec.size(); p++) {
@@ -2529,7 +2613,7 @@ try {
 
 							double dIndex;
 							if (fFirstWhere) {
-								dIndex = FirstWhere(cdhWorking, pathnode, strOp, strThreshold, dIndices, dArray);
+								dIndex = FirstWhere(cdhWorking, pathnode, strOp, strThreshold, strRadiusArg, dIndices, dArray);
 							} else {
 								dIndex = LastWhere(cdhWorking, pathnode, strOp, strThreshold, dIndices, dArray);
 							}
@@ -2558,7 +2642,7 @@ try {
 
 								double dIndex;
 								if (fFirstWhere) {
-									dIndex = FirstWhere(cdhWorking, pathnode, strOp, strThreshold, dIndices, dArray);
+									dIndex = FirstWhere(cdhWorking, pathnode, strOp, strThreshold, strRadiusArg, dIndices, dArray);
 								} else {
 									dIndex = LastWhere(cdhWorking, pathnode, strOp, strThreshold, dIndices, dArray);
 								}

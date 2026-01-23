@@ -36,6 +36,7 @@ void NcFileVector::clear() {
 	m_vecNcFile.resize(0);
 	m_vecFilenames.resize(0);
 	m_vecFileType.resize(0);
+	m_vecFileTime.resize(0);
 	m_time = Time(Time::CalendarUnknown);
 	m_vecTimeIxs.resize(0);
 }
@@ -81,7 +82,16 @@ void NcFileVector::InsertFile(
 		} else {
 			NcVar * varTime = NcGetTimeVariable(*pNewFile);
 			if (varTime == NULL) {
-				m_vecFileType.push_back(FileType_NoTimeVar);
+				NcVar * varTimes = pNewFile->get_var("Times");
+				if (varTimes != NULL) {
+					ReadWRFTimeDataFromNcFile(
+						pNewFile,
+						strFile,
+						m_vecFileTime[m_vecFileTime.size()-1]);
+					m_vecFileType.push_back(FileType_Standard);
+				} else {
+					m_vecFileType.push_back(FileType_NoTimeVar);
+				}
 			} else {
 				// If the time variable exists read it in
 				ReadCFTimeDataFromNcFile(
@@ -207,12 +217,30 @@ long NcFileVector::GetTimeIx(size_t pos) const {
 		_ASSERT(m_vecNcFile.size() == m_vecFileType.size());
 
 		const NcTimeDimension & vecTimes = m_vecFileTime[pos];
+		if (m_vecFileType[pos] == FileType_NoTimeVar) {
+			_EXCEPTION1("Input file \"%s\" has no time variable. Cannot determine time index from time string.",
+				m_vecFilenames[pos].c_str());
+		}
 		_ASSERT(vecTimes.size() > 0);
 
 		if (m_vecFileType[pos] == NcFileVector::FileType_Standard) {
+
+			// Try to identify exact timestamp
 			for (long t = 0; t < vecTimes.size(); t++) {
 				if (vecTimes[t] == m_time) {
 					return t;
+				}
+			}
+
+			// Use time bounds
+			if (vecTimes.m_vecTimeBounds.size() != 0) {
+				_ASSERT(vecTimes.m_vecTimeBounds.size() == vecTimes.size());
+				for (long t = 0; t < vecTimes.size(); t++) {
+					if ((vecTimes.m_vecTimeBounds[t].first <= m_time) &&
+					    (vecTimes.m_vecTimeBounds[t].second > m_time)
+					) {
+						return t;
+					}
 				}
 			}
 

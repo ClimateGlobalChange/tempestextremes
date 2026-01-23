@@ -28,6 +28,10 @@ if(DEFINED ENABLE_MPI AND ENABLE_MPI)
   endif()
 endif()
 
+if(DEFINED TEMPEST_NOREGEX)
+  add_compile_definitions(TEMPEST_NOREGEX)
+endif()
+
 if(WIN32)
   add_compile_definitions(_USE_MATH_DEFINES 1)
 endif()
