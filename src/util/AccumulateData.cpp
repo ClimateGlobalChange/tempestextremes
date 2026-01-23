@@ -31,6 +31,7 @@
 #include <set>
 #include <map>
 #include <limits>
+#include <ctime>
 
 #if defined(TEMPEST_MPIOMP)
 #include <mpi.h>
@@ -86,6 +87,9 @@ try {
 	// Accumulate from previous times
 	bool fAccumBackward;
 
+	// Offset hour
+	int nOffsetHour;
+
 	// Check for missing data
 	bool fMissingData;
 
@@ -98,6 +102,9 @@ try {
 	// Variables to preserve
 	std::string strPreserveVar;
 
+	// Command line
+	std::string strCommandLine = GetCommandLineAsString(argc, argv);
+
 	// Parse the command line
 	BeginCommandLine()
 		CommandLineString(strInputData, "in_data", "");
@@ -107,6 +114,7 @@ try {
 		CommandLineStringD(strOp, "op", "sum", "[sum|avg|min|max]");
 		CommandLineStringD(strAccumFrequency, "accumfreq", "6h", "[1h|3h|6h|daily|monthly|annual|wateryear]");
 		CommandLineBool(fAccumBackward, "accumbackward");
+		CommandLineInt(nOffsetHour, "offsethour", 0);
 		CommandLineBool(fMissingData, "missingdata");
 		CommandLineString(strVariable, "var", "");
 		CommandLineString(strVariableOut, "varout", "");
@@ -225,6 +233,16 @@ try {
 		_EXCEPTIONT("--accumfreq must be \"1h\", \"3h\", \"6h\", \"daily\", \"monthly\", \"annual\", or \"wateryear\"");
 	}
 
+	// Check --offsethour
+	if (nOffsetHour != 0) {
+		if (eAccumulationFreq != AccumulationFrequency_24h) {
+			_EXCEPTIONT("--offsethour is only compatible with \"daily\"");
+		}
+		if ((nOffsetHour < -12) || (nOffsetHour > 12)) {
+			_EXCEPTIONT("For --accumfreq \"daily\" --offsethour must be between -12 and +12");
+		}
+	}
+
 	// Data
 	size_t sTotalSize = 1;
 	std::vector<long> vecPos;
@@ -248,7 +266,7 @@ try {
 
 		vecPos.clear();
 		vecSize.clear();
-
+/*
 		if (dataAccum.IsAttached()) {
 			if ((m_eAccumOp == AccumulateDataOp_Sum) ||
 			    (m_eAccumOp == AccumulateDataOp_Avg)
@@ -266,7 +284,7 @@ try {
 				}
 			}
 		}
-
+*/
 		if (dataAccumCount.IsAttached()) {
 			dataAccumCount.Zero();
 		}
@@ -301,6 +319,7 @@ try {
 			}
 	
 			// Get FillValue
+			bool fHasFillValue = false;
 			float dFillValue = std::numeric_limits<float>::max();
 			if (fMissingData) {
 				NcAtt * attFillValue = var->get_att("_FillValue");
@@ -309,6 +328,7 @@ try {
 				}
 				if (attFillValue != NULL) {
 					dFillValue = attFillValue->as_float(0);
+					fHasFillValue = true;
 				}
 			}
 
@@ -323,6 +343,11 @@ try {
 			if (attAddOffset != NULL) {
 				dAddOffset = attAddOffset->as_float(0);
 			}
+
+			// Apply scale_factor and add_offset to _FillValue
+			if (fHasFillValue) {
+				dFillValue = dFillValue * dScaleFactor + dAddOffset;
+			}
 	
 			// Allocate space for accumulation
 			if (f == 0) {
@@ -335,16 +360,27 @@ try {
 				vecPos.resize(var->num_dims(), 0);
 				dataIn.Allocate(sTotalSize);
 				dataAccum.Allocate(sTotalSize);
+
+				if (m_eAccumOp == AccumulateDataOp_Min) {
+					for (size_t i = 0; i < sTotalSize; i++) {
+						dataAccum[i] = std::numeric_limits<float>::max();
+					}
 	
+				} else if (m_eAccumOp == AccumulateDataOp_Max) {
+					for (size_t i = 0; i < sTotalSize; i++) {
+						dataAccum[i] = -std::numeric_limits<float>::max();
+					}
+				}
+
 				if (fMissingData) {
 					dataAccumCount.Allocate(sTotalSize);
 				}
 			}
-	
+
 			// Get times in this input file
 			NcTimeDimension vecTimesIn;
 			ReadCFTimeDataFromNcFile(&ncfilein, vecInputFiles[f], vecTimesIn, false);
-	
+
 			if (vecTimesIn.size() < 1) {
 				_EXCEPTION1("Time variable in file \"%s\" has zero length",
 					vecInputFiles[f].c_str());
@@ -385,7 +421,23 @@ try {
 				} else if (eAccumulationFreq == AccumulationFrequency_6h) {
 					timeRounded.SetSecond((timeRounded.GetSecond() / 21600) * 21600);
 				} else if (eAccumulationFreq == AccumulationFrequency_24h) {
-					timeRounded.SetSecond(0);
+					if (nOffsetHour == 0) {
+						timeRounded.SetSecond(0);
+					} else if (nOffsetHour < 0) {
+						if (timeRounded.GetSecond() >= 86400 + 3600 * nOffsetHour) {
+							timeRounded.SetSecond(86400 + 3600 * nOffsetHour);
+						} else {
+							timeRounded.SetSecond(3600 * nOffsetHour);
+							timeRounded.NormalizeTime();
+						}
+					} else {
+						if (timeRounded.GetSecond() >= 3600 * nOffsetHour) {
+							timeRounded.SetSecond(3600 * nOffsetHour);
+						} else {
+							timeRounded.SetSecond(-86400 + 3600 * nOffsetHour);
+							timeRounded.NormalizeTime();
+						}
+					}
 				} else if (eAccumulationFreq == AccumulationFrequency_Monthly) {
 					timeRounded.SetSecond(0);
 					timeRounded.SetDay(1);
@@ -438,6 +490,14 @@ try {
 				if (!pncfileout->is_valid()) {
 					_EXCEPTION1("Unable to open output file \"%s\"", vecOutputFiles[f].c_str());
 				}
+
+				// Add provenance information
+				const std::time_t timetNow = std::time(nullptr);
+				std::string strProvenance = std::asctime(std::localtime(&timetNow));
+				strProvenance += ": " + strCommandLine;
+
+				pncfileout->add_att("history", strProvenance.c_str());
+
 			}
 			_ASSERT(pncfileout != NULL);
 
@@ -494,6 +554,10 @@ try {
 					varout->add_att("_FillValue", std::numeric_limits<float>::max());
 				} else if (m_eAccumOp == AccumulateDataOp_Max) {
 					varout->add_att("_FillValue", -std::numeric_limits<float>::max());
+				} else {
+					if (fHasFillValue) {
+						varout->add_att("_FillValue", dFillValue);
+					}
 				}
 
 				CopyNcVarAttributes(var, varout);

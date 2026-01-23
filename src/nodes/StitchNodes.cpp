@@ -20,8 +20,8 @@
 #include "FilenameList.h"
 #include "NodeFileUtilities.h"
 #include "CoordTransforms.h"
-
 #include "kdtree.h"
+#include "TimeMatch.h"
 
 #include <cstdlib>
 #include <cstdio>
@@ -93,6 +93,9 @@ void ParseDetectNodesFile(
 	const Time & timeBegin,
 	const Time & timeEnd,
 	size_t sGridDims
+#ifndef TEMPEST_NOREGEX
+	, const std::regex & reTimeSubset
+#endif
 ) {
 	// Open file for reading
 	FILE * fp = fopen(strInputFile.c_str(), "r");
@@ -208,7 +211,13 @@ void ParseDetectNodesFile(
 					fIncludeTimeSlice = false;
 				}
 			}
-
+			
+#ifndef TEMPEST_NOREGEX
+			std::smatch match;
+			if (!std::regex_search(vecTimeString[4], match, reTimeSubset)) {
+				fIncludeTimeSlice = false;
+			}
+#endif
 			if (fIncludeTimeSlice) {
 				auto it = mapCandidateInfo.find(time);
 				if (it != mapCandidateInfo.end()) {
@@ -219,7 +228,7 @@ void ParseDetectNodesFile(
 						iterCurrentTime->second.resize(iCandidate + nCandidates);
 
 					} else {
-						_EXCEPTION2("Repated time \"%s\" found in candidate files on line (%lu)",
+						_EXCEPTION2("Repeated time \"%s\" found in candidate files on line (%lu)",
 							time.ToString().c_str(), sLineNumber);
 					}
 
@@ -758,10 +767,10 @@ void GeneratePathSegmentsSetBasic(
 						vecNodes[t][i].latRad,
 						vecNodes[t+g][iRes].lonRad,
 						vecNodes[t+g][iRes].latRad);
-
+                // printf("%1.15e %1.15e\n", dRDeg, dRangeDeg);
 				// Verify great circle distance satisfies range requirement
-				if (dRDeg <= dRangeDeg) {
 
+				if (dRDeg <= dRangeDeg) {
 					// Insert new path segment into set of path segments
 					vecPathSegmentsSet[t].insert(
 						SimplePathSegment(t, i, t+g, iRes));
@@ -841,6 +850,7 @@ void GeneratePathSegmentsWithPriority(
 	const std::vector< std::vector<Node> > & vecNodes,
 	const std::vector<kdtree *> & vecKDTrees,
 	const int ixPriorityCol,
+	bool fSortPriorityHighToLow,
 	int nMaxGapSteps,
 	double dMaxGapSeconds,
 	double dRangeDeg,
@@ -872,6 +882,9 @@ void GeneratePathSegmentsWithPriority(
 			}
 
 			double dPriority = std::stod(tscinfo[i][ixPriorityCol]);
+			if (fSortPriorityHighToLow) {
+				dPriority *= -1.0;
+			}
 			mapPriority.insert(std::pair<double, TimeCandidatePair>(dPriority, TimeCandidatePair(t,i)));
 		}
 	}
@@ -1050,8 +1063,8 @@ try {
 	// Maximum time gap (in time steps or duration)
 	std::string strMaxGapSize;
 
-	// Time step stride
-	int nTimeStride;
+	// Time subset
+	std::string strTimeFilter;
 
 	// Calendar type
 	std::string strCalendar;
@@ -1092,6 +1105,7 @@ try {
 		CommandLineStringD(strThreshold, "threshold", "",
 			"[col,op,value,count;...]");
 		CommandLineStringD(strCalendar, "caltype", "standard", "(none|standard|noleap|360_day)");
+		CommandLineString(strTimeFilter, "timefilter", "");
 		CommandLineBool(fAllowRepeatedTimes, "allow_repeated_times");
 		CommandLineBool(fAddVelocity, "add_velocity");
 		//CommandLineInt(nTimeStride, "timestride", 1);
@@ -1216,6 +1230,41 @@ try {
 		vecInputFiles.FromFile(strInputFileList, false);
 	}
 
+#ifdef TEMPEST_NOREGEX
+	if (strTimeFilter != "") {
+		_EXCEPTIONT("Cannot use --timefilter with -DTEMPEST_NOREGEX compiler flag");
+	}
+#endif
+#ifndef TEMPEST_NOREGEX
+	// Parse --timefilter
+	if (strTimeFilter == "3hr") {
+		strTimeFilter = "(0|3|6|9|12|15|18|21)";
+	}
+	if (strTimeFilter == "6hr") {
+		strTimeFilter = "(0|6|12|18)";
+	}
+	if (strTimeFilter == "daily") {
+		strTimeFilter = "0";
+	}
+	if (strTimeFilter == "") {
+		strTimeFilter = "\\d+";
+	}
+
+	// Define regular expression
+	std::regex reTimeSubset;
+	if (strTimeFilter != "") {
+		// Test regex support
+		TestRegex();
+
+		try {
+			reTimeSubset.assign(strTimeFilter);
+		} catch(std::regex_error & reerr) {
+			_EXCEPTION2("Parse error in --timefilter regular expression \"%s\" (code %i)",
+				strTimeFilter.c_str(), reerr.code());
+		}
+	}
+#endif
+
 	// Parse format string
 	std::vector< std::string > vecFormatStrings;
 	ParseVariableList(strFormat, vecFormatStrings);
@@ -1287,7 +1336,11 @@ try {
 				fAllowRepeatedTimes,
 				timeBegin,
 				timeEnd,
-				sGridDims);
+				sGridDims
+#ifndef TEMPEST_NOREGEX
+				, reTimeSubset
+#endif
+				);
 		}
 
 		if (mapCandidateInfo.size() == 0) {
@@ -1422,6 +1475,11 @@ try {
 			vecPathSegmentsSet);
 
 	} else {
+		bool fSortPriorityHighToLow = false;
+		if (strPrioritize[0] == '-') {
+			strPrioritize = strPrioritize.substr(1);
+			fSortPriorityHighToLow = true;
+		}	
 		int ixPriorityCol = (-1);
 		for (int i = 0; i < vecFormatStrings.size(); i++) {
 			if (vecFormatStrings[i] == strPrioritize) {
@@ -1439,6 +1497,7 @@ try {
 			vecNodes,
 			vecKDTrees,
 			ixPriorityCol,
+			fSortPriorityHighToLow,
 			nMaxGapSteps,
 			dMaxGapSeconds,
 			dRangeDeg,
@@ -1783,4 +1842,5 @@ try {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
 

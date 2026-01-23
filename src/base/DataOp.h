@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <limits>
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -69,6 +70,12 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 
 class DataOp {
+
+public:
+	///	<summary>
+	///		Default FillValue.
+	///	</summary>
+	constexpr static const float DefaultFillValue = std::numeric_limits<float>::max();
 
 public:
 	///	<summary>
@@ -119,6 +126,29 @@ public:
 	///	</summary>
 	virtual std::string GetUnits(
 		const std::vector<std::string> & vecUnits
+	);
+
+public:
+	///	<summary>
+	///		Returns true if any of the arguments has a FillValue.
+	///	</summary>
+	bool HasFillValue(
+		const std::vector<DataArray1D<float> const *> vecArgData
+	);
+
+	///	<summary>
+	///		If all FillValue in the vector are the same then return the common
+	///		FillValue. If any are not equal return the default FillValue.
+	///	</summary>
+	float GetFillValue_Common(
+		const std::vector<DataArray1D<float> const *> vecArgData
+	);
+
+	///	<summary>
+	///		Get the modified FillValue
+	///	</summary>
+	virtual float GetFillValue(
+		const std::vector<DataArray1D<float> const *> vecArgData
 	);
 
 protected:
@@ -1177,6 +1207,66 @@ public:
 	///		Constructor.
 	///	</summary>
 	DataOp_RELHUMFROMTDTA() :
+		DataOp(name)
+	{ }
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class DataOp_VPDFROMTAHUR : public DataOp {
+
+public:
+	///	<summary>
+	///		Operartor name.
+	///	</summary>
+	static const char * name;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_VPDFROMTAHUR() :
+		DataOp(name)
+	{ }
+
+public:
+	///	<summary>
+	///		Apply the operator.
+	///	</summary>
+	virtual bool Apply(
+		const SimpleGrid & grid,
+		const std::vector<std::string> & strArg,
+		const std::vector<DataArray1D<float> const *> & vecArgData,
+		DataArray1D<float> & dataout
+	);
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+class DataOp_VPDFROMTAHUSPRES : public DataOp {
+
+public:
+	///	<summary>
+	///		Operartor name.
+	///	</summary>
+	static const char * name;
+
+public:
+	///	<summary>
+	///		Constructor.
+	///	</summary>
+	DataOp_VPDFROMTAHUSPRES() :
 		DataOp(name)
 	{ }
 

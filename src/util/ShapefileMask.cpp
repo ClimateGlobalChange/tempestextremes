@@ -59,6 +59,9 @@ try {
 	// Connectivity file
 	std::string strConnectivity;
 
+	// Grid file
+	std::string strGridFile;
+
 	// Data is regional
 	bool fRegional;
 
@@ -96,6 +99,7 @@ try {
 	BeginCommandLine()
 		CommandLineString(strInputData, "in_data", "");
 		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineString(strGridFile, "in_grid", "");
 		CommandLineBool(fRegional, "regional");
 
 		CommandLineString(strShapefile, "shp", "");
@@ -105,7 +109,7 @@ try {
 		CommandLineString(strVariables, "var", "");
 		CommandLineString(strOutputVariables, "varout", "");
 		CommandLineBool(fWriteShapeIds, "writeshapeids");
-		CommandLineStringD(strOperation, "op", "mask", "(mask|mean|q25|median|q75)");
+		CommandLineStringD(strOperation, "op", "mask", "(mask|mean|sum|q25|median|q75)");
 		CommandLineString(strLongitudeName, "lonname", "lon");
 		CommandLineString(strLatitudeName, "latname", "lat");
 
@@ -138,6 +142,7 @@ try {
 	STLStringHelper::ToLower(strOperation);
 	if ((strOperation != "mask") &&
 		(strOperation != "mean") &&
+		(strOperation != "sum") &&
 	    (strOperation != "q25") &&
 	    (strOperation != "median") &&
 	    (strOperation != "q75")
@@ -248,12 +253,27 @@ try {
 		AnnounceStartBlock("No connectivity file specified");
 		Announce("Attempting to generate latitude-longitude grid from data file");
 
-		grid.GenerateLatitudeLongitude(
-			vecFiles[0],
-			strLatitudeName,
-			strLongitudeName,
-			fRegional,
-			false);
+		if (strGridFile == "") {
+			grid.GenerateLatitudeLongitude(
+				vecFiles[0],
+				strLatitudeName,
+				strLongitudeName,
+				fRegional,
+				false);
+		} else {
+			NcFile ncgridfile(strGridFile.c_str(), NcFile::ReadOnly);
+			if (!ncgridfile.is_valid()) {
+				_EXCEPTION1("Unable to open --in_grid file \"%s\"",
+					strGridFile.c_str());
+			}
+
+			grid.GenerateLatitudeLongitude(
+				&ncgridfile,
+				strLatitudeName,
+				strLongitudeName,
+				fRegional,
+				false);
+		}
 
 		if (grid.m_nGridDim.size() != 2) {
 			_EXCEPTIONT("Logic error when generating connectivity");
@@ -373,6 +393,7 @@ try {
 	AnnounceStartBlock("Building map");
 
 	std::vector<int> nShpMap;
+	std::vector<double> dShpArea(sShpRegionCount, 0.0);
 
 	nShpMap.resize(grid.m_dLat.GetRows(), static_cast<int>(-1));
 	for (size_t k = 0; k < grid.m_dLat.GetRows(); k++) {
@@ -387,6 +408,9 @@ try {
 			if (vecLatLonBox[s].contains(dLatDeg, dStandardLonDeg)) {
 				if (FaceContainsNode(mesh.faces[s], mesh.nodes, dLatDeg, dStandardLonDeg)) {
 					nShpMap[k] = static_cast<int>(s);
+					if (grid.m_dArea.GetRows() != 0) {
+						dShpArea[s] += grid.m_dArea[k];
+					}
 					break;
 				}
 			}
@@ -420,6 +444,21 @@ try {
 			varShapeIds->set_cur(0, 0);
 			varShapeIds->put(&(nShpMap[0]), dim0->size(), dim1->size());
 		}
+
+		AnnounceEndBlock("Done");
+	}
+
+	// Write shape areas to file
+	if (pncOutput != NULL) {
+		AnnounceStartBlock("Writing shape areas to file");
+		NcVar * varShapeAreas = pncOutput->add_var("shapearea", ncFloat, dimShp);
+		if (varShapeAreas == NULL) {
+			_EXCEPTION1("Unable to create variable \"shapearea\" in NetCDF file \"%s\"", strOutputData.c_str());
+		}
+		varShapeAreas->set_cur((long)0);
+		varShapeAreas->put(&(dShpArea[0]), dShpArea.size());
+		varShapeAreas->add_att("long_name", "shape area");
+		varShapeAreas->add_att("units", "sr");
 
 		AnnounceEndBlock("Done");
 	}
@@ -567,20 +606,22 @@ try {
 				}
 
 				// Calculate the mean within all shapes
-				if (strOperation == "mean") {
-					std::vector<size_t> sDataCount(sShpRegionCount, 0);
+				if ((strOperation == "mean") || (strOperation == "sum")) {
+					_ASSERT(grid.m_dArea.GetRows() == nShpMap.size());
+					//std::vector<size_t> sDataCount(sShpRegionCount, 0);
 					std::fill(dataOut.begin(), dataOut.end(), 0.0f);
 					for (size_t k = 0; k < nShpMap.size(); k++) {
 						if ((!std::isnan(dataState[k])) && (dataState[k] != dFillValue)) {
 							if (nShpMap[k] != static_cast<size_t>(-1)) {
-								dataOut[nShpMap[k]] += static_cast<double>(dataState[k]);
-								sDataCount[nShpMap[k]]++;
+								dataOut[nShpMap[k]] += static_cast<double>(dataState[k]) * grid.m_dArea[k];
+								//sDataCount[nShpMap[k]]++;
 							}
 						}
 					}
+					bool fNormalizeByArea = (strOperation == "mean");
 					for (size_t s = 0; s < sShpRegionCount; s++) {
-						if (sDataCount[s] != 0) {
-							dataOut[s] /= static_cast<float>(sDataCount[s]);
+						if (fNormalizeByArea && (dShpArea[s] != 0)) {
+							dataOut[s] /= static_cast<float>(dShpArea[s]);
 						}
 						if (fpCSV != NULL) {
 							fprintf(fpCSV, ", %g", dataOut[s]);

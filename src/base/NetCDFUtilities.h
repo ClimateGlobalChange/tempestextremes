@@ -191,6 +191,11 @@ public:
 	///		Associated type of time.
 	///	</summary>
 	TimeDimType m_dimtype;
+
+	///	<summary>
+	///		Time bounds.
+	///	</summary>
+	std::vector< std::pair<Time,Time> > m_vecTimeBounds;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -340,6 +345,17 @@ void CopyNcVarTimeSubset(
 	NcFile & ncOut,
 	const std::string & strVarName,
 	const std::vector<Time> & vecOutputTimes
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+///	<summary>
+///		Read Time data from a WRF output NetCDF file.
+///	</summary>
+void ReadWRFTimeDataFromNcFile(
+	NcFile * ncfile,
+	const std::string & strFilename,
+	NcTimeDimension & vecTimes
 );
 
 ////////////////////////////////////////////////////////////////////////////////

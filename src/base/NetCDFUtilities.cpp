@@ -310,9 +310,16 @@ void CopyNcVarAttributes(
 				varIn->name(), att->name());
 		}
 
-		// Do not copy over _FillValue if input/output variable types are different
-		if (strAttName == "_FillValue") {
+		// Do not copy over _FillValue or missing_value if input/output
+		// variable types are different
+		if ((strAttName == "_FillValue") || (strAttName == "missing_value")) {
 			if (varIn->type() != varOut->type()) {
+				continue;
+			}
+			if (varOut->get_att("_FillValue") != NULL) {
+				continue;
+			}
+			if (varOut->get_att("missing_value") != NULL) {
 				continue;
 			}
 		}
@@ -902,6 +909,48 @@ void CopyNcVarTimeSubset(
 
 ////////////////////////////////////////////////////////////////////////////////
 
+void ReadWRFTimeDataFromNcFile(
+	NcFile * ncfile,
+	const std::string & strFilename,
+	NcTimeDimension & vecTimes
+) {
+	_ASSERT(ncfile != NULL);
+
+	// Empty existing Time vector
+	vecTimes.clear();
+
+	// Get the Times variable
+	NcVar * varTimes = ncfile->get_var("Times");
+	if (varTimes == NULL) {
+		_EXCEPTION1("Variable \"Times\" not found in WRF file \"%s\"",
+			strFilename.c_str());
+	}
+
+	if (varTimes->num_dims() != 2) {
+		_EXCEPTION1("Variable \"Times\" in WRF file \"%s\" must have 2 dimensions (Time x DateStrLen)",
+			strFilename.c_str());
+	}
+
+	// Load in Times data
+	std::string strTime;
+	strTime.resize(varTimes->get_dim(1)->size());
+
+	for (long t = 0; t < varTimes->get_dim(0)->size(); t++) {
+		varTimes->set_cur(t, 0);
+		varTimes->get(&(strTime[0]), 1, varTimes->get_dim(1)->size());
+
+		Time time(Time::CalendarGregorian);
+		time.FromFormattedString(strTime);
+		vecTimes.push_back(time);
+
+		if (t == 0) {
+			vecTimes.m_units = std::string("hours since ") + time.ToString();
+		}
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void ReadCFTimeDataFromNcFile(
 	NcFile * ncfile,
 	const std::string & strFilename,
@@ -919,12 +968,12 @@ void ReadCFTimeDataFromNcFile(
 	NcVar * varTime = NcGetTimeVariable(*ncfile);
 
 	if (varTime == NULL) {
-		_EXCEPTION1("Variable \"time\" not found in file \"%s\"",
+		_EXCEPTION1("Variable \"time\" or equivalent not found in file \"%s\"",
 			strFilename.c_str());
 	}
 	if (dimTime == NULL) {
 		if (varTime->num_dims() != 0) {
-			_EXCEPTION1("Dimension \"time\" not found in file \"%s\"",
+			_EXCEPTION1("Dimension \"time\" or equivalent not found in file \"%s\"",
 				strFilename.c_str());
 		}
 		lTimeCount = 1;
@@ -984,35 +1033,35 @@ void ReadCFTimeDataFromNcFile(
 	vecTimes.m_units = attTimeUnits->as_string(0);
 
 	// Load in time data
-	DataArray1D<int> vecTimeInt;
-	DataArray1D<float> vecTimeFloat;
-	DataArray1D<double> vecTimeDouble;
-	DataArray1D<ncint64> vecTimeInt64;
+	std::vector<int> vecTimeInt;
+	std::vector<float> vecTimeFloat;
+	std::vector<double> vecTimeDouble;
+	std::vector<ncint64> vecTimeInt64;
 
 	if (varTime->type() == ncInt) {
-		vecTimeInt.Allocate(lTimeCount);
+		vecTimeInt.resize(lTimeCount);
 		varTime->set_cur((long)0);
 		varTime->get(&(vecTimeInt[0]), lTimeCount);
 
 	} else if (varTime->type() == ncFloat) {
-		vecTimeFloat.Allocate(lTimeCount);
+		vecTimeFloat.resize(lTimeCount);
 		varTime->set_cur((long)0);
 		varTime->get(&(vecTimeFloat[0]), lTimeCount);
 
 	} else if (varTime->type() == ncDouble) {
-		vecTimeDouble.Allocate(lTimeCount);
+		vecTimeDouble.resize(lTimeCount);
 		varTime->set_cur((long)0);
 		varTime->get(&(vecTimeDouble[0]), lTimeCount);
 
 	} else if (varTime->type() == ncInt64) {
-		vecTimeInt64.Allocate(lTimeCount);
+		vecTimeInt64.resize(lTimeCount);
 		varTime->set_cur((long)0);
 		varTime->get(&(vecTimeInt64[0]), lTimeCount);
 
 	} else {
-		_EXCEPTION1("Variable \"time\" has invalid type "
+		_EXCEPTION2("Variable \"%s\" has invalid type "
 			"(expected \"int\", \"int64\", \"float\" or \"double\")"
-			" in file \"%s\"", strFilename.c_str());
+			" in file \"%s\"", varTime->name(), strFilename.c_str());
 	}
 
 	for (int t = 0; t < lTimeCount; t++) {
@@ -1044,6 +1093,98 @@ void ReadCFTimeDataFromNcFile(
 #endif
 
 		vecTimes.push_back(time);
+	}
+
+	// Load in time bounds
+	NcVar * varTimeBounds = NULL;
+
+	NcAtt * attBounds = varTime->get_att("bounds");
+	if (attBounds != NULL) {
+		varTimeBounds = ncfile->get_var(attBounds->as_string(0));
+	}
+	if (varTimeBounds == NULL) {
+		varTimeBounds = ncfile->get_var("time_bnds");
+	}
+	if (varTimeBounds == NULL) {
+		varTimeBounds = ncfile->get_var("time_bounds");
+	}
+	if (varTimeBounds != NULL) {
+		if (varTimeBounds->num_dims() != 2) {
+			_EXCEPTION1("Time bounds variable \"%s\" must have two dimensions", varTimeBounds->name());
+		}
+		if (varTimeBounds->get_dim(0)->size() != lTimeCount) {
+			_EXCEPTION2("Time bounds variable \"%s\" first dimension must have same length as time variable \"%s\"",
+				varTimeBounds->name(), varTime->name());
+		}
+		if (varTimeBounds->get_dim(1)->size() != 2) {
+			_EXCEPTION1("Time bounds variable \"%s\" second dimension must be size 2",
+				varTimeBounds->name());
+		}
+
+		if (varTimeBounds->type() == ncInt) {
+			vecTimeInt.resize(2 * lTimeCount);
+			varTimeBounds->set_cur(0, 0);
+			varTimeBounds->get(&(vecTimeInt[0]), lTimeCount, 2);
+
+		} else if (varTime->type() == ncFloat) {
+			vecTimeFloat.resize(2 * lTimeCount);
+			varTimeBounds->set_cur(0, 0);
+			varTimeBounds->get(&(vecTimeFloat[0]), lTimeCount, 2);
+
+		} else if (varTime->type() == ncDouble) {
+			vecTimeDouble.resize(2 * lTimeCount);
+			varTimeBounds->set_cur(0, 0);
+			varTimeBounds->get(&(vecTimeDouble[0]), lTimeCount, 2);
+
+		} else if (varTime->type() == ncInt64) {
+			vecTimeInt64.resize(2 * lTimeCount);
+			varTimeBounds->set_cur(0, 0);
+			varTimeBounds->get(&(vecTimeInt64[0]), lTimeCount, 2);
+
+		} else {
+			_EXCEPTION2("Variable \"%s\" has invalid type "
+				"(expected \"int\", \"int64\", \"float\" or \"double\")"
+				" in file \"%s\"", varTimeBounds->name(), strFilename.c_str());
+		}
+
+		for (int t = 0; t < lTimeCount; t++) {
+			std::pair<Time,Time> prTimeBound;
+			for (int tb = 0; tb < 2; tb++) {
+				Time time(eCalendarType);
+
+				if (varTimeBounds->type() == ncInt) {
+					time.FromCFCompliantUnitsOffsetInt(
+						vecTimes.m_units,
+						vecTimeInt[2*t+tb]);
+
+				} else if (varTimeBounds->type() == ncFloat) {
+					time.FromCFCompliantUnitsOffsetDouble(
+						vecTimes.m_units,
+						static_cast<double>(vecTimeFloat[2*t+tb]));
+
+				} else if (varTimeBounds->type() == ncDouble) {
+					time.FromCFCompliantUnitsOffsetDouble(
+						vecTimes.m_units,
+						vecTimeDouble[2*t+tb]);
+
+				} else if (varTimeBounds->type() == ncInt64) {
+					time.FromCFCompliantUnitsOffsetInt(
+						vecTimes.m_units,
+						(int)(vecTimeInt64[2*t+tb]));
+				}
+
+#if defined(ROUND_TIMES_TO_NEAREST_MINUTE)
+				time.RoundToNearestMinute();
+#endif
+				if (tb == 0) {
+					prTimeBound.first = time;
+				} else {
+					prTimeBound.second = time;
+				}
+			}
+
+			vecTimes.m_vecTimeBounds.push_back(prTimeBound);
+		}
 	}
 }
 
