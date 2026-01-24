@@ -32,6 +32,9 @@ if(DEFINED TEMPEST_NOREGEX)
   add_compile_definitions(TEMPEST_NOREGEX)
 endif()
 
+option(STITCHBLOBS_MPI_DEBUG "Enable StitchBlobs MPI debug helpers" OFF)
+
+
 if(WIN32)
   add_compile_definitions(_USE_MATH_DEFINES 1)
 endif()
