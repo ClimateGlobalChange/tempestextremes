@@ -310,16 +310,42 @@ void CopyNcVarAttributes(
 				varIn->name(), att->name());
 		}
 
-		// Do not copy over _FillValue or missing_value if input/output
-		// variable types are different
+		// Do not copy over _FillValue or missing_value if already present in output
+		// If output type is float or double then rescale _FillValue or missing_value
 		if ((strAttName == "_FillValue") || (strAttName == "missing_value")) {
-			if (varIn->type() != varOut->type()) {
-				continue;
-			}
 			if (varOut->get_att("_FillValue") != NULL) {
 				continue;
 			}
 			if (varOut->get_att("missing_value") != NULL) {
+				continue;
+			}
+			if (varIn->type() != varOut->type()) {
+				NcAtt * attScaleFactor = varIn->get_att("scale_factor");
+				NcAtt * attAddOffset = varIn->get_att("add_offset");
+				if (varOut->type() == ncDouble) {
+					double dFillValue = varIn->as_double(0);
+					if (attScaleFactor != NULL) {
+						double dScaleFactor = attScaleFactor->as_double(0);
+						dFillValue *= dScaleFactor;
+					}
+					if (attAddOffset != NULL) {
+						double dAddOffset = attAddOffset->as_double(0);
+						dFillValue += dAddOffset;
+					}
+					varOut->add_att(strAttName.c_str(), dFillValue);
+				}
+				if (varOut->type() == ncFloat) {
+					float dFillValue = varIn->as_double(0);
+					if (attScaleFactor != NULL) {
+						float dScaleFactor = attScaleFactor->as_float(0);
+						dFillValue *= dScaleFactor;
+					}
+					if (attAddOffset != NULL) {
+						float dAddOffset = attAddOffset->as_float(0);
+						dFillValue += dAddOffset;
+					}
+					varOut->add_att(strAttName.c_str(), dFillValue);
+				}
 				continue;
 			}
 		}
