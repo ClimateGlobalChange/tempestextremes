@@ -18,7 +18,7 @@ INSTALL_PREFIX=""             # Specify the installation directory.
                               # and final executables will be installed in TEMPEST_EXTREMES_SOURCE_DIR/bin.
 
 # Developer Configuration Options
-STITCHBLOBS_MPI_DEBUG="ON"   # "ON" or "OFF" (enables extra MPI debug helpers in StitchBlobs)
+STITCHBLOBS_MPI_DEBUG="OFF"   # "ON" or "OFF" (enables extra MPI debug helpers in StitchBlobs)
 
 
 ./remove_depend.sh
