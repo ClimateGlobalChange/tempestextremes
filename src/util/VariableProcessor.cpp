@@ -520,6 +520,8 @@ try {
 					CopyNcVarAttributes(ncvarIn, vecNcVarOut[v], vecDoNotCopyNames);
 				}
 				vecNcVarOutWroteUnits[v] = true;
+			} else {
+				vecNcVarOut[v]->add_att("_FillValue", DataOp::DefaultFillValue);
 			}
 		}
 
