@@ -1713,6 +1713,8 @@ bool DataOp_POW::Apply(
 			m_strName.c_str(), strArg.size());
 	}
 
+	dataout.SetFillValue(DefaultFillValue);
+
 	if ((vecArgData[0] == NULL) && (vecArgData[1] == NULL)) {
 		float dValue = atof(strArg[0].c_str());
 		float dExponent = atof(strArg[1].c_str());
@@ -1725,7 +1727,11 @@ bool DataOp_POW::Apply(
 		const DataArray1D<float> & data = *(vecArgData[1]);
 
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = pow(dValue, data[i]);
+			if (data.HasFillValue() && (data[i] == data.GetFillValue())) {
+				dataout[i] = dataout.GetFillValue();
+			} else {
+				dataout[i] = pow(dValue, data[i]);
+			}
 		}
 
 	} else if ((vecArgData[0] != NULL) && (vecArgData[1] == NULL)) {
@@ -1733,7 +1739,11 @@ bool DataOp_POW::Apply(
 		float dExponent = atof(strArg[1].c_str());
 
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = pow(data[i],dExponent);
+			if (data.HasFillValue() && (data[i] == data.GetFillValue())) {
+				dataout[i] = dataout.GetFillValue();
+			} else {
+				dataout[i] = pow(data[i],dExponent);
+			}
 		}
 
 	} else if ((vecArgData[0] != NULL) && (vecArgData[1] == NULL)) {
@@ -1741,7 +1751,13 @@ bool DataOp_POW::Apply(
 		const DataArray1D<float> & dataExponent = *(vecArgData[1]);
 
 		for (int i = 0; i < dataout.GetRows(); i++) {
-			dataout[i] = pow(dataValue[i],dataExponent[i]);
+			if ((dataValue.HasFillValue() && (dataValue[i] == dataValue.GetFillValue())) ||
+			    (dataExponent.HasFillValue() && (dataExponent[i] == dataExponent.GetFillValue()))
+			) {
+				dataout[i] = dataout.GetFillValue();
+			} else {
+				dataout[i] = pow(dataValue[i],dataExponent[i]);
+			}
 		}
 	
 	} else {
