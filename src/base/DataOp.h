@@ -73,9 +73,9 @@ class DataOp {
 
 public:
 	///	<summary>
-	///		Default FillValue.
+	///		Default FillValue. We use the same value here as NumPy.
 	///	</summary>
-	constexpr static const float DefaultFillValue = std::numeric_limits<float>::max();
+	constexpr static const float DefaultFillValue = 1.0e20f;
 
 public:
 	///	<summary>
