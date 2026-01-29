@@ -1059,7 +1059,7 @@ bool DataOp_PROD::Apply(
 			const DataArray1D<float> & data  = *(vecArgData[v]);
 			for (int i = 0; i < dataout.GetRows(); i++) {
 				if (std::isnan(data[i]) ||
-				    (data[i] == data.GetFillValue()) ||
+				    (data.HasFillValue() && (data[i] == data.GetFillValue())) ||
 				    (dataout[i] == dataout.GetFillValue())
 				) {
 					dataout[i] = dataout.GetFillValue();
