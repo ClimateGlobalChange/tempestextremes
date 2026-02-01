@@ -74,6 +74,9 @@ try {
 	// Connectivity
 	std::string strConnectivity;
 
+	// Grid file
+	std::string strGridFile;
+
 	// Data is regional
 	bool fRegional;
 
@@ -128,6 +131,7 @@ try {
 		CommandLineString(strInputDataList, "in_data_list", "");
 		CommandLineString(strOutputData, "out_data", "");
 		CommandLineString(strConnectivity, "in_connect", "");
+		CommandLineString(strGridFile, "in_grid", "");
 		CommandLineBool(fRegional, "regional");
 		CommandLineBool(fMissingData, "missingdata");
 		CommandLineString(strStartTime, "time_start", "");
@@ -265,13 +269,17 @@ try {
 		AnnounceStartBlock("No connectivity file specified");
 		Announce("Attempting to generate latitude-longitude grid from data file");
 
-		// Load in file vector
-		NcFileVector vecNcFiles;
-		vecNcFiles.ParseFromString(vecInputFiles[0]);
-		_ASSERT(vecNcFiles.size() > 0);
+		// Get the list of data files
+		NcFileVector vecFiles;
+		if (strGridFile == "") {
+			vecFiles.ParseFromString(vecInputFiles[0]);
+		} else {
+			vecFiles.ParseFromString(strGridFile);
+		}
+		_ASSERT(vecFiles.size() > 0);
 
 		grid.GenerateLatitudeLongitude(
-			vecNcFiles[0],
+			vecFiles[0],
 			strLatitudeName,
 			strLongitudeName,
 			fRegional,
