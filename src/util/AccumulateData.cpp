@@ -338,17 +338,18 @@ try {
 			NcAtt * attScaleFactor = var->get_att("scale_factor");
 			if (attScaleFactor != NULL) {
 				dScaleFactor = attScaleFactor->as_float(0);
+				if (fHasFillValue) {
+					dFillValue *= dScaleFactor;
+				}
 			}
 			NcAtt * attAddOffset = var->get_att("add_offset");
 			if (attAddOffset != NULL) {
 				dAddOffset = attAddOffset->as_float(0);
+				if (fHasFillValue) {
+					dFillValue += dAddOffset;
+				}
 			}
 
-			// Apply scale_factor and add_offset to _FillValue
-			if (fHasFillValue) {
-				dFillValue = dFillValue * dScaleFactor + dAddOffset;
-			}
-	
 			// Allocate space for accumulation
 			if (f == 0) {
 				vecSize.resize(var->num_dims());
@@ -551,9 +552,17 @@ try {
 				}
 	
 				if (m_eAccumOp == AccumulateDataOp_Min) {
-					varout->add_att("_FillValue", std::numeric_limits<float>::max());
+					if (fMissingData && fHasFillValue) {
+						varout->add_att("_FillValue", dFillValue);
+					} else {
+						varout->add_att("_FillValue", std::numeric_limits<float>::max());
+					}
 				} else if (m_eAccumOp == AccumulateDataOp_Max) {
-					varout->add_att("_FillValue", -std::numeric_limits<float>::max());
+					if (fMissingData && fHasFillValue) {
+						varout->add_att("_FillValue", dFillValue);
+					} else {
+						varout->add_att("_FillValue", -std::numeric_limits<float>::max());
+					}
 				} else {
 					if (fHasFillValue) {
 						varout->add_att("_FillValue", dFillValue);
