@@ -323,7 +323,7 @@ void CopyNcVarAttributes(
 				NcAtt * attScaleFactor = varIn->get_att("scale_factor");
 				NcAtt * attAddOffset = varIn->get_att("add_offset");
 				if (varOut->type() == ncDouble) {
-					double dFillValue = varIn->as_double(0);
+					double dFillValue = att->as_double(0);
 					if (attScaleFactor != NULL) {
 						double dScaleFactor = attScaleFactor->as_double(0);
 						dFillValue *= dScaleFactor;
@@ -335,7 +335,7 @@ void CopyNcVarAttributes(
 					varOut->add_att(strAttName.c_str(), dFillValue);
 				}
 				if (varOut->type() == ncFloat) {
-					float dFillValue = varIn->as_double(0);
+					float dFillValue = att->as_double(0);
 					if (attScaleFactor != NULL) {
 						float dScaleFactor = attScaleFactor->as_float(0);
 						dFillValue *= dScaleFactor;
