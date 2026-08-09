@@ -1587,6 +1587,32 @@ NcBool NcVar::sync(void)
 	return TRUE;
 }
 
+std::vector<size_t> NcVar::get_chunk_size() {
+	int storage;
+	size_t chunksizesarr[NC_MAX_VAR_DIMS];
+
+	if (NcError::set_err( nc_inq_var_chunking(the_file->id(), the_id, &storage, chunksizesarr)) != NC_NOERR) {
+		return std::vector<size_t>();
+	}
+
+	if (storage != NC_CHUNKED) {
+		return std::vector<size_t>();
+	} else {
+		std::vector<size_t> vecChunkSizes(num_dims());
+		for (int d = 0; d < num_dims(); d++) {
+			vecChunkSizes[d] = chunksizesarr[d];
+		}
+		return vecChunkSizes;
+	}
+}
+
+void NcVar::set_chunk_size( const size_t* chunk_size ) {
+	NcError::set_err( nc_def_var_chunking(the_file->id(), the_id, NC_CHUNKED, chunk_size));
+}
+
+void NcVar::set_chunk_size( const std::vector<size_t> & chunk_size ) {
+	NcError::set_err( nc_def_var_chunking(the_file->id(), the_id, NC_CHUNKED, &(chunk_size[0])));
+}
 
 NcVar::NcVar(NcFile* nc, int id)
 	: NcTypedComponent(nc), the_id(id)

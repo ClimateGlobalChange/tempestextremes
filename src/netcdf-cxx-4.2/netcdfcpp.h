@@ -12,6 +12,7 @@
 
 // arrays that know their element type
 #include "ncvalues.h"
+#include <vector>
 
 typedef const char * NcToken;   // names for netCDF objects
 typedef unsigned int NcBool;    // many members return 0 on failure
@@ -446,6 +447,11 @@ public:
 
 	int id( void ) const;   // rarely needed, C interface id
 	NcBool sync( void );
+
+	// Chunking commands
+	std::vector<size_t> get_chunk_size();
+	void set_chunk_size( const size_t* chunk_size );
+	void set_chunk_size( const std::vector<size_t> & chunk_size );
 
 private:
 	int dim_to_index(NcDim* rdim);
