@@ -721,11 +721,6 @@ try {
 	Announce(e.ToString().c_str());
 }
 
-#if defined(TEMPEST_MPIOMP)
-	// Deinitialize MPI
-	MPI_Finalize();
-#endif
-
 }
 
 ///////////////////////////////////////////////////////////////////////////////
