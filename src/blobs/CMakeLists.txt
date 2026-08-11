@@ -17,7 +17,9 @@ list(APPEND PERSISTENT_BLOBS_FILES
 
 list(APPEND STITCH_BLOBS_FILES
   StitchBlobs.cpp
+  StitchBlobsMPIUtilities.h
 )
+
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
@@ -39,6 +41,13 @@ target_link_libraries(PersistentBlobs PUBLIC extremesbase netcdf_c++ ${MPI_CXX_L
 
 add_executable(StitchBlobs ${STITCH_BLOBS_FILES})
 target_link_libraries(StitchBlobs PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
+
+if(STITCHBLOBS_MPI_DEBUG)
+  target_compile_definitions(StitchBlobs PRIVATE STITCHBLOBS_MPI_DEBUG=1)
+else()
+  target_compile_definitions(StitchBlobs PRIVATE STITCHBLOBS_MPI_DEBUG=0)
+endif()
+
 
 # Install executables to the "bin" directory under the installation prefix.
 install(
