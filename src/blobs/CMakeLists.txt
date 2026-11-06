@@ -48,9 +48,13 @@ else()
   target_compile_definitions(StitchBlobs PRIVATE STITCHBLOBS_MPI_DEBUG=0)
 endif()
 
+add_executable(StitchBlobsNodeEstimator StitchBlobsNodeEstimator.cpp)
+target_link_libraries(StitchBlobsNodeEstimator PUBLIC netcdf_c++)
+
 
 # Install executables to the "bin" directory under the installation prefix.
 install(
-  TARGETS BlobStats DetectBlobs PersistentBlobs StitchBlobs
+  TARGETS BlobStats DetectBlobs PersistentBlobs StitchBlobs StitchBlobsNodeEstimator
   RUNTIME DESTINATION bin
 )
+install(PROGRAMS stitchblobs_suggest_nodes.sh DESTINATION bin)
