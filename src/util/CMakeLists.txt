@@ -51,6 +51,10 @@ list(APPEND VARIABLE_PROCESSOR_FILES
   VariableProcessor.cpp
 )
 
+list(APPEND CALCULATE_IDF_FILES
+  CalculateIDF.cpp
+)
+
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/../base
@@ -96,6 +100,9 @@ target_link_libraries(ShapefileMask PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIB
 add_executable(VariableProcessor ${VARIABLE_PROCESSOR_FILES})
 target_link_libraries(VariableProcessor PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
 
+add_executable(CalculateIDF ${CALCULATE_IDF_FILES})
+target_link_libraries(CalculateIDF PUBLIC extremesbase netcdf_c++ ${MPI_CXX_LIBRARIES})
+
 install(
   TARGETS
     AccumulateData
@@ -110,6 +117,7 @@ install(
     QuantileCalculator
     ShapefileMask
     VariableProcessor
+    CalculateIDF
   RUNTIME DESTINATION bin
 )
 
