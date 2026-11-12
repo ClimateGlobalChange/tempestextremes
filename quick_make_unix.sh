@@ -17,6 +17,10 @@ INSTALL_PREFIX=""             # Specify the installation directory.
                               # If left blank, it defaults to the project root (TEMPEST_EXTREMES_SOURCE_DIR)
                               # and final executables will be installed in TEMPEST_EXTREMES_SOURCE_DIR/bin.
 
+# Developer Configuration Options
+STITCHBLOBS_MPI_DEBUG="OFF"   # "ON" or "OFF" (enables extra MPI debug helpers in StitchBlobs)
+
+
 ./remove_depend.sh
 
 
@@ -123,6 +127,7 @@ cmake_args=(
   -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
   -DCMAKE_CXX_FLAGS_DEBUG="${OPTIMIZATION_LEVEL} ${DEBUG_FLAGS}"
   -DENABLE_MPI="${ENABLE_MPI}"
+  -DSTITCHBLOBS_MPI_DEBUG="${STITCHBLOBS_MPI_DEBUG}"
   -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}"
 )
 
